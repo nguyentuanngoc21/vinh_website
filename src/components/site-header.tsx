@@ -1,0 +1,58 @@
+import Link from "next/link";
+import { MagnifyingGlassIcon, BookmarkSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import { NavStripLinks } from "@/components/nav-strip-links";
+import { AuthCluster } from "@/components/auth-cluster";
+
+type SiteHeaderProps = {
+  /** Home renders the nav strip itself, further down the page. */
+  showNav?: boolean;
+  /** Kết nối has its own people search field; the generic one would duplicate it. */
+  showSearch?: boolean;
+  searchPlaceholder?: string;
+  ctaLabel?: string;
+};
+
+export function SiteHeader({
+  showNav = true,
+  showSearch = true,
+  searchPlaceholder = "Tìm truyện, tác giả…",
+  ctaLabel = "Viết truyện",
+}: SiteHeaderProps = {}) {
+  return (
+    <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-11 py-4 backdrop-blur">
+      <Link href="/" className="flex shrink-0 items-center gap-[9px] no-underline">
+        <svg width="34" height="34" viewBox="0 0 100 100" className="shrink-0">
+          <circle cx="50" cy="50" r="48" fill="var(--color-brand-ink)" />
+          <path
+            d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
+            fill="#fff"
+          />
+          <circle cx="44" cy="24" r="3" fill="var(--color-brand-ink)" />
+        </svg>
+        <span className="text-[27px] font-extrabold tracking-[-0.5px] text-brand-ink">
+          Vịnh
+        </span>
+      </Link>
+
+      {showNav && (
+        <div className="order-3 -mx-11 -mb-4 flex min-w-0 flex-[0_0_calc(100%+88px)] gap-5 overflow-x-auto overflow-y-hidden bg-brand-ink px-11 py-[13px] text-[15px] font-medium [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <NavStripLinks />
+        </div>
+      )}
+
+      <div className="flex shrink-0 items-center gap-3.5">
+        {showSearch && (
+          <div className="hidden w-[240px] items-center gap-2 rounded-full bg-neutral-bg px-4 py-2.5 text-sm text-[#9a9a9a] lg:flex">
+            <MagnifyingGlassIcon size={16} />
+            {searchPlaceholder}
+          </div>
+        )}
+        <BookmarkSimpleIcon
+          size={21}
+          className="cursor-default text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
+        />
+        <AuthCluster ctaLabel={ctaLabel} />
+      </div>
+    </header>
+  );
+}

@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — single source of truth for the Vịnh palette.
+ * Change a value here and every bg-, text-, border-, and fill- utility
+ * (and every var(--color-*) reference in raw SVG/style props) updates
+ * everywhere at once. Tailwind v4 auto-generates utilities from any
+ * --color-* variable declared in @theme, e.g. --color-brand-ink below
+ * gives you bg-brand-ink, text-brand-ink, border-brand-ink, fill-brand-ink,
+ * and opacity modifiers like bg-brand-ink/40, for free.
+ *
+ * Naming: brand-* = identity (logo, primary CTA). ink/stone/slate/cream =
+ * neutrals for text and surfaces. success/info = status colors. chart-* =
+ * categorical data-viz palette (admin dashboards) — intentionally varied
+ * hues, don't consolidate these.
+ *
+ * Known duplicates kept separate on purpose (see REVIEW.md "Cleanup
+ * candidates"): stone vs stone-alt, and the cream-* family, are near-
+ * identical values used inconsistently across the original components.
+ * They're tokenized as-is so nothing visually shifts; unify them once a
+ * designer confirms which one is "correct".
+ */
+@theme inline {
+  --font-sans: var(--font-be-vietnam-pro);
+
+  /* Brand identity */
+  --color-brand-ink: #143b4d;
+  --color-brand-ink-dark: #0f2e3d;
+  --color-brand-gold: #d9a441;
+  --color-brand-gold-light: #e9c074;
+  --color-brand-gold-dark: #a9781a;
+
+  /* Neutrals — text */
+  --color-ink: #15110f;
+  --color-stone: #8a8178;
+  --color-stone-alt: #8a8278;
+  --color-stone-light: #a09689;
+  --color-stone-dark: #6f665c;
+  --color-slate: #41525c;
+
+  /* Neutrals — surfaces & borders */
+  --color-cream: #eceae7;
+  --color-cream-card: #fbf7ec;
+  --color-cream-card-alt: #f4efe4;
+  --color-cream-border: #e2d9c8;
+  --color-border-light: #dcd7d0;
+  --color-neutral-bg: #f4f4f5;
+
+  /* Status */
+  --color-success: #1f8a6b;
+  --color-info: #2563a8;
+  --color-info-bg: #eaf0f2;
+
+  /* Admin sidebar (dark surface) text */
+  --color-sidebar-text: #cdd9de;
+  --color-sidebar-text-dim: #8fa3ad;
+  --color-sidebar-text-dim-2: #9fbac6;
+
+  /* Chart / data-viz categorical palette */
+  --color-chart-indigo: #4338ca;
+  --color-chart-teal: #0e7490;
+  --color-chart-pink: #9d174d;
+  --color-chart-cyan: #0891b2;
+  --color-chart-amber: #b45309;
+  --color-chart-purple: #7c3aed;
+  --color-chart-rose: #db2777;
+  --color-chart-orange: #9a3412;
+  --color-chart-green: #16a34a;
+  --color-chart-teal-dark: #115e59;
+  --color-chart-teal-2: #0d9488;
+}
+
+body {
+  font-family: var(--font-sans), sans-serif;
+}
+
+@keyframes vn-drift {
+  0% {
+    transform: rotate(-24deg) translate(0, 0);
+  }
+  50% {
+    transform: rotate(-24deg) translate(26px, -30px);
+  }
+  100% {
+    transform: rotate(-24deg) translate(0, 0);
+  }
+}
