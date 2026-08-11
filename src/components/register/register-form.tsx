@@ -13,16 +13,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
-
-const SCORE_COLORS = ["#e2e0dc", "#B02A37", "#D98B41", "#C9A83A", "#2F7A4F"];
-const SCORE_LABELS = ["", "Yếu — nên thêm chữ số và ký tự đặc biệt", "Trung bình", "Khá tốt", "Mạnh"];
-
-function passwordScore(pw: string): number {
-  if (pw.length === 0) return 0;
-  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((r) => r.test(pw)).length;
-  const base = pw.length >= 12 ? 2 : pw.length >= 8 ? 1 : 0;
-  return Math.min(4, Math.max(1, base + classes - 1));
-}
+import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/lib/password-strength";
 
 type SlotKey = "front" | "back";
 
@@ -180,7 +171,7 @@ export function RegisterForm() {
               {[0, 1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  style={{ background: i < score ? SCORE_COLORS[score] : "#efedea" }}
+                  style={{ background: i < score ? PASSWORD_SCORE_COLORS[score] : "#efedea" }}
                   className="h-1 flex-1 rounded-full transition-colors"
                 />
               ))}
@@ -189,7 +180,7 @@ export function RegisterForm() {
               style={{ color: score >= 3 ? "#2F7A4F" : "var(--color-stone-light)" }}
               className="mt-1.5 text-xs"
             >
-              {SCORE_LABELS[score] || "Ít nhất 8 ký tự"}
+              {PASSWORD_SCORE_LABELS[score] || "Ít nhất 8 ký tự"}
             </div>
           </div>
           <Field

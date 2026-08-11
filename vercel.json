@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/wallet/cron/settle-pending",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

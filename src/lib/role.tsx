@@ -5,6 +5,7 @@ import {
   login as loginRequest,
   logout as logoutRequest,
   register as registerRequest,
+  resetPassword as resetPasswordRequest,
   type RegisterPayload,
   type Session,
 } from "@/lib/auth";
@@ -20,6 +21,7 @@ type RoleContextValue = {
   isAdmin: boolean;
   login: (email: string, password: string, remember: boolean) => Promise<AuthOutcome>;
   register: (payload: RegisterPayload) => Promise<AuthOutcome>;
+  resetPassword: (password: string) => Promise<AuthOutcome>;
   logout: () => void;
 };
 
@@ -94,6 +96,16 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     return { ok: true as const };
   }, []);
 
+  // Reached only after the recovery-link session is already in place (see
+  // /api/auth/confirm); a successful reset signs the user straight in,
+  // same "remember by default" treatment as a fresh registration.
+  const resetPassword = useCallback(async (password: string) => {
+    const result = await resetPasswordRequest(password);
+    if (!result.ok) return result;
+    writeSession(result.session, true);
+    return { ok: true as const };
+  }, []);
+
   const logout = useCallback(() => {
     // Fire-and-forget: clear the server cookie without blocking the UI,
     // which flips to signed-out the moment writeSession(null, …) runs.
@@ -110,6 +122,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         isAdmin: session?.role === "admin",
         login,
         register,
+        resetPassword,
         logout,
       }}
     >

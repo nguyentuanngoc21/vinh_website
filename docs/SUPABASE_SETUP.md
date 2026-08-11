@@ -110,7 +110,39 @@ const { data: { user } } = await supabase.auth.getUser();
 Không bắt buộc làm ngay — hệ thống cookie tự ký hiện tại vẫn an toàn và
 độc lập, gộp lại chỉ để giảm phức tạp về lâu dài.
 
-## 5. Ảnh CCCD — lưu ý bắt buộc
+## 5. Quên mật khẩu / đặt lại mật khẩu
+
+Luồng đã code sẵn (3 route + 2 trang), nhưng **cần cấu hình 1 chỗ trên
+Supabase Dashboard trước khi chạy được**, nếu không `resetPasswordForEmail`
+sẽ âm thầm rớt `redirectTo` về Site URL mặc định:
+
+1. Vào **Authentication → URL Configuration → Redirect URLs**, thêm:
+   - `http://localhost:3000/api/auth/confirm` (dev)
+   - `https://<domain-thật>/api/auth/confirm` (production)
+2. Email template "Reset Password" mặc định của Supabase đã dùng đúng biến
+   `{{ .ConfirmationURL }}` nối với `redirectTo` ở trên — không cần sửa gì
+   thêm để chạy thử. Muốn email trông giống gửi từ Vịnh (nội dung + tên
+   người gửi) thay vì mặc định của Supabase, xem
+   [`docs/supabase/email-templates/`](./supabase/email-templates/README.md)
+   — có sẵn file HTML để dán vào Dashboard và hướng dẫn cấu hình SMTP riêng.
+
+Luồng hoạt động (xem comment trong từng file để biết lý do từng bước):
+
+```
+/quen-mat-khau (form nhập email)
+  → POST /api/auth/forgot-password → supabase.auth.resetPasswordForEmail()
+  → email tới người dùng, link trỏ tới /api/auth/confirm?code=...&next=/dat-lai-mat-khau
+  → GET /api/auth/confirm → exchangeCodeForSession(code) → set cookie sb-* → redirect
+/dat-lai-mat-khau (form mật khẩu mới)
+  → POST /api/auth/reset-password → supabase.auth.updateUser({ password })
+  → set lại cookie vinh_session → đăng nhập luôn, redirect về "/"
+```
+
+Route `/api/auth/forgot-password` luôn trả về cùng một thông báo thành công
+chung chung dù email có tồn tại hay không (giống hành vi mặc định của
+`resetPasswordForEmail`) — tránh lộ thông tin email nào đã đăng ký.
+
+## 6. Ảnh CCCD — lưu ý bắt buộc
 
 - Bucket `identity-documents` đã được tạo **private** trong schema — không
   đổi thành public.

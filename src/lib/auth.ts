@@ -88,6 +88,65 @@ export async function register(payload: RegisterPayload): Promise<AuthResult> {
 }
 
 /**
+ * Calls POST /api/auth/forgot-password. Always resolves `ok: true` on a
+ * well-formed request — the backend deliberately returns the same generic
+ * message whether or not the email is registered (see that route), so
+ * there is nothing more specific to surface here either.
+ */
+export async function requestPasswordReset(email: string): Promise<AuthResult | { ok: true; message: string }> {
+  let res: Response;
+  try {
+    res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    return { ok: false, error: "Không thể kết nối máy chủ. Vui lòng thử lại sau." };
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    return {
+      ok: false,
+      error: (data && typeof data.error === "string" && data.error) || "Có lỗi xảy ra. Vui lòng thử lại.",
+    };
+  }
+
+  return { ok: true, message: data.message as string };
+}
+
+/**
+ * Calls POST /api/auth/reset-password — the final step of the forgot-
+ * password flow, after the user followed the emailed link (which
+ * establishes the recovery session /api/auth/confirm sets up). Returns a
+ * full Session on success, same shape as login/register, since the backend
+ * signs the user in immediately.
+ */
+export async function resetPassword(password: string): Promise<AuthResult> {
+  let res: Response;
+  try {
+    res = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+  } catch {
+    return { ok: false, error: "Không thể kết nối máy chủ. Vui lòng thử lại sau." };
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    return {
+      ok: false,
+      error: (data && typeof data.error === "string" && data.error) || "Đặt lại mật khẩu thất bại. Vui lòng thử lại.",
+    };
+  }
+
+  return { ok: true, session: data as Session };
+}
+
+/**
  * Clears the server-side session cookie. Best-effort: logout should still
  * clear the client-side session (localStorage/sessionStorage, in role.tsx)
  * even if this request fails, so it's never awaited from a place that

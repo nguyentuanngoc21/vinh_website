@@ -57,10 +57,12 @@ export function LoginForm() {
         <div>
           <div className="mb-[7px] flex items-center justify-between">
             <span className="text-[13px] font-semibold text-slate">Mật khẩu</span>
-            {/* No "quên mật khẩu" flow yet — inert, same treatment as other not-yet-built links. */}
-            <span className="cursor-default text-[12.5px] font-medium text-brand-gold-dark">
+            <Link
+              href="/quen-mat-khau"
+              className="text-[12.5px] font-medium text-brand-gold-dark hover:text-brand-gold"
+            >
               Quên mật khẩu?
-            </span>
+            </Link>
           </div>
           <Field
             label={null}

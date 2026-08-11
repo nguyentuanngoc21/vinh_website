@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CoinsIcon } from "@phosphor-icons/react/dist/ssr";
 import { TOKEN_LOGS, DEFAULT_TOKEN_BALANCE } from "@/lib/profile";
 import { Field, Button } from "@/components/ui";
@@ -67,9 +68,12 @@ export function EditProfileTab({
           <div className="mt-2.5 text-[13px] leading-[1.6] text-sidebar-text-dim-2">
             Dùng để mở chương sớm, tặng tác giả và mua ảnh bìa trong thư viện thiết kế.
           </div>
-          <Button type="button" className="mt-4 w-auto items-center gap-2 px-5 py-2.5 text-[13.5px] font-semibold">
+          <Link
+            href="/ca-nhan/nap-token"
+            className="mt-4 flex w-auto items-center justify-center gap-2 rounded-[10px] bg-brand-gold px-5 py-2.5 text-[13.5px] font-semibold text-brand-ink no-underline transition-transform active:scale-[.99]"
+          >
             <CoinsIcon weight="fill" size={16} /> Nạp thêm token
-          </Button>
+          </Link>
         </div>
         <div className="rounded-[18px] border border-cream p-5">
           <div className="mb-3 text-[13px] font-semibold text-ink">

@@ -21,7 +21,18 @@ export type TransactionType =
   | "topup"
   | "refund"
   | "admin_adjustment"
-  | "screenshot_penalty";
+  | "screenshot_penalty"
+  // Added by migrations/20260807_wallet_ledger_extension.sql.
+  | "purchase_credit" // author's revenue-share leg of a purchase_chapter debit — starts 'pending'
+  | "withdrawal"
+  | "platform_bonus";
+
+// See migrations/20260807_wallet_ledger_extension.sql part 2. Every row
+// created before that migration is 'completed' by default (backfilled).
+export type TransactionStatus = "pending" | "processing" | "available" | "completed" | "failed" | "reversed";
+
+export type DepositStatus = "pending" | "success" | "failed";
+export type WithdrawalStatus = "pending" | "processing" | "success" | "failed";
 
 export type Database = {
   public: {
@@ -41,6 +52,10 @@ export type Database = {
           cccd_last4: string | null; // last 4 digits only — see schema.sql note
           cccd_verified: boolean;
           token_balance: number;
+          // Author revenue-share still inside its hold period — see
+          // migrations/20260807_wallet_ledger_extension.sql part 1.
+          // Visible to the user, not spendable/withdrawable yet.
+          token_balance_pending: number;
           screenshot_penalty_count: number;
           screenshot_penalty_expires_at: string | null;
           screenshot_penalty_banned: boolean;
@@ -59,6 +74,7 @@ export type Database = {
           cccd_last4?: string | null;
           cccd_verified?: boolean;
           token_balance?: number;
+          token_balance_pending?: number;
           screenshot_penalty_count?: number;
           screenshot_penalty_expires_at?: string | null;
           screenshot_penalty_banned?: boolean;
@@ -149,6 +165,12 @@ export type Database = {
           amount: number;
           penalty_percent: number;
           balance_after: number;
+          // Snapshot of token_balance_pending after this op; null unless
+          // status = 'pending'. See wallet_ledger_extension.sql part 2.
+          pending_balance_after: number | null;
+          status: TransactionStatus;
+          available_at: string | null;
+          related_transaction_id: string | null;
           reference_type: string | null;
           reference_id: string | null;
           created_at: string;
@@ -159,6 +181,108 @@ export type Database = {
         // the field) because @supabase/postgrest-js's GenericTable type
         // requires Insert to be present — omitting it entirely breaks
         // type inference for EVERY table in the schema, not just this one.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      deposit_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          payment_gateway: string;
+          gateway_order_id: string;
+          amount_vnd: number;
+          token_amount: number;
+          status: DepositStatus;
+          raw_payload: Record<string, unknown> | null;
+          transaction_id: string | null;
+          created_at: string;
+          processed_at: string | null;
+        };
+        // Written only by the service-role client (deposit-service.ts) —
+        // never through the RLS-checked client (no insert/update policy
+        // exists on this table, see schema.sql part 6c), but it IS a
+        // direct table insert/update rather than an RPC, unlike the other
+        // wallet tables below, so (unlike those) this needs real shapes.
+        Insert: {
+          id?: string;
+          user_id: string;
+          payment_gateway: string;
+          gateway_order_id: string;
+          amount_vnd: number;
+          token_amount: number;
+          status?: DepositStatus;
+          raw_payload?: Record<string, unknown> | null;
+        };
+        Update: {
+          status?: DepositStatus;
+          transaction_id?: string | null;
+          processed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      withdrawal_requests: {
+        Row: {
+          id: string;
+          user_id: string;
+          amount_tokens: number;
+          amount_vnd: number;
+          bank_account_number: string;
+          bank_account_name: string;
+          bank_code: string;
+          status: WithdrawalStatus;
+          payout_gateway_ref: string | null;
+          failure_reason: string | null;
+          transaction_id: string;
+          refund_transaction_id: string | null;
+          created_at: string;
+          processed_at: string | null;
+        };
+        // Rows are only created via create_withdrawal_request() and
+        // updated via mark_withdrawal_result() — see withdrawal-service.ts.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      purchase_transactions: {
+        Row: {
+          id: string;
+          buyer_id: string;
+          author_id: string;
+          chapter_id: string;
+          amount: number;
+          author_share: number;
+          platform_share: number;
+          debit_transaction_id: string;
+          credit_transaction_id: string;
+          created_at: string;
+        };
+        // Rows are only created via create_purchase() — see LedgerService.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      platform_revenue_entries: {
+        Row: {
+          id: string;
+          purchase_transaction_id: string;
+          amount: number;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      platform_bonus_grants: {
+        Row: {
+          id: string;
+          transaction_id: string;
+          recipient_id: string;
+          granted_by: string;
+          reason: string;
+          created_at: string;
+        };
+        // Rows are only created via grant_platform_bonus() — see LedgerService.
         Insert: never;
         Update: never;
         Relationships: [];
@@ -328,6 +452,61 @@ export type Database = {
           p_reference_type?: string | null;
           p_reference_id?: string | null;
           p_penalty_percent?: number | null;
+          // Added by wallet_ledger_extension.sql — all optional/defaulted,
+          // existing call sites (register, penalty route, claim_daily_task)
+          // omit them and keep working unchanged.
+          p_status?: TransactionStatus | null;
+          p_available_at?: string | null;
+          p_related_transaction_id?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["transactions"]["Row"];
+      };
+      settle_pending_transaction: {
+        Args: { p_transaction_id: string };
+        Returns: Database["public"]["Tables"]["transactions"]["Row"] | null;
+      };
+      settle_due_pending_transactions: {
+        Args: { p_limit?: number | null };
+        Returns: Database["public"]["Tables"]["transactions"]["Row"][];
+      };
+      create_withdrawal_request: {
+        Args: {
+          p_user_id: string;
+          p_amount_tokens: number;
+          p_amount_vnd: number;
+          p_bank_account_number: string;
+          p_bank_account_name: string;
+          p_bank_code: string;
+        };
+        Returns: Database["public"]["Tables"]["withdrawal_requests"]["Row"];
+      };
+      mark_withdrawal_result: {
+        Args: {
+          p_request_id: string;
+          p_success: boolean;
+          p_gateway_ref?: string | null;
+          p_failure_reason?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["withdrawal_requests"]["Row"];
+      };
+      create_purchase: {
+        Args: {
+          p_buyer_id: string;
+          p_author_id: string;
+          p_chapter_id: string;
+          p_amount: number;
+          p_author_share: number;
+          p_platform_share: number;
+          p_hold_days: number;
+        };
+        Returns: Database["public"]["Tables"]["purchase_transactions"]["Row"];
+      };
+      grant_platform_bonus: {
+        Args: {
+          p_admin_id: string;
+          p_recipient_id: string;
+          p_amount: number;
+          p_reason: string;
         };
         Returns: Database["public"]["Tables"]["transactions"]["Row"];
       };

@@ -96,4 +96,7 @@ export const DAILY_TASKS: DailyTask[] = [
 export const DEFAULT_NICKNAME = "Minh Khôi";
 export const DEFAULT_BIO =
   'Người kể chuyện bán thời gian, mê truyện trinh thám và những buổi sáng Hà Nội. Đang viết dở "Vịnh Đêm".';
-export const DEFAULT_TOKEN_BALANCE = "1.240";
+// Numeric source of truth (also used by the token top-up flow, see
+// lib/topup.ts) — the display string below is just it, locale-formatted.
+export const DEFAULT_TOKEN_BALANCE_NUM = 1240;
+export const DEFAULT_TOKEN_BALANCE = DEFAULT_TOKEN_BALANCE_NUM.toLocaleString("vi-VN");
