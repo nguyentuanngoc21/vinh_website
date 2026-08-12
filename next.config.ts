@@ -18,13 +18,23 @@ const nextConfig: NextConfig = {
   // tiếp được các require() ngay trong chính file đó (`require('..')`,
   // `require('./getCore')`,...) — deploy lên Vercel báo
   // "Cannot find module '..'" dù chạy `next dev` bình thường không sao.
-  // Ép include thủ công toàn bộ 2 package OCR cần tới runtime.
+  // Ép include thủ công mọi package mà src/worker-script + src/worker/node
+  // của tesseract.js require() tới (đã grep hết require() không tương đối
+  // trong 2 thư mục đó để chốt danh sách — xem package.json của
+  // tesseract.js để đối chiếu nếu bump version). Bỏ qua idb-keyval (chỉ
+  // dùng ở nhánh browser) và opencollective-postinstall (chỉ chạy lúc cài,
+  // không được require() lúc runtime).
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
   outputFileTracingIncludes: {
     "/api/auth/register": [
       "./node_modules/tesseract.js/**/*",
       "./node_modules/tesseract.js-core/**/*",
       "./node_modules/wasm-feature-detect/**/*",
+      "./node_modules/bmp-js/**/*",
+      "./node_modules/is-url/**/*",
+      "./node_modules/node-fetch/**/*",
+      "./node_modules/regenerator-runtime/**/*",
+      "./node_modules/zlibjs/**/*",
     ],
   },
   images: {
