@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# tesseract.js (src/lib/ocr.ts) caches its Vietnamese language data as a
+# plain file in the working directory on Node — not source, don't commit it
+*.traineddata

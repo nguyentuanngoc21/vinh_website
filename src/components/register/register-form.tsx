@@ -2,11 +2,12 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   EyeIcon,
   EyeSlashIcon,
   ArrowRightIcon,
+  ArrowLeftIcon,
   IdentificationCardIcon,
   CheckCircleIcon,
   InfoIcon,
@@ -18,8 +19,16 @@ import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/l
 type SlotKey = "front" | "back";
 
 export function RegisterForm() {
-  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set by /api/auth/confirm khi link xác nhận đăng ký (trong mail) đã
+  // thiếu/hết hạn/dùng rồi — mirror đúng cách forgot-password-form.tsx xử
+  // lý error=link-het-han.
+  const linkExpired = searchParams.get("error") === "link-het-han";
+
   const { register } = useRole();
+  // Đăng ký xong KHÔNG có session ngay (xem RegisterResult ở lib/auth.ts) —
+  // giữ lại email vừa đăng ký để hiện trong màn "cần xác thực" bên dưới.
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -82,7 +91,7 @@ export function RegisterForm() {
       setError(result.error);
       return;
     }
-    router.push("/");
+    setSubmittedEmail(email.trim());
   };
 
   // pw2 / cccd validation status, computed once and handed to <Field status=…>
@@ -101,6 +110,34 @@ export function RegisterForm() {
         ? ({ tone: "success", message: "Số hợp lệ" } as const)
         : ({ tone: "error", message: `Đã nhập ${cccdDigits.length}/12 chữ số` } as const);
 
+  // Tài khoản đã tạo xong (auth.users + profiles + identity_verifications)
+  // nhưng chưa đăng nhập được — chặn ở đây đúng như forgot-password-form.tsx
+  // chặn sau khi gửi mail, thay vì router.push("/") như trước.
+  if (submittedEmail) {
+    return (
+      <div className="mx-auto w-full max-w-[400px]">
+        <CheckCircleIcon weight="fill" size={40} color="#2F7A4F" />
+        <div className="mt-4 text-[24px] font-bold tracking-[-0.4px] text-brand-ink">
+          Cần bạn xác thực tài khoản
+        </div>
+        <div className="mt-2 text-[14.5px] leading-[1.6] text-stone">
+          Chúng tôi đã gửi một email xác nhận tới{" "}
+          <span className="font-medium text-slate">{submittedEmail}</span>. Bấm vào liên kết
+          trong email đó để hoàn tất đăng ký — tài khoản chỉ dùng được sau khi xác nhận.
+        </div>
+        <div className="mt-3 text-[13px] leading-[1.6] text-stone-light">
+          Không thấy email? Kiểm tra thêm thư mục Spam, hoặc đợi vài phút rồi thử lại.
+        </div>
+        <Link
+          href="/dang-nhap"
+          className="mt-6 flex items-center justify-center gap-[9px] rounded-[10px] border border-brand-ink py-[13px] text-[14.5px] font-semibold text-brand-ink no-underline transition-transform active:scale-[.99]"
+        >
+          <ArrowLeftIcon size={16} /> Quay lại đăng nhập
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="mx-auto w-full max-w-[520px]">
       <div className="text-[30px] font-bold tracking-[-0.6px] text-brand-ink">
@@ -112,6 +149,15 @@ export function RegisterForm() {
           Đăng nhập
         </Link>
       </div>
+
+      {linkExpired && !error && (
+        <div className="mt-4">
+          <Alert tone="error">
+            Liên kết xác nhận đăng ký đã hết hạn hoặc không hợp lệ. Vui lòng điền lại thông tin bên
+            dưới — hệ thống sẽ gửi lại email xác nhận.
+          </Alert>
+        </div>
+      )}
 
       <div className="mb-3.5 mt-[30px] text-[11.5px] font-semibold tracking-[1.3px] text-brand-gold-dark">
         1 · THÔNG TIN TÀI KHOẢN

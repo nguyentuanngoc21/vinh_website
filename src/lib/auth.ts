@@ -20,6 +20,12 @@ export type RegisterPayload = {
   cccdBack: File;
 };
 
+// Khác AuthResult: đăng ký xong KHÔNG có session ngay — tài khoản Supabase
+// đã tạo (auth.users + profiles + identity_verifications) nhưng email chưa
+// xác nhận, nên chưa cho vào app. /api/auth/confirm mới là nơi thực sự
+// đăng nhập, sau khi người dùng bấm link trong mail (xem route đó).
+export type RegisterResult = { ok: true; pendingConfirmation: true } | { ok: false; error: string };
+
 /**
  * Calls the real auth backend at POST /api/auth/login. Wire that route
  * handler up to your database (verify the credentials, look up the user's
@@ -55,8 +61,13 @@ export async function login(email: string, password: string, remember: boolean):
  * handler up to your database (create the user, store the CCCD images
  * securely, verify uniqueness) — sent as multipart form data since it
  * carries the two ID card photos alongside the text fields.
+ *
+ * Returns `pendingConfirmation`, not a `Session` — the backend deliberately
+ * doesn't sign the user in yet (see register/route.ts). They're signed in
+ * for real once they click the emailed confirmation link and land on
+ * /api/auth/confirm.
  */
-export async function register(payload: RegisterPayload): Promise<AuthResult> {
+export async function register(payload: RegisterPayload): Promise<RegisterResult> {
   const body = new FormData();
   body.set("email", payload.email);
   body.set("username", payload.username);
@@ -84,7 +95,7 @@ export async function register(payload: RegisterPayload): Promise<AuthResult> {
     };
   }
 
-  return { ok: true, session: data as Session };
+  return { ok: true, pendingConfirmation: true };
 }
 
 /**

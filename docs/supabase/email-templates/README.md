@@ -46,8 +46,9 @@ Các biến dùng được trong mọi template (không phải chỉ Reset Passw
 `{{ .TokenHash }}`. Chi tiết: [Supabase Auth Email Templates
 docs](https://supabase.com/docs/guides/auth/auth-email-templates).
 
-Muốn brand hoá luôn email "Confirm signup" (email xác nhận khi đăng ký, nếu
-bật "Confirm email" trong Auth settings) thì làm tương tự ở template
-**Confirm signup** — hiện dự án này chưa có file mẫu riêng cho nó vì luồng
-đăng ký hiện dùng `signUp()` không kèm bước xác nhận (xem
-`src/app/api/auth/register/route.ts`); thêm khi cần.
+Email xác nhận đăng ký ("Confirm signup") cũng dùng chung cơ chế trên: mở
+[`confirm-signup.html`](./confirm-signup.html), dán vào Supabase Dashboard →
+**Authentication → Emails → Confirm signup**. Route `signUp()` trong
+`src/app/api/auth/register/route.ts` đã set `emailRedirectTo` trỏ về
+`/api/auth/confirm?next=/` — cùng route xử lý code với luồng quên mật khẩu,
+chỉ khác `next` đích đến sau khi đổi code lấy session.

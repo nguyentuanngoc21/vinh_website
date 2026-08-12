@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Lora } from "next/font/google";
 import Link from "next/link";
 import {
@@ -71,7 +72,9 @@ export default function RegisterPage() {
       </div>
 
       <div className="flex flex-col justify-center p-6 py-10 sm:p-14">
-        <RegisterForm />
+        <Suspense fallback={null}>
+          <RegisterForm />
+        </Suspense>
       </div>
     </div>
   );

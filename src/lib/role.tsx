@@ -88,11 +88,13 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     return { ok: true as const };
   }, []);
 
-  // A freshly registered account is signed in immediately, remembered by default.
+  // Không sign-in ở đây nữa — register/route.ts không trả session, chỉ tạo
+  // tài khoản + gửi mail xác nhận (xem RegisterResult ở lib/auth.ts). Người
+  // dùng chỉ thực sự đăng nhập sau khi bấm link trong mail, qua
+  // /api/auth/confirm (route đó set vinh_session, không phải ở đây).
   const register = useCallback(async (payload: RegisterPayload) => {
     const result = await registerRequest(payload);
     if (!result.ok) return result;
-    writeSession(result.session, true);
     return { ok: true as const };
   }, []);
 

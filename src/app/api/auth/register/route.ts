@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { setSessionCookie } from "@/lib/session";
-import type { Session } from "@/lib/auth";
 import { verifyCccdAgainstImages } from "@/lib/ocr";
 
 export async function POST(request: Request) {
@@ -58,10 +56,22 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
+  const origin = new URL(request.url).origin;
 
+  // emailRedirectTo giống cách forgot-password/route.ts làm cho luồng quên
+  // mật khẩu: không set thì Supabase rơi về Site URL mặc định, link "Xác
+  // nhận đăng ký" trong mail sẽ không chạy qua /api/auth/confirm để đổi
+  // code lấy session — người dùng bấm vào chỉ thấy trang chủ với ?code=...
+  // vô dụng trên URL. flow=signup để /api/auth/confirm biết đây là luồng
+  // đăng ký (khác luồng quên mật khẩu) và thật sự đăng nhập (set
+  // vinh_session) ngay khi đổi code thành công — trước đó tài khoản đã tạo
+  // xong nhưng CHƯA đăng nhập được, xem NextResponse.json ở cuối route này.
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: `${origin}/api/auth/confirm?next=${encodeURIComponent("/")}&flow=signup`,
+    },
   });
   if (authError || !authData.user) {
     return NextResponse.json(
@@ -134,8 +144,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // role mặc định 'user' (xem schema.sql phần 1) — không set ở đây, để
-  // Postgres tự áp default, tránh 1 user tự gửi role khác qua request.
-  const session: Session = { email, name: realname, handle: username, role: "user" };
-  return setSessionCookie(NextResponse.json(session), session, true);
+  // KHÔNG đăng nhập ở đây — tài khoản đã tạo đủ (auth.users + profiles +
+  // identity_verifications) nhưng email chưa xác nhận. Cố tình không set
+  // vinh_session để tránh cho vào app trước khi họ bấm link trong mail.
+  // /api/auth/confirm mới là nơi thật sự đăng nhập, sau khi
+  // exchangeCodeForSession() xác nhận link hợp lệ — xem route đó.
+  return NextResponse.json({ pendingConfirmation: true });
 }
