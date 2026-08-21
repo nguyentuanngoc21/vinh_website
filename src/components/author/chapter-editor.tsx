@@ -1,44 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 import {
   CaretRightIcon,
   CloudCheckIcon,
   QuotesIcon,
-  TextAlignLeftIcon,
   MinusIcon,
-  ImageIcon,
   TextHTwoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Field } from "@/components/ui";
 
-const DRAFT_DEFAULT = `Gió từ vịnh thổi vào, mang theo mùi muối và một thứ im lặng rất cũ. Bà tôi nói biển nhớ tất cả những ai từng ra đi, và cất giữ tên họ dưới đáy nước sâu, nơi không ánh nắng nào với tới.
+type ChapterEditorProps = {
+  bookTitle: string;
+  title: string;
+  onTitleChange: (title: string) => void;
+  content: string;
+  onContentChange: (content: string) => void;
+  savedAt: Date | null;
+};
 
-Đêm ấy không có trăng. Chỉ có ngọn hải đăng ở mũi đất phía tây, cứ mười hai giây lại quét một vòng sáng qua mặt nước đen, rồi tắt. Tôi đếm những lần ấy, như đếm nhịp thở của một người đang ngủ — đều đặn, kiên nhẫn, và buồn không nói thành lời.
+/**
+ * Toolbar B/I/H2/quote/gạch ngang giờ thao tác THẬT trên đoạn đang chọn
+ * trong textarea (bọc/chèn markdown) — trước đây toàn bộ là <div> không
+ * onClick. Bỏ 2 nút cũ: "align-left" (không có khái niệm căn lề với
+ * content lưu dạng text thuần) và ảnh (cần bucket/route upload riêng,
+ * việc khác ngoài phạm vi sửa lần này) — giữ nút giả vờ hoạt động còn tệ
+ * hơn không có nút.
+ */
+export function ChapterEditor({
+  bookTitle,
+  title,
+  onTitleChange,
+  content,
+  onContentChange,
+  savedAt,
+}: ChapterEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-Cha tôi ra khơi từ lúc tôi còn chưa biết nhớ mặt người. Mẹ giữ lại cho tôi một chiếc áo của ông, thứ vải đã bạc đi vì nắng và vì những lần giặt bằng nước biển.`;
-
-const TOOLBAR_ICONS = [QuotesIcon, TextAlignLeftIcon, MinusIcon];
-
-export function ChapterEditor() {
-  const [draft, setDraft] = useState(DRAFT_DEFAULT);
-
-  const words = (draft.trim().match(/\S+/g) ?? []).length;
+  const words = (content.trim().match(/\S+/g) ?? []).length;
   const wordCount = words.toLocaleString("vi-VN");
   const readMin = Math.max(1, Math.round(words / 200));
+
+  const wrapSelection = (marker: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const { selectionStart, selectionEnd } = el;
+    const selected = content.slice(selectionStart, selectionEnd);
+    const next =
+      content.slice(0, selectionStart) + marker + selected + marker + content.slice(selectionEnd);
+    onContentChange(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(selectionStart + marker.length, selectionStart + marker.length + selected.length);
+    });
+  };
+
+  const prefixCurrentLine = (prefix: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const { selectionStart, selectionEnd } = el;
+    const lineStart = content.lastIndexOf("\n", selectionStart - 1) + 1;
+    const next = content.slice(0, lineStart) + prefix + content.slice(lineStart);
+    onContentChange(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(selectionStart + prefix.length, selectionEnd + prefix.length);
+    });
+  };
+
+  const insertDivider = () => {
+    const el = textareaRef.current;
+    const pos = el?.selectionStart ?? content.length;
+    onContentChange(`${content.slice(0, pos)}\n\n---\n\n${content.slice(pos)}`);
+  };
 
   return (
     <div className="flex flex-col overflow-hidden bg-[#FBF8F1]">
       <div className="flex items-center justify-between border-b border-cream-border bg-[#FBF8F1] px-7 py-3.5">
         <div className="flex items-center gap-2.5 text-[13px] font-medium text-stone-alt">
-          <span>Vũng Vịnh Cuối Trời</span>
+          <span>{bookTitle}</span>
           <CaretRightIcon size={12} />
-          <span className="font-semibold text-brand-ink">Chương 14</span>
+          <span className="font-semibold text-brand-ink">{title || "Chương mới"}</span>
         </div>
         <div className="flex items-center gap-3.5 text-[13px] font-medium text-stone-alt">
-          <span className="flex items-center gap-1">
-            <CloudCheckIcon color="#3B9B6F" /> Đã lưu tự động · 14:32
-          </span>
+          {savedAt && (
+            <span className="flex items-center gap-1">
+              <CloudCheckIcon color="#3B9B6F" /> Đã lưu ·{" "}
+              {savedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
         </div>
       </div>
 
@@ -46,46 +96,67 @@ export function ChapterEditor() {
         <div className="mx-auto max-w-[660px] px-7">
           <Field
             label={null}
-            defaultValue="Đêm không trăng"
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            placeholder="Tên chương"
             className="mb-1.5 w-full resize-none border-none bg-transparent p-0 font-[family-name:var(--font-lora)] text-[32px] font-semibold text-brand-ink outline-none"
           />
           <div className="mb-[22px] flex items-center gap-3.5 text-[13px] text-stone-alt">
-            <span>Chương 14</span>
-            <span>·</span>
             <span>{wordCount} chữ</span>
             <span>·</span>
             <span>~{readMin} phút đọc</span>
           </div>
 
           <div className="sticky top-0 z-[5] mb-5 flex items-center gap-1 border-b border-cream-border bg-[#FBF8F1] py-2">
-            <div className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-bold transition-colors hover:bg-info-bg">
+            <button
+              type="button"
+              onClick={() => wrapSelection("**")}
+              title="Đậm"
+              className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-bold transition-colors hover:bg-info-bg"
+            >
               B
-            </div>
-            <div className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-medium italic transition-colors hover:bg-info-bg">
+            </button>
+            <button
+              type="button"
+              onClick={() => wrapSelection("*")}
+              title="Nghiêng"
+              className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-medium italic transition-colors hover:bg-info-bg"
+            >
               I
-            </div>
-            <div className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg">
+            </button>
+            <button
+              type="button"
+              onClick={() => prefixCurrentLine("## ")}
+              title="Tiêu đề nhỏ"
+              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
+            >
               <TextHTwoIcon size={17} />
-            </div>
+            </button>
             <div className="mx-1.5 h-5 w-px bg-cream-border" />
-            {TOOLBAR_ICONS.map((Icon, i) => (
-              <div
-                key={i}
-                className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
-              >
-                <Icon size={17} />
-              </div>
-            ))}
-            <div className="mx-1.5 h-5 w-px bg-cream-border" />
-            <div className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg">
-              <ImageIcon size={17} />
-            </div>
+            <button
+              type="button"
+              onClick={() => prefixCurrentLine("> ")}
+              title="Trích dẫn"
+              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
+            >
+              <QuotesIcon size={17} />
+            </button>
+            <button
+              type="button"
+              onClick={insertDivider}
+              title="Chèn gạch ngang"
+              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
+            >
+              <MinusIcon size={17} />
+            </button>
           </div>
 
           <textarea
+            ref={textareaRef}
             className="min-h-[460px] w-full resize-none border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] outline-none"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            value={content}
+            onChange={(e) => onContentChange(e.target.value)}
+            placeholder="Bắt đầu viết…"
           />
         </div>
       </div>

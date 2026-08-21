@@ -15,6 +15,7 @@ import {
 import { useRole } from "@/lib/role";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
 import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/lib/password-strength";
+import { LegalLink } from "@/components/legal/legal-link";
 
 type SlotKey = "front" | "back";
 
@@ -324,8 +325,8 @@ export function RegisterForm() {
       <div className="mt-[26px]">
         <Checkbox checked={agree} onChange={() => setAgree((v) => !v)}>
           Tôi xác nhận thông tin trên là chính xác và đồng ý với{" "}
-          <span className="text-brand-gold-dark">Điều khoản sử dụng</span> cùng{" "}
-          <span className="text-brand-gold-dark">Chính sách bảo mật</span> của Vịnh.
+          <LegalLink doc="terms" className="text-brand-gold-dark">Điều khoản sử dụng</LegalLink> cùng{" "}
+          <LegalLink doc="privacy" className="text-brand-gold-dark">Chính sách bảo mật</LegalLink> của Vịnh.
         </Checkbox>
       </div>
 

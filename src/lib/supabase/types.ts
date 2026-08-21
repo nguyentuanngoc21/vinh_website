@@ -14,6 +14,21 @@ export type CreatorTag = "author" | "illustrator" | "narrator";
 
 export type ContentSource = "independent" | "story_upload";
 
+// Dùng bởi hệ thống sinh bìa tự động (src/lib/covers/genre-styles.ts) khi
+// books.cover_design_item_id còn null. 8 giá trị y hệt field `tag` ở mock
+// data (src/lib/books.ts) — không phát sinh taxonomy mới. Cột thật là
+// `text` + CHECK, không phải Postgres enum (migrations/20260819_add_book_genre.sql),
+// nên type ở đây là union thường, không map từ 1 Postgres enum type.
+export type BookGenre =
+  | "Ngôn tình"
+  | "Trinh thám"
+  | "Tản văn"
+  | "Văn học"
+  | "Lịch sử"
+  | "Kỳ ảo"
+  | "Kinh dị"
+  | "Phiêu lưu";
+
 export type TransactionType =
   | "signup_bonus"
   | "daily_task_reward"
@@ -117,6 +132,9 @@ export type Database = {
           synopsis: string | null;
           // null = tác giả chưa dán link thiết kế nào — chưa hiện bìa.
           cover_design_item_id: string | null;
+          // null = chưa gán thể loại — src/lib/covers dùng style fallback
+          // riêng cho trường hợp này, không coi null là lỗi.
+          genre: BookGenre | null;
           published: boolean;
           // pgvector column — the JS client returns/accepts this as a
           // plain number[] (or null), Postgres handles the vector type.
@@ -130,6 +148,7 @@ export type Database = {
           slug: string;
           synopsis?: string | null;
           cover_design_item_id?: string | null;
+          genre?: BookGenre | null;
           published?: boolean;
           embedding?: number[] | null;
         };
@@ -144,6 +163,11 @@ export type Database = {
           content: string;
           order_index: number;
           published: boolean;
+          // Số token đọc chương, 0 = miễn phí. Giá niêm yết — chưa tự
+          // động nối vào create_purchase()/purchase_transactions.
+          price: number;
+          // true = chỉ phân phối trên Vịnh (mặc định).
+          is_exclusive: boolean;
           created_at: string;
         };
         Insert: {
@@ -153,6 +177,8 @@ export type Database = {
           content: string;
           order_index: number;
           published?: boolean;
+          price?: number;
+          is_exclusive?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["chapters"]["Insert"]>;
         Relationships: [];

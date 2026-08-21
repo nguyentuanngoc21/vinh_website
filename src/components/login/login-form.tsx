@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { EyeIcon, EyeSlashIcon, ArrowRightIcon, UserPlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
+import { LegalLink } from "@/components/legal/legal-link";
 
 export function LoginForm() {
   const router = useRouter();
@@ -124,8 +125,8 @@ export function LoginForm() {
 
       <div className="mt-6 text-[12.5px] leading-[1.6] text-stone-light">
         Khi đăng nhập, bạn đồng ý với{" "}
-        <span className="cursor-default text-brand-gold-dark">Điều khoản sử dụng</span> và{" "}
-        <span className="cursor-default text-brand-gold-dark">Chính sách bảo mật</span> của Vịnh.
+        <LegalLink doc="terms" className="text-brand-gold-dark">Điều khoản sử dụng</LegalLink> và{" "}
+        <LegalLink doc="privacy" className="text-brand-gold-dark">Chính sách bảo mật</LegalLink> của Vịnh.
       </div>
     </form>
   );

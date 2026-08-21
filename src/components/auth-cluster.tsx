@@ -9,10 +9,12 @@ import {
   SignOutIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
+import { CreateWorkModal } from "@/components/author/create-work-modal";
 
 export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: string }) {
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const initial = session?.name?.[0] ?? "?";
   const userName = session?.name ?? "";
@@ -28,12 +30,28 @@ export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: strin
           Đăng nhập
         </Link>
       )}
-      <Link
-        href="/author"
-        className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
-      >
-        {ctaLabel}
-      </Link>
+      {isGuest ? (
+        // Chưa đăng nhập: đưa tới trang đăng nhập trước — bấm mở modal
+        // ngay sẽ chỉ nhận lỗi 401 khi submit vì tạo truyện cần
+        // author_id thật (POST /api/authoring/books).
+        <Link
+          href="/dang-nhap"
+          className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
+        >
+          {ctaLabel}
+        </Link>
+      ) : (
+        // Trước đây là <Link href="/author"> — luôn mở lại đúng 1 trang
+        // tĩnh, không phân biệt được "viết truyện mới" với "sửa truyện
+        // cũ". Giờ mở thẳng modal tạo mới, không điều hướng vào sách cũ.
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="shrink-0 cursor-pointer whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink"
+        >
+          {ctaLabel}
+        </button>
+      )}
       {isAdmin && (
         <Link
           href="/admin"
@@ -91,6 +109,7 @@ export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: strin
           )}
         </div>
       )}
+      <CreateWorkModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </>
   );
 }

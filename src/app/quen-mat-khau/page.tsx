@@ -4,6 +4,7 @@ import { Lora } from "next/font/google";
 import Link from "next/link";
 import { FingerprintIcon, HeadphonesIcon, ChartLineUpIcon } from "@phosphor-icons/react/dist/ssr";
 import { ForgotPasswordForm } from "@/components/forgot-password/forgot-password-form";
+import { LegalLink } from "@/components/legal/legal-link";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -66,7 +67,8 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div className="relative text-[13px] text-[#7d94a0]">
-          © 2026 Vịnh · Điều khoản · Bảo mật
+          © 2026 Vịnh · <LegalLink doc="terms" className="text-[#7d94a0] hover:text-white">Điều khoản</LegalLink> ·{" "}
+          <LegalLink doc="privacy" className="text-[#7d94a0] hover:text-white">Bảo mật</LegalLink>
         </div>
       </div>
 

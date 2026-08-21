@@ -1,22 +1,37 @@
-import { FacebookLogoIcon, YoutubeLogoIcon, InstagramLogoIcon } from "@phosphor-icons/react/dist/ssr";
+"use client";
 
-const LINK_COLUMNS = [
+import { FacebookLogoIcon, YoutubeLogoIcon, InstagramLogoIcon } from "@phosphor-icons/react/dist/ssr";
+import { LegalLink } from "@/components/legal/legal-link";
+
+type FooterLink = { label: string; legalDoc?: "terms" | "privacy" };
+
+const LINK_COLUMNS: { title: string; links: FooterLink[] }[] = [
   {
     title: "Khám phá",
-    links: ["Truyện chữ", "Truyện audio", "Blog", "Bảng xếp hạng"],
+    links: [
+      { label: "Truyện chữ" },
+      { label: "Truyện audio" },
+      { label: "Blog" },
+      { label: "Bảng xếp hạng" },
+    ],
   },
   {
     title: "Tác giả",
     links: [
-      "Đăng tác phẩm",
-      "Bản quyền & bảo hộ",
-      "Quyền lợi tác giả",
-      "Hướng dẫn",
+      { label: "Đăng tác phẩm" },
+      { label: "Bản quyền & bảo hộ" },
+      { label: "Quyền lợi tác giả" },
+      { label: "Hướng dẫn" },
     ],
   },
   {
     title: "Hỗ trợ",
-    links: ["Trung tâm trợ giúp", "Điều khoản", "Bảo mật", "Liên hệ"],
+    links: [
+      { label: "Trung tâm trợ giúp" },
+      { label: "Điều khoản", legalDoc: "terms" },
+      { label: "Bảo mật", legalDoc: "privacy" },
+      { label: "Liên hệ" },
+    ],
   },
 ];
 
@@ -44,11 +59,17 @@ export function SiteFooter() {
               {col.title}
             </div>
             <div className="flex flex-col gap-2.5 text-sm">
-              {col.links.map((link) => (
-                <span key={link} className="cursor-default">
-                  {link}
-                </span>
-              ))}
+              {col.links.map((link) =>
+                link.legalDoc ? (
+                  <LegalLink key={link.label} doc={link.legalDoc} className="text-left text-[#c9c3bd] hover:text-white">
+                    {link.label}
+                  </LegalLink>
+                ) : (
+                  <span key={link.label} className="cursor-default">
+                    {link.label}
+                  </span>
+                ),
+              )}
             </div>
           </div>
         ))}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Lora } from "next/font/google";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+import { DevelopmentOverlay } from "@/components/development-overlay";
 import { ContinueListening } from "@/components/audio-hub/continue-listening";
 import { ResumeRow } from "@/components/audio-hub/resume-row";
 import { LibraryGrid } from "@/components/audio-hub/library-grid";
@@ -26,31 +27,33 @@ export default function AudioHubPage() {
           searchPlaceholder="Tìm truyện audio…"
           ctaLabel="Đăng tải Audio"
         />
-        <main>
-          <ContinueListening />
-          <ResumeRow />
-          <LibraryGrid />
-          <NarratorsRow />
-          <section className="px-11 pb-10 pt-[34px]">
-            <div className="flex items-center justify-between rounded-[20px] bg-[#F7EFD8] px-10 py-8">
-              <div>
-                <div className="text-[22px] font-bold text-brand-ink">
-                  Có giọng đọc hay?
+        <DevelopmentOverlay>
+          <main>
+            <ContinueListening />
+            <ResumeRow />
+            <LibraryGrid />
+            <NarratorsRow />
+            <section className="px-11 pb-10 pt-[34px]">
+              <div className="flex items-center justify-between rounded-[20px] bg-[#F7EFD8] px-10 py-8">
+                <div>
+                  <div className="text-[22px] font-bold text-brand-ink">
+                    Có giọng đọc hay?
+                  </div>
+                  <div className="mt-[5px] text-[14.5px] text-[#6b5f3a]">
+                    Ghi âm tác phẩm và chia sẻ trên Vịnh — bản ghi được gắn
+                    watermark âm thanh tự động.
+                  </div>
                 </div>
-                <div className="mt-[5px] text-[14.5px] text-[#6b5f3a]">
-                  Ghi âm tác phẩm và chia sẻ trên Vịnh — bản ghi được gắn
-                  watermark âm thanh tự động.
-                </div>
+                <Link
+                  href="/author"
+                  className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
+                >
+                  Gửi bản thu
+                </Link>
               </div>
-              <Link
-                href="/author"
-                className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
-              >
-                Gửi bản thu
-              </Link>
-            </div>
-          </section>
-        </main>
+            </section>
+          </main>
+        </DevelopmentOverlay>
       </div>
       <MiniPlayerBar />
     </div>

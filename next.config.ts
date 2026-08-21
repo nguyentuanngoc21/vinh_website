@@ -36,6 +36,13 @@ const nextConfig: NextConfig = {
       "./node_modules/regenerator-runtime/**/*",
       "./node_modules/zlibjs/**/*",
     ],
+    // src/lib/covers/fonts.ts đọc font vendor qua fs.readFileSync(process.cwd()
+    // + "/public/fonts/covers/...") lúc runtime (cho next/og's ImageResponse ở
+    // route này) — `public/` thường được Vercel phục vụ qua CDN riêng, KHÔNG
+    // tự đóng gói theo function serverless. Cùng bài học với tesseract.js ở
+    // trên: ép include thủ công để tránh ENOENT khi deploy, dù chạy `next dev`
+    // local không bao giờ gặp lỗi này (public/ luôn có sẵn trên đĩa lúc dev).
+    "/api/books/[id]/cover": ["./public/fonts/covers/*.ttf"],
   },
   images: {
     remotePatterns: [

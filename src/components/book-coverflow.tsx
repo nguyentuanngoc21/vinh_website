@@ -5,6 +5,18 @@ import Link from "next/link";
 import { CaretLeftIcon, CaretRightIcon, HeadphonesIcon } from "@phosphor-icons/react/dist/ssr";
 import { books } from "@/lib/books";
 import { NavStripLinks } from "@/components/nav-strip-links";
+import { BookCover } from "@/components/covers/book-cover";
+import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
+import type { BookGenre } from "@/lib/supabase/types";
+
+// books[].tag là string tự do (mock, chưa nối Supabase thật — xem
+// src/lib/books.ts) nhưng mọi giá trị đang dùng đều khớp đúng 1 trong 8
+// BookGenre chính thức (không có "Kinh dị"/"Phiêu lưu" trong mock, chỉ có
+// trong danh sách filter genres) — cast an toàn ở đây, không phải ép kiểu
+// bừa.
+function mockTagToGenre(tag: string): BookGenre {
+  return tag as BookGenre;
+}
 
 const VISIBLE_DEPTH = 3;
 const STAGE_WIDTH = 1160;
@@ -44,11 +56,22 @@ function buildSlide(index: number, active: number, n: number) {
     cursor: "pointer",
   };
 
+  // Bìa tự động sinh theo genre (src/lib/covers/*) thay cho gradient
+  // phẳng cũ — books[].gradient (mock) không còn dùng để vẽ bìa, chỉ còn
+  // dùng lại màu (from/to) cho dải phản chiếu bên dưới, để phản chiếu
+  // khớp đúng màu bìa thật đang hiện ra (palette được chọn theo hash,
+  // không phải luôn giống gradient mock gốc).
+  const coverSpec = buildCoverSpec({
+    id: books[index].title,
+    title: books[index].title,
+    author: books[index].author,
+    genre: mockTagToGenre(books[index].tag),
+  });
+
   const coverStyle: CSSProperties = {
     width: "100%",
     height: "100%",
     borderRadius: 14,
-    background: books[index].gradient,
     boxShadow: abs === 0 ? "0 26px 50px rgba(0,0,0,.38)" : "0 14px 30px rgba(0,0,0,.22)",
     display: "flex",
     flexDirection: "column",
@@ -68,7 +91,7 @@ function buildSlide(index: number, active: number, n: number) {
     width: "100%",
     height: 58,
     borderRadius: 14,
-    background: books[index].gradient,
+    background: `linear-gradient(${coverSpec.palette.from}, ${coverSpec.palette.to})`,
     opacity: hidden || c > 2 ? 0 : 0.16,
     transform: "scaleY(-1)",
     WebkitMaskImage: "linear-gradient(to bottom, #000 0%, transparent 92%)",
@@ -155,13 +178,21 @@ export function BookCoverflow() {
               return (
                 <div key={book.title} style={wrapStyle} onClick={() => go(i)}>
                   <div style={coverStyle}>
+                    <div className="absolute inset-0">
+                      <BookCover
+                        id={book.title}
+                        title={book.title}
+                        author={book.author}
+                        genre={mockTagToGenre(book.tag)}
+                      />
+                    </div>
                     <div className="absolute top-3.5 left-3.5 rounded-full bg-black/[0.32] px-2.5 py-1 text-[10px] font-semibold tracking-[.6px] uppercase backdrop-blur-[2px]">
                       {book.tag}
                     </div>
-                    <div className="text-[19px] leading-[1.25] font-bold tracking-[-.2px]">
+                    <div className="relative text-[19px] leading-[1.25] font-bold tracking-[-.2px]">
                       {book.title}
                     </div>
-                    <div className="mt-1 text-[13px] opacity-[0.82]">{book.author}</div>
+                    <div className="relative mt-1 text-[13px] opacity-[0.82]">{book.author}</div>
                   </div>
                   <div style={reflStyle} />
                 </div>

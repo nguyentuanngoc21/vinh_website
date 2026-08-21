@@ -184,6 +184,21 @@ create policy "authors update chapters on their own books"
   on public.chapters for update
   using (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid()));
 
+-- --- Giá + độc quyền — panel xuất bản (src/components/author/publish-panel.tsx).
+-- price: số token đọc chương, 0 = miễn phí (không CHECK > 0 như
+-- purchase_transactions.amount — đó là số tiền 1 giao dịch thật, đây là
+-- giá niêm yết). is_exclusive: mặc định true, khớp UI mock cũ. Không cần
+-- RLS/trigger riêng — 2 cột thường, đã được policy update ở trên cover.
+-- Xem migrations/20260820_add_chapter_price.sql. ---
+alter table public.chapters
+  add column price integer not null default 0;
+
+alter table public.chapters
+  add constraint chapters_price_check check (price >= 0);
+
+alter table public.chapters
+  add column is_exclusive boolean not null default true;
+
 -- ---------------------------------------------------------------------
 -- 4. Storage buckets
 -- ---------------------------------------------------------------------
@@ -1222,6 +1237,29 @@ begin
   return v_row;
 end;
 $$ language plpgsql security definer;
+
+-- --- Genre — dùng bởi hệ thống sinh bìa tự động (src/lib/covers/*) khi
+-- sách chưa có cover_design_item_id. text + CHECK, không phải enum, để sửa
+-- 1 giá trị sai hay thêm thể loại thứ 9 chỉ cần đổi constraint, không phải
+-- mổ lại type. 8 giá trị lấy đúng từ field `tag` ở mock data
+-- (src/lib/books.ts) — không phát sinh taxonomy mới. Nullable: sách cũ
+-- chưa có genre, code sinh bìa có nhánh fallback riêng cho null, không cần
+-- database nói dối bằng default giả. Không cần RLS/trigger riêng — genre
+-- là cột thường, đã được policy "authors update their own books" ở phần 3
+-- cover sẵn (khác cover_design_item_id, không phải link chéo bảng cần
+-- xác thực share_token). Xem migrations/20260819_add_book_genre.sql. ---
+alter table public.books
+  add column genre text;
+
+alter table public.books
+  add constraint books_genre_check
+  check (genre is null or genre in (
+    'Ngôn tình', 'Trinh thám', 'Tản văn', 'Văn học',
+    'Lịch sử', 'Kỳ ảo', 'Kinh dị', 'Phiêu lưu'
+  ));
+
+create index books_genre_idx
+  on public.books (genre) where genre is not null;
 
 create function public.regenerate_design_share_token(p_design_item_id uuid)
 returns text as $$
