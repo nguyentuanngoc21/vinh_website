@@ -4,8 +4,6 @@ import { BookCoverflow } from "@/components/book-coverflow";
 import { HeroTrending } from "@/components/hero-trending";
 import { RankingGenres } from "@/components/ranking-genres";
 import { NewWorksGrid } from "@/components/new-works-grid";
-import { AudioSpotlight } from "@/components/audio-spotlight";
-import { DevelopmentOverlay } from "@/components/development-overlay";
 import { CopyrightBand } from "@/components/copyright-band";
 import { AuthorCta } from "@/components/author-cta";
 import { SiteFooter } from "@/components/site-footer";
@@ -31,13 +29,13 @@ export default async function Home() {
           <HeroTrending book={trending} />
           <RankingGenres weeklyRanking={weeklyRanking} />
           <NewWorksGrid books={newest} />
-          {/* Audio chưa nối chapter_audio_links/audio_narrations thật —
-              cùng trạng thái "đang phát triển" như /audio, /rankings,
-              /blog (xem development-overlay.tsx) nên che luôn ở đây,
-              tránh lộ lại nội dung audio giả trên trang chủ. */}
-          <DevelopmentOverlay>
-            <AudioSpotlight />
-          </DevelopmentOverlay>
+          {/* AudioSpotlight tạm bỏ khỏi trang chủ — nội dung của nó vẫn
+              hardcode cứng ("Vũng Vịnh Cuối Trời — Chương 14"), chưa nối
+              chapter_audio_links/audio_narrations thật. DevelopmentOverlay
+              (dùng cho /audio, /rankings, /blog) không hợp để bọc 1 section
+              giữa trang — nó pin theo VIEWPORT nên đè lên section khác khi
+              cuộn trang, không chỉ đè lên đúng AudioSpotlight. Thêm lại
+              <AudioSpotlight /> ở đây khi audio có data thật. */}
           <CopyrightBand />
           <AuthorCta />
         </main>
