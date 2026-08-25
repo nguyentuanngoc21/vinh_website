@@ -93,6 +93,60 @@ function splitByChuongMarkers(text: string): { chapters: DetectedChapter[]; fell
   return { chapters, fellBack: false };
 }
 
+const HEADING_TAG_RE = /<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi;
+
+function decodeHtmlEntities(html: string): string {
+  return html
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function htmlToText(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<\/(p|h[1-6]|li)>/gi, "\n\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+  )
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Tách chương theo style "Heading" THẬT của Word — chỉ dùng được với HTML
+ * do mammoth.convertToHtml() sinh ra từ 1 file .docx (mammoth tự map style
+ * "Heading 1".."Heading 6" của Word sang <h1>..<h6>, xem
+ * node_modules/mammoth/lib/options-reader.js). Đây là tín hiệu chắc chắn
+ * hơn regex đoán chữ ở splitByChuongMarkers() — "chương trình"/"huy
+ * chương" không thể vô tình mang style Heading trừ khi tác giả TỰ đánh
+ * dấu nó là heading (lúc đó đúng là 1 heading thật). Chỉ hoạt động nếu
+ * tác giả dùng đúng style Heading có sẵn của Word — bôi đậm/tăng size chữ
+ * tay không đủ để mammoth nhận ra.
+ *
+ * Trả về [] nếu tìm được ít hơn 2 heading — không đáng gọi là "tách chương".
+ */
+export function extractHeadingChapters(html: string): DetectedChapter[] {
+  const marks: { index: number; end: number; titleHtml: string }[] = [];
+  let m: RegExpExecArray | null;
+  HEADING_TAG_RE.lastIndex = 0;
+  while ((m = HEADING_TAG_RE.exec(html))) {
+    marks.push({ index: m.index, end: m.index + m[0].length, titleHtml: m[2] });
+  }
+
+  if (marks.length < 2) return [];
+
+  return marks.map((mark, i) => {
+    const end = i + 1 < marks.length ? marks[i + 1].index : html.length;
+    const content = htmlToText(html.slice(mark.end, end));
+    const title = htmlToText(mark.titleHtml) || `Chương ${i + 1}`;
+    return { no: i + 1, title, content, words: countWords(content) };
+  });
+}
+
 export function splitChapters(text: string, mode: SplitMode): SplitResult {
   if (!text.trim()) {
     return { chapters: [], truncated: false, fellBackToSingle: false };

@@ -10,7 +10,7 @@ import {
   XIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Alert, Button, Field } from "@/components/ui";
-import { countWords, splitChapters, type SplitMode } from "@/lib/authoring/split-chapters";
+import { countWords, splitChapters, type DetectedChapter, type SplitMode } from "@/lib/authoring/split-chapters";
 
 type ImportManuscriptModalProps = {
   open: boolean;
@@ -24,7 +24,14 @@ type ImportManuscriptModalProps = {
   destinationBookId?: string;
 };
 
-const SPLIT_OPTIONS: { id: SplitMode; label: string }[] = [
+/** "heading" không phải 1 mode của splitChapters() (hàm đó chỉ tách theo
+ * chữ trong rawText) — đây là 1 nguồn dữ liệu riêng, lấy thẳng từ
+ * headingChapters do API /manuscripts/extract trả về (tách theo style
+ * Heading thật của Word). Chỉ tồn tại khi vừa tải lên 1 file .docx có
+ * dùng style đó. */
+type ImportSplitMode = SplitMode | "heading";
+
+const TEXT_SPLIT_OPTIONS: { id: SplitMode; label: string }[] = [
   { id: "chuong", label: 'Theo "Chương x"' },
   { id: "blank", label: "Dòng trống kép" },
   { id: "none", label: "Một chương duy nhất" },
@@ -53,7 +60,10 @@ export function ImportManuscriptModal({
   const [rawText, setRawText] = useState("");
   const [sourceLabel, setSourceLabel] = useState("");
   const [extracting, setExtracting] = useState(false);
-  const [splitMode, setSplitMode] = useState<SplitMode>("chuong");
+  const [splitMode, setSplitMode] = useState<ImportSplitMode>("chuong");
+  // Chỉ có giá trị sau khi tải lên 1 file .docx thật sự dùng style Heading
+  // của Word — xem extractHeadingChapters() trong split-chapters.ts.
+  const [headingChapters, setHeadingChapters] = useState<DetectedChapter[]>([]);
   const [destinationMode, setDestinationMode] = useState<"new" | "existing">(
     destinationBookId ? "existing" : "new"
   );
@@ -78,6 +88,7 @@ export function ImportManuscriptModal({
       setSourceLabel("");
       setExtracting(false);
       setSplitMode("chuong");
+      setHeadingChapters([]);
       setDestinationMode(destinationBookId ? "existing" : "new");
       setExistingBookId(destinationBookId ?? books[0]?.id ?? "");
       setNewBookTitle("");
@@ -86,10 +97,25 @@ export function ImportManuscriptModal({
     }
   }
 
-  const { chapters: detected, truncated, fellBackToSingle } = useMemo(
-    () => splitChapters(rawText, splitMode),
-    [rawText, splitMode]
+  const splitOptions = useMemo(
+    () =>
+      headingChapters.length > 0
+        ? [{ id: "heading" as const, label: "Theo Heading trong Word (khuyên dùng)" }, ...TEXT_SPLIT_OPTIONS]
+        : TEXT_SPLIT_OPTIONS,
+    [headingChapters]
   );
+
+  const { chapters: detected, truncated, fellBackToSingle } = useMemo(() => {
+    if (splitMode === "heading") {
+      const capped = headingChapters.length > 300;
+      return {
+        chapters: capped ? headingChapters.slice(0, 300) : headingChapters,
+        truncated: capped,
+        fellBackToSingle: false,
+      };
+    }
+    return splitChapters(rawText, splitMode);
+  }, [rawText, splitMode, headingChapters]);
 
   if (!open) return null;
 
@@ -101,6 +127,8 @@ export function ImportManuscriptModal({
       const text = await file.text();
       setRawText(text);
       setSourceLabel(file.name);
+      setHeadingChapters([]);
+      setSplitMode("chuong");
       setStep("review");
       return;
     }
@@ -120,8 +148,13 @@ export function ImportManuscriptModal({
         setError((data && typeof data.error === "string" && data.error) || "Không đọc được file này.");
         return;
       }
+      const headings: DetectedChapter[] = Array.isArray(data.headingChapters) ? data.headingChapters : [];
       setRawText(data.text);
       setSourceLabel(file.name);
+      setHeadingChapters(headings);
+      // Style Heading thật của Word đáng tin hơn regex đoán chữ — ưu tiên
+      // chọn sẵn khi có, tác giả vẫn đổi được sang 3 chế độ khác bên dưới.
+      setSplitMode(headings.length > 0 ? "heading" : "chuong");
       setStep("review");
     } catch {
       setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
@@ -134,6 +167,8 @@ export function ImportManuscriptModal({
     if (!pastedText.trim()) return;
     setRawText(pastedText);
     setSourceLabel(`${countWords(pastedText).toLocaleString("vi-VN")} chữ đã dán`);
+    setHeadingChapters([]);
+    setSplitMode("chuong");
     setStep("review");
   };
 
@@ -348,7 +383,7 @@ export function ImportManuscriptModal({
 
             <div className="mb-1.5 text-[13px] font-semibold text-[#5C5650]">Tách chương theo</div>
             <div className="mb-4 flex w-fit gap-1.5 rounded-[9px] border border-cream-border bg-white p-1">
-              {SPLIT_OPTIONS.map((opt) => (
+              {splitOptions.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"

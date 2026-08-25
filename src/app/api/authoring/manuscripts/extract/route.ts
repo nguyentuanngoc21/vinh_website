@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { createClient } from "@/lib/supabase/server";
+import { extractHeadingChapters } from "@/lib/authoring/split-chapters";
 
 // ~4.5MB là giới hạn body thật của Vercel Route Handler cho Route Handlers
 // (không cấu hình được lớn hơn) — giữ dư 0.5MB làm biên an toàn.
@@ -17,6 +18,12 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024;
  *
  * Yêu cầu đăng nhập dù không ghi DB — chặn lạm dụng CPU của 1 endpoint
  * parse file công khai.
+ *
+ * Ngoài text thô, cũng thử tách theo style "Heading" thật của Word
+ * (mammoth.convertToHtml, xem extractHeadingChapters) — tín hiệu chắc hơn
+ * regex "Chương N" vì dựa vào định dạng, không phải nội dung chữ. Chỉ có
+ * hiệu quả nếu tác giả dùng đúng style Heading của Word; nếu không, client
+ * vẫn còn 3 chế độ tách theo chữ (split-chapters.ts) làm phương án chính.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -44,13 +51,20 @@ export async function POST(request: Request) {
   }
 
   let text: string;
+  let headingChapters: ReturnType<typeof extractHeadingChapters> = [];
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await mammoth.extractRawText({ buffer });
-    for (const message of result.messages) {
+
+    const rawResult = await mammoth.extractRawText({ buffer });
+    for (const message of rawResult.messages) {
       if (message.type === "warning") console.warn("[manuscripts/extract]", message.message);
     }
-    text = result.value;
+    text = rawResult.value;
+
+    // Second pass, cùng buffer — cần HTML (không phải text thô) để thấy
+    // được <h1>..<h6> mammoth sinh ra từ style Heading của Word.
+    const htmlResult = await mammoth.convertToHtml({ buffer });
+    headingChapters = extractHeadingChapters(htmlResult.value);
   } catch (error) {
     console.error("[manuscripts/extract] mammoth failed:", error);
     return NextResponse.json({ error: "File .docx không hợp lệ hoặc bị hỏng." }, { status: 400 });
@@ -63,5 +77,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ text });
+  return NextResponse.json({ text, headingChapters });
 }
