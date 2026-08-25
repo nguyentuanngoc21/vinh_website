@@ -187,12 +187,11 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
                             {book.genre}
                           </div>
                         )}
-                        {/* Không overlay tên tác giả ở đây — GeneratedBookCover
-                            (bên trong BookCover) đã tự vẽ tên tác giả căn giữa
-                            ở footer bìa, thêm 1 dòng nữa ở đây bị lặp 2 lần. */}
-                        <div className="relative text-[19px] leading-[1.25] font-bold tracking-[-.2px]">
-                          {book.title}
-                        </div>
+                        {/* Không overlay tên truyện/tác giả ở đây —
+                            GeneratedBookCover (bên trong BookCover) đã tự vẽ
+                            cả 2 ngay trên bìa (title theo layout riêng, tác
+                            giả căn giữa ở footer) — thêm chữ trắng đè lên chỉ
+                            gây lặp 2 lần cùng nội dung. */}
                       </div>
                       <div style={reflStyle} />
                     </div>
