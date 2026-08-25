@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { BookmarkSimpleIcon, FingerprintIcon } from "@phosphor-icons/react/dist/ssr";
-import { rankings, genres } from "@/lib/books";
+import { genres } from "@/lib/books";
 import { AdminModerationCallout } from "@/components/home/admin-moderation-callout";
+import { BookCover } from "@/components/covers/book-cover";
+import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
-export function RankingGenres() {
+const RANK_COLORS = ["var(--color-brand-gold)", "#C9A86A", "#f0b429", "#9a9a9a"];
+
+export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[] }) {
   return (
     <section className="grid grid-cols-1 gap-12 px-11 pb-2 pt-6 md:grid-cols-2">
       <div>
@@ -16,32 +20,47 @@ export function RankingGenres() {
 
         <AdminModerationCallout />
 
-        <div className="flex flex-col gap-4">
-          {rankings.map((book) => (
-            <div key={book.title} className="flex items-center gap-4">
-              <div
-                className="w-[26px] text-2xl font-extrabold"
-                style={{ color: book.rankColor }}
+        {weeklyRanking.length === 0 ? (
+          <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#e7e5e4] bg-[#fafaf9] py-10 text-center">
+            <div className="text-sm font-semibold text-ink">Chưa có dữ liệu xếp hạng</div>
+            <div className="text-[13px] text-[#9a9a9a]">Cần ít nhất 1 truyện được xuất bản để tính bảng xếp hạng.</div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {weeklyRanking.map((book, i) => (
+              <Link
+                key={book.id}
+                href={`/truyen/${book.slug}`}
+                className="flex items-center gap-4 no-underline"
               >
-                {book.rank}
-              </div>
-              <div
-                style={{ background: book.gradient }}
-                className="h-[60px] w-11 shrink-0 rounded-md"
-              />
-              <div className="flex-1">
-                <div className="text-base font-semibold">{book.title}</div>
-                <div className="text-[13px] text-[#9a9a9a]">
-                  {book.author} · {book.reads} · {book.tag}
+                <div className="w-[26px] text-2xl font-extrabold" style={{ color: RANK_COLORS[i] ?? "#9a9a9a" }}>
+                  {i + 1}
                 </div>
-              </div>
-              <BookmarkSimpleIcon
-                size={20}
-                className="cursor-default text-[#cfcfcf] transition-colors hover:text-brand-gold-dark"
-              />
-            </div>
-          ))}
-        </div>
+                <div className="h-[60px] w-11 shrink-0 overflow-hidden rounded-md">
+                  <BookCover
+                    id={book.id}
+                    title={book.title}
+                    author={book.authorNickname}
+                    genre={book.genre}
+                    coverUrl={book.coverUrl}
+                    className="h-full w-full"
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="text-base font-semibold text-ink">{book.title}</div>
+                  <div className="text-[13px] text-[#9a9a9a]">
+                    {book.authorNickname ?? "Ẩn danh"} · {book.viewCount.toLocaleString("vi-VN")} đọc
+                    {book.genre ? ` · ${book.genre}` : ""}
+                  </div>
+                </div>
+                <BookmarkSimpleIcon
+                  size={20}
+                  className="cursor-default text-[#cfcfcf] transition-colors hover:text-brand-gold-dark"
+                />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
