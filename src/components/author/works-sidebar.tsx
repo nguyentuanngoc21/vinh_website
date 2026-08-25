@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowSquareOutIcon, PlusIcon, GearIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOutIcon, PlusIcon, GearIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { useCreateWork } from "@/lib/authoring/use-create-work";
 import { BookCover } from "@/components/covers/book-cover";
+import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
 import { VinhMark } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
@@ -19,18 +21,15 @@ export type SidebarBook = {
   // chỉ 404 nếu false, dùng để quyết định có hiện link "Xem trang truyện" không.
   published: boolean;
   meta: string;
-  // null chỉ xảy ra nếu 1 sách bị xoá hết chương bằng tay ngoài luồng tạo
-  // sách bình thường (create luôn kèm "Chương 1") — phòng hộ, không click
-  // được tới đâu trong trường hợp hiếm này.
-  latestChapterId: string | null;
 };
 
 export function WorksSidebar({ books }: { books: SidebarBook[] }) {
   const pathname = usePathname();
-  // /author/[bookId]/[chapterId] → phần tử thứ 3 sau khi split("/").
+  // /author/[bookId]/... → phần tử thứ 3 sau khi split("/").
   const activeBookId = pathname?.split("/")[2];
   const { session } = useRole();
   const { createWork, pending } = useCreateWork();
+  const [showImport, setShowImport] = useState(false);
 
   return (
     <aside className="flex flex-col overflow-hidden bg-brand-ink-dark text-sidebar-text">
@@ -85,16 +84,12 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
                 active ? "bg-brand-gold-light/14" : "hover:bg-info-bg/10"
               }`}
             >
-              {book.latestChapterId ? (
-                <Link
-                  href={`/author/${book.id}/${book.latestChapterId}`}
-                  className="flex min-w-0 flex-1 items-center gap-[11px] p-3 no-underline"
-                >
-                  {content}
-                </Link>
-              ) : (
-                <div className="flex min-w-0 flex-1 items-center gap-[11px] p-3">{content}</div>
-              )}
+              <Link
+                href={`/author/${book.id}`}
+                className="flex min-w-0 flex-1 items-center gap-[11px] p-3 no-underline"
+              >
+                {content}
+              </Link>
               {book.published && (
                 <Link
                   href={`/truyen/${book.slug}`}
@@ -121,6 +116,20 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
       >
         <PlusIcon className="inline" /> {pending ? "Đang tạo…" : "Tác phẩm mới"}
       </button>
+
+      <button
+        type="button"
+        onClick={() => setShowImport(true)}
+        className="mx-4 mt-2 cursor-pointer rounded-[9px] border border-dashed border-white/22 p-[11px] text-center text-[13px] font-semibold text-sidebar-text-dim"
+      >
+        <UploadSimpleIcon className="inline" /> Nhập bản thảo
+      </button>
+
+      <ImportManuscriptModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        books={books.map((b) => ({ id: b.id, title: b.title }))}
+      />
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-white/8 px-[18px] py-4">
         <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#c8a86a] text-sm font-bold text-white">

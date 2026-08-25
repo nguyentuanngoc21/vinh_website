@@ -41,25 +41,22 @@ export default async function AuthorLayout({ children }: LayoutProps<"/author">)
   // 2 query riêng (không embed chapters(...) qua books) — types.ts hiện
   // hand-written với Relationships: [] cho mọi bảng, embed select không
   // có chỗ dựa để type đúng; join lại bằng JS đơn giản và chắc chắn hơn.
+  // Chỉ cần đếm số chương cho `meta` — link mỗi sách giờ trỏ vào
+  // /author/[bookId] (trang tổng quan, tự query chương của nó), không còn
+  // cần order_index/chương mới nhất ở đây.
   const { data: chapterRows } = bookIds.length
-    ? await supabase
-        .from("chapters")
-        .select("id, book_id, order_index")
-        .in("book_id", bookIds)
-        .order("order_index", { ascending: false })
-    : { data: [] as { id: string; book_id: string; order_index: number }[] };
+    ? await supabase.from("chapters").select("id, book_id").in("book_id", bookIds)
+    : { data: [] as { id: string; book_id: string }[] };
 
   const books: SidebarBook[] = (bookRows ?? []).map((book) => {
-    const chaptersForBook = (chapterRows ?? []).filter((c) => c.book_id === book.id);
+    const chapterCount = (chapterRows ?? []).filter((c) => c.book_id === book.id).length;
     return {
       id: book.id,
       title: book.title,
       genre: book.genre,
       slug: book.slug,
       published: book.published,
-      meta: `${chaptersForBook.length} chương · ${book.published ? "Đang ra" : "Bản nháp"}`,
-      // chapterRows đã order_index desc — [0] là chương mới nhất.
-      latestChapterId: chaptersForBook[0]?.id ?? null,
+      meta: `${chapterCount} chương · ${book.published ? "Đang ra" : "Bản nháp"}`,
     };
   });
 
