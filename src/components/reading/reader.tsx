@@ -5,31 +5,39 @@ import Link from "next/link";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  BookmarkSimpleIcon,
   HeadphonesIcon,
   ListBulletsIcon,
+  ShareNetworkIcon,
   TextAaIcon,
   ShieldCheckIcon,
 } from "@phosphor-icons/react/dist/ssr";
+import { ChapterPicker, type ReaderChapterSummary } from "./chapter-picker";
+import { VoteButton } from "./vote-button";
+import { AuthorPanel } from "./author-panel";
+import { ReadingListModal } from "./reading-list-modal";
+import { shareOrCopy } from "@/lib/share";
 
 type ThemeName = "cream" | "sepia" | "dark";
 
-const THEMES: Record<
-  ThemeName,
-  {
-    pageBg: string;
-    barBg: string;
-    body: string;
-    ink: string;
-    inkSoft: string;
-    hair: string;
-    wmColor: string;
-    tintBg: string;
-    tintBorder: string;
-    tintInk: string;
-    swatch: string;
-    swatchBorder: string;
-  }
-> = {
+// Export cho các component con (chapter-picker/vote-button/author-panel)
+// nhận đúng type của `c` (1 mục trong THEMES) mà không phải định nghĩa lại.
+export type ThemeColors = {
+  pageBg: string;
+  barBg: string;
+  body: string;
+  ink: string;
+  inkSoft: string;
+  hair: string;
+  wmColor: string;
+  tintBg: string;
+  tintBorder: string;
+  tintInk: string;
+  swatch: string;
+  swatchBorder: string;
+};
+
+const THEMES: Record<ThemeName, ThemeColors> = {
   cream: {
     pageBg: "var(--color-cream-card-alt)",
     barBg: "#FBF8F1",
@@ -196,7 +204,58 @@ async function postScreenshotPenaltyToServer(): Promise<PenaltyState | null> {
   }
 }
 
-export function Reader() {
+export type ReaderProps = {
+  bookSlug?: string;
+  /** uuid thật của books.id — khác bookSlug, cần cho reading_list_items.book_id
+   * (FK trỏ vào books.id, không phải slug). */
+  bookId?: string;
+  bookTitle?: string;
+  bookSynopsis?: string | null;
+  authorId?: string | null;
+  authorName?: string;
+  authorAvatarUrl?: string | null;
+  isOwnBook?: boolean;
+  showFollowButton?: boolean;
+  isFollowingAuthor?: boolean;
+  /** id của chapters — cần để gọi route vote và ghép URL chia sẻ đoạn
+   * đang đọc. Mặc định "" (chưa từng có ở phase trước) — các hành động
+   * mạng tự no-op khi rỗng, để src/app/read/page.tsx (gọi <Reader/> không
+   * props) không gọi nhầm /api/chapters//vote. */
+  chapterId?: string;
+  chapterTitle?: string;
+  chapterPosition?: number;
+  /** Nội dung thô của chapters.content — chia đoạn bằng "\n\n". Mặc định
+   * = PARAGRAPHS mock, để src/app/read/page.tsx (gọi <Reader /> không
+   * props) tiếp tục chạy y nguyên như trước khi có route động. */
+  content?: string;
+  prevChapterId?: string | null;
+  nextChapterId?: string | null;
+  chapters?: ReaderChapterSummary[];
+  initialVoted?: boolean;
+  initialVoteCount?: number;
+};
+
+export function Reader({
+  bookSlug = "",
+  bookId = "",
+  bookTitle = "Vũng Vịnh Cuối Trời",
+  bookSynopsis = null,
+  authorId = null,
+  authorName = "Minh Khôi",
+  authorAvatarUrl = null,
+  isOwnBook = false,
+  showFollowButton = false,
+  isFollowingAuthor = false,
+  chapterId = "",
+  chapterTitle = "Đêm không trăng",
+  chapterPosition = 14,
+  content = PARAGRAPHS.join("\n\n"),
+  prevChapterId = null,
+  nextChapterId = null,
+  chapters = [],
+  initialVoted = false,
+  initialVoteCount = 0,
+}: ReaderProps) {
   const [fontSize, setFontSize] = useState(19);
   const [theme, setTheme] = useState<ThemeName>("cream");
   const [panelOpen, setPanelOpen] = useState(true);
@@ -204,9 +263,103 @@ export function Reader() {
   const [screenshotDetected, setScreenshotDetected] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const penaltyAppliedRef = useRef(false);
+  // "Giờ hiện tại" cho isPenaltyActive bên dưới — KHÔNG gọi Date.now() trực
+  // tiếp lúc render (react-hooks/purity: gọi hàm impure trong render có thể
+  // cho kết quả khác nhau giữa các lần render, gây lệch nếu React sau này
+  // render lại 1 lần build/commit nhiều lần — vd bật React Compiler).
+  // null lúc mount đầu (trước khi effect chạy) — coi như "chưa có phạt" cho
+  // tới khi có mốc giờ thật, khớp cách `penalty` cũng khởi tạo rỗng rồi mới
+  // nạp state thật ở effect bên dưới.
+  const [now, setNow] = useState<number | null>(null);
 
   const c = THEMES[theme];
-  const isPenaltyActive = penalty.banned || (!!penalty.expiresAt && penalty.expiresAt > Date.now());
+  const isPenaltyActive = penalty.banned || (!!penalty.expiresAt && now !== null && penalty.expiresAt > now);
+
+  const paragraphs = content.split("\n\n");
+  // Cùng công thức với src/components/author/chapter-editor.tsx, để số chữ/
+  // thời gian đọc khớp giữa lúc soạn và lúc đọc thật.
+  const wordCount = (content.trim().match(/\S+/g) ?? []).length;
+  const readMinutes = Math.max(1, Math.round(wordCount / 200));
+
+  // --- State cho chọn chương/vote/danh sách đọc/follow/share — hoàn toàn
+  // mới, KHÔNG đụng tới state/effect hệ thống chống chụp màn hình ở trên. ---
+  const [chapterPickerOpen, setChapterPickerOpen] = useState(false);
+  const [voted, setVoted] = useState(initialVoted);
+  const [voteCount, setVoteCount] = useState(initialVoteCount);
+  const [voting, setVoting] = useState(false);
+  const [following, setFollowing] = useState(isFollowingAuthor);
+  const [followPending, setFollowPending] = useState(false);
+  const [listModalOpen, setListModalOpen] = useState(false);
+  const [copyBubble, setCopyBubble] = useState<string | null>(null);
+  const [visibleParagraph, setVisibleParagraph] = useState(paragraphs[0] ?? "");
+  const paragraphRefs = useRef<Array<HTMLParagraphElement | null>>([]);
+
+  const showCopyBubble = (label: string) => {
+    setCopyBubble(label);
+    setTimeout(() => setCopyBubble(null), 2200);
+  };
+
+  const handleToggleVote = async () => {
+    if (voting || !chapterId) return;
+    setVoting(true);
+    const prevVoted = voted;
+    const prevCount = voteCount;
+    setVoted(!prevVoted);
+    setVoteCount(prevCount + (prevVoted ? -1 : 1));
+    try {
+      const res = await fetch(`/api/chapters/${chapterId}/vote`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) {
+        setVoted(!!data.voted);
+        setVoteCount(typeof data.voteCount === "number" ? data.voteCount : prevCount);
+      } else {
+        setVoted(prevVoted);
+        setVoteCount(prevCount);
+      }
+    } catch {
+      setVoted(prevVoted);
+      setVoteCount(prevCount);
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const handleToggleFollow = async () => {
+    if (followPending || !authorId) return;
+    setFollowPending(true);
+    const prevFollowing = following;
+    setFollowing(!prevFollowing);
+    try {
+      const res = await fetch(`/api/authors/${authorId}/follow`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) setFollowing(!!data.following);
+      else setFollowing(prevFollowing);
+    } catch {
+      setFollowing(prevFollowing);
+    } finally {
+      setFollowPending(false);
+    }
+  };
+
+  const handleShareStory = async () => {
+    if (!bookSlug || typeof window === "undefined") return;
+    const result = await shareOrCopy({
+      title: `${chapterTitle} - ${bookTitle} - ${authorName}`,
+      text: bookSynopsis ?? "",
+      url: `${window.location.origin}/truyen/${bookSlug}`,
+    });
+    if (result === "copied") showCopyBubble("Đã sao chép liên kết");
+  };
+
+  const handleShareExcerpt = async () => {
+    if (!bookSlug || !chapterId || typeof window === "undefined") return;
+    const result = await shareOrCopy({
+      title: chapterTitle,
+      text: visibleParagraph,
+      url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
+    });
+    if (result === "copied") showCopyBubble("Đã sao chép liên kết");
+  };
 
   useEffect(() => {
     const loadPenalty = async () => {
@@ -221,6 +374,23 @@ export function Reader() {
     };
 
     loadPenalty();
+  }, []);
+
+  // Cấp "giờ hiện tại" cho isPenaltyActive từ effect (client-only), không
+  // gọi Date.now() lúc render. 30s/lần là đủ mịn — hạn phạt tính theo NGÀY
+  // (3/7/14/30 ngày, xem PENALTY_RULES), không cần chính xác tới giây; tick
+  // định kỳ giúp phạt tự hết hiệu lực trên UI mà không cần refresh trang.
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    // setTimeout(0) thay vì gọi tick() đồng bộ ngay dòng đầu effect —
+    // react-hooks/set-state-in-effect không cho setState đồng bộ ngay
+    // trong thân effect (xem cùng cách xử lý ở reading-list-modal.tsx).
+    const timeout = setTimeout(tick, 0);
+    const interval = setInterval(tick, 30_000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -305,6 +475,37 @@ export function Reader() {
     };
   }, []);
 
+  // Theo dõi đoạn văn đang hiện giữa khung nhìn lúc cuộn — dùng cho nút
+  // chia sẻ ở AuthorPanel ("chia sẻ đoạn đang đọc"). Effect RIÊNG, không
+  // chung với 3 effect chống chụp màn hình ở trên.
+  useEffect(() => {
+    if (paragraphs.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length === 0) return;
+        const viewportMid = window.innerHeight / 2;
+        let best = visible[0];
+        let bestDist = Infinity;
+        for (const e of visible) {
+          const mid = e.boundingClientRect.top + e.boundingClientRect.height / 2;
+          const dist = Math.abs(mid - viewportMid);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = e;
+          }
+        }
+        const idx = Number((best.target as HTMLElement).dataset.paragraphIndex);
+        if (!Number.isNaN(idx) && paragraphs[idx]) setVisibleParagraph(paragraphs[idx]);
+      },
+      { threshold: [0, 0.25, 0.5, 0.75, 1], rootMargin: "-40% 0px -40% 0px" }
+    );
+    const els = paragraphRefs.current;
+    els.forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content]);
+
   return (
     <div style={{ background: c.pageBg }} className="min-h-screen">
       <div
@@ -312,7 +513,7 @@ export function Reader() {
         className="sticky top-0 z-30 flex items-center justify-between border-b px-7 py-3"
       >
         <div className="flex min-w-0 items-center gap-4.5">
-          <Link href="/">
+          <Link href={bookSlug ? `/truyen/${bookSlug}` : "/"}>
             <ArrowLeftIcon
               size={22}
               style={{ color: c.ink }}
@@ -333,10 +534,10 @@ export function Reader() {
                 style={{ color: c.ink }}
                 className="truncate text-[15px] font-semibold"
               >
-                Vũng Vịnh Cuối Trời
+                {bookTitle}
               </div>
               <div style={{ color: c.inkSoft }} className="text-xs">
-                Chương 14 · Đêm không trăng
+                Chương {chapterPosition} · {chapterTitle}
               </div>
             </div>
           </div>
@@ -351,14 +552,30 @@ export function Reader() {
           </Link>
           <ListBulletsIcon
             size={22}
+            role="button"
+            aria-label="Chọn chương"
+            tabIndex={0}
             style={{ color: c.ink }}
             className="cursor-pointer transition-colors hover:text-brand-gold-dark"
+            onClick={() => {
+              // 2 panel nổi (chọn chương/cỡ chữ) đè lên nhau nếu cùng mở —
+              // loại trừ nhau, giống tab, cho gọn.
+              setChapterPickerOpen((v) => !v);
+              setPanelOpen(false);
+            }}
           />
+          <VoteButton variant="compact" voted={voted} voteCount={voteCount} pending={voting} onToggle={handleToggleVote} c={c} />
           <TextAaIcon
             size={23}
+            role="button"
+            aria-label="Tuỳ chỉnh cỡ chữ và nền"
+            tabIndex={0}
             style={{ color: c.ink }}
             className="cursor-pointer transition-colors hover:text-brand-gold-dark"
-            onClick={() => setPanelOpen((v) => !v)}
+            onClick={() => {
+              setPanelOpen((v) => !v);
+              setChapterPickerOpen(false);
+            }}
           />
         </div>
       </div>
@@ -426,7 +643,50 @@ export function Reader() {
         </div>
       )}
 
-      <div className="relative mx-auto max-w-[720px] overflow-hidden px-8 py-[54px] pb-20">
+      {chapterPickerOpen && (
+        <ChapterPicker
+          chapters={chapters}
+          currentChapterId={chapterId}
+          bookSlug={bookSlug}
+          onClose={() => setChapterPickerOpen(false)}
+          c={c}
+        />
+      )}
+
+      <div className="mx-auto max-w-[1160px]">
+        <div className="grid grid-cols-1 xl:grid-cols-[220px_720px_220px] xl:justify-center xl:gap-8">
+          <aside className="hidden xl:block">
+            <div className="sticky top-[90px]">
+              <AuthorPanel
+                variant="rail"
+                authorName={authorName}
+                authorAvatarUrl={authorAvatarUrl}
+                isOwnBook={isOwnBook}
+                showFollowButton={showFollowButton}
+                following={following}
+                pending={followPending}
+                onToggleFollow={handleToggleFollow}
+                onShareExcerpt={handleShareExcerpt}
+                c={c}
+              />
+            </div>
+          </aside>
+
+          <div className="relative mx-auto max-w-[720px] overflow-hidden px-8 py-[54px] pb-20">
+        <div className="relative z-[2] mb-6 xl:hidden">
+          <AuthorPanel
+            variant="inline"
+            authorName={authorName}
+            authorAvatarUrl={authorAvatarUrl}
+            isOwnBook={isOwnBook}
+            showFollowButton={showFollowButton}
+            following={following}
+            pending={followPending}
+            onToggleFollow={handleToggleFollow}
+            onShareExcerpt={handleShareExcerpt}
+            c={c}
+          />
+        </div>
         <div
           aria-hidden="true"
           style={{ inset: "-30% -20%" }}
@@ -450,23 +710,23 @@ export function Reader() {
             style={{ color: c.inkSoft }}
             className="text-xs font-medium tracking-[2px]"
           >
-            CHƯƠNG 14
+            CHƯƠNG {chapterPosition}
           </div>
           <h1
             style={{ color: c.ink }}
             className="mb-1.5 mt-2.5 font-[family-name:var(--font-lora)] text-[34px] font-semibold leading-[1.25]"
           >
-            Đêm không trăng
+            {chapterTitle}
           </h1>
           <div
             style={{ color: c.inkSoft }}
             className="mb-2 flex items-center gap-3.5 text-[13px]"
           >
-            <span>Minh Khôi</span>
+            <span>{authorName}</span>
             <span>·</span>
-            <span>3.240 chữ</span>
+            <span>{wordCount.toLocaleString("vi-VN")} chữ</span>
             <span>·</span>
-            <span>12 phút đọc</span>
+            <span>{readMinutes} phút đọc</span>
           </div>
 
           <div
@@ -502,8 +762,15 @@ export function Reader() {
               style={{ fontSize: `${fontSize}px`, color: c.body }}
               className="font-[family-name:var(--font-lora)] leading-[2]"
             >
-              {PARAGRAPHS.map((p, i) => (
-                <p key={i} className="mb-[1.5em]">
+              {paragraphs.map((p, i) => (
+                <p
+                  key={i}
+                  ref={(el) => {
+                    paragraphRefs.current[i] = el;
+                  }}
+                  data-paragraph-index={i}
+                  className="mb-[1.5em]"
+                >
                   {p}
                 </p>
               ))}
@@ -515,19 +782,75 @@ export function Reader() {
             )}
           </div>
 
-          <div className="mt-[54px] flex gap-3.5">
-            <div
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setListModalOpen(true)}
+              disabled={!bookId}
               style={{ borderColor: c.hair, color: c.ink }}
-              className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border py-[15px] text-sm font-semibold transition-colors hover:border-brand-ink"
+              className="flex cursor-pointer items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors hover:border-brand-ink disabled:cursor-default disabled:opacity-60"
             >
-              <ArrowLeftIcon /> Chương trước
-            </div>
-            <div className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-brand-ink bg-brand-ink py-[15px] text-sm font-semibold text-white">
-              Chương sau <ArrowRightIcon />
-            </div>
+              <BookmarkSimpleIcon /> Thêm
+            </button>
+            <VoteButton variant="full" voted={voted} voteCount={voteCount} pending={voting} onToggle={handleToggleVote} />
+            <button
+              type="button"
+              onClick={handleShareStory}
+              style={{ borderColor: c.hair, color: c.ink }}
+              className="flex cursor-pointer items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors hover:border-brand-ink"
+            >
+              <ShareNetworkIcon /> Chia sẻ
+            </button>
+            {copyBubble && <span className="text-xs font-medium text-brand-gold-dark">{copyBubble}</span>}
+          </div>
+
+          <div className="mt-[30px] flex gap-3.5">
+            {prevChapterId ? (
+              <Link
+                href={`/read/${bookSlug}/${prevChapterId}`}
+                style={{ borderColor: c.hair, color: c.ink }}
+                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border py-[15px] text-sm font-semibold no-underline transition-colors hover:border-brand-ink"
+              >
+                <ArrowLeftIcon /> Chương trước
+              </Link>
+            ) : (
+              <div
+                style={{ borderColor: c.hair, color: c.inkSoft }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border py-[15px] text-sm font-semibold opacity-55"
+              >
+                <ArrowLeftIcon /> Chương trước
+              </div>
+            )}
+            {nextChapterId ? (
+              <Link
+                href={`/read/${bookSlug}/${nextChapterId}`}
+                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-brand-ink bg-brand-ink py-[15px] text-sm font-semibold text-white no-underline"
+              >
+                Chương sau <ArrowRightIcon />
+              </Link>
+            ) : (
+              <div className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border border-brand-ink bg-brand-ink py-[15px] text-sm font-semibold text-white opacity-55">
+                Chương sau <ArrowRightIcon />
+              </div>
+            )}
           </div>
         </div>
+          </div>
+
+          {/* Cột 3 để trống — chỉ để cột giữa (nội dung) canh tâm đúng
+              cách khi cột trái (author rail) đã chiếm chỗ ở xl+. */}
+          <div className="hidden xl:block" />
+        </div>
       </div>
+
+      {bookId && (
+        <ReadingListModal
+          open={listModalOpen}
+          onClose={() => setListModalOpen(false)}
+          bookId={bookId}
+          bookTitle={bookTitle}
+        />
+      )}
     </div>
   );
 }

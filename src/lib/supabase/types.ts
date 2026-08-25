@@ -15,19 +15,22 @@ export type CreatorTag = "author" | "illustrator" | "narrator";
 export type ContentSource = "independent" | "story_upload";
 
 // Dùng bởi hệ thống sinh bìa tự động (src/lib/covers/genre-styles.ts) khi
-// books.cover_design_item_id còn null. 8 giá trị y hệt field `tag` ở mock
-// data (src/lib/books.ts) — không phát sinh taxonomy mới. Cột thật là
-// `text` + CHECK, không phải Postgres enum (migrations/20260819_add_book_genre.sql),
-// nên type ở đây là union thường, không map từ 1 Postgres enum type.
+// books.cover_design_item_id còn null. 10 giá trị = taxonomy CHÍNH THỨC
+// của nền tảng (migrations/20260825_update_book_genres.sql, thay cho 8
+// giá trị tạm ban đầu ở migrations/20260819_add_book_genre.sql). Cột
+// thật là `text` + CHECK, không phải Postgres enum, nên type ở đây là
+// union thường, không map từ 1 Postgres enum type.
 export type BookGenre =
-  | "Ngôn tình"
+  | "Linh dị"
+  | "Cổ tích & Thần thoại"
+  | "Dã sử"
   | "Trinh thám"
-  | "Tản văn"
-  | "Văn học"
-  | "Lịch sử"
-  | "Kỳ ảo"
-  | "Kinh dị"
-  | "Phiêu lưu";
+  | "Tâm lý - tội phạm"
+  | "Tình cảm"
+  | "Đời sống - Xã hội"
+  | "Khoa học viễn tưởng"
+  | "Tiên hiệp/ kiếm hiệp"
+  | "Kỳ ảo";
 
 export type TransactionType =
   | "signup_bonus"
@@ -135,6 +138,13 @@ export type Database = {
           // null = chưa gán thể loại — src/lib/covers dùng style fallback
           // riêng cho trường hợp này, không coi null là lỗi.
           genre: BookGenre | null;
+          // Free text, tác giả tự định nghĩa — KHÁC genre (1 giá trị, danh
+          // sách cố định). Xem migrations/20260824_add_book_tags_and_view_count.sql.
+          tags: string[];
+          // Tăng mỗi lần tải trang chương, không khử trùng lặp. Chỉ đổi
+          // được qua RPC increment_book_view_count() — không có trong
+          // Insert/Update vì client không tự set số này.
+          view_count: number;
           published: boolean;
           // pgvector column — the JS client returns/accepts this as a
           // plain number[] (or null), Postgres handles the vector type.
@@ -149,6 +159,7 @@ export type Database = {
           synopsis?: string | null;
           cover_design_item_id?: string | null;
           genre?: BookGenre | null;
+          tags?: string[];
           published?: boolean;
           embedding?: number[] | null;
         };
@@ -168,6 +179,11 @@ export type Database = {
           price: number;
           // true = chỉ phân phối trên Vịnh (mặc định).
           is_exclusive: boolean;
+          // Checkbox 1 chiều — tối đa 1 chương/sách, không đổi lại được
+          // false sau khi lưu true (trigger DB chặn). Dùng để tính trạng
+          // thái "Đã hoàn thành" ở trang giới thiệu truyện. Xem
+          // migrations/20260824_add_chapter_is_last.sql.
+          is_last_chapter: boolean;
           created_at: string;
         };
         Insert: {
@@ -179,8 +195,83 @@ export type Database = {
           published?: boolean;
           price?: number;
           is_exclusive?: boolean;
+          is_last_chapter?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["chapters"]["Insert"]>;
+        Relationships: [];
+      };
+      chapter_votes: {
+        Row: {
+          id: string;
+          chapter_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          chapter_id: string;
+          user_id: string;
+        };
+        // Toggle = insert (vote) hoặc delete (bỏ vote) — không có update.
+        Update: never;
+        Relationships: [];
+      };
+      book_progress: {
+        Row: {
+          user_id: string;
+          book_id: string;
+          chapter_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          book_id: string;
+          chapter_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["book_progress"]["Insert"]>;
+        Relationships: [];
+      };
+      author_follows: {
+        Row: {
+          follower_id: string;
+          author_id: string;
+          created_at: string;
+        };
+        Insert: {
+          follower_id: string;
+          author_id: string;
+        };
+        // Toggle = insert (theo dõi) hoặc delete (bỏ theo dõi) — không có update.
+        Update: never;
+        Relationships: [];
+      };
+      reading_lists: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+        };
+        Update: { name: string };
+        Relationships: [];
+      };
+      reading_list_items: {
+        Row: {
+          list_id: string;
+          book_id: string;
+          added_at: string;
+        };
+        Insert: {
+          list_id: string;
+          book_id: string;
+        };
+        // Thêm/xoá sách khỏi danh sách = insert/delete — không có update.
+        Update: never;
         Relationships: [];
       };
       transactions: {
@@ -468,8 +559,19 @@ export type Database = {
         };
         Relationships: [];
       };
+      chapter_vote_counts: {
+        Row: {
+          chapter_id: string;
+          vote_count: number;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
+      increment_book_view_count: {
+        Args: { p_book_id: string };
+        Returns: void;
+      };
       apply_transaction: {
         Args: {
           p_user_id: string;

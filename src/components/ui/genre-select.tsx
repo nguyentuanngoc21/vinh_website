@@ -1,20 +1,7 @@
 "use client";
 
 import type { BookGenre } from "@/lib/supabase/types";
-
-// 8 giá trị khớp đúng CHECK constraint books_genre_check
-// (migrations/20260819_add_book_genre.sql) — không định nghĩa lại ở đâu
-// khác, đây là nguồn duy nhất cho UI chọn genre.
-const GENRE_OPTIONS: BookGenre[] = [
-  "Ngôn tình",
-  "Trinh thám",
-  "Tản văn",
-  "Văn học",
-  "Lịch sử",
-  "Kỳ ảo",
-  "Kinh dị",
-  "Phiêu lưu",
-];
+import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 
 type GenreSelectProps = {
   value: BookGenre | null;
@@ -32,7 +19,7 @@ type GenreSelectProps = {
 export function GenreSelect({ value, onChange, className }: GenreSelectProps) {
   return (
     <div className={`flex flex-wrap gap-2 ${className ?? ""}`}>
-      {GENRE_OPTIONS.map((genre) => {
+      {BOOK_GENRES.map((genre) => {
         const active = genre === value;
         return (
           <button

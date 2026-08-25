@@ -6,7 +6,7 @@ function normalizeDigits(text: string): string | null {
   const digits = text.replace(/\D/g, "");
   if (!digits) return null;
 
-  const matches = digits.match(/\d{8,12}/g) ?? [];
+  const matches = digits.match(OCR_DIGIT_REGEX) ?? [];
   if (matches.length === 0) return null;
 
   const candidate = matches[0];

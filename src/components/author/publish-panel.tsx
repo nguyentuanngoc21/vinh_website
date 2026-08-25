@@ -2,7 +2,8 @@
 
 import { CoinsIcon } from "@phosphor-icons/react/dist/ssr";
 import { CopyrightSettings } from "@/components/author/copyright-settings";
-import { GenreSelect } from "@/components/ui";
+import { TagInput } from "@/components/author/tag-input";
+import { Field, GenreSelect } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
 type PublishPanelProps = {
@@ -15,8 +16,15 @@ type PublishPanelProps = {
   onExclusiveChange: (value: boolean) => void;
   price: number;
   onPriceChange: (value: number) => void;
+  bookTitle: string;
+  onBookTitleChange: (title: string) => void;
+  /** Lưu tên truyện — gọi lúc blur, không phải mỗi lần gõ (khác genre/tags,
+   * đổi rời rạc theo click/Enter nên PATCH ngay được). */
+  onBookTitleCommit: () => void;
   genre: BookGenre | null;
   onGenreChange: (genre: BookGenre) => void;
+  tags: string[];
+  onTagsChange: (tags: string[]) => void;
 };
 
 /**
@@ -36,8 +44,13 @@ export function PublishPanel({
   onExclusiveChange,
   price,
   onPriceChange,
+  bookTitle,
+  onBookTitleChange,
+  onBookTitleCommit,
   genre,
   onGenreChange,
+  tags,
+  onTagsChange,
 }: PublishPanelProps) {
   return (
     <div className="flex flex-col overflow-y-auto border-l border-cream-border bg-white">
@@ -71,8 +84,24 @@ export function PublishPanel({
 
         <div className="mb-6 flex flex-col gap-3.5">
           <div>
+            <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tên truyện</div>
+            <Field
+              label={null}
+              value={bookTitle}
+              onChange={(e) => onBookTitleChange(e.target.value)}
+              onBlur={onBookTitleCommit}
+              placeholder="Vũng Vịnh Cuối Trời"
+            />
+          </div>
+
+          <div>
             <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Thể loại</div>
             <GenreSelect value={genre} onChange={onGenreChange} />
+          </div>
+
+          <div>
+            <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tag</div>
+            <TagInput tags={tags} onChange={onTagsChange} />
           </div>
 
           <div>

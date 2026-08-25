@@ -228,9 +228,48 @@ function BackgroundDecoration({
       return <StarDots spec={spec} />;
     case "comic-shadow":
       return <RouteLine spec={spec} />;
+    case "circuit-lines":
+      return <CircuitFrame spec={spec} />;
     default:
       return null;
   }
+}
+
+// Khoa học viễn tưởng — khung 4 góc kiểu HUD + 1 đường ngang mảnh nét đứt,
+// vị trí theo effectSeed. Thuần <path>/<line>, không filter — an toàn ở
+// cả 2 renderer (chỉ SVG dùng file này, nhưng giữ nguyên tắc "core luôn
+// hiện được" cho nhất quán với các effect khác).
+function CircuitFrame({ spec }: { spec: CoverSpec }) {
+  const accent = spec.palette.accent ?? spec.palette.text;
+  const inset = 20;
+  const bracket = 26;
+  const lineY = 130 + (spec.effectSeed % 40);
+  return (
+    <g stroke={accent} fill="none" opacity={0.55}>
+      <path d={`M ${inset} ${inset + bracket} V ${inset} H ${inset + bracket}`} strokeWidth={1.5} />
+      <path
+        d={`M ${VIEW_WIDTH - inset - bracket} ${inset} H ${VIEW_WIDTH - inset} V ${inset + bracket}`}
+        strokeWidth={1.5}
+      />
+      <path
+        d={`M ${inset} ${VIEW_HEIGHT - inset - bracket} V ${VIEW_HEIGHT - inset} H ${inset + bracket}`}
+        strokeWidth={1.5}
+      />
+      <path
+        d={`M ${VIEW_WIDTH - inset - bracket} ${VIEW_HEIGHT - inset} H ${VIEW_WIDTH - inset} V ${VIEW_HEIGHT - inset - bracket}`}
+        strokeWidth={1.5}
+      />
+      <line
+        x1={inset}
+        y1={lineY}
+        x2={VIEW_WIDTH - inset}
+        y2={lineY}
+        strokeWidth={1}
+        strokeDasharray="4 6"
+        opacity={0.6}
+      />
+    </g>
+  );
 }
 
 function StarDots({ spec }: { spec: CoverSpec }) {

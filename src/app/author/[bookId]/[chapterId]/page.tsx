@@ -38,7 +38,7 @@ export default async function AuthorChapterPage({
 
   const { data: book } = await supabase
     .from("books")
-    .select("id, title, genre, author_id")
+    .select("id, title, genre, tags, slug, published, author_id")
     .eq("id", bookId)
     .maybeSingle();
 
@@ -48,7 +48,7 @@ export default async function AuthorChapterPage({
 
   const { data: chapter } = await supabase
     .from("chapters")
-    .select("id, title, content, published, price, is_exclusive")
+    .select("id, title, content, published, price, is_exclusive, is_last_chapter")
     .eq("id", chapterId)
     .eq("book_id", bookId)
     .maybeSingle();
@@ -62,6 +62,9 @@ export default async function AuthorChapterPage({
       bookId={book.id}
       bookTitle={book.title}
       bookGenre={book.genre}
+      bookTags={book.tags}
+      bookSlug={book.slug}
+      bookPublished={book.published}
       chapter={chapter}
     />
   );

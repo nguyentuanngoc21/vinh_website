@@ -5,16 +5,16 @@ import Link from "next/link";
 import {
   ShieldCheckIcon,
   UserCircleIcon,
-  GearIcon,
+  NotebookIcon,
   SignOutIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
-import { CreateWorkModal } from "@/components/author/create-work-modal";
+import { useCreateWork } from "@/lib/authoring/use-create-work";
 
 export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: string }) {
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
+  const { createWork, pending } = useCreateWork();
 
   const initial = session?.name?.[0] ?? "?";
   const userName = session?.name ?? "";
@@ -43,13 +43,15 @@ export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: strin
       ) : (
         // Trước đây là <Link href="/author"> — luôn mở lại đúng 1 trang
         // tĩnh, không phân biệt được "viết truyện mới" với "sửa truyện
-        // cũ". Giờ mở thẳng modal tạo mới, không điều hướng vào sách cũ.
+        // cũ". Giờ tạo sách mới ngay và điều hướng thẳng vào trang viết —
+        // không qua modal hỏi tên/thể loại nữa (sửa được ngay trong lúc viết).
         <button
           type="button"
-          onClick={() => setCreateOpen(true)}
-          className="shrink-0 cursor-pointer whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink"
+          onClick={createWork}
+          disabled={pending}
+          className="shrink-0 cursor-pointer whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
         >
-          {ctaLabel}
+          {pending ? "Đang tạo…" : ctaLabel}
         </button>
       )}
       {isAdmin && (
@@ -93,7 +95,12 @@ export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: strin
                 onClick={() => setMenuOpen(false)}
                 className="flex items-center gap-[11px] px-[18px] py-3 text-sm font-medium text-ink no-underline transition-colors hover:bg-cream-card"
               >
-                <GearIcon size={18} color="var(--color-stone)" /> Cài đặt tài khoản
+                {/* Trước đây ghi "Cài đặt tài khoản" nhưng lại trỏ tới
+                    /author (trang viết truyện) — nhãn sai, khiến tác giả
+                    không biết đây chính là nơi có "Tác phẩm của tôi". Đổi
+                    tên đúng với nơi nó dẫn tới; "/ca-nhan" ở trên mới là
+                    cài đặt tài khoản thật. */}
+                <NotebookIcon size={18} color="var(--color-stone)" /> Trang viết truyện
               </Link>
               <button
                 type="button"
@@ -109,7 +116,6 @@ export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: strin
           )}
         </div>
       )}
-      <CreateWorkModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </>
   );
 }

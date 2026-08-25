@@ -73,6 +73,30 @@ create view public.author_public_profiles as
   select id, username, nickname, avatar_url, creator_tags
   from public.profiles;
 
+-- --- Theo dõi tác giả, dạng toggle (nút Theo dõi/Đang theo dõi ở trang
+-- đọc chương) — quan hệ profile-to-profile nên đặt ngay đây, không thuộc
+-- phần 3 (books/chapters). Composite PK, giống book_progress, không có
+-- bảng nào khác cần FK trỏ vào 1 dòng follow. Route API thật dùng
+-- service-role + userId resolve qua getAuthedUserId() (src/lib/wallet/session.ts)
+-- — RLS dưới đây chỉ là defense-in-depth. Xem
+-- migrations/20260824_add_author_follows.sql. ---
+create table public.author_follows (
+  follower_id uuid not null references auth.users (id) on delete cascade,
+  author_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, author_id),
+  constraint author_follows_no_self_follow check (follower_id <> author_id)
+);
+
+create index author_follows_author_id_idx on public.author_follows (author_id);
+
+alter table public.author_follows enable row level security;
+
+create policy "followers manage their own follow rows"
+  on public.author_follows for all
+  using (auth.uid() = follower_id)
+  with check (auth.uid() = follower_id and follower_id <> author_id);
+
 -- ---------------------------------------------------------------------
 -- 2. Identity verification (CCCD)
 -- ---------------------------------------------------------------------
@@ -198,6 +222,56 @@ alter table public.chapters
 
 alter table public.chapters
   add column is_exclusive boolean not null default true;
+
+-- --- Chương cuối — checkbox 1 chiều ở chapter-editor.tsx, dùng để tính
+-- trạng thái "Đã hoàn thành" ở trang giới thiệu truyện (/truyen/[slug]).
+-- Tối đa 1 chương/sách được true, và KHÔNG được đổi lại false (trigger
+-- dưới đây chặn ở mức DB, áp dụng cả với service-role key).
+-- Xem migrations/20260824_add_chapter_is_last.sql. ---
+alter table public.chapters
+  add column is_last_chapter boolean not null default false;
+
+create unique index chapters_one_last_chapter_per_book_idx
+  on public.chapters (book_id) where is_last_chapter;
+
+create function public.prevent_unset_last_chapter()
+returns trigger as $$
+begin
+  if old.is_last_chapter = true and new.is_last_chapter = false then
+    raise exception 'is_last_chapter is irreversible once set to true (chapter %)', old.id;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger prevent_unset_last_chapter
+  before update on public.chapters
+  for each row execute function public.prevent_unset_last_chapter();
+
+-- --- Tags tự do (KHÁC genre — 1 sách vẫn 1 genre, xem phần 9) + lượt
+-- xem. Xem migrations/20260824_add_book_tags_and_view_count.sql. ---
+alter table public.books
+  add column tags text[] not null default '{}';
+
+alter table public.books
+  add constraint books_tags_length_check check (cardinality(tags) <= 20);
+
+alter table public.books
+  add column view_count integer not null default 0;
+
+alter table public.books
+  add constraint books_view_count_check check (view_count >= 0);
+
+-- security definer: tăng view an toàn dưới race condition, và không cho
+-- client tự set view_count bằng bất kỳ số nào — chỉ +1 đúng 1 sách
+-- published/lần gọi. Escape hatch DUY NHẤT để đổi cột này.
+create function public.increment_book_view_count(p_book_id uuid)
+returns void as $$
+  update public.books set view_count = view_count + 1
+  where id = p_book_id and published;
+$$ language sql security definer set search_path = public;
+
+grant execute on function public.increment_book_view_count(uuid) to anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 4. Storage buckets
@@ -935,6 +1009,100 @@ create policy "users manage their own reading history"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- --- Vote theo-chương, dạng toggle (bấm lại = bỏ vote) — nút "Bình chọn"
+-- trên trang đọc CHƯA được xây (phase sau); schema này chuẩn bị trước để
+-- trang giới thiệu truyện có cột số để hiển thị (sẽ luôn là 0 cho tới khi
+-- nút vote thật ra mắt). Bảng gốc chỉ chủ vote xem được dòng của mình
+-- (giống reading_history) — aggregate công khai đi qua view riêng, giống
+-- pattern public_design_items ở phần 9. Xem
+-- migrations/20260824_add_chapter_votes.sql. ---
+create table public.chapter_votes (
+  id uuid primary key default gen_random_uuid(),
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (chapter_id, user_id)
+);
+
+create index chapter_votes_chapter_id_idx on public.chapter_votes (chapter_id);
+
+alter table public.chapter_votes enable row level security;
+
+create policy "users manage their own chapter votes"
+  on public.chapter_votes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.chapter_vote_counts as
+  select chapter_id, count(*)::integer as vote_count
+  from public.chapter_votes
+  group by chapter_id;
+
+-- Tổng vote của 1 SÁCH = SUM(vote_count) mọi chương thuộc sách đó, tính ở
+-- tầng app — không cần view/cột riêng ở cấp books.
+
+-- --- "Chương đọc gần nhất" cho nút "Tiếp tục đọc" — 1 dòng/cặp (user,
+-- sách), tra O(1). Cố ý là bảng RIÊNG, không thêm unique vào
+-- reading_history ở trên (bảng đó là log đầy đủ cho recommend_books() và
+-- phân tích, không được rút gọn). Xem
+-- migrations/20260824_add_book_progress.sql. ---
+create table public.book_progress (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  book_id uuid not null references public.books (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, book_id)
+);
+
+alter table public.book_progress enable row level security;
+
+create policy "users manage their own book progress"
+  on public.book_progress for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- --- "Danh sách đọc" kiểu playlist YouTube — mỗi danh sách chứa nguyên
+-- SÁCH (không phải chương lẻ), 1 user có nhiều danh sách. 2 bảng, giống
+-- quan hệ books/chapters: 1 bảng cha (metadata danh sách) + 1 bảng con FK
+-- vào cha (sách nào nằm trong danh sách nào). Route API thật (add/remove
+-- item) dùng service-role + tự kiểm reading_lists.user_id = userId trước
+-- khi ghi — RLS dưới đây chỉ defense-in-depth. Xem
+-- migrations/20260824_add_reading_lists.sql. ---
+create table public.reading_lists (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null check (char_length(trim(name)) > 0),
+  created_at timestamptz not null default now()
+);
+
+create index reading_lists_user_id_idx on public.reading_lists (user_id);
+
+alter table public.reading_lists enable row level security;
+
+create policy "users manage their own reading lists"
+  on public.reading_lists for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table public.reading_list_items (
+  list_id uuid not null references public.reading_lists (id) on delete cascade,
+  book_id uuid not null references public.books (id) on delete cascade,
+  added_at timestamptz not null default now(),
+  primary key (list_id, book_id)
+);
+
+create index reading_list_items_book_id_idx on public.reading_list_items (book_id);
+
+alter table public.reading_list_items enable row level security;
+
+-- Không có user_id trực tiếp trên bảng này — ownership đi qua
+-- list_id -> reading_lists.user_id, giống pattern "chapters" join tới
+-- "books.author_id" ở phần 3.
+create policy "users manage items in their own reading lists"
+  on public.reading_list_items for all
+  using (exists (select 1 from public.reading_lists rl where rl.id = list_id and rl.user_id = auth.uid()))
+  with check (exists (select 1 from public.reading_lists rl where rl.id = list_id and rl.user_id = auth.uid()));
+
 -- Index gần-đúng cho tìm kiếm vector nhanh trên tập sách lớn (bỏ qua nếu
 -- catalog còn nhỏ — dưới ~10k sách thì quét tuần tự vẫn đủ nhanh).
 -- create index on public.books using ivfflat (embedding vector_cosine_ops) with (lists = 100);
@@ -1240,22 +1408,24 @@ $$ language plpgsql security definer;
 
 -- --- Genre — dùng bởi hệ thống sinh bìa tự động (src/lib/covers/*) khi
 -- sách chưa có cover_design_item_id. text + CHECK, không phải enum, để sửa
--- 1 giá trị sai hay thêm thể loại thứ 9 chỉ cần đổi constraint, không phải
--- mổ lại type. 8 giá trị lấy đúng từ field `tag` ở mock data
--- (src/lib/books.ts) — không phát sinh taxonomy mới. Nullable: sách cũ
--- chưa có genre, code sinh bìa có nhánh fallback riêng cho null, không cần
+-- 1 giá trị sai hay thêm thể loại chỉ cần đổi constraint, không phải mổ
+-- lại type — đã đúng như vậy: 10 giá trị dưới đây là taxonomy CHÍNH THỨC
+-- của nền tảng, thay thế 8 giá trị tạm ban đầu (xem
+-- migrations/20260825_update_book_genres.sql). Nullable: sách cũ chưa có
+-- genre, code sinh bìa có nhánh fallback riêng cho null, không cần
 -- database nói dối bằng default giả. Không cần RLS/trigger riêng — genre
 -- là cột thường, đã được policy "authors update their own books" ở phần 3
 -- cover sẵn (khác cover_design_item_id, không phải link chéo bảng cần
--- xác thực share_token). Xem migrations/20260819_add_book_genre.sql. ---
+-- xác thực share_token). ---
 alter table public.books
   add column genre text;
 
 alter table public.books
   add constraint books_genre_check
   check (genre is null or genre in (
-    'Ngôn tình', 'Trinh thám', 'Tản văn', 'Văn học',
-    'Lịch sử', 'Kỳ ảo', 'Kinh dị', 'Phiêu lưu'
+    'Linh dị', 'Cổ tích & Thần thoại', 'Dã sử', 'Trinh thám',
+    'Tâm lý - tội phạm', 'Tình cảm', 'Đời sống - Xã hội',
+    'Khoa học viễn tưởng', 'Tiên hiệp/ kiếm hiệp', 'Kỳ ảo'
   ));
 
 create index books_genre_idx

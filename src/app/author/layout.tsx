@@ -32,7 +32,7 @@ export default async function AuthorLayout({ children }: LayoutProps<"/author">)
 
   const { data: bookRows } = await supabase
     .from("books")
-    .select("id, title, genre, published")
+    .select("id, title, genre, slug, published")
     .eq("author_id", userData.user.id)
     .order("created_at", { ascending: false });
 
@@ -55,6 +55,8 @@ export default async function AuthorLayout({ children }: LayoutProps<"/author">)
       id: book.id,
       title: book.title,
       genre: book.genre,
+      slug: book.slug,
+      published: book.published,
       meta: `${chaptersForBook.length} chương · ${book.published ? "Đang ra" : "Bản nháp"}`,
       // chapterRows đã order_index desc — [0] là chương mới nhất.
       latestChapterId: chaptersForBook[0]?.id ?? null,

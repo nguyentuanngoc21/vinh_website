@@ -11,8 +11,8 @@ import { coverFontFamily } from "@/lib/covers/font-family";
  * đó. 2 file chia sẻ DỮ LIỆU qua CoverSpec, không chia sẻ JSX.
  *
  * Vì Satori không chắc hỗ trợ SVG filter (feTurbulence/feDisplacementMap
- * dùng ở bản SVG cho "Kinh dị"/"Tản văn"/"Lịch sử") — bản OG này dùng
- * CSS text-shadow/box-shadow tương đương thay cho filter đúng nghĩa. Chữ
+ * dùng ở bản SVG cho "Linh dị"/"Dã sử") — bản OG này dùng CSS
+ * text-shadow/box-shadow tương đương thay cho filter đúng nghĩa. Chữ
  * chính luôn render bằng màu đặc (spec.palette.text), text-shadow chỉ là
  * lớp thêm — không phụ thuộc effect để đọc được tên sách.
  */
@@ -55,6 +55,8 @@ function effectTextShadow(spec: CoverSpec): string | undefined {
       return `0 0 22px ${accent}`;
     case "distressed":
       return `3px 3px 0 ${accent}, -1px -1px 0 rgba(0,0,0,0.4)`;
+    case "circuit-lines":
+      return `0 0 10px ${accent}, 0 0 2px ${accent}`;
     case "paper-grain":
     case "hairline-border":
     case "sepia-duotone":

@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 import type { BookGenre } from "@/lib/supabase/types";
 
-const VALID_GENRES: readonly BookGenre[] = [
-  "Ngôn tình",
-  "Trinh thám",
-  "Tản văn",
-  "Văn học",
-  "Lịch sử",
-  "Kỳ ảo",
-  "Kinh dị",
-  "Phiêu lưu",
-];
-
 function isBookGenre(value: unknown): value is BookGenre {
-  return typeof value === "string" && (VALID_GENRES as readonly string[]).includes(value);
+  return typeof value === "string" && (BOOK_GENRES as readonly string[]).includes(value);
+}
+
+const MAX_TAGS = 20; // khớp CHECK books_tags_length_check
+
+function parseTags(value: unknown): string[] | null {
+  if (!Array.isArray(value) || !value.every((t) => typeof t === "string")) return null;
+  const cleaned = Array.from(new Set(value.map((t) => t.trim()).filter(Boolean)));
+  return cleaned.slice(0, MAX_TAGS);
 }
 
 /**
@@ -34,12 +32,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
-  const update: { title?: string; genre?: BookGenre } = {};
+  const update: { title?: string; genre?: BookGenre; tags?: string[] } = {};
   if (typeof body.title === "string" && body.title.trim()) {
     update.title = body.title.trim();
   }
   if (isBookGenre(body.genre)) {
     update.genre = body.genre;
+  }
+  const tags = parseTags(body.tags);
+  if (tags) {
+    update.tags = tags;
   }
 
   if (Object.keys(update).length === 0) {
@@ -51,7 +53,7 @@ export async function PATCH(
     .from("books")
     .update(update)
     .eq("id", bookId)
-    .select("id, title, genre")
+    .select("id, title, genre, tags")
     .maybeSingle();
 
   if (error) {

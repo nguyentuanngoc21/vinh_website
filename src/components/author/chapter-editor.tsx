@@ -1,14 +1,16 @@
 "use client";
 
 import { useRef } from "react";
+import Link from "next/link";
 import {
+  ArrowSquareOutIcon,
   CaretRightIcon,
   CloudCheckIcon,
   QuotesIcon,
   MinusIcon,
   TextHTwoIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Field } from "@/components/ui";
+import { Checkbox, Field } from "@/components/ui";
 
 type ChapterEditorProps = {
   bookTitle: string;
@@ -17,6 +19,16 @@ type ChapterEditorProps = {
   content: string;
   onContentChange: (content: string) => void;
   savedAt: Date | null;
+  isLastChapter: boolean;
+  onIsLastChapterToggle: () => void;
+  /** true nếu chương này đã từng lưu is_last_chapter=true — checkbox
+   * khoá lại vĩnh viễn từ đây (không unlock được, khớp trigger DB
+   * prevent_unset_last_chapter). */
+  isLastChapterLocked: boolean;
+  bookSlug: string;
+  /** true = sách đã có ít nhất 1 chương từng xuất bản — /truyen/[slug]
+   * chỉ tồn tại từ lúc đó, nên link "Xem trang truyện" chỉ hiện khi true. */
+  bookPublished: boolean;
 };
 
 /**
@@ -34,6 +46,11 @@ export function ChapterEditor({
   content,
   onContentChange,
   savedAt,
+  isLastChapter,
+  onIsLastChapterToggle,
+  isLastChapterLocked,
+  bookSlug,
+  bookPublished,
 }: ChapterEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -83,6 +100,16 @@ export function ChapterEditor({
           <span className="font-semibold text-brand-ink">{title || "Chương mới"}</span>
         </div>
         <div className="flex items-center gap-3.5 text-[13px] font-medium text-stone-alt">
+          {bookPublished && (
+            <Link
+              href={`/truyen/${bookSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-brand-gold-dark no-underline transition-colors hover:text-brand-ink"
+            >
+              Xem trang truyện <ArrowSquareOutIcon size={13} />
+            </Link>
+          )}
           {savedAt && (
             <span className="flex items-center gap-1">
               <CloudCheckIcon color="#3B9B6F" /> Đã lưu ·{" "}
@@ -105,6 +132,13 @@ export function ChapterEditor({
             <span>{wordCount} chữ</span>
             <span>·</span>
             <span>~{readMin} phút đọc</span>
+          </div>
+
+          <div className={`mb-[22px] ${isLastChapterLocked ? "opacity-60" : ""}`}>
+            <Checkbox checked={isLastChapter} onChange={isLastChapterLocked ? () => {} : onIsLastChapterToggle}>
+              Đây là chương cuối cùng của truyện
+              {isLastChapterLocked && <span className="ml-1 text-stone-alt">(không thể bỏ chọn sau khi lưu)</span>}
+            </Checkbox>
           </div>
 
           <div className="sticky top-0 z-[5] mb-5 flex items-center gap-1 border-b border-cream-border bg-[#FBF8F1] py-2">
