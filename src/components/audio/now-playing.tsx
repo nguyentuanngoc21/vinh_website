@@ -12,6 +12,7 @@ import {
   BookOpenIcon,
   ShieldCheckIcon,
 } from "@phosphor-icons/react/dist/ssr";
+import { VinhMark } from "@/components/ui";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 const SLEEPS: (number | null)[] = [null, 15, 30, 45];
@@ -44,14 +45,7 @@ export function NowPlaying() {
           </div>
         </div>
         <div className="flex items-center gap-2.5">
-          <svg width="28" height="28" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="48" fill="var(--color-brand-ink)" />
-            <path
-              d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
-              fill="var(--color-cream-card-alt)"
-            />
-            <circle cx="44" cy="24" r="3" fill="var(--color-brand-ink)" />
-          </svg>
+          <VinhMark size={28} tone="cream" />
           <div className="text-lg font-extrabold text-white">Vịnh</div>
         </div>
       </div>

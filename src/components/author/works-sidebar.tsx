@@ -6,6 +6,7 @@ import { ArrowSquareOutIcon, PlusIcon, GearIcon } from "@phosphor-icons/react/di
 import { useRole } from "@/lib/role";
 import { useCreateWork } from "@/lib/authoring/use-create-work";
 import { BookCover } from "@/components/covers/book-cover";
+import { VinhMark } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type SidebarBook = {
@@ -35,14 +36,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
     <aside className="flex flex-col overflow-hidden bg-brand-ink-dark text-sidebar-text">
       <div className="flex items-center gap-[9px] border-b border-white/8 px-5 py-[18px]">
         <Link href="/" className="flex flex-1 items-center gap-[9px] no-underline">
-          <svg width="30" height="30" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="48" fill="var(--color-brand-ink)" />
-            <path
-              d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
-              fill="var(--color-cream-card-alt)"
-            />
-            <circle cx="44" cy="24" r="3" fill="var(--color-brand-ink)" />
-          </svg>
+          <VinhMark size={30} tone="cream" />
           <span className="text-[19px] font-extrabold text-white">Vịnh</span>
         </Link>
         <span className="ml-auto rounded-[5px] border border-brand-gold-light/40 px-[7px] py-0.5 text-[11px] font-medium text-brand-gold-light">

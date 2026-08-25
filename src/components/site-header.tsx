@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MagnifyingGlassIcon, BookmarkSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { NavStripLinks } from "@/components/nav-strip-links";
 import { AuthCluster } from "@/components/auth-cluster";
+import { VinhMark } from "@/components/ui";
 
 type SiteHeaderProps = {
   /** Home renders the nav strip itself, further down the page. */
@@ -21,14 +22,7 @@ export function SiteHeader({
   return (
     <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-11 py-4 backdrop-blur">
       <Link href="/" className="flex shrink-0 items-center gap-[9px] no-underline">
-        <svg width="34" height="34" viewBox="0 0 100 100" className="shrink-0">
-          <circle cx="50" cy="50" r="48" fill="var(--color-brand-ink)" />
-          <path
-            d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
-            fill="#fff"
-          />
-          <circle cx="44" cy="24" r="3" fill="var(--color-brand-ink)" />
-        </svg>
+        <VinhMark size={34} tone="ink" className="shrink-0" />
         <span className="text-[27px] font-extrabold tracking-[-0.5px] text-brand-ink">
           Vịnh
         </span>

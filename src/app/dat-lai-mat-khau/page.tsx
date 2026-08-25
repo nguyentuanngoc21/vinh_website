@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FingerprintIcon, HeadphonesIcon, ChartLineUpIcon } from "@phosphor-icons/react/dist/ssr";
 import { ResetPasswordForm } from "@/components/reset-password/reset-password-form";
 import { LegalLink } from "@/components/legal/legal-link";
+import { VinhMark } from "@/components/ui";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -32,14 +33,7 @@ export default function ResetPasswordPage() {
           className="pointer-events-none absolute -bottom-40 -right-36 h-[520px] w-[520px] rounded-full"
         />
         <Link href="/" className="relative flex items-center gap-[11px] text-inherit no-underline">
-          <svg width="40" height="40" viewBox="0 0 100 100" className="shrink-0">
-            <circle cx="50" cy="50" r="48" fill="var(--color-cream-card-alt)" />
-            <path
-              d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
-              fill="var(--color-brand-ink-dark)"
-            />
-            <circle cx="44" cy="24" r="3" fill="var(--color-cream-card-alt)" />
-          </svg>
+          <VinhMark size={40} tone="cream" className="shrink-0" />
           <div className="text-[30px] font-extrabold tracking-[-0.5px]">Vịnh</div>
         </Link>
 

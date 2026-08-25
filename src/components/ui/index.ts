@@ -5,3 +5,4 @@ export { Checkbox } from "./checkbox";
 export { Breadcrumbs, type BreadcrumbItem } from "./breadcrumbs";
 export { GenreSelect } from "./genre-select";
 export { Pill } from "./pill";
+export { VinhMark } from "./vinh-mark";

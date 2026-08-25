@@ -2,6 +2,7 @@
 
 import { FacebookLogoIcon, YoutubeLogoIcon, InstagramLogoIcon } from "@phosphor-icons/react/dist/ssr";
 import { LegalLink } from "@/components/legal/legal-link";
+import { VinhMark } from "@/components/ui";
 
 type FooterLink = { label: string; legalDoc?: "terms" | "privacy" };
 
@@ -40,7 +41,8 @@ export function SiteFooter() {
     <footer className="bg-ink px-11 pb-9 pt-12 text-[#c9c3bd]">
       <div className="grid grid-cols-1 gap-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
-          <div className="mb-3 text-2xl font-extrabold text-brand-gold">
+          <div className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-brand-gold">
+            <VinhMark size={26} tone="cream" />
             Vịnh
           </div>
           <p className="max-w-[280px] text-sm leading-[1.6]">

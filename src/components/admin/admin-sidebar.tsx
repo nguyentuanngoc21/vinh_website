@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
   GearIcon,
 } from "@phosphor-icons/react/dist/ssr";
+import { VinhMark } from "@/components/ui";
 
 // Only "Tổng quan" has a real page today (src/app/admin/page.tsx). The rest
 // are placeholders — give them `href` once their /admin/<route>/page.tsx
@@ -33,14 +34,7 @@ export function AdminSidebar() {
         href="/"
         className="flex items-center gap-[9px] border-b border-white/10 px-5 py-[18px]"
       >
-        <svg width="30" height="30" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="48" fill="var(--color-brand-ink)" />
-          <path
-            d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
-            fill="var(--color-cream-card-alt)"
-          />
-          <circle cx="44" cy="24" r="3" fill="var(--color-brand-ink)" />
-        </svg>
+        <VinhMark size={30} tone="cream" />
         <span className="text-[19px] font-extrabold text-white">Vịnh</span>
         <span className="ml-auto rounded-[5px] border border-brand-gold-light/40 px-[7px] py-0.5 text-[11px] font-medium text-brand-gold-light">
           Admin

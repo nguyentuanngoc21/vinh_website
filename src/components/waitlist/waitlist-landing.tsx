@@ -1,4 +1,5 @@
 import { BookOpenTextIcon, PenNibIcon } from "@phosphor-icons/react/dist/ssr";
+import { VinhMark } from "@/components/ui";
 
 type WaitlistKind = "reader" | "author";
 
@@ -30,14 +31,7 @@ export function WaitlistLanding() {
       />
 
       <div className="relative flex items-center gap-[9px]">
-        <svg width="34" height="34" viewBox="0 0 100 100" className="shrink-0">
-          <circle cx="50" cy="50" r="48" fill="var(--color-cream-card-alt)" />
-          <path
-            d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
-            fill="var(--color-brand-ink-dark)"
-          />
-          <circle cx="44" cy="24" r="3" fill="var(--color-brand-ink-dark)" />
-        </svg>
+        <VinhMark size={34} tone="cream" className="shrink-0" />
         <span className="text-[22px] font-extrabold tracking-[-0.4px]">Vịnh</span>
       </div>
 

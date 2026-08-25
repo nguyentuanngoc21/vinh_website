@@ -17,6 +17,7 @@ import { VoteButton } from "./vote-button";
 import { AuthorPanel } from "./author-panel";
 import { ReadingListModal } from "./reading-list-modal";
 import { shareOrCopy } from "@/lib/share";
+import { VinhMark } from "@/components/ui";
 
 type ThemeName = "cream" | "sepia" | "dark";
 
@@ -521,14 +522,7 @@ export function Reader({
             />
           </Link>
           <div className="flex min-w-0 items-center gap-2.5">
-            <svg width="30" height="30" viewBox="0 0 100 100" className="shrink-0">
-              <circle cx="50" cy="50" r="48" fill="var(--color-brand-ink)" />
-              <path
-                d="M50,98 A48,48 0 0 1 50,2 A24,24 0 0 1 50,50 A24,24 0 0 0 50,98 Z"
-                fill="var(--color-cream-card-alt)"
-              />
-              <circle cx="44" cy="24" r="3" fill="var(--color-brand-ink)" />
-            </svg>
+            <VinhMark size={30} style={{ color: c.ink }} className="shrink-0" />
             <div className="min-w-0">
               <div
                 style={{ color: c.ink }}
