@@ -1431,6 +1431,19 @@ alter table public.books
 create index books_genre_idx
   on public.books (genre) where genre is not null;
 
+-- RLS ("authors update their own books", phần 3) chỉ kiểm AI được sửa
+-- hàng, không kiểm CỘT NÀO — Postgres RLS không làm được việc đó ở cấp
+-- cột. GRANT cấp cột dưới đây là lớp chặn bổ sung: dù đúng là chủ sách,
+-- client chỉ sửa được đúng các cột đang thật sự có đường update từ code
+-- (title/genre/tags qua PATCH /api/authoring/books/[bookId], published tự
+-- flip khi publish chương đầu tiên) — không tự PATCH thẳng
+-- view_count/author_id/... qua REST API của Supabase (anon key + JWT của
+-- chính họ) để bỏ qua route app. Đặt ở đây (không phải ngay sau policy ở
+-- phần 3) vì genre/tags chỉ vừa tồn tại tới điểm này trong file.
+-- Xem migrations/20260825_restrict_books_column_grants.sql.
+revoke update on public.books from authenticated, anon;
+grant update (title, genre, tags, published) on public.books to authenticated;
+
 create function public.regenerate_design_share_token(p_design_item_id uuid)
 returns text as $$
 declare
