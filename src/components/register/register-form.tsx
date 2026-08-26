@@ -51,9 +51,10 @@ export function RegisterForm() {
   const cccdDigits = cccd.replace(/\D/g, "");
   const cccdOk = cccdDigits.length === 12;
 
-  const filled = [email, uname, nickname, pw, pw2, realname, phone].every(
-    (v) => v.trim().length > 0
-  );
+  // realname/phone thuộc mục "Xác minh danh tính" — tùy chọn như CCCD, có
+  // thể bổ sung sau trong Thông tin cá nhân, nên không nằm trong danh sách
+  // trường bắt buộc này nữa.
+  const filled = [email, uname, nickname, pw, pw2].every((v) => v.trim().length > 0);
   // CCCD giờ tùy chọn (có thể bổ sung sau trong Thông tin cá nhân) — chỉ
   // bắt buộc hoàn thiện nếu người dùng đã bắt đầu điền dở (nhập số hoặc
   // chọn 1 trong 2 ảnh), tránh vừa cho qua vừa gửi dữ liệu nửa vời.

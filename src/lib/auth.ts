@@ -13,11 +13,13 @@ export type RegisterPayload = {
   username: string;
   nickname: string;
   password: string;
-  realname: string;
-  phone: string;
-  // Tùy chọn — có thể bổ sung sau trong Thông tin cá nhân (xem
-  // src/app/api/profile/identity/route.ts). Cả 3 field này phải cùng có
-  // hoặc cùng không, register-form.tsx đã đảm bảo điều đó trước khi gọi.
+  // Toàn bộ phần "Xác minh danh tính" đều tùy chọn — có thể bổ sung sau
+  // trong Thông tin cá nhân (xem src/app/api/profile/identity/route.ts và
+  // src/components/profile/identity-form.tsx). realname/phone không còn
+  // bắt buộc như trước. cccd/cccdFront/cccdBack phải cùng có hoặc cùng
+  // không, register-form.tsx đã đảm bảo điều đó trước khi gọi.
+  realname?: string;
+  phone?: string;
   cccd?: string;
   cccdFront?: File;
   cccdBack?: File;
@@ -76,8 +78,8 @@ export async function register(payload: RegisterPayload): Promise<RegisterResult
   body.set("username", payload.username);
   body.set("nickname", payload.nickname);
   body.set("password", payload.password);
-  body.set("realname", payload.realname);
-  body.set("phone", payload.phone);
+  if (payload.realname) body.set("realname", payload.realname);
+  if (payload.phone) body.set("phone", payload.phone);
   if (payload.cccd && payload.cccdFront && payload.cccdBack) {
     body.set("cccd", payload.cccd);
     body.set("cccdFront", payload.cccdFront);

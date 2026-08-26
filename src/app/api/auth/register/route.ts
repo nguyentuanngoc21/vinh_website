@@ -8,10 +8,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
-  // CCCD giờ tùy chọn (xem register-form.tsx) — chỉ bắt buộc nếu người
-  // dùng đã gửi kèm ít nhất 1 trong 3 field liên quan, để tránh nửa vời
-  // (có số mà thiếu ảnh, hoặc ngược lại).
-  const required = ["email", "username", "nickname", "password", "realname", "phone"];
+  // Toàn bộ "Xác minh danh tính" (tên thật, số điện thoại, CCCD + ảnh) đều
+  // tùy chọn ở bước đăng ký — chỉ bắt buộc nếu người dùng đã gửi kèm ít
+  // nhất 1 trong 3 field CCCD, để tránh nửa vời (có số mà thiếu ảnh, hoặc
+  // ngược lại). realname/phone có thể bổ sung sau trong Thông tin cá nhân.
+  const required = ["email", "username", "nickname", "password"];
   const missing = required.filter((key) => !String(form.get(key) ?? "").trim());
 
   const cccdRaw = String(form.get("cccd") ?? "").trim();
@@ -40,8 +41,9 @@ export async function POST(request: Request) {
   const username = String(form.get("username"));
   const nickname = String(form.get("nickname"));
   const password = String(form.get("password"));
-  const realname = String(form.get("realname"));
-  const phone = String(form.get("phone"));
+  // Tùy chọn — bỏ trống thì không set vào profiles (xem insert bên dưới).
+  const realname = String(form.get("realname") ?? "").trim();
+  const phone = String(form.get("phone") ?? "").trim();
 
   if (cccdSubmitted && !/^\d{12}$/.test(cccdRaw)) {
     return NextResponse.json(
@@ -113,8 +115,8 @@ export async function POST(request: Request) {
     id: authData.user.id,
     username,
     nickname,
-    real_name: realname,
-    phone,
+    ...(realname ? { real_name: realname } : {}),
+    ...(phone ? { phone } : {}),
     ...(cccdVerified ? { cccd_last4: cccdRaw.slice(-4), cccd_verified: true } : {}),
   });
   if (profileError) {
