@@ -9,16 +9,26 @@ function isBookGenre(value: unknown): value is BookGenre {
 }
 
 const DEFAULT_TITLE = "Truyện mới";
+const MAX_TAGS = 20; // khớp CHECK books_tags_length_check
+
+function parseTags(value: unknown): string[] {
+  if (!Array.isArray(value) || !value.every((t) => typeof t === "string")) return [];
+  return Array.from(new Set(value.map((t) => t.trim()).filter(Boolean))).slice(0, MAX_TAGS);
+}
 
 /**
- * POST /api/authoring/books — luồng "Viết truyện"/"+ Tác phẩm mới"
- * (src/lib/authoring/use-create-work.ts, dùng chung bởi
- * src/components/auth-cluster.tsx và src/components/author/works-sidebar.tsx):
- * tạo sách mới + chương đầu tiên trong CÙNG 1 request, trả về cả 2 id để
- * client router.push thẳng vào /author/[bookId]/[chapterId] ngay — không
- * còn bước hỏi tên/thể loại nào trước đó (trước đây là 1 modal, bỏ hẳn vì
- * chỉ thêm 1 bước không cần thiết trước khi vào viết). Tên/thể loại đều
- * sửa được ngay trong publish-panel.tsx sau khi đã vào trang viết.
+ * POST /api/authoring/books — tạo sách mới + chương đầu tiên trong CÙNG
+ * 1 request. Trước đây gọi ngay lúc bấm "+ Tác phẩm mới"/"Viết truyện"
+ * (chưa viết gì cũng ghi Supabase) — giờ CHỈ được gọi từ
+ * src/components/author/new-work-workspace.tsx (route /author/new), lúc
+ * tác giả bấm "Lưu nháp"/"Xuất bản" LẦN ĐẦU với nội dung thật đã gõ. "+
+ * Tác phẩm mới"/"Viết truyện" giờ chỉ router.push("/author/new") (xem
+ * works-sidebar.tsx, auth-cluster.tsx) — không gọi route này nữa cho tới
+ * lúc có gì để lưu thật.
+ *
+ * Mọi field đều optional (giữ tương thích nếu có nơi gọi rỗng `{}` như
+ * trước) — thiếu chapterTitle/chapterContent thì tạo "Chương 1" rỗng như
+ * hành vi cũ.
  *
  * Dùng createClient() (RLS thật qua auth.getUser()), KHÔNG service-role —
  * author_id luôn là uuid của chính người gọi, policy "authors manage
@@ -27,11 +37,19 @@ const DEFAULT_TITLE = "Truyện mới";
  */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  // title/genre đều optional — không còn UI nào hỏi trước lúc tạo.
-  // slugifyTitle() luôn thêm hậu tố ngẫu nhiên nên nhiều sách cùng để mặc
-  // định "Truyện mới" vẫn ra slug khác nhau, không đụng unique constraint.
   const title = (typeof body?.title === "string" ? body.title.trim() : "") || DEFAULT_TITLE;
   const genre = isBookGenre(body?.genre) ? body.genre : null;
+  const tags = parseTags(body?.tags);
+  const isExclusive = typeof body?.isExclusive === "boolean" ? body.isExclusive : true;
+
+  const chapterTitle = (typeof body?.chapterTitle === "string" ? body.chapterTitle.trim() : "") || "Chương 1";
+  const chapterContent = typeof body?.chapterContent === "string" ? body.chapterContent : "";
+  const chapterPublished = body?.published === true;
+  let chapterPrice = 0;
+  if (typeof body?.price === "number" && Number.isFinite(body.price) && body.price >= 0) {
+    chapterPrice = Math.round(body.price);
+  }
+  const isLastChapter = body?.isLastChapter === true;
 
   const supabase = await createClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -46,6 +64,8 @@ export async function POST(request: Request) {
       title,
       slug: slugifyTitle(title),
       genre,
+      tags,
+      is_exclusive: isExclusive,
     })
     .select("id")
     .single();
@@ -59,9 +79,12 @@ export async function POST(request: Request) {
     .from("chapters")
     .insert({
       book_id: book.id,
-      title: "Chương 1",
-      content: "",
+      title: chapterTitle,
+      content: chapterContent,
       order_index: 1,
+      published: chapterPublished,
+      price: chapterPrice,
+      is_last_chapter: isLastChapter,
     })
     .select("id")
     .single();
@@ -75,6 +98,15 @@ export async function POST(request: Request) {
       { error: "Đã tạo truyện nhưng không tạo được chương đầu. Vui lòng thử lại.", bookId: book.id },
       { status: 500 }
     );
+  }
+
+  // Cùng side-effect với PATCH /api/authoring/chapters/:id: xuất bản
+  // chương đầu tiên (ngay lúc tạo, nếu tác giả bấm "Xuất bản" làm hành
+  // động lưu đầu tiên) khiến sách đó công khai — books.published mặc
+  // định false lúc insert ở trên.
+  if (chapterPublished) {
+    const { error: publishError } = await supabase.from("books").update({ published: true }).eq("id", book.id);
+    if (publishError) console.error("[authoring] publish book at creation failed:", publishError);
   }
 
   return NextResponse.json({ bookId: book.id, chapterId: chapter.id });

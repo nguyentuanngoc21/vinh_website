@@ -12,14 +12,13 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { VinhMark } from "@/components/ui";
 
-// Only "Tổng quan" has a real page today (src/app/admin/page.tsx). The rest
-// are placeholders — give them `href` once their /admin/<route>/page.tsx
-// exists, and the active-state check below (which compares against the
-// real pathname) will pick them up automatically.
+// Chỉ "Tổng quan" và "Nội dung" có trang thật — còn lại vẫn là placeholder,
+// cho href một khi /admin/<route>/page.tsx tồn tại, active-state check
+// dưới đây (so theo pathname thật) sẽ tự nhận ra.
 const NAV_ITEMS = [
   { label: "Tổng quan", icon: ChartLineUpIcon, href: "/admin" },
   { label: "Giao dịch", icon: ReceiptIcon, href: null },
-  { label: "Nội dung", icon: BooksIcon, href: null },
+  { label: "Nội dung", icon: BooksIcon, href: "/admin/noi-dung" },
   { label: "Người dùng", icon: UsersThreeIcon, href: null },
   { label: "Bản quyền", icon: ShieldCheckIcon, href: null },
   { label: "Cài đặt", icon: GearIcon, href: null },

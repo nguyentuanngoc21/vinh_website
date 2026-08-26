@@ -38,17 +38,19 @@ export default async function AuthorChapterPage({
 
   const { data: book } = await supabase
     .from("books")
-    .select("id, title, genre, tags, slug, published, author_id")
+    .select("id, title, genre, tags, slug, published, author_id, is_exclusive, published_at, deleted_at")
     .eq("id", bookId)
     .maybeSingle();
 
-  if (!book || book.author_id !== userData.user.id) {
+  // deleted_at khác null: sách đã bị tác giả xoá (soft-delete) — coi như
+  // không tồn tại với chính họ nữa, giống không tìm thấy.
+  if (!book || book.author_id !== userData.user.id || book.deleted_at) {
     notFound();
   }
 
   const { data: chapter } = await supabase
     .from("chapters")
-    .select("id, title, content, published, price, is_exclusive, is_last_chapter")
+    .select("id, title, content, published, price, is_last_chapter")
     .eq("id", chapterId)
     .eq("book_id", bookId)
     .maybeSingle();
@@ -65,6 +67,8 @@ export default async function AuthorChapterPage({
       bookTags={book.tags}
       bookSlug={book.slug}
       bookPublished={book.published}
+      bookIsExclusive={book.is_exclusive}
+      bookPublishedAt={book.published_at}
       chapter={chapter}
     />
   );

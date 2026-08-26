@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * PATCH /api/authoring/chapters/:chapterId — dùng cho cả "Lưu nháp"
  * (published: false) và "Xuất bản" (published: true) ở
- * chapter-editor.tsx/publish-panel.tsx, cùng việc lưu Độc quyền/Giá
- * chương (is_exclusive/price — migrations/20260820_add_chapter_price.sql).
+ * chapter-editor.tsx/publish-panel.tsx, cùng việc lưu Giá chương (price —
+ * migrations/20260820_add_chapter_price.sql). Độc quyền KHÔNG còn ở đây —
+ * đã chuyển lên cấp truyện (books.is_exclusive, PATCH qua
+ * /api/authoring/books/[bookId] — xem migrations/20260826_add_book_exclusivity.sql).
  * Không tự check ownership tay — policy "authors update chapters on
  * their own books" (docs/supabase/schema.sql) đã chặn qua RLS.
  */
@@ -24,7 +26,6 @@ export async function PATCH(
     content?: string;
     published?: boolean;
     price?: number;
-    is_exclusive?: boolean;
     is_last_chapter?: boolean;
   } = {};
 
@@ -34,7 +35,6 @@ export async function PATCH(
   if (typeof body.price === "number" && Number.isFinite(body.price) && body.price >= 0) {
     update.price = Math.round(body.price);
   }
-  if (typeof body.is_exclusive === "boolean") update.is_exclusive = body.is_exclusive;
   if (typeof body.is_last_chapter === "boolean") update.is_last_chapter = body.is_last_chapter;
 
   if (Object.keys(update).length === 0) {
@@ -65,7 +65,7 @@ export async function PATCH(
     .from("chapters")
     .update(update)
     .eq("id", chapterId)
-    .select("id, book_id, title, content, published, price, is_exclusive, is_last_chapter")
+    .select("id, book_id, title, content, published, price, is_last_chapter")
     .maybeSingle();
 
   if (error) {

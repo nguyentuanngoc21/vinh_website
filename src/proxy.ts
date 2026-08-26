@@ -37,7 +37,11 @@ export async function proxy(request: NextRequest) {
   const needsAnyLogin =
     needsAuthor || READER_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
 
-  if (needsAdmin && session?.role !== "admin") {
+  // super_admin có mọi quyền của admin CỘNG THÊM (docs/supabase/schema.sql)
+  // — trước đây chỉ check === "admin" nên 1 tài khoản super_admin bị đá
+  // khỏi /admin hoàn toàn. getAuthedAdminId() (src/lib/wallet/session.ts)
+  // đã chấp nhận cả 2 role đúng cách; sửa lại đây cho khớp.
+  if (needsAdmin && session?.role !== "admin" && session?.role !== "super_admin") {
     return redirectToLogin(request);
   }
 

@@ -143,7 +143,9 @@ export async function requireAdmin(): Promise<Session> {
   const { redirect } = await import("next/navigation");
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const session = await decodeSession(token);
-  if (!session || session.role !== "admin") {
+  // super_admin có mọi quyền của admin CỘNG THÊM — cùng lý do sửa ở
+  // src/proxy.ts, khớp getAuthedAdminId() (src/lib/wallet/session.ts).
+  if (!session || (session.role !== "admin" && session.role !== "super_admin")) {
     redirect("/dang-nhap");
     throw new Error("unreachable"); // `redirect()` throws; this satisfies TS's control-flow analysis
   }

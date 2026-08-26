@@ -9,12 +9,10 @@ import {
   SignOutIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
-import { useCreateWork } from "@/lib/authoring/use-create-work";
 
 export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: string }) {
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { createWork, pending } = useCreateWork();
 
   const initial = session?.name?.[0] ?? "?";
   const userName = session?.name ?? "";
@@ -43,16 +41,16 @@ export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: strin
       ) : (
         // Trước đây là <Link href="/author"> — luôn mở lại đúng 1 trang
         // tĩnh, không phân biệt được "viết truyện mới" với "sửa truyện
-        // cũ". Giờ tạo sách mới ngay và điều hướng thẳng vào trang viết —
-        // không qua modal hỏi tên/thể loại nữa (sửa được ngay trong lúc viết).
-        <button
-          type="button"
-          onClick={createWork}
-          disabled={pending}
-          className="shrink-0 cursor-pointer whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+        // cũ". Sau đó đổi sang tạo sách ngay (POST) rồi điều hướng — giờ
+        // đổi lại lần nữa: chỉ mở /author/new (KHÔNG ghi Supabase), sách
+        // chỉ thật sự được tạo lúc bấm Lưu/Xuất bản lần đầu ở đó (xem
+        // new-work-workspace.tsx + POST /api/authoring/books).
+        <Link
+          href="/author/new"
+          className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
         >
-          {pending ? "Đang tạo…" : ctaLabel}
-        </button>
+          {ctaLabel}
+        </Link>
       )}
       {isAdmin && (
         <Link

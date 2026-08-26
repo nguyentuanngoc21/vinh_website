@@ -169,9 +169,13 @@ create table public.books (
 
 alter table public.books enable row level security;
 
+-- deleted_at is null: sách bị soft-delete (phần 3b, xem
+-- migrations/20260826_add_book_soft_delete.sql) không còn hiện với khách
+-- công khai, dù published vẫn true. Tác giả (auth.uid() = author_id) vẫn
+-- thấy được để khôi phục.
 create policy "published books are public"
   on public.books for select
-  using (published or auth.uid() = author_id);
+  using ((published and deleted_at is null) or auth.uid() = author_id);
 
 create policy "authors manage their own books"
   on public.books for insert
@@ -196,7 +200,9 @@ alter table public.chapters enable row level security;
 create policy "published chapters follow their book's visibility"
   on public.chapters for select
   using (
-    published and exists (select 1 from public.books b where b.id = book_id and b.published)
+    published and exists (
+      select 1 from public.books b where b.id = book_id and b.published and b.deleted_at is null
+    )
     or exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid())
   );
 
@@ -272,6 +278,46 @@ returns void as $$
 $$ language sql security definer set search_path = public;
 
 grant execute on function public.increment_book_view_count(uuid) to anon, authenticated;
+
+-- --- Soft-delete cho books — KHÔNG có DELETE thật/policy delete/GRANT
+-- delete ở đâu cả. deleted_at is null = còn sống. Điều kiện được phép xoá
+-- (chưa published, hoặc published nhưng không exclusive; và không có
+-- purchase_transactions nào của chương thuộc sách) enforce ở API route
+-- (src/app/api/authoring/books/[bookId]/route.ts, DELETE) — không ở DB,
+-- vì purchase_transactions.chapter_id là uuid trần, không FK, và rule
+-- phụ thuộc business logic. Xem migrations/20260826_add_book_soft_delete.sql. ---
+alter table public.books
+  add column deleted_at timestamptz;
+
+-- --- Độc quyền chuyển lên cấp TRUYỆN (trước đây chỉ có chapters.is_exclusive
+-- ở phần 3, không nhất quán giữa các chương cùng 1 sách). Cột
+-- chapters.is_exclusive GIỮ NGUYÊN, không drop — app đã ngừng đọc/viết nó.
+-- published_at: mốc để tính "khoá exclusivity 3 ngày sau khi publish" —
+-- set đúng 1 lần bởi trigger dưới, KHÔNG có trong bất kỳ GRANT nào (tác
+-- giả không được tự set/backdate). Rule 3-ngày enforce ở API route
+-- (không phải CHECK/trigger — CHECK không re-evaluate theo now() khi
+-- thời gian trôi qua, và admin override qua service-role phải bypass
+-- được rule này mà service-role không bypass trigger/constraint).
+-- Xem migrations/20260826_add_book_exclusivity.sql. ---
+alter table public.books
+  add column is_exclusive boolean not null default true;
+
+alter table public.books
+  add column published_at timestamptz;
+
+create function public.set_book_published_at()
+returns trigger as $$
+begin
+  if old.published = false and new.published = true and new.published_at is null then
+    new.published_at := now();
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger set_book_published_at
+  before update on public.books
+  for each row execute function public.set_book_published_at();
 
 -- ---------------------------------------------------------------------
 -- 4. Storage buckets
@@ -1440,9 +1486,13 @@ create index books_genre_idx
 -- view_count/author_id/... qua REST API của Supabase (anon key + JWT của
 -- chính họ) để bỏ qua route app. Đặt ở đây (không phải ngay sau policy ở
 -- phần 3) vì genre/tags chỉ vừa tồn tại tới điểm này trong file.
--- Xem migrations/20260825_restrict_books_column_grants.sql.
+-- Xem migrations/20260825_restrict_books_column_grants.sql. Danh sách
+-- cột được mở rộng thêm deleted_at (soft-delete) và is_exclusive (độc
+-- quyền cấp truyện) bởi migrations/20260826_add_book_soft_delete.sql và
+-- 20260826_add_book_exclusivity.sql — published_at CỐ Ý không có trong
+-- danh sách này, xem comment ở phần 3.
 revoke update on public.books from authenticated, anon;
-grant update (title, genre, tags, published) on public.books to authenticated;
+grant update (title, genre, tags, published, deleted_at, is_exclusive) on public.books to authenticated;
 
 create function public.regenerate_design_share_token(p_design_item_id uuid)
 returns text as $$

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowSquareOutIcon, CoinsIcon, PlusIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOutIcon, CoinsIcon, PlusIcon, TrashIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
 import type { BookGenre } from "@/lib/supabase/types";
 
@@ -13,7 +13,6 @@ export type OverviewChapter = {
   order_index: number;
   published: boolean;
   price: number;
-  is_exclusive: boolean;
   is_last_chapter: boolean;
 };
 
@@ -23,6 +22,7 @@ type BookOverviewProps = {
   bookGenre: BookGenre | null;
   bookSlug: string;
   bookPublished: boolean;
+  bookIsExclusive: boolean;
   /** Đã order by order_index asc từ page.tsx. */
   chapters: OverviewChapter[];
 };
@@ -38,14 +38,39 @@ export function BookOverview({
   bookGenre,
   bookSlug,
   bookPublished,
+  bookIsExclusive,
   chapters,
 }: BookOverviewProps) {
   const router = useRouter();
   const [creatingChapter, setCreatingChapter] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const latest = chapters[chapters.length - 1] ?? null;
   const publishedCount = chapters.filter((c) => c.published).length;
+
+  // Chỉ để hiện/disable nút — server (DELETE route) là chốt chặn thật
+  // (còn kiểm cả lịch sử giao dịch mua chương, việc client không biết).
+  const canDelete = !bookPublished || !bookIsExclusive;
+
+  const handleDelete = async () => {
+    if (deleting || !canDelete) return;
+    if (!window.confirm(`Xoá truyện "${bookTitle}"? Truyện sẽ ẩn khỏi danh sách của bạn.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/authoring/books/${bookId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert((data && typeof data.error === "string" && data.error) || "Không xoá được. Vui lòng thử lại.");
+        setDeleting(false);
+        return;
+      }
+      router.push("/author");
+    } catch {
+      alert("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
+      setDeleting(false);
+    }
+  };
 
   const handleNewChapter = async () => {
     if (creatingChapter) return;
@@ -106,6 +131,19 @@ export function BookOverview({
           </div>
         </div>
         <div className="flex shrink-0 gap-2.5">
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={!canDelete || deleting}
+            title={
+              !canDelete
+                ? "Không thể xoá tác phẩm đã xuất bản ở dạng độc quyền — chuyển sang tự do trước, hoặc liên hệ quản trị viên."
+                : undefined
+            }
+            className="flex items-center gap-1.5 rounded-[9px] border border-[#f3c6c6] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-[#B02A37] disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <TrashIcon size={16} /> {deleting ? "Đang xoá…" : "Xoá truyện"}
+          </button>
           <button
             type="button"
             onClick={() => setShowImport(true)}

@@ -146,6 +146,19 @@ export type Database = {
           // Insert/Update vì client không tự set số này.
           view_count: number;
           published: boolean;
+          // true = chỉ phân phối trên Vịnh (mặc định) — độc quyền giờ ở
+          // cấp TRUYỆN (chapters.is_exclusive vẫn còn cột nhưng app không
+          // đọc/viết nữa). Xem migrations/20260826_add_book_exclusivity.sql.
+          is_exclusive: boolean;
+          // Mốc lúc published chuyển false -> true, set 1 lần bởi trigger
+          // set_book_published_at — KHÔNG có trong Insert/Update, client
+          // không tự set/backdate được (đây là mốc tính khoá exclusivity
+          // 3 ngày). null = chưa từng published, hoặc published từ trước
+          // migration này (không backfill).
+          published_at: string | null;
+          // null = còn sống. Soft-delete — không có DELETE thật. Xem
+          // migrations/20260826_add_book_soft_delete.sql.
+          deleted_at: string | null;
           // pgvector column — the JS client returns/accepts this as a
           // plain number[] (or null), Postgres handles the vector type.
           embedding: number[] | null;
@@ -161,6 +174,8 @@ export type Database = {
           genre?: BookGenre | null;
           tags?: string[];
           published?: boolean;
+          is_exclusive?: boolean;
+          deleted_at?: string | null;
           embedding?: number[] | null;
         };
         Update: Partial<Database["public"]["Tables"]["books"]["Insert"]>;
@@ -177,7 +192,10 @@ export type Database = {
           // Số token đọc chương, 0 = miễn phí. Giá niêm yết — chưa tự
           // động nối vào create_purchase()/purchase_transactions.
           price: number;
-          // true = chỉ phân phối trên Vịnh (mặc định).
+          // DEPRECATED — độc quyền giờ đọc/viết ở books.is_exclusive (cấp
+          // truyện, không phải từng chương). Cột này vẫn còn trong DB
+          // (không drop) nhưng app không đọc/viết nữa. Xem
+          // migrations/20260826_add_book_exclusivity.sql.
           is_exclusive: boolean;
           // Checkbox 1 chiều — tối đa 1 chương/sách, không đổi lại được
           // false sau khi lưu true (trigger DB chặn). Dùng để tính trạng

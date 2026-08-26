@@ -34,6 +34,7 @@ export default async function AuthorLayout({ children }: LayoutProps<"/author">)
     .from("books")
     .select("id, title, genre, slug, published")
     .eq("author_id", userData.user.id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   const bookIds = (bookRows ?? []).map((b) => b.id);

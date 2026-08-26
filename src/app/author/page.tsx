@@ -20,6 +20,7 @@ export default async function AuthorIndexPage() {
     .from("books")
     .select("id")
     .eq("author_id", userData.user.id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

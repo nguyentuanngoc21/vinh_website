@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChapterEditor } from "@/components/author/chapter-editor";
 import { PublishPanel } from "@/components/author/publish-panel";
+import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type WorkspaceChapter = {
@@ -11,7 +12,6 @@ export type WorkspaceChapter = {
   content: string;
   published: boolean;
   price: number;
-  is_exclusive: boolean;
   is_last_chapter: boolean;
 };
 
@@ -22,6 +22,10 @@ type AuthorWorkspaceProps = {
   bookTags: string[];
   bookSlug: string;
   bookPublished: boolean;
+  // Độc quyền giờ ở cấp TRUYỆN (books.is_exclusive), không phải chương —
+  // xem migrations/20260826_add_book_exclusivity.sql.
+  bookIsExclusive: boolean;
+  bookPublishedAt: string | null;
   chapter: WorkspaceChapter;
 };
 
@@ -39,6 +43,8 @@ export function AuthorWorkspace({
   bookTags,
   bookSlug,
   bookPublished,
+  bookIsExclusive,
+  bookPublishedAt,
   chapter,
 }: AuthorWorkspaceProps) {
   const [bookTitle, setBookTitle] = useState(initialBookTitle);
@@ -51,7 +57,8 @@ export function AuthorWorkspace({
   const [content, setContent] = useState(chapter.content);
   const [published, setPublished] = useState(chapter.published);
   const [price, setPrice] = useState(chapter.price);
-  const [isExclusive, setIsExclusive] = useState(chapter.is_exclusive);
+  const [isExclusive, setIsExclusive] = useState(bookIsExclusive);
+  const [exclusiveError, setExclusiveError] = useState<string | null>(null);
   const [genre, setGenre] = useState<BookGenre | null>(bookGenre);
   const [tags, setTags] = useState<string[]>(bookTags);
   const [isLastChapter, setIsLastChapter] = useState(chapter.is_last_chapter);
@@ -77,7 +84,6 @@ export function AuthorWorkspace({
           content,
           published: nextPublished,
           price,
-          is_exclusive: isExclusive,
           is_last_chapter: isLastChapter,
         }),
       });
@@ -100,6 +106,42 @@ export function AuthorWorkspace({
     setSavedAt(new Date());
     setSaving(false);
   };
+
+  // Không optimistic-rollback-lặng-lẽ như handleGenreChange/handleTagsChange
+  // — đổi độc quyền có thể bị SERVER chặn (khoá 3 ngày, xem
+  // migrations/20260826_add_book_exclusivity.sql), nên phải chờ phản hồi
+  // trước khi coi là thành công, và trả lỗi rõ nếu bị chặn.
+  const handleExclusiveChange = async (nextExclusive: boolean) => {
+    setExclusiveError(null);
+    try {
+      const res = await fetch(`/api/authoring/books/${bookId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_exclusive: nextExclusive }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setExclusiveError(
+          (data && typeof data.error === "string" && data.error) || "Không đổi được. Vui lòng thử lại."
+        );
+        return;
+      }
+      setIsExclusive(nextExclusive);
+    } catch {
+      setExclusiveError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
+    }
+  };
+
+  // Chỉ chiều true -> false bị khoá — server (route PATCH books) là nơi
+  // enforce thật; đây chỉ để disable nút + giải thích trước khi bấm,
+  // tránh gửi request chắc chắn bị 403. Có thể lệch nếu vừa xuất bản
+  // trong cùng phiên này (published_at server mới set chưa refetch về
+  // client) — chấp nhận được, server vẫn là chốt chặn thật.
+  const exclusiveLocked = isExclusivityLocked({
+    isExclusive,
+    published: isBookPublished,
+    publishedAt: bookPublishedAt,
+  });
 
   const handleGenreChange = async (nextGenre: BookGenre) => {
     setGenre(nextGenre);
@@ -174,7 +216,9 @@ export function AuthorWorkspace({
         onSaveDraft={() => save(false)}
         onPublish={() => save(true)}
         isExclusive={isExclusive}
-        onExclusiveChange={setIsExclusive}
+        onExclusiveChange={handleExclusiveChange}
+        exclusiveLocked={exclusiveLocked}
+        exclusiveError={exclusiveError}
         price={price}
         onPriceChange={setPrice}
         bookTitle={bookTitle}

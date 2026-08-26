@@ -14,6 +14,11 @@ type PublishPanelProps = {
   onPublish: () => void;
   isExclusive: boolean;
   onExclusiveChange: (value: boolean) => void;
+  // true = đã xuất bản độc quyền quá 3 ngày — không cho đổi về tự do nữa
+  // (xem migrations/20260826_add_book_exclusivity.sql). Chỉ khoá chiều
+  // true -> false; chọn "Độc quyền" luôn bấm được.
+  exclusiveLocked: boolean;
+  exclusiveError: string | null;
   price: number;
   onPriceChange: (value: number) => void;
   bookTitle: string;
@@ -42,6 +47,8 @@ export function PublishPanel({
   onPublish,
   isExclusive,
   onExclusiveChange,
+  exclusiveLocked,
+  exclusiveError,
   price,
   onPriceChange,
   bookTitle,
@@ -123,7 +130,9 @@ export function PublishPanel({
               <button
                 type="button"
                 onClick={() => onExclusiveChange(false)}
-                className={`flex-1 cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${
+                disabled={exclusiveLocked}
+                title={exclusiveLocked ? "Đã độc quyền quá 3 ngày kể từ lúc xuất bản — không đổi lại được." : undefined}
+                className={`flex-1 cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
                   !isExclusive
                     ? "bg-brand-ink text-white"
                     : "border border-cream-border bg-white text-stone-alt"
@@ -133,10 +142,15 @@ export function PublishPanel({
               </button>
             </div>
             <div className="mt-2 text-[12px] text-stone-alt">
-              {isExclusive
-                ? "Truyện này chỉ được phân phối trên Vịnh. Tác giả giữ quyền tái bản."
-                : "Tác giả có thể xuất bản truyện này ở các nền tảng khác."}
+              {exclusiveLocked
+                ? "Đã xuất bản độc quyền quá 3 ngày — không thể chuyển về tự do nữa (liên hệ quản trị viên nếu cần)."
+                : isExclusive
+                  ? "Truyện này chỉ được phân phối trên Vịnh. Tác giả giữ quyền tái bản."
+                  : "Tác giả có thể xuất bản truyện này ở các nền tảng khác."}
             </div>
+            {exclusiveError && (
+              <div className="mt-2 text-[12px] font-medium text-[#B02A37]">{exclusiveError}</div>
+            )}
           </div>
 
           <div>

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowSquareOutIcon, PlusIcon, GearIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
-import { useCreateWork } from "@/lib/authoring/use-create-work";
 import { BookCover } from "@/components/covers/book-cover";
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
 import { VinhMark } from "@/components/ui";
@@ -28,7 +27,6 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
   // /author/[bookId]/... → phần tử thứ 3 sau khi split("/").
   const activeBookId = pathname?.split("/")[2];
   const { session } = useRole();
-  const { createWork, pending } = useCreateWork();
   const [showImport, setShowImport] = useState(false);
 
   return (
@@ -108,14 +106,12 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={createWork}
-        disabled={pending}
-        className="mx-4 mt-3.5 cursor-pointer rounded-[9px] border border-dashed border-white/22 p-[11px] text-center text-[13px] font-semibold text-sidebar-text-dim disabled:cursor-default disabled:opacity-60"
+      <Link
+        href="/author/new"
+        className="mx-4 mt-3.5 block cursor-pointer rounded-[9px] border border-dashed border-white/22 p-[11px] text-center text-[13px] font-semibold text-sidebar-text-dim no-underline"
       >
-        <PlusIcon className="inline" /> {pending ? "Đang tạo…" : "Tác phẩm mới"}
-      </button>
+        <PlusIcon className="inline" /> Tác phẩm mới
+      </Link>
 
       <button
         type="button"
