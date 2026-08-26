@@ -8,7 +8,6 @@ import {
   EyeSlashIcon,
   ArrowRightIcon,
   ArrowLeftIcon,
-  IdentificationCardIcon,
   CheckCircleIcon,
   InfoIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -16,8 +15,9 @@ import { useRole } from "@/lib/role";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
 import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/lib/password-strength";
 import { LegalLink } from "@/components/legal/legal-link";
+import { CccdUploadTiles, type CccdSlotKey } from "@/components/register/cccd-upload-tiles";
 
-type SlotKey = "front" | "back";
+type SlotKey = CccdSlotKey;
 
 export function RegisterForm() {
   const searchParams = useSearchParams();
@@ -51,20 +51,26 @@ export function RegisterForm() {
   const cccdDigits = cccd.replace(/\D/g, "");
   const cccdOk = cccdDigits.length === 12;
 
-  const filled = [email, uname, nickname, pw, pw2, realname, phone, cccd].every(
+  const filled = [email, uname, nickname, pw, pw2, realname, phone].every(
     (v) => v.trim().length > 0
   );
-  const ready = filled && match && cccdOk && agree && !!files.front && !!files.back && !pending;
+  // CCCD giờ tùy chọn (có thể bổ sung sau trong Thông tin cá nhân) — chỉ
+  // bắt buộc hoàn thiện nếu người dùng đã bắt đầu điền dở (nhập số hoặc
+  // chọn 1 trong 2 ảnh), tránh vừa cho qua vừa gửi dữ liệu nửa vời.
+  const cccdStarted = cccd.length > 0 || !!files.front || !!files.back;
+  const cccdComplete = cccdOk && !!files.front && !!files.back;
+  const cccdReady = !cccdStarted || cccdComplete;
+  const ready = filled && match && cccdReady && agree && !pending;
 
   const missing = useMemo(() => {
     const list: string[] = [];
     if (!filled) list.push("điền hết các trường");
     if (pw2.length > 0 && !match) list.push("mật khẩu khớp nhau");
-    if (cccd.length > 0 && !cccdOk) list.push("CCCD đủ 12 số");
-    if (!files.front || !files.back) list.push("tải cả hai mặt căn cước");
+    if (cccdStarted && !cccdOk) list.push("CCCD đủ 12 số");
+    if (cccdStarted && (!files.front || !files.back)) list.push("tải cả hai mặt căn cước");
     if (!agree) list.push("đồng ý điều khoản");
     return list;
-  }, [filled, pw2, match, cccd, cccdOk, files, agree]);
+  }, [filled, pw2, match, cccdStarted, cccdOk, files, agree]);
 
   const onFile = (slot: SlotKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -73,7 +79,7 @@ export function RegisterForm() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!ready || !files.front || !files.back) return;
+    if (!ready) return;
     setPending(true);
     setError(null);
     const result = await register({
@@ -83,9 +89,12 @@ export function RegisterForm() {
       password: pw,
       realname: realname.trim(),
       phone: phone.trim(),
-      cccd: cccdDigits,
-      cccdFront: files.front,
-      cccdBack: files.back,
+      // Chỉ đính CCCD khi người dùng đã điền đủ cả 3 — bỏ trống hoàn toàn
+      // thì không gửi gì, register() ở lib/auth.ts sẽ không set các field
+      // này vào FormData.
+      ...(cccdComplete && files.front && files.back
+        ? { cccd: cccdDigits, cccdFront: files.front, cccdBack: files.back }
+        : {}),
     });
     setPending(false);
     if (!result.ok) {
@@ -243,7 +252,10 @@ export function RegisterForm() {
       </div>
 
       <div className="mb-3.5 mt-[30px] text-[11.5px] font-semibold tracking-[1.3px] text-brand-gold-dark">
-        2 · XÁC MINH DANH TÍNH
+        2 · XÁC MINH DANH TÍNH{" "}
+        <span className="font-normal normal-case tracking-normal text-stone-light">
+          (tùy chọn — có thể bổ sung sau trong Thông tin cá nhân)
+        </span>
       </div>
       <div className="flex flex-col gap-3.5">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -279,39 +291,7 @@ export function RegisterForm() {
           <div className="mb-[7px] text-[13px] font-semibold text-slate">
             Ảnh căn cước công dân
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {(
-              [
-                { key: "front" as const, title: "Mặt trước" },
-                { key: "back" as const, title: "Mặt sau" },
-              ]
-            ).map((slot) => {
-              const file = files[slot.key];
-              return (
-                <label
-                  key={slot.key}
-                  style={{
-                    borderColor: file ? "#2F7A4F" : "var(--color-border-light)",
-                    background: file ? "#F4FAF6" : "#fdfdfc",
-                  }}
-                  className="flex min-h-[132px] cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] border-dashed p-[22px_16px] transition-colors hover:border-brand-gold hover:bg-[#FCFAF4]"
-                >
-                  <input type="file" accept="image/*" onChange={onFile(slot.key)} className="hidden" />
-                  {file ? (
-                    <CheckCircleIcon weight="fill" size={26} color="#2F7A4F" />
-                  ) : (
-                    <IdentificationCardIcon size={26} color="var(--color-stone-light)" />
-                  )}
-                  <div className="mt-2.5 text-[13.5px] font-semibold text-slate">
-                    {file ? `${slot.title} · đã chọn` : slot.title}
-                  </div>
-                  <div className="mt-1 text-center text-xs text-stone-light">
-                    {file ? file.name : "Nhấn để chọn ảnh hoặc kéo vào đây"}
-                  </div>
-                </label>
-              );
-            })}
-          </div>
+          <CccdUploadTiles files={files} onFile={onFile} />
           <div className="mt-3 flex items-start gap-2 rounded-[10px] border border-[#F0E3C4] bg-cream-card p-[11px_13px]">
             <InfoIcon size={16} color="var(--color-brand-gold-dark)" className="mt-0.5 shrink-0" />
             <div className="text-[12.5px] leading-[1.55] text-stone-dark">

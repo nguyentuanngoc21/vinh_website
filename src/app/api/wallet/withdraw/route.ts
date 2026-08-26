@@ -12,20 +12,17 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const amountTokens = Number(body?.amountTokens);
-  const bankAccountNumber = typeof body?.bankAccountNumber === "string" ? body.bankAccountNumber.trim() : "";
-  const bankAccountName = typeof body?.bankAccountName === "string" ? body.bankAccountName.trim() : "";
-  const bankCode = typeof body?.bankCode === "string" ? body.bankCode.trim() : "";
 
-  if (!Number.isFinite(amountTokens) || amountTokens <= 0 || !bankAccountNumber || !bankAccountName || !bankCode) {
+  if (!Number.isFinite(amountTokens) || amountTokens <= 0) {
     return NextResponse.json({ error: "Thiếu hoặc sai thông tin yêu cầu rút tiền." }, { status: 400 });
   }
 
+  // Ngân hàng thụ hưởng KHÔNG nhận từ body nữa — luôn lấy từ hồ sơ đã lưu
+  // & xác minh trong Thông tin cá nhân (WithdrawalService.requestWithdrawal
+  // tự kiểm tra cccd_verified + bank_code/bank_account_number ở đó).
   const result = await WithdrawalService.requestWithdrawal(supabase, {
     userId,
     amountTokens,
-    bankAccountNumber,
-    bankAccountName,
-    bankCode,
   });
 
   if (!result.ok) {

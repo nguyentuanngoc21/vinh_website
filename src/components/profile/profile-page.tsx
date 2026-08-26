@@ -16,7 +16,7 @@ import {
 } from "@/lib/profile";
 
 export function ProfilePage() {
-  const [tab, setTab] = useState<ProfileTab>("following");
+  const [tab, setTab] = useState<ProfileTab>("edit");
   const [nickname, setNickname] = useState(DEFAULT_NICKNAME);
   const [bio, setBio] = useState(DEFAULT_BIO);
   const [activeConv, setActiveConv] = useState(0);

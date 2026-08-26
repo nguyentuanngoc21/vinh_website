@@ -69,6 +69,13 @@ export type Database = {
           phone: string | null;
           cccd_last4: string | null; // last 4 digits only — see schema.sql note
           cccd_verified: boolean;
+          // Ngân hàng thụ hưởng để rút token — xem
+          // migrations/20260826_add_profile_bank_info.sql. Rút token chỉ
+          // dùng được khi cccd_verified = true và cả 3 cột này khác null
+          // (WithdrawalService.requestWithdrawal).
+          bank_code: string | null;
+          bank_name: string | null;
+          bank_account_number: string | null;
           token_balance: number;
           // Author revenue-share still inside its hold period — see
           // migrations/20260807_wallet_ledger_extension.sql part 1.
@@ -91,6 +98,9 @@ export type Database = {
           phone?: string | null;
           cccd_last4?: string | null;
           cccd_verified?: boolean;
+          bank_code?: string | null;
+          bank_name?: string | null;
+          bank_account_number?: string | null;
           token_balance?: number;
           token_balance_pending?: number;
           screenshot_penalty_count?: number;
@@ -119,8 +129,13 @@ export type Database = {
           cccd_number: string;
           cccd_front_path: string;
           cccd_back_path: string;
+          // Mặc định DB là 'pending', nhưng route server chủ động insert
+          // 'approved' ngay khi OCR khớp ảnh (xác minh tự động, không có
+          // màn hình admin duyệt tay ở bản này) — xem register/route.ts và
+          // api/profile/identity/route.ts.
+          status?: "pending" | "approved" | "rejected";
         };
-        // status/reviewed_by/reviewed_at chỉ đổi được qua luồng admin duyệt
+        // reviewed_by/reviewed_at chỉ đổi được qua luồng admin duyệt tay
         // (xây riêng sau) — chưa có RPC cho việc này ở bản schema hiện tại,
         // nên tạm không cho update qua client.
         Update: never;

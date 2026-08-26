@@ -13,24 +13,9 @@ type WithdrawalRow = Database["public"]["Tables"]["withdrawal_requests"]["Row"];
 export type WithdrawalRequestInput = {
   userId: string;
   amountTokens: number;
-  bankAccountNumber: string;
-  bankAccountName: string;
-  bankCode: string;
 };
 
 export type WithdrawalResult = { ok: true; request: WithdrawalRow } | { ok: false; error: string };
-
-/** Uppercase, diacritics-stripped comparison — "Nguyễn Văn A" vs "NGUYEN
- * VAN A" (what a bank transfer form/API typically returns) must match. */
-function normalizeName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // strip combining diacritical marks left by NFD
-    .replace(/đ/gi, "d")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, " ");
-}
 
 /**
  * Approximates "withdrawable ceiling" per the AML-style policy default in
@@ -85,7 +70,7 @@ export const WithdrawalService = {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("token_balance, real_name")
+      .select("token_balance, real_name, cccd_verified, bank_code, bank_name, bank_account_number")
       .eq("id", input.userId)
       .single();
     if (profileError || !profile) return { ok: false, error: "Không tìm thấy hồ sơ." };
@@ -94,8 +79,19 @@ export const WithdrawalService = {
       return { ok: false, error: "Số dư khả dụng không đủ." };
     }
 
-    if (!profile.real_name || normalizeName(profile.real_name) !== normalizeName(input.bankAccountName)) {
-      return { ok: false, error: "Tên chủ tài khoản ngân hàng không khớp với tên đã xác minh trên hệ thống." };
+    // Điều kiện bắt buộc để rút token: CCCD đã xác minh (OCR khớp ảnh,
+    // xem api/profile/identity/route.ts) VÀ đã lưu đủ ngân hàng thụ hưởng
+    // (api/profile/bank/route.ts) — cả hai cập nhật trong Thông tin cá
+    // nhân, không phải điền lại mỗi lần rút.
+    if (!profile.cccd_verified || !profile.bank_code || !profile.bank_account_number) {
+      return {
+        ok: false,
+        error:
+          "Cần hoàn tất xác minh CCCD và thông tin ngân hàng thụ hưởng trong Thông tin cá nhân trước khi rút token.",
+      };
+    }
+    if (!profile.real_name) {
+      return { ok: false, error: "Cần có Tên thật trên hồ sơ trước khi rút token." };
     }
 
     const since = new Date();
@@ -126,9 +122,11 @@ export const WithdrawalService = {
       p_user_id: input.userId,
       p_amount_tokens: input.amountTokens,
       p_amount_vnd: tokensToVnd(input.amountTokens),
-      p_bank_account_number: input.bankAccountNumber,
-      p_bank_account_name: input.bankAccountName,
-      p_bank_code: input.bankCode,
+      // Lấy thẳng từ hồ sơ đã lưu & xác minh ở trên — KHÔNG còn từ
+      // input/client nữa, xem comment ở WithdrawalRequestInput.
+      p_bank_account_number: profile.bank_account_number,
+      p_bank_account_name: profile.real_name,
+      p_bank_code: profile.bank_code,
     });
     if (error) return { ok: false, error: error.message || "Không thể tạo yêu cầu rút tiền." };
 

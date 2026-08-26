@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { CoinsIcon } from "@phosphor-icons/react/dist/ssr";
+import { CoinsIcon, CheckCircleIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { TOKEN_LOGS, DEFAULT_TOKEN_BALANCE } from "@/lib/profile";
 import { Field, Button } from "@/components/ui";
+import { BankInfoForm } from "@/components/profile/bank-info-form";
+import { IdentityForm } from "@/components/profile/identity-form";
 
 type EditProfileTabProps = {
   nickname: string;
@@ -18,38 +21,91 @@ export function EditProfileTab({
   onNicknameChange,
   onBioChange,
 }: EditProfileTabProps) {
+  // Cả 2 điều kiện đều bắt đầu unknown (null) cho tới khi form con tương
+  // ứng tải xong GET của nó — chỉ hiện banner "đủ điều kiện"/"thiếu" sau
+  // khi cả hai đã biết, tránh nháy sai trạng thái lúc đầu.
+  const [bankSaved, setBankSaved] = useState<boolean | null>(null);
+  const [cccdVerified, setCccdVerified] = useState<boolean | null>(null);
+  const eligibility =
+    bankSaved === null || cccdVerified === null ? null : bankSaved && cccdVerified;
+
   return (
     <div className="grid grid-cols-1 gap-[26px] px-11 pb-[60px] pt-[26px] lg:grid-cols-[1.4fr_.9fr]">
-      <div className="rounded-[18px] border border-cream p-[26px]">
-        <div className="text-[19px] font-bold text-brand-ink">Chỉnh sửa thông tin cá nhân</div>
-        <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
-          Tên hiển thị và mô tả sẽ xuất hiện trên trang tác giả cùng mọi bình luận của bạn.
-        </div>
-        <div className="mt-[22px] flex flex-col gap-[18px]">
-          <Field
-            label="Nickname"
-            value={nickname}
-            onChange={(e) => onNicknameChange(e.target.value)}
-            className="px-3.5 py-3 text-sm"
-            hint="Có thể đổi 1 lần mỗi 30 ngày."
-          />
-          <label className="block">
-            <div className="mb-2 text-[13px] font-semibold text-ink">Mô tả về bản thân</div>
-            <textarea
-              value={bio}
-              onChange={(e) => onBioChange(e.target.value.slice(0, 280))}
-              rows={5}
-              className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.65] outline-none focus:border-brand-gold"
+      <div className="flex flex-col gap-[26px]">
+        {eligibility !== null && (
+          <div
+            className={
+              "flex items-center gap-2.5 rounded-[14px] border px-[18px] py-3.5 text-[13.5px] font-medium " +
+              (eligibility
+                ? "border-[#cfe8d9] bg-[#F4FAF6] text-[#2F7A4F]"
+                : "border-[#F0E3C4] bg-cream-card text-stone-dark")
+            }
+          >
+            {eligibility ? (
+              <>
+                <CheckCircleIcon weight="fill" size={18} /> Đủ điều kiện rút token
+              </>
+            ) : (
+              <>
+                <WarningCircleIcon weight="fill" size={18} color="var(--color-brand-gold-dark)" />
+                Cần hoàn tất CCCD và ngân hàng thụ hưởng bên dưới để rút token
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="rounded-[18px] border border-cream p-[26px]">
+          <div className="text-[19px] font-bold text-brand-ink">Chỉnh sửa thông tin cá nhân</div>
+          <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
+            Tên hiển thị và mô tả sẽ xuất hiện trên trang tác giả cùng mọi bình luận của bạn.
+          </div>
+          <div className="mt-[22px] flex flex-col gap-[18px]">
+            <Field
+              label="Nickname"
+              value={nickname}
+              onChange={(e) => onNicknameChange(e.target.value)}
+              className="px-3.5 py-3 text-sm"
+              hint="Có thể đổi 1 lần mỗi 30 ngày."
             />
-            <div className="mt-1.5 text-xs text-stone">{bio.length}/280 ký tự</div>
-          </label>
-          <div className="flex gap-2.5">
-            <Button type="button" className="w-auto px-6 py-[11px] text-sm font-semibold">
-              Lưu thay đổi
-            </Button>
-            <Button type="button" variant="ghost" className="w-auto px-[22px] py-[11px] text-sm font-medium">
-              Hủy
-            </Button>
+            <label className="block">
+              <div className="mb-2 text-[13px] font-semibold text-ink">Mô tả về bản thân</div>
+              <textarea
+                value={bio}
+                onChange={(e) => onBioChange(e.target.value.slice(0, 280))}
+                rows={5}
+                className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.65] outline-none focus:border-brand-gold"
+              />
+              <div className="mt-1.5 text-xs text-stone">{bio.length}/280 ký tự</div>
+            </label>
+            <div className="flex gap-2.5">
+              <Button type="button" className="w-auto px-6 py-[11px] text-sm font-semibold">
+                Lưu thay đổi
+              </Button>
+              <Button type="button" variant="ghost" className="w-auto px-[22px] py-[11px] text-sm font-medium">
+                Hủy
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-cream p-[26px]">
+          <div className="text-[19px] font-bold text-brand-ink">Ngân hàng thụ hưởng</div>
+          <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
+            Dùng để nhận tiền khi rút token — tên chủ tài khoản phải khớp Tên thật đã xác minh.
+          </div>
+          <div className="mt-[22px]">
+            <BankInfoForm onSaved={setBankSaved} />
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-cream p-[26px]">
+          <div className="text-[19px] font-bold text-brand-ink">Căn cước công dân</div>
+          <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
+            Xác minh CCCD để mở khoá tính năng rút token — hệ thống tự đối chiếu số bạn nhập với ảnh
+            tải lên.
+          </div>
+          <div className="mt-[22px]">
+            <IdentityForm onVerified={setCccdVerified} />
           </div>
         </div>
       </div>

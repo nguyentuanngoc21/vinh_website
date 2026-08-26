@@ -15,9 +15,12 @@ export type RegisterPayload = {
   password: string;
   realname: string;
   phone: string;
-  cccd: string;
-  cccdFront: File;
-  cccdBack: File;
+  // Tùy chọn — có thể bổ sung sau trong Thông tin cá nhân (xem
+  // src/app/api/profile/identity/route.ts). Cả 3 field này phải cùng có
+  // hoặc cùng không, register-form.tsx đã đảm bảo điều đó trước khi gọi.
+  cccd?: string;
+  cccdFront?: File;
+  cccdBack?: File;
 };
 
 // Khác AuthResult: đăng ký xong KHÔNG có session ngay — tài khoản Supabase
@@ -75,9 +78,11 @@ export async function register(payload: RegisterPayload): Promise<RegisterResult
   body.set("password", payload.password);
   body.set("realname", payload.realname);
   body.set("phone", payload.phone);
-  body.set("cccd", payload.cccd);
-  body.set("cccdFront", payload.cccdFront);
-  body.set("cccdBack", payload.cccdBack);
+  if (payload.cccd && payload.cccdFront && payload.cccdBack) {
+    body.set("cccd", payload.cccd);
+    body.set("cccdFront", payload.cccdFront);
+    body.set("cccdBack", payload.cccdBack);
+  }
 
   let res: Response;
   try {

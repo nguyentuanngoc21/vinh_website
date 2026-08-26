@@ -1,9 +1,9 @@
 export type ProfileTab = "following" | "chat" | "edit" | "tasks";
 
 export const PROFILE_TABS: { id: ProfileTab; label: string; icon: string }[] = [
-  { id: "following", label: "Đang theo dõi", icon: "users" },
-  { id: "chat", label: "Hội thoại", icon: "chat" },
   { id: "edit", label: "Thông tin cá nhân", icon: "pencil" },
+  { id: "chat", label: "Hội thoại", icon: "chat" },
+  { id: "following", label: "Đang theo dõi", icon: "users" },
   { id: "tasks", label: "Nhiệm vụ ngày", icon: "target" },
 ];
 

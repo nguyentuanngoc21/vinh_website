@@ -117,6 +117,14 @@ create policy "followers manage their own follow rows"
 -- a dispute — never expose them to the reading/browsing UI.
 create type public.verification_status as enum ('pending', 'approved', 'rejected');
 
+-- status mặc định 'pending', nhưng route server (register/route.ts,
+-- api/profile/identity/route.ts) chủ động insert 'approved' ngay khi OCR
+-- khớp ảnh với số CCCD nhập — xác minh tự động, KHÔNG có màn hình admin
+-- duyệt tay ở bản này (reviewed_by/reviewed_at để null cho các dòng đó,
+-- vì không có người duyệt). Cột status vẫn giữ nguyên 3 giá trị để dễ
+-- thêm luồng admin duyệt tay sau này nếu cần (set 'pending' thay vì
+-- 'approved' lúc insert, rồi admin tự đổi qua policy "admins can view and
+-- review all verifications" bên dưới).
 create table public.identity_verifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -406,6 +414,31 @@ create trigger enforce_role_change_authority
 -- phiên đăng nhập của họ) — không dùng SQL Editor cho việc thường xuyên,
 -- chỉ dùng đúng 1 lần lúc khởi tạo.
 
+-- cccd_verified giờ có thể được set true tự động khi OCR khớp ảnh CCCD —
+-- không chỉ lúc đăng ký (register/route.ts) mà cả khi cập nhật sau này
+-- trong Thông tin cá nhân (api/profile/identity/route.ts). Bảo vệ y hệt
+-- role ở trên: policy "update own profile" (auth.uid() = id) không tự
+-- chặn cột nào ngoài role, nên nếu thiếu trigger này thì user thường tự
+-- UPDATE profiles set cccd_verified = true được — xem
+-- migrations/20260826_add_profile_bank_info.sql.
+create function public.enforce_cccd_verified_authority()
+returns trigger as $$
+begin
+  if new.cccd_verified is distinct from old.cccd_verified then
+    if auth.uid() is not null and not exists (
+      select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+    ) then
+      raise exception 'cccd_verified can only be set by a trusted server context or an admin';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger enforce_cccd_verified_authority
+  before update on public.profiles
+  for each row execute function public.enforce_cccd_verified_authority();
+
 -- =======================================================================
 -- Phần bổ sung: ví token & lịch sử giao dịch, nhiệm vụ hàng ngày, gợi ý
 -- truyện. Ba phần độc lập, thêm phần nào cần trước cũng được.
@@ -432,6 +465,18 @@ alter table public.profiles add column screenshot_penalty_count integer not null
 alter table public.profiles add column screenshot_penalty_expires_at timestamptz;
 alter table public.profiles add column screenshot_penalty_banned boolean not null default false;
 alter table public.profiles add column screenshot_penalty_last_offense_at timestamptz;
+
+-- Ngân hàng thụ hưởng để rút token (src/components/profile/bank-info-form.tsx)
+-- + 4 chữ số cuối CCCD để hiện dạng che bớt trong Thông tin cá nhân, không
+-- cần SELECT bảng identity_verifications nhạy cảm hơn cho việc đó — xem
+-- migrations/20260826_add_profile_bank_info.sql. Rút token
+-- (create_withdrawal_request bên dưới, cùng phần 6) chỉ dùng được khi
+-- cccd_verified = true VÀ đủ 3 cột ngân hàng — xem
+-- WithdrawalService.requestWithdrawal.
+alter table public.profiles add column cccd_last4 text;
+alter table public.profiles add column bank_code text;
+alter table public.profiles add column bank_name text;
+alter table public.profiles add column bank_account_number text;
 
 create type public.transaction_type as enum (
   'signup_bonus', 'daily_task_reward', 'purchase_chapter', 'topup', 'refund', 'admin_adjustment', 'screenshot_penalty',
@@ -627,7 +672,7 @@ create type public.deposit_status as enum ('pending', 'success', 'failed');
 create table public.deposit_transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  payment_gateway text not null, -- 'vnpay' | 'payos' | 'momo' | 'stub' — xem src/lib/wallet/deposit-service.ts
+  payment_gateway text not null, -- 'zalopay' | 'vnpay' | 'payos' | 'momo' | 'stub' — xem src/lib/wallet/deposit-service.ts
   gateway_order_id text not null,
   amount_vnd integer not null check (amount_vnd > 0),
   token_amount integer not null check (token_amount > 0),
