@@ -23,6 +23,12 @@ type RoleContextValue = {
   register: (payload: RegisterPayload) => Promise<AuthOutcome>;
   resetPassword: (password: string) => Promise<AuthOutcome>;
   logout: () => void;
+  /** Patches just `session.name` in the cached session after a successful
+   * nickname save (src/app/api/profile/me/route.ts) — without this, the
+   * top-nav avatar/name in auth-cluster.tsx keeps showing the old value
+   * until the next login, since it reads the cached session, not a live
+   * query. No-op if signed out. */
+  updateSessionName: (name: string) => void;
 };
 
 const RoleContext = createContext<RoleContextValue | null>(null);
@@ -78,6 +84,25 @@ function writeSession(session: Session | null, remember: boolean) {
   listeners.forEach((listener) => listener());
 }
 
+// Same storage-preserving idea as writeSession(), but only patches `name`
+// in place — re-uses whichever storage (local vs session) already holds
+// the session instead of needing the caller to know/pass `remember` again.
+function patchSessionName(name: string) {
+  if (!cachedSession) return;
+  const updated: Session = { ...cachedSession, name };
+  try {
+    if (localStorage.getItem(STORAGE_KEY)) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } else if (sessionStorage.getItem(STORAGE_KEY)) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+  } catch {
+    // ignore
+  }
+  cachedSession = updated;
+  listeners.forEach((listener) => listener());
+}
+
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const session = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -115,6 +140,10 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     writeSession(null, false);
   }, []);
 
+  const updateSessionName = useCallback((name: string) => {
+    patchSessionName(name);
+  }, []);
+
   return (
     <RoleContext.Provider
       value={{
@@ -126,6 +155,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         register,
         resetPassword,
         logout,
+        updateSessionName,
       }}
     >
       {children}

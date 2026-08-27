@@ -76,6 +76,11 @@ export type Database = {
           bank_code: string | null;
           bank_name: string | null;
           bank_account_number: string | null;
+          // Xem migrations/20260827_add_profile_bio.sql. nickname_updated_at
+          // chỉ dùng để enforce cooldown 30 ngày ở api/profile/me/route.ts —
+          // không hiển thị trực tiếp.
+          bio: string | null;
+          nickname_updated_at: string | null;
           token_balance: number;
           // Author revenue-share still inside its hold period — see
           // migrations/20260807_wallet_ledger_extension.sql part 1.
@@ -101,6 +106,8 @@ export type Database = {
           bank_code?: string | null;
           bank_name?: string | null;
           bank_account_number?: string | null;
+          bio?: string | null;
+          nickname_updated_at?: string | null;
           token_balance?: number;
           token_balance_pending?: number;
           screenshot_penalty_count?: number;

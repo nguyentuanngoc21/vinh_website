@@ -1,3 +1,5 @@
+import type { TransactionType } from "@/lib/supabase/types";
+
 export type ProfileTab = "following" | "chat" | "edit" | "tasks";
 
 export const PROFILE_TABS: { id: ProfileTab; label: string; icon: string }[] = [
@@ -69,13 +71,26 @@ export const THREADS: ThreadMessage[][] = [
   ],
 ];
 
-export type TokenLogEntry = { label: string; amount: string };
+// Bảng nhãn hiển thị cho type giao dịch thật (transactions.type) — thay
+// cho TOKEN_LOGS mock trước đây. Không join sang chapters/books nên nhãn
+// chỉ chung chung theo loại giao dịch, không nêu tên truyện/tác giả cụ
+// thể (getTransactions() hiện chỉ select("*") trên transactions).
+const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
+  signup_bonus: "Thưởng đăng ký",
+  daily_task_reward: "Nhiệm vụ ngày",
+  purchase_chapter: "Mở chương",
+  topup: "Nạp token",
+  refund: "Hoàn token",
+  admin_adjustment: "Điều chỉnh bởi quản trị viên",
+  screenshot_penalty: "Phạt chụp màn hình",
+  purchase_credit: "Doanh thu bán truyện",
+  withdrawal: "Rút token",
+  platform_bonus: "Thưởng từ Vịnh",
+};
 
-export const TOKEN_LOGS: TokenLogEntry[] = [
-  { label: "Nhiệm vụ ngày · 12/06", amount: "+45" },
-  { label: "Mở chương sớm · Vịnh Đêm", amount: "−30" },
-  { label: "Tặng tác giả Lam Thư", amount: "−50" },
-];
+export function transactionTypeLabel(type: TransactionType): string {
+  return TRANSACTION_TYPE_LABELS[type] ?? type;
+}
 
 export type DailyTask = {
   id: string;
@@ -93,10 +108,8 @@ export const DAILY_TASKS: DailyTask[] = [
   { id: "t4", title: "Chia sẻ một tác phẩm", desc: "Chưa hoàn thành", icon: "share", reward: 10, progress: 0 },
 ];
 
-export const DEFAULT_NICKNAME = "Minh Khôi";
-export const DEFAULT_BIO =
-  'Người kể chuyện bán thời gian, mê truyện trinh thám và những buổi sáng Hà Nội. Đang viết dở "Vịnh Đêm".';
-// Numeric source of truth (also used by the token top-up flow, see
-// lib/topup.ts) — the display string below is just it, locale-formatted.
+// Chỉ còn dùng bởi lib/topup.ts (luồng nạp token vẫn mock, chưa nối DB) —
+// "Thông tin cá nhân"/ProfileHeader giờ lấy số dư thật qua
+// GET /api/wallet/balance (xem edit-profile-tab.tsx, profile-page.tsx),
+// không đọc hằng số này nữa.
 export const DEFAULT_TOKEN_BALANCE_NUM = 1240;
-export const DEFAULT_TOKEN_BALANCE = DEFAULT_TOKEN_BALANCE_NUM.toLocaleString("vi-VN");

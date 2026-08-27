@@ -478,6 +478,13 @@ alter table public.profiles add column bank_code text;
 alter table public.profiles add column bank_name text;
 alter table public.profiles add column bank_account_number text;
 
+-- Mô tả bản thân + mốc lần đổi nickname gần nhất (tab "Thông tin cá nhân",
+-- src/components/profile/edit-profile-tab.tsx) — nickname_updated_at chỉ
+-- dùng để enforce cooldown 30 ngày ở tầng ứng dụng
+-- (src/app/api/profile/me/route.ts), không phải cột hiển thị.
+alter table public.profiles add column bio text;
+alter table public.profiles add column nickname_updated_at timestamptz;
+
 create type public.transaction_type as enum (
   'signup_bonus', 'daily_task_reward', 'purchase_chapter', 'topup', 'refund', 'admin_adjustment', 'screenshot_penalty',
   -- 'purchase_chapter' ở trên là vế trừ của người mua; 'purchase_credit' là

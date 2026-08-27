@@ -1,26 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CoinsIcon, CheckCircleIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
-import { TOKEN_LOGS, DEFAULT_TOKEN_BALANCE } from "@/lib/profile";
-import { Field, Button } from "@/components/ui";
+import { transactionTypeLabel } from "@/lib/profile";
+import { Field, Button, Alert } from "@/components/ui";
 import { BankInfoForm } from "@/components/profile/bank-info-form";
 import { IdentityForm } from "@/components/profile/identity-form";
+import { useRole } from "@/lib/role";
+import type { TransactionType } from "@/lib/supabase/types";
+
+type TransactionEntry = { id: string; type: TransactionType; amount: number; created_at: string };
+
+type LoadState = "loading" | "ready";
 
 type EditProfileTabProps = {
-  nickname: string;
-  bio: string;
-  onNicknameChange: (value: string) => void;
-  onBioChange: (value: string) => void;
+  /** Bắn lên profile-page.tsx sau khi lưu nickname thành công — để
+   * ProfileHeader (hiển thị trên mọi tab, không chỉ tab này) cập nhật
+   * theo ngay, không cần load lại trang. */
+  onNicknameSaved?: (nickname: string) => void;
 };
 
-export function EditProfileTab({
-  nickname,
-  bio,
-  onNicknameChange,
-  onBioChange,
-}: EditProfileTabProps) {
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+}
+
+export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
+  const { updateSessionName } = useRole();
+
   // Cả 2 điều kiện đều bắt đầu unknown (null) cho tới khi form con tương
   // ứng tải xong GET của nó — chỉ hiện banner "đủ điều kiện"/"thiếu" sau
   // khi cả hai đã biết, tránh nháy sai trạng thái lúc đầu.
@@ -28,6 +35,75 @@ export function EditProfileTab({
   const [cccdVerified, setCccdVerified] = useState<boolean | null>(null);
   const eligibility =
     bankSaved === null || cccdVerified === null ? null : bankSaved && cccdVerified;
+
+  const [state, setState] = useState<LoadState>("loading");
+  const [nickname, setNickname] = useState("");
+  const [savedNickname, setSavedNickname] = useState("");
+  const [bio, setBio] = useState("");
+  const [savedBio, setSavedBio] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+  const [transactions, setTransactions] = useState<TransactionEntry[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/profile/me").then((res) => (res.ok ? res.json() : null)),
+      fetch("/api/wallet/balance").then((res) => (res.ok ? res.json() : null)),
+      fetch("/api/wallet/transactions?limit=5").then((res) => (res.ok ? res.json() : null)),
+    ]).then(([me, balance, txns]) => {
+      if (cancelled) return;
+      if (me) {
+        setNickname(me.nickname ?? "");
+        setSavedNickname(me.nickname ?? "");
+        setBio(me.bio ?? "");
+        setSavedBio(me.bio ?? "");
+      }
+      if (balance) setTokenBalance(balance.available ?? null);
+      if (txns) setTransactions(txns.entries ?? []);
+      setState("ready");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dirty = nickname.trim() !== savedNickname || bio !== savedBio;
+  const ready = nickname.trim().length > 0 && dirty && !pending;
+
+  const handleSave = async () => {
+    if (!ready) return;
+    setPending(true);
+    setError(null);
+    setSaved(false);
+    const res = await fetch("/api/profile/me", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nickname: nickname.trim(), bio }),
+    });
+    const data = await res.json().catch(() => null);
+    setPending(false);
+    if (!res.ok) {
+      setError((data && data.error) || "Lưu thông tin thất bại.");
+      return;
+    }
+    const newNickname = data.nickname ?? nickname.trim();
+    setSavedNickname(newNickname);
+    setSavedBio(bio);
+    setSaved(true);
+    updateSessionName(newNickname);
+    onNicknameSaved?.(newNickname);
+  };
+
+  const handleCancel = () => {
+    setNickname(savedNickname);
+    setBio(savedBio);
+    setError(null);
+    setSaved(false);
+  };
 
   return (
     <div className="grid grid-cols-1 gap-[26px] px-11 pb-[60px] pt-[26px] lg:grid-cols-[1.4fr_.9fr]">
@@ -59,33 +135,52 @@ export function EditProfileTab({
           <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
             Tên hiển thị và mô tả sẽ xuất hiện trên trang tác giả cùng mọi bình luận của bạn.
           </div>
-          <div className="mt-[22px] flex flex-col gap-[18px]">
-            <Field
-              label="Nickname"
-              value={nickname}
-              onChange={(e) => onNicknameChange(e.target.value)}
-              className="px-3.5 py-3 text-sm"
-              hint="Có thể đổi 1 lần mỗi 30 ngày."
-            />
-            <label className="block">
-              <div className="mb-2 text-[13px] font-semibold text-ink">Mô tả về bản thân</div>
-              <textarea
-                value={bio}
-                onChange={(e) => onBioChange(e.target.value.slice(0, 280))}
-                rows={5}
-                className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.65] outline-none focus:border-brand-gold"
+          {state === "loading" ? (
+            <div className="mt-[22px] text-[13.5px] text-stone-light">Đang tải…</div>
+          ) : (
+            <div className="mt-[22px] flex flex-col gap-[18px]">
+              <Field
+                label="Nickname"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                className="px-3.5 py-3 text-sm"
+                hint="Có thể đổi 1 lần mỗi 30 ngày."
               />
-              <div className="mt-1.5 text-xs text-stone">{bio.length}/280 ký tự</div>
-            </label>
-            <div className="flex gap-2.5">
-              <Button type="button" className="w-auto px-6 py-[11px] text-sm font-semibold">
-                Lưu thay đổi
-              </Button>
-              <Button type="button" variant="ghost" className="w-auto px-[22px] py-[11px] text-sm font-medium">
-                Hủy
-              </Button>
+              <label className="block">
+                <div className="mb-2 text-[13px] font-semibold text-ink">Mô tả về bản thân</div>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value.slice(0, 280))}
+                  rows={5}
+                  className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.65] outline-none focus:border-brand-gold"
+                />
+                <div className="mt-1.5 text-xs text-stone">{bio.length}/280 ký tự</div>
+              </label>
+              {saved && !dirty && (
+                <div className="text-[13px] font-medium text-[#2F7A4F]">Đã lưu thay đổi.</div>
+              )}
+              {error && <Alert tone="error">{error}</Alert>}
+              <div className="flex gap-2.5">
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!ready}
+                  className="w-auto px-6 py-[11px] text-sm font-semibold"
+                >
+                  {pending ? "Đang lưu…" : "Lưu thay đổi"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancel}
+                  disabled={!dirty || pending}
+                  className="w-auto px-[22px] py-[11px] text-sm font-medium"
+                >
+                  Hủy
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="rounded-[18px] border border-cream p-[26px]">
@@ -117,7 +212,7 @@ export function EditProfileTab({
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <div className="text-[40px] font-extrabold tracking-[-1px] text-brand-gold-light">
-              {DEFAULT_TOKEN_BALANCE}
+              {tokenBalance === null ? "…" : tokenBalance.toLocaleString("vi-VN")}
             </div>
             <div className="text-sm font-medium text-sidebar-text-dim-2">token</div>
           </div>
@@ -135,20 +230,27 @@ export function EditProfileTab({
           <div className="mb-3 text-[13px] font-semibold text-ink">
             Hoạt động token gần đây
           </div>
-          {TOKEN_LOGS.map((log) => (
-            <div
-              key={log.label}
-              className="flex justify-between gap-3 border-t border-[#f5f4f2] py-2.5"
-            >
-              <div className="text-[13px] text-stone-dark">{log.label}</div>
+          {transactions.length === 0 ? (
+            <div className="py-2.5 text-[13px] text-stone-light">Chưa có giao dịch nào.</div>
+          ) : (
+            transactions.map((txn) => (
               <div
-                style={{ color: log.amount[0] === "+" ? "#2F7A4F" : "#B02A37" }}
-                className="text-[13px] font-bold"
+                key={txn.id}
+                className="flex justify-between gap-3 border-t border-[#f5f4f2] py-2.5"
               >
-                {log.amount}
+                <div className="text-[13px] text-stone-dark">
+                  {transactionTypeLabel(txn.type)} · {formatShortDate(txn.created_at)}
+                </div>
+                <div
+                  style={{ color: txn.amount >= 0 ? "#2F7A4F" : "#B02A37" }}
+                  className="text-[13px] font-bold"
+                >
+                  {txn.amount >= 0 ? "+" : ""}
+                  {txn.amount.toLocaleString("vi-VN")}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
