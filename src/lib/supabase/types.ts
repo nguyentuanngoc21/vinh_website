@@ -76,6 +76,9 @@ export type Database = {
           bank_code: string | null;
           bank_name: string | null;
           bank_account_number: string | null;
+          // Người dùng tự nhập — KHÔNG ép = real_name (xem
+          // migrations/20260827_add_bank_account_name.sql).
+          bank_account_name: string | null;
           // Xem migrations/20260827_add_profile_bio.sql. nickname_updated_at
           // chỉ dùng để enforce cooldown 30 ngày ở api/profile/me/route.ts —
           // không hiển thị trực tiếp.
@@ -106,6 +109,7 @@ export type Database = {
           bank_code?: string | null;
           bank_name?: string | null;
           bank_account_number?: string | null;
+          bank_account_name?: string | null;
           bio?: string | null;
           nickname_updated_at?: string | null;
           token_balance?: number;

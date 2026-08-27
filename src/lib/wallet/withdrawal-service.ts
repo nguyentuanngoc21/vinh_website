@@ -70,7 +70,7 @@ export const WithdrawalService = {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("token_balance, real_name, cccd_verified, bank_code, bank_name, bank_account_number")
+      .select("token_balance, cccd_verified, bank_code, bank_name, bank_account_number, bank_account_name")
       .eq("id", input.userId)
       .single();
     if (profileError || !profile) return { ok: false, error: "Không tìm thấy hồ sơ." };
@@ -82,16 +82,22 @@ export const WithdrawalService = {
     // Điều kiện bắt buộc để rút token: CCCD đã xác minh (OCR khớp ảnh,
     // xem api/profile/identity/route.ts) VÀ đã lưu đủ ngân hàng thụ hưởng
     // (api/profile/bank/route.ts) — cả hai cập nhật trong Thông tin cá
-    // nhân, không phải điền lại mỗi lần rút.
-    if (!profile.cccd_verified || !profile.bank_code || !profile.bank_account_number) {
+    // nhân, không phải điền lại mỗi lần rút. bank_account_name là người
+    // dùng tự khai, KHÔNG ép khớp real_name (xem
+    // migrations/20260827_add_bank_account_name.sql) — chủ tài khoản có
+    // thể không phải chính người lập hồ sơ, và ngân hàng có thể in tên
+    // không dấu khác real_name có dấu dù đúng người.
+    if (
+      !profile.cccd_verified ||
+      !profile.bank_code ||
+      !profile.bank_account_number ||
+      !profile.bank_account_name
+    ) {
       return {
         ok: false,
         error:
           "Cần hoàn tất xác minh CCCD và thông tin ngân hàng thụ hưởng trong Thông tin cá nhân trước khi rút token.",
       };
-    }
-    if (!profile.real_name) {
-      return { ok: false, error: "Cần có Tên thật trên hồ sơ trước khi rút token." };
     }
 
     const since = new Date();
@@ -122,10 +128,12 @@ export const WithdrawalService = {
       p_user_id: input.userId,
       p_amount_tokens: input.amountTokens,
       p_amount_vnd: tokensToVnd(input.amountTokens),
-      // Lấy thẳng từ hồ sơ đã lưu & xác minh ở trên — KHÔNG còn từ
-      // input/client nữa, xem comment ở WithdrawalRequestInput.
+      // Lấy thẳng từ hồ sơ đã lưu ở trên — KHÔNG còn từ input/client nữa,
+      // xem comment ở WithdrawalRequestInput. bank_account_name là tên
+      // người dùng tự khai (không phải real_name) — xem comment ở guard
+      // phía trên.
       p_bank_account_number: profile.bank_account_number,
-      p_bank_account_name: profile.real_name,
+      p_bank_account_name: profile.bank_account_name,
       p_bank_code: profile.bank_code,
     });
     if (error) return { ok: false, error: error.message || "Không thể tạo yêu cầu rút tiền." };

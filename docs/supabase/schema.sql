@@ -478,6 +478,14 @@ alter table public.profiles add column bank_code text;
 alter table public.profiles add column bank_name text;
 alter table public.profiles add column bank_account_number text;
 
+-- Tên chủ tài khoản ngân hàng — người dùng TỰ NHẬP, KHÔNG ép = real_name
+-- nữa (xem migrations/20260827_add_bank_account_name.sql: chủ tài khoản
+-- có thể khác người lập hồ sơ — mượn tài khoản người thân — và nhiều
+-- ngân hàng in tên không dấu, so khớp cứng với real_name có dấu sẽ sai
+-- dù đúng người). Thông tin do người dùng khai, sai thì trách nhiệm
+-- thuộc về người dùng.
+alter table public.profiles add column bank_account_name text;
+
 -- Mô tả bản thân + mốc lần đổi nickname gần nhất (tab "Thông tin cá nhân",
 -- src/components/profile/edit-profile-tab.tsx) — nickname_updated_at chỉ
 -- dùng để enforce cooldown 30 ngày ở tầng ứng dụng

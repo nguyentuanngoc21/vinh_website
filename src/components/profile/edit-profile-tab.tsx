@@ -186,7 +186,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
         <div className="rounded-[18px] border border-cream p-[26px]">
           <div className="text-[19px] font-bold text-brand-ink">Ngân hàng thụ hưởng</div>
           <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
-            Dùng để nhận tiền khi rút token — tên chủ tài khoản phải khớp Tên thật đã xác minh.
+            Dùng để nhận tiền khi rút token — nhập đúng thông tin, bạn chịu trách nhiệm nếu sai.
           </div>
           <div className="mt-[22px]">
             <BankInfoForm onSaved={setBankSaved} />

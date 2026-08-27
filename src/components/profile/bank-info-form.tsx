@@ -12,11 +12,18 @@ type LoadState = "loading" | "ready";
  * identity-form.tsx). Load/lưu qua GET|POST /api/profile/bank, theo đúng
  * pattern src/app/api/wallet/balance/route.ts (service-role +
  * getAuthedUserId()).
+ *
+ * Tên chủ tài khoản do người dùng TỰ NHẬP, KHÔNG mặc định/ép = Tên thật
+ * đã xác minh — chủ tài khoản có thể không phải chính người lập hồ sơ
+ * (mượn tài khoản người thân khi chưa có thẻ), và nhiều ngân hàng in tên
+ * không dấu nên so khớp cứng với real_name có dấu sẽ sai dù đúng người.
+ * Thông tin này do người dùng khai, sai thì trách nhiệm thuộc về họ.
  */
 export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }) {
   const [state, setState] = useState<LoadState>("loading");
   const [bank, setBank] = useState<VietnamBank | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -28,10 +35,12 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
       .then((data) => {
         if (cancelled || !data) return;
         const found = data.bankCode ? findBankByCode(data.bankCode) : null;
+        const isSaved = !!found && !!data.bankAccountNumber && !!data.bankAccountName;
         setBank(found ?? null);
         setAccountNumber(data.bankAccountNumber ?? "");
-        setSaved(!!found && !!data.bankAccountNumber);
-        onSaved?.(!!found && !!data.bankAccountNumber);
+        setAccountName(data.bankAccountName ?? "");
+        setSaved(isSaved);
+        onSaved?.(isSaved);
       })
       .finally(() => {
         if (!cancelled) setState("ready");
@@ -43,7 +52,8 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
   }, []);
 
   const accountDigits = accountNumber.replace(/\D/g, "");
-  const ready = !!bank && accountDigits.length >= 6 && accountDigits.length <= 19 && !pending;
+  const ready =
+    !!bank && accountDigits.length >= 6 && accountDigits.length <= 19 && accountName.trim().length > 0 && !pending;
 
   const handleSave = async () => {
     if (!ready || !bank) return;
@@ -52,7 +62,11 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
     const res = await fetch("/api/profile/bank", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bankCode: bank.code, bankAccountNumber: accountDigits }),
+      body: JSON.stringify({
+        bankCode: bank.code,
+        bankAccountNumber: accountDigits,
+        bankAccountName: accountName.trim(),
+      }),
     });
     const data = await res.json().catch(() => null);
     setPending(false);
@@ -83,6 +97,17 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
         }}
       />
       <Field
+        label="Tên chủ tài khoản"
+        type="text"
+        value={accountName}
+        onChange={(e) => {
+          setAccountName(e.target.value);
+          setSaved(false);
+        }}
+        placeholder="Đúng như in trên thẻ/sao kê ngân hàng"
+        hint="Ghi đúng tên chủ tài khoản — có thể khác Tên thật trên hồ sơ (ví dụ mượn tài khoản người thân, hoặc ngân hàng ghi tên không dấu). Bạn chịu trách nhiệm nếu thông tin sai."
+      />
+      <Field
         label="Số tài khoản"
         type="text"
         inputMode="numeric"
@@ -93,7 +118,7 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
         }}
         placeholder="Nhập số tài khoản"
         className="tracking-[1px]"
-        hint="Chỉ gồm chữ số, tên chủ tài khoản mặc định là Tên thật đã xác minh trên hồ sơ."
+        hint="Chỉ gồm chữ số."
       />
       {error && <Alert tone="error">{error}</Alert>}
       <Button
