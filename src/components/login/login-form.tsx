@@ -12,21 +12,21 @@ export function LoginForm() {
   const router = useRouter();
   const { login } = useRole();
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ready = email.trim().length > 0 && password.length > 0;
+  const ready = identifier.trim().length > 0 && password.length > 0;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready || pending) return;
     setPending(true);
     setError(null);
-    const result = await login(email.trim(), password, remember);
+    const result = await login(identifier.trim(), password, remember);
     setPending(false);
     if (!result.ok) {
       setError(result.error);
@@ -47,11 +47,11 @@ export function LoginForm() {
 
       <div className="mt-[30px] flex flex-col gap-3.5">
         <Field
-          label="Email hoặc số điện thoại"
+          label="Email hoặc tên tài khoản"
           type="text"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="ban@email.com"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
+          placeholder="ban@email.com hoặc tên tài khoản"
           autoComplete="username"
         />
 

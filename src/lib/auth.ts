@@ -32,18 +32,21 @@ export type RegisterPayload = {
 export type RegisterResult = { ok: true; pendingConfirmation: true } | { ok: false; error: string };
 
 /**
- * Calls the real auth backend at POST /api/auth/login. Wire that route
- * handler up to your database (verify the credentials, look up the user's
- * role) — this function is the one seam the UI talks to, so nothing above
- * it needs to change once that's done.
+ * Calls the real auth backend at POST /api/auth/login. `identifier` is
+ * email OR username — the route resolves username → email server-side
+ * (profiles.username is unique) before calling Supabase's
+ * signInWithPassword(), which still does the actual password check either
+ * way. Named `identifier`, not `email`, so a value that's actually a
+ * username doesn't sit in a misleadingly-named variable up the call chain
+ * (login-form.tsx, role.tsx).
  */
-export async function login(email: string, password: string, remember: boolean): Promise<AuthResult> {
+export async function login(identifier: string, password: string, remember: boolean): Promise<AuthResult> {
   let res: Response;
   try {
     res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, remember }),
+      body: JSON.stringify({ identifier, password, remember }),
     });
   } catch {
     return { ok: false, error: "Không thể kết nối máy chủ. Vui lòng thử lại sau." };

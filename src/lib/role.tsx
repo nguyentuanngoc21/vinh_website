@@ -19,7 +19,7 @@ type RoleContextValue = {
   isGuest: boolean;
   isLogged: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string, remember: boolean) => Promise<AuthOutcome>;
+  login: (identifier: string, password: string, remember: boolean) => Promise<AuthOutcome>;
   register: (payload: RegisterPayload) => Promise<AuthOutcome>;
   resetPassword: (password: string) => Promise<AuthOutcome>;
   logout: () => void;
@@ -81,8 +81,8 @@ function writeSession(session: Session | null, remember: boolean) {
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const session = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const login = useCallback(async (email: string, password: string, remember: boolean) => {
-    const result = await loginRequest(email, password, remember);
+  const login = useCallback(async (identifier: string, password: string, remember: boolean) => {
+    const result = await loginRequest(identifier, password, remember);
     if (!result.ok) return result;
     writeSession(result.session, remember);
     return { ok: true as const };
