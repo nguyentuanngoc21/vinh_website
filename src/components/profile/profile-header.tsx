@@ -9,6 +9,8 @@ type ProfileHeaderProps = {
   username: string;
   joinedYear: string;
   tokenBalance: string;
+  followingCount: number;
+  followerCount: number;
   coverImageUrl: string | null;
   /** Bắn lên profile-page.tsx sau khi tải/gỡ ảnh bìa thành công — cùng
    * pattern onNicknameSaved, để ProfileHeader luôn hiển thị đúng ảnh mới
@@ -23,6 +25,8 @@ export function ProfileHeader({
   username,
   joinedYear,
   tokenBalance,
+  followingCount,
+  followerCount,
   coverImageUrl,
   onCoverSaved,
 }: ProfileHeaderProps) {
@@ -110,14 +114,11 @@ export function ProfileHeader({
             {joinedYear && `Tham gia từ ${joinedYear}`}
           </div>
           <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[13.5px] text-stone-dark sm:justify-start">
-            {/* Đang theo dõi/người theo dõi vẫn là số mock — chưa join
-                author_follows theo cả 2 chiều (khác phạm vi "nối nickname/bio/
-                token vào DB" lần này), không hiển thị nhầm là số thật. */}
             <div>
-              <b className="font-bold text-ink">128</b> đang theo dõi
+              <b className="font-bold text-ink">{followingCount.toLocaleString("vi-VN")}</b> đang theo dõi
             </div>
             <div>
-              <b className="font-bold text-ink">4.216</b> người theo dõi
+              <b className="font-bold text-ink">{followerCount.toLocaleString("vi-VN")}</b> người theo dõi
             </div>
             <div>
               <b className="font-bold text-brand-gold-dark">{tokenBalance}</b> token

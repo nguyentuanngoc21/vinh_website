@@ -9,67 +9,10 @@ export const PROFILE_TABS: { id: ProfileTab; label: string; icon: string }[] = [
   { id: "tasks", label: "Nhiệm vụ ngày", icon: "target" },
 ];
 
+// Cũng dùng để tô màu avatar fallback (không có avatar_url thật) ở
+// chat-tab.tsx/connect-directory.tsx — chọn tone theo hash(userId), xem
+// toneFor() ở đó.
 export const AVATAR_TONES = ["#2F5D6E", "#7A5C3E", "#4A5D3A", "#6B4356", "#3D4B77", "#8A6B2F"];
-
-export type FollowedPerson = { name: string; meta: string };
-
-export const FOLLOWED_PEOPLE: FollowedPerson[] = [
-  { name: "Lam Thư", meta: "Tác giả · 12 truyện · 8.4k theo dõi" },
-  { name: "Hạ Vũ", meta: "Họa sĩ bìa · 240 thiết kế" },
-  { name: "Trần Bách", meta: "Tác giả · Trinh thám đô thị" },
-  { name: "Ngọc Diệp", meta: "Giọng đọc · 96 audio" },
-  { name: "Vũ Kiên", meta: "Biên tập viên · Vịnh Studio" },
-  { name: "Mai An", meta: "Tác giả · Ngôn tình cổ đại" },
-];
-
-export type Conversation = {
-  name: string;
-  snippet: string;
-  time: string;
-  unread: boolean;
-  status: string;
-};
-
-export const CONVERSATIONS: Conversation[] = [
-  { name: "Lam Thư", snippet: "Chương mới mình gửi bạn đọc thử nhé", time: "09:42", unread: true, status: "Đang hoạt động" },
-  { name: "Hạ Vũ", snippet: "Bìa bản 2 đây, tông trầm hơn", time: "Hôm qua", unread: false, status: "Đang hoạt động" },
-  { name: "Nhóm Vịnh Studio", snippet: "Kiên: họp lúc 20h nha cả nhà", time: "Hôm qua", unread: true, status: "6 thành viên" },
-  { name: "Trần Bách", snippet: "Cảm ơn bạn đã ủng hộ 50 token!", time: "T4", unread: false, status: "Đang hoạt động" },
-  { name: "Ngọc Diệp", snippet: "Mình thu xong tập 12 rồi", time: "T3", unread: false, status: "Đang hoạt động" },
-  { name: "Mai An", snippet: "Bạn đọc tới chương mấy rồi?", time: "12/06", unread: false, status: "Đang hoạt động" },
-];
-
-export type ThreadMessage = { text: string; mine: boolean };
-
-export const THREADS: ThreadMessage[][] = [
-  [
-    { text: "Chào Khôi, chương mới mình vừa viết xong", mine: false },
-    { text: "Gửi mình đọc thử với!", mine: true },
-    { text: "Chương này dài hơn bình thường, khoảng 4k chữ", mine: false },
-    { text: "Ok mình đọc tối nay rồi góp ý nhé", mine: true },
-    { text: "Chương mới mình gửi bạn đọc thử nhé", mine: false },
-  ],
-  [
-    { text: "Bìa bản 2 đây, tông trầm hơn", mine: false },
-    { text: "Đẹp hơn bản 1 nhiều", mine: true },
-  ],
-  [
-    { text: "Kiên: họp lúc 20h nha cả nhà", mine: false },
-    { text: "Mình có mặt", mine: true },
-  ],
-  [
-    { text: "Cảm ơn bạn đã ủng hộ 50 token!", mine: false },
-    { text: "Truyện hay mà, xứng đáng", mine: true },
-  ],
-  [
-    { text: "Mình thu xong tập 12 rồi", mine: false },
-    { text: "Tuyệt vời, để mình nghe thử", mine: true },
-  ],
-  [
-    { text: "Bạn đọc tới chương mấy rồi?", mine: false },
-    { text: "Chương 27, đang cày tiếp", mine: true },
-  ],
-];
 
 // Bảng nhãn hiển thị cho type giao dịch thật (transactions.type) — thay
 // cho TOKEN_LOGS mock trước đây. Không join sang chapters/books nên nhãn

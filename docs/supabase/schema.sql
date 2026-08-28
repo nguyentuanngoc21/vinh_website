@@ -2,10 +2,15 @@
 --
 -- Scope: covers accounts/roles, identity verification (CCCD upload),
 -- a minimal books/chapters model, token wallet + transaction history,
--- daily tasks, and vector-based book recommendations. Still NOT modeled:
--- audio, blog, connect directory, rankings, chat — those are still mock
--- data in src/lib/*.ts; add tables for them the same way as you wire each
--- section up for real.
+-- daily tasks, vector-based book recommendations, author follows, 1-1
+-- direct messages, and the connect directory (all real now — the
+-- directory's "Truyện chữ"/"Audio"/"Design" sections read
+-- books/public_audio_narrations/public_design_items by real author id;
+-- see author_follows/direct_messages/author_public_profiles). Still NOT
+-- modeled: blog, rankings — those remain mock data in src/lib/*.ts (the
+-- connect directory's "Blog" section was removed from the UI rather than
+-- shown with fabricated numbers, see src/components/connect/connect-directory.tsx);
+-- add a table for it the same way as you wire that section up for real.
 --
 -- Run with: supabase db push  (or paste into the SQL editor)
 
@@ -82,7 +87,7 @@ revoke update on public.profiles from authenticated, anon;
 -- Không lọc theo role — mọi user (kể cả role='user' thường, có gắn tag
 -- creator_tags hay không) đều cần username/nickname/avatar hiện công khai.
 create view public.author_public_profiles as
-  select id, username, nickname, avatar_url, cover_image_url, creator_tags
+  select id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags
   from public.profiles;
 
 -- --- Theo dõi tác giả, dạng toggle (nút Theo dõi/Đang theo dõi ở trang
@@ -108,6 +113,48 @@ create policy "followers manage their own follow rows"
   on public.author_follows for all
   using (auth.uid() = follower_id)
   with check (auth.uid() = follower_id and follower_id <> author_id);
+
+-- --- Nhắn tin 1-1 (tab "Hội thoại" ở /ca-nhan, nút "Nhắn tin" ở
+-- /ket-noi) — 1 bảng duy nhất, không tách conversations/participants
+-- riêng vì đây chỉ là chat 1-1 (không có group chat), "cuộc hội thoại"
+-- giữa 2 người suy ra trực tiếp từ cặp (sender_id, recipient_id). Route
+-- thật dùng service-role (khớp pattern api/profile/cover, .../identity)
+-- — RLS dưới đây chỉ là defense-in-depth. Xem
+-- migrations/20260828_add_direct_messages.sql. ---
+create table public.direct_messages (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  recipient_id uuid not null references auth.users (id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 4000),
+  -- null = người nhận chưa đọc. Chỉ có đọc/chưa đọc, không có trạng thái
+  -- "đã gửi/đã nhận" như app chat thật.
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint direct_messages_no_self_message check (sender_id <> recipient_id)
+);
+
+-- Lọc theo least/greatest(sender_id, recipient_id) để 1 index dùng được
+-- cho truy vấn "toàn bộ tin giữa tôi và người X" ở cả 2 chiều gửi/nhận.
+create index direct_messages_thread_idx
+  on public.direct_messages (least(sender_id, recipient_id), greatest(sender_id, recipient_id), created_at);
+
+create index direct_messages_unread_idx
+  on public.direct_messages (recipient_id, sender_id) where read_at is null;
+
+alter table public.direct_messages enable row level security;
+
+create policy "participants read their own messages"
+  on public.direct_messages for select
+  using (auth.uid() = sender_id or auth.uid() = recipient_id);
+
+create policy "users send messages as themselves"
+  on public.direct_messages for insert
+  with check (auth.uid() = sender_id);
+
+create policy "recipients mark messages read"
+  on public.direct_messages for update
+  using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
 
 -- ---------------------------------------------------------------------
 -- 2. Identity verification (CCCD)

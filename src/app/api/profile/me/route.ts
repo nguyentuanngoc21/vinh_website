@@ -22,6 +22,21 @@ export async function GET() {
     return NextResponse.json({ error: "Không tìm thấy hồ sơ." }, { status: 404 });
   }
 
+  // 2 query count riêng (không phải trên `data` — profiles không có cột
+  // đếm sẵn) — author_follows RLS chỉ cho follower tự thấy hàng của
+  // mình, nên phải qua service-role mới đếm được cả 2 chiều. Xem
+  // profile-header.tsx (trước đây hardcode 128/4.216).
+  const [{ count: followingCount }, { count: followerCount }] = await Promise.all([
+    supabase
+      .from("author_follows")
+      .select("author_id", { count: "exact", head: true })
+      .eq("follower_id", userId),
+    supabase
+      .from("author_follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("author_id", userId),
+  ]);
+
   return NextResponse.json({
     username: data.username,
     nickname: data.nickname,
@@ -29,6 +44,8 @@ export async function GET() {
     nicknameUpdatedAt: data.nickname_updated_at,
     createdAt: data.created_at,
     coverImageUrl: data.cover_image_url,
+    followingCount: followingCount ?? 0,
+    followerCount: followerCount ?? 0,
   });
 }
 

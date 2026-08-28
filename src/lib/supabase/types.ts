@@ -333,6 +333,28 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      direct_messages: {
+        Row: {
+          id: string;
+          sender_id: string;
+          recipient_id: string;
+          body: string;
+          // null = người nhận chưa đọc. Xem
+          // migrations/20260828_add_direct_messages.sql.
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          sender_id: string;
+          recipient_id: string;
+          body: string;
+        };
+        // Update chỉ dùng để set read_at (đánh dấu đã đọc) — route server
+        // tự giới hạn field, type ở đây rộng hơn 1 chút cho đơn giản.
+        Update: { read_at?: string | null };
+        Relationships: [];
+      };
       reading_lists: {
         Row: {
           id: string;
@@ -838,6 +860,9 @@ export type Database = {
           nickname: string;
           avatar_url: string | null;
           cover_image_url: string | null;
+          // Xem migrations/20260828_extend_author_public_profiles.sql.
+          bio: string | null;
+          created_at: string;
           creator_tags: CreatorTag[];
         };
         Relationships: [];

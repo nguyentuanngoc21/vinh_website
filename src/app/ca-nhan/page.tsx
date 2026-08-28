@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Lora } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { ProfilePage } from "@/components/profile/profile-page";
@@ -19,7 +20,9 @@ export default function ProfileRoutePage() {
       <div className="mx-auto max-w-[1280px] bg-white">
         <SiteHeader />
         <main>
-          <ProfilePage />
+          <Suspense fallback={null}>
+            <ProfilePage />
+          </Suspense>
         </main>
       </div>
     </div>

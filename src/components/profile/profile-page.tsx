@@ -1,19 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileTabs } from "@/components/profile/profile-tabs";
 import { FollowingTab } from "@/components/profile/following-tab";
 import { ChatTab } from "@/components/profile/chat-tab";
 import { EditProfileTab } from "@/components/profile/edit-profile-tab";
 import { DailyTasksTab } from "@/components/profile/daily-tasks-tab";
-import { CONVERSATIONS, type ProfileTab } from "@/lib/profile";
+import type { ProfileTab } from "@/lib/profile";
 
 export function ProfilePage() {
-  const [tab, setTab] = useState<ProfileTab>("edit");
-  const [activeConv, setActiveConv] = useState(0);
-  const [mobileView, setMobileView] = useState<"list" | "thread">("list");
-  const [mute, setMute] = useState(false);
+  // ?chat=<userId> — deep link "Nhắn tin" từ /ket-noi hoặc following-tab.tsx
+  // (nút đó điều hướng tới đây thay vì mở modal riêng). useSearchParams()
+  // cần Suspense boundary ở cha — xem app/ca-nhan/page.tsx.
+  const searchParams = useSearchParams();
+  const chatWithParam = searchParams.get("chat");
+
+  const [tab, setTab] = useState<ProfileTab>(chatWithParam ? "chat" : "edit");
+  const [activeUserId, setActiveUserId] = useState<string | null>(chatWithParam);
+  const [mobileView, setMobileView] = useState<"list" | "thread">(chatWithParam ? "thread" : "list");
 
   // Header hiển thị trên MỌI tab (không chỉ tab "edit"), nên fetch riêng
   // ở đây thay vì đọc state của EditProfileTab — 2 nơi cùng gọi
@@ -25,6 +31,8 @@ export function ProfilePage() {
   const [joinedYear, setJoinedYear] = useState("");
   const [tokenBalance, setTokenBalance] = useState("…");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followerCount, setFollowerCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +46,8 @@ export function ProfilePage() {
         setUsername(me.username ?? "");
         if (me.createdAt) setJoinedYear(String(new Date(me.createdAt).getFullYear()));
         setCoverImageUrl(me.coverImageUrl ?? null);
+        setFollowingCount(me.followingCount ?? 0);
+        setFollowerCount(me.followerCount ?? 0);
       }
       if (balance) setTokenBalance(Number(balance.available ?? 0).toLocaleString("vi-VN"));
     });
@@ -46,11 +56,11 @@ export function ProfilePage() {
     };
   }, []);
 
-  // Jumping here from the Following tab's "Nhắn tin" button both switches
-  // tab and focuses the matching conversation (mirrors the mockup's
-  // Math.min clamp so an index past the sample thread list still resolves).
-  const openChatWith = (personIndex: number) => {
-    setActiveConv(Math.min(personIndex, CONVERSATIONS.length - 1));
+  // Nút "Nhắn tin" ở following-tab.tsx (và ?chat= khi tới từ /ket-noi)
+  // đều gọi qua đây — id THẬT (profiles.id), không phải index vào mảng
+  // mock như trước.
+  const openChatWith = (userId: string) => {
+    setActiveUserId(userId);
     setMobileView("thread");
     setTab("chat");
   };
@@ -62,6 +72,8 @@ export function ProfilePage() {
         username={username}
         joinedYear={joinedYear}
         tokenBalance={tokenBalance}
+        followingCount={followingCount}
+        followerCount={followerCount}
         coverImageUrl={coverImageUrl}
         onCoverSaved={setCoverImageUrl}
       />
@@ -71,15 +83,13 @@ export function ProfilePage() {
 
       {tab === "chat" && (
         <ChatTab
-          activeConv={activeConv}
-          onSelectConv={(i) => {
-            setActiveConv(i);
+          activeUserId={activeUserId}
+          onSelectUser={(userId) => {
+            setActiveUserId(userId);
             setMobileView("thread");
           }}
           mobileView={mobileView}
           onBack={() => setMobileView("list")}
-          mute={mute}
-          onToggleMute={() => setMute((v) => !v)}
         />
       )}
 

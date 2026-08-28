@@ -24,7 +24,9 @@ export type DesignPin = {
   id: number;
   title: string;
   artist: string;
-  /** Matches a person id in src/lib/connect-directory.ts, for linking to their profile. */
+  /** Mock id — /thiet-ke vẫn chưa nối Supabase (design_items/illustrator_id
+   * thật), nên KHÔNG còn khớp với id thật ở /ket-noi (đã nối DB, xem
+   * src/app/ket-noi/page.tsx) như trước. Sửa khi /thiet-ke được nối thật. */
   artistId: string;
   cat: Exclude<Category, "Tất cả">;
   likes: number;
