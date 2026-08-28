@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("username, nickname, bio, nickname_updated_at, created_at")
+    .select("username, nickname, bio, nickname_updated_at, created_at, cover_image_url")
     .eq("id", userId)
     .single();
   if (error || !data) {
@@ -28,6 +28,7 @@ export async function GET() {
     bio: data.bio ?? "",
     nicknameUpdatedAt: data.nickname_updated_at,
     createdAt: data.created_at,
+    coverImageUrl: data.cover_image_url,
   });
 }
 

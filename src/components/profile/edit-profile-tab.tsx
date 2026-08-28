@@ -106,7 +106,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-[26px] px-11 pb-[60px] pt-[26px] lg:grid-cols-[1.4fr_.9fr]">
+    <div className="grid grid-cols-1 gap-[26px] px-4 pb-[60px] pt-[26px] sm:px-8 lg:grid-cols-[1.4fr_.9fr] lg:px-11">
       <div className="flex flex-col gap-[26px]">
         {eligibility !== null && (
           <div

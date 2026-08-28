@@ -21,12 +21,12 @@ export function FollowingTab({ onMessage }: FollowingTabProps) {
   const toggle = (name: string) => setUnfollowed((prev) => ({ ...prev, [name]: !prev[name] }));
 
   return (
-    <div className="px-11 pb-[60px] pt-[26px]">
+    <div className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
       <div className="mb-[18px] flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">
           ĐANG THEO DÕI · 128 NGƯỜI
         </div>
-        <div className="w-[250px] rounded-full bg-neutral-bg px-4 py-2.5">
+        <div className="w-full rounded-full bg-neutral-bg px-4 py-2.5 sm:w-[250px]">
           <Field
             label={null}
             value={query}

@@ -61,6 +61,9 @@ export type Database = {
           username: string;
           nickname: string;
           avatar_url: string | null;
+          // Ảnh bìa trang cá nhân/tác giả — xem
+          // migrations/20260828_add_profile_cover_image.sql.
+          cover_image_url: string | null;
           role: Role;
           // Nhãn mô tả, không phải quyền hạn — ai cũng tự gắn được, xem
           // comment trong schema.sql phần 1.
@@ -100,6 +103,7 @@ export type Database = {
           username: string;
           nickname: string;
           avatar_url?: string | null;
+          cover_image_url?: string | null;
           role?: Role;
           creator_tags?: CreatorTag[];
           real_name?: string | null;
@@ -576,6 +580,7 @@ export type Database = {
           username: string;
           nickname: string;
           avatar_url: string | null;
+          cover_image_url: string | null;
           creator_tags: CreatorTag[];
         };
         Relationships: [];

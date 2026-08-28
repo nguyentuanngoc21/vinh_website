@@ -39,6 +39,10 @@ create table public.profiles (
   username text unique not null,
   nickname text not null,
   avatar_url text, -- công khai — path trong bucket "avatars" (thêm ở phần 4) hoặc URL ngoài
+  -- Ảnh bìa trang cá nhân/tác giả — cùng bucket "avatars", khác filename
+  -- prefix ("cover-" thay vì "avatar-"), cùng folder-per-user nên RLS sẵn
+  -- có không cần sửa. Xem migrations/20260828_add_profile_cover_image.sql.
+  cover_image_url text,
   role public.user_role not null default 'user',
   creator_tags public.creator_tag[] not null default '{}',
   real_name text,
@@ -70,7 +74,7 @@ create policy "users can update their own profile (not their own role)"
 -- Không lọc theo role — mọi user (kể cả role='user' thường, có gắn tag
 -- creator_tags hay không) đều cần username/nickname/avatar hiện công khai.
 create view public.author_public_profiles as
-  select id, username, nickname, avatar_url, creator_tags
+  select id, username, nickname, avatar_url, cover_image_url, creator_tags
   from public.profiles;
 
 -- --- Theo dõi tác giả, dạng toggle (nút Theo dõi/Đang theo dõi ở trang

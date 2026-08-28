@@ -35,8 +35,8 @@ export function ChatTab({
   const messages = THREADS[activeConv];
 
   return (
-    <div className="px-11 pb-[60px] pt-[22px]">
-      <div className="grid h-[604px] grid-cols-[320px_1fr_272px] overflow-hidden rounded-[18px] border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-[560px] max-[759px]:grid-cols-1">
+    <div className="px-0 pb-6 pt-[22px] sm:px-8 sm:pb-[60px] lg:px-11">
+      <div className="grid h-[604px] grid-cols-[320px_1fr_272px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-[calc(100vh-260px)] max-[759px]:min-h-[420px] max-[759px]:grid-cols-1 sm:rounded-[18px]">
         {/* Conversation list */}
         <div
           className={`flex min-w-0 flex-col border-r border-[#f0f0ef] ${

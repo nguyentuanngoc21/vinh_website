@@ -19,7 +19,7 @@ type ProfileTabsProps = { active: ProfileTab; onChange: (tab: ProfileTab) => voi
 
 export function ProfileTabs({ active, onChange }: ProfileTabsProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto border-b border-[#f0f0ef] px-11 pt-[22px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex gap-2 overflow-x-auto border-b border-[#f0f0ef] px-4 pt-[22px] [scrollbar-width:none] sm:px-8 lg:px-11 [&::-webkit-scrollbar]:hidden">
       {PROFILE_TABS.map((tab) => {
         const Icon = TAB_ICONS[tab.icon as keyof typeof TAB_ICONS];
         const isActive = tab.id === active;

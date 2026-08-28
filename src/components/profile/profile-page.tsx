@@ -24,6 +24,7 @@ export function ProfilePage() {
   const [username, setUsername] = useState("");
   const [joinedYear, setJoinedYear] = useState("");
   const [tokenBalance, setTokenBalance] = useState("…");
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +37,7 @@ export function ProfilePage() {
         setNickname(me.nickname ?? "");
         setUsername(me.username ?? "");
         if (me.createdAt) setJoinedYear(String(new Date(me.createdAt).getFullYear()));
+        setCoverImageUrl(me.coverImageUrl ?? null);
       }
       if (balance) setTokenBalance(Number(balance.available ?? 0).toLocaleString("vi-VN"));
     });
@@ -60,6 +62,8 @@ export function ProfilePage() {
         username={username}
         joinedYear={joinedYear}
         tokenBalance={tokenBalance}
+        coverImageUrl={coverImageUrl}
+        onCoverSaved={setCoverImageUrl}
       />
       <ProfileTabs active={tab} onChange={setTab} />
 

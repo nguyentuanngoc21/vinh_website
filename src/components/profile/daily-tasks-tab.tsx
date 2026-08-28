@@ -29,7 +29,7 @@ export function DailyTasksTab() {
   const claim = (id: string) => setClaimed((prev) => ({ ...prev, [id]: true }));
 
   return (
-    <div className="px-11 pb-[60px] pt-[26px]">
+    <div className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-[#F0E3C4] bg-cream-card px-6 py-5">
         <div>
           <div className="text-lg font-bold text-brand-ink">Nhiệm vụ hôm nay</div>

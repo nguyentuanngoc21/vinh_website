@@ -20,7 +20,7 @@ export function SiteHeader({
   ctaLabel = "Viết truyện",
 }: SiteHeaderProps = {}) {
   return (
-    <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-11 py-4 backdrop-blur">
+    <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11">
       <Link href="/" className="flex shrink-0 items-center gap-[9px] no-underline">
         <VinhMark size={34} tone="ink" className="shrink-0" />
         <span className="text-[27px] font-extrabold tracking-[-0.5px] text-brand-ink">
@@ -29,7 +29,7 @@ export function SiteHeader({
       </Link>
 
       {showNav && (
-        <div className="order-3 -mx-11 -mb-4 flex min-w-0 flex-[0_0_calc(100%+88px)] gap-5 overflow-x-auto overflow-y-hidden bg-brand-ink px-11 py-[13px] text-[15px] font-medium [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="order-3 -mx-4 -mb-4 flex min-w-0 flex-[0_0_calc(100%+32px)] gap-5 overflow-x-auto overflow-y-hidden bg-brand-ink px-4 py-[13px] text-[15px] font-medium [scrollbar-width:none] sm:-mx-8 sm:flex-[0_0_calc(100%+64px)] sm:px-8 lg:-mx-11 lg:flex-[0_0_calc(100%+88px)] lg:px-11 [&::-webkit-scrollbar]:hidden">
           <NavStripLinks />
         </div>
       )}
