@@ -68,8 +68,19 @@ const CREATOR_TAG_LABELS: Record<CreatorTag, string> = {
 const FILTER_TAGS = ["Tất cả", "Đọc giả", "Tác giả", "Họa sĩ", "Lồng tiếng"] as const;
 type FilterTag = (typeof FILTER_TAGS)[number];
 
+// creator_tags là tự khai báo thủ công (chưa có UI nào để user tự set,
+// xuất bản sách cũng KHÔNG tự động thêm 'author') — nên gần như luôn
+// rỗng dù người đó đã có tác phẩm thật. Union thêm nhãn suy ra trực tiếp
+// từ works (đã có sẵn dữ liệu thật) để không hiện sai "Đọc giả" cho
+// người rõ ràng đã đăng truyện/audio/thiết kế.
 function tagsOf(p: ConnectPerson): string[] {
-  return p.creatorTags.length > 0 ? p.creatorTags.map((t) => CREATOR_TAG_LABELS[t]) : ["Đọc giả"];
+  const declared = p.creatorTags.map((t) => CREATOR_TAG_LABELS[t]);
+  const derived: string[] = [];
+  if (p.works.truyen.length > 0) derived.push("Tác giả");
+  if (p.works.audio.length > 0) derived.push("Lồng tiếng");
+  if (p.works.design.length > 0) derived.push("Họa sĩ");
+  const tags = [...new Set([...declared, ...derived])];
+  return tags.length > 0 ? tags : ["Đọc giả"];
 }
 
 function toneFor(userId: string): string {

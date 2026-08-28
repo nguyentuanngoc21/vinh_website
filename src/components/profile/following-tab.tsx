@@ -4,21 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { ChatCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { AVATAR_TONES } from "@/lib/profile";
 import { Field, Alert } from "@/components/ui";
-import type { CreatorTag } from "@/lib/supabase/types";
 
 type FollowedPerson = {
   userId: string;
   nickname: string;
   username: string;
   avatarUrl: string | null;
-  creatorTags: CreatorTag[];
+  // Đã suy sẵn ở server (union creator_tags tự khai báo + suy từ
+  // sách/audio/thiết kế thật đã đăng — xem api/follows/route.ts, vì
+  // creator_tags gần như luôn rỗng do chưa có UI nào set nó).
+  tags: string[];
   followerCount: number;
-};
-
-const CREATOR_TAG_LABELS: Record<CreatorTag, string> = {
-  author: "Tác giả",
-  illustrator: "Họa sĩ",
-  narrator: "Lồng tiếng",
 };
 
 function toneFor(userId: string): string {
@@ -28,8 +24,7 @@ function toneFor(userId: string): string {
 }
 
 function metaFor(p: FollowedPerson): string {
-  const tags = p.creatorTags.length > 0 ? p.creatorTags.map((t) => CREATOR_TAG_LABELS[t]).join(", ") : "Độc giả";
-  return `${tags} · ${p.followerCount.toLocaleString("vi-VN")} người theo dõi`;
+  return `${p.tags.join(", ")} · ${p.followerCount.toLocaleString("vi-VN")} người theo dõi`;
 }
 
 type FollowingTabProps = { onMessage: (userId: string) => void };
