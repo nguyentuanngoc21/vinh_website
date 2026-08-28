@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -12,6 +12,7 @@ import {
   InfoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
+import { resendOtp } from "@/lib/auth";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
 import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/lib/password-strength";
 import { LegalLink } from "@/components/legal/legal-link";
@@ -26,10 +27,19 @@ export function RegisterForm() {
   // lý error=link-het-han.
   const linkExpired = searchParams.get("error") === "link-het-han";
 
-  const { register } = useRole();
+  const router = useRouter();
+  const { register, verifySignupCode } = useRole();
   // Đăng ký xong KHÔNG có session ngay (xem RegisterResult ở lib/auth.ts) —
   // giữ lại email vừa đăng ký để hiện trong màn "cần xác thực" bên dưới.
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  // Mã 6 số trong cùng email xác nhận — xem verify-otp/route.ts cho lý do
+  // cần lối đi này song song với bấm link (link mở sai browser trên mobile
+  // sẽ luôn báo hết hạn dù mail vừa gửi).
+  const [otp, setOtp] = useState("");
+  const [otpPending, setOtpPending] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -105,6 +115,29 @@ export function RegisterForm() {
     setSubmittedEmail(email.trim());
   };
 
+  const handleVerifyOtp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!submittedEmail || otp.trim().length === 0 || otpPending) return;
+    setOtpPending(true);
+    setOtpError(null);
+    const result = await verifySignupCode(submittedEmail, otp.trim());
+    setOtpPending(false);
+    if (!result.ok) {
+      setOtpError(result.error);
+      return;
+    }
+    router.push("/");
+  };
+
+  const handleResend = async () => {
+    if (!submittedEmail || resending) return;
+    setResending(true);
+    setResendMsg(null);
+    const result = await resendOtp(submittedEmail, "signup");
+    setResending(false);
+    setResendMsg(result.ok ? "Đã gửi lại email xác nhận." : result.error);
+  };
+
   // pw2 / cccd validation status, computed once and handed to <Field status=…>
   // instead of each field hand-rolling its own inline `style={{ color: … }}`.
   const pw2Status =
@@ -134,11 +167,43 @@ export function RegisterForm() {
         <div className="mt-2 text-[14.5px] leading-[1.6] text-stone">
           Chúng tôi đã gửi một email xác nhận tới{" "}
           <span className="font-medium text-slate">{submittedEmail}</span>. Bấm vào liên kết
-          trong email đó để hoàn tất đăng ký — tài khoản chỉ dùng được sau khi xác nhận.
+          trong email đó, hoặc nhập mã 6 số cũng có trong email vào ô dưới đây — tài khoản chỉ
+          dùng được sau khi xác nhận.
         </div>
-        <div className="mt-3 text-[13px] leading-[1.6] text-stone-light">
-          Không thấy email? Kiểm tra thêm thư mục Spam, hoặc đợi vài phút rồi thử lại.
-        </div>
+
+        <form onSubmit={handleVerifyOtp} className="mt-5">
+          <Field
+            label="Mã xác nhận (6 số)"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="123456"
+            className="text-center text-[18px] tracking-[6px]"
+          />
+          {otpError && (
+            <div className="mt-3">
+              <Alert tone="error">{otpError}</Alert>
+            </div>
+          )}
+          <div className="mt-3">
+            <Button type="submit" disabled={otp.trim().length === 0 || otpPending}>
+              {otpPending ? "Đang xác nhận…" : "Xác nhận mã"}
+            </Button>
+          </div>
+        </form>
+
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resending}
+          className="mt-3 cursor-pointer text-[13px] font-medium text-brand-gold-dark hover:text-brand-gold disabled:cursor-default disabled:opacity-60"
+        >
+          {resending ? "Đang gửi lại…" : "Không thấy email? Gửi lại"}
+        </button>
+        {resendMsg && <div className="mt-1.5 text-[12.5px] text-stone-light">{resendMsg}</div>}
+
         <Link
           href="/dang-nhap"
           className="mt-6 flex items-center justify-center gap-[9px] rounded-[10px] border border-brand-ink py-[13px] text-[14.5px] font-semibold text-brand-ink no-underline transition-transform active:scale-[.99]"
