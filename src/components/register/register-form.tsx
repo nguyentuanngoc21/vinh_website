@@ -32,9 +32,11 @@ export function RegisterForm() {
   // Đăng ký xong KHÔNG có session ngay (xem RegisterResult ở lib/auth.ts) —
   // giữ lại email vừa đăng ký để hiện trong màn "cần xác thực" bên dưới.
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
-  // Mã 6 số trong cùng email xác nhận — xem verify-otp/route.ts cho lý do
-  // cần lối đi này song song với bấm link (link mở sai browser trên mobile
-  // sẽ luôn báo hết hạn dù mail vừa gửi).
+  // Mã OTP trong email xác nhận (độ dài do setting "OTP Length" của
+  // project Supabase quyết định, không cố định — xem comment ở Field bên
+  // dưới) — xem verify-otp/route.ts cho lý do cần lối đi này thay cho bấm
+  // link (link mở sai browser trên mobile sẽ luôn báo hết hạn dù mail vừa
+  // gửi).
   const [otp, setOtp] = useState("");
   const [otpPending, setOtpPending] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -166,21 +168,28 @@ export function RegisterForm() {
         </div>
         <div className="mt-2 text-[14.5px] leading-[1.6] text-stone">
           Chúng tôi đã gửi một email xác nhận tới{" "}
-          <span className="font-medium text-slate">{submittedEmail}</span>. Bấm vào liên kết
-          trong email đó, hoặc nhập mã 6 số cũng có trong email vào ô dưới đây — tài khoản chỉ
-          dùng được sau khi xác nhận.
+          <span className="font-medium text-slate">{submittedEmail}</span>. Nhập mã xác nhận có
+          trong email đó vào ô dưới đây — tài khoản chỉ dùng được sau khi xác nhận.
         </div>
 
         <form onSubmit={handleVerifyOtp} className="mt-5">
           <Field
-            label="Mã xác nhận (6 số)"
+            label="Mã xác nhận"
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
             value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            placeholder="123456"
-            className="text-center text-[18px] tracking-[6px]"
+            // Không hardcode đúng 6 hay 8 số — độ dài mã do setting "OTP
+            // Length" của project Supabase quyết định (Authentication →
+            // Sign In / Providers → Email), có thể đổi bất cứ lúc nào mà
+            // code này không biết trước. Chỉ chặn ký tự không phải số +
+            // giới hạn trên (10) để tránh input vô hạn, KHÔNG cắt theo
+            // đúng 6 như bản trước — đó chính là lý do mã luôn báo sai dù
+            // vừa copy từ email (mã thật của project này là 8 số, bị cắt
+            // cụt về 6 trước khi gửi lên verifyOtp()).
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            placeholder="Nhập mã trong email"
+            className="text-center text-[18px] tracking-[4px]"
           />
           {otpError && (
             <div className="mt-3">

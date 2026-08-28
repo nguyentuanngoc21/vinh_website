@@ -130,7 +130,7 @@ sẽ âm thầm rớt `redirectTo` về Site URL mặc định:
    Supabase chỉ có nút bấm/link, không có `{{ .Token }}`, nên nếu không dán
    lại thì người dùng không có cách nào nhập mã.
 
-**Chỉ dùng mã 6 số (OTP), không dùng link** — bản trước từng có cả nút bấm
+**Chỉ dùng mã OTP, không dùng link** — bản trước từng có cả nút bấm
 (link PKCE) song song với mã, nhưng đã bỏ nút đó khỏi email: link PKCE chỉ
 đổi được session nếu mở ĐÚNG browser đã gửi request `resetPasswordForEmail`/
 `signUp` (cần cookie `code_verifier` của browser đó). Trên mobile, bấm link
@@ -138,16 +138,20 @@ từ app Gmail/Outlook thường mở sang browser khác của máy → luôn b�
 hoặc không hợp lệ" dù mail vừa gửi (đây gần như luôn là nguyên nhân thật của
 lỗi 400 ở `POST /auth/v1/token?grant_type=pkce` trong Supabase Auth Logs, chứ
 không phải mã thật sự hết hạn) — có cả 2 lựa chọn trong 1 email mà 1 luôn
-lỗi gây nhầm lẫn hơn là giúp. Luồng hoạt động (xem comment trong từng file
-để biết lý do từng bước):
+lỗi gây nhầm lẫn hơn là giúp. Độ dài mã do setting **OTP Length** của
+project quyết định (Supabase Dashboard → Authentication → Sign In /
+Providers → mở provider **Email**) — không hardcode đúng 1 số cụ thể ở FE,
+vì setting này đổi được bất cứ lúc nào mà code không biết trước (xem
+comment trong register-form.tsx/forgot-password-form.tsx). Luồng hoạt động
+(xem comment trong từng file để biết lý do từng bước):
 
 ```
 /dang-ky (submit form → màn "Cần bạn xác thực tài khoản" hiện ra ngay,
           có sẵn ô nhập mã — không cần rời trang)
-  → nhập mã 6 số → POST /api/auth/verify-otp {email, token, type:"signup"}
+  → nhập mã → POST /api/auth/verify-otp {email, token, type:"signup"}
   → supabase.auth.verifyOtp() → set cookie vinh_session → đăng nhập luôn
 /quen-mat-khau (submit email → màn "Kiểm tra email của bạn", có sẵn ô nhập mã)
-  → nhập mã 6 số → POST /api/auth/verify-otp {email, token, type:"recovery"}
+  → nhập mã → POST /api/auth/verify-otp {email, token, type:"recovery"}
   → supabase.auth.verifyOtp() → set cookie sb-* → redirect /dat-lai-mat-khau
 /dat-lai-mat-khau (form mật khẩu mới)
   → POST /api/auth/reset-password → supabase.auth.updateUser({ password })
