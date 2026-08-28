@@ -19,6 +19,9 @@ export type SidebarBook = {
   // src/app/api/authoring/chapters/[chapterId]/route.ts) — /truyen/[slug]
   // chỉ 404 nếu false, dùng để quyết định có hiện link "Xem trang truyện" không.
   published: boolean;
+  /** null = chưa gắn bìa thật, đã resolve sẵn từ author/layout.tsx qua
+   * resolveBookCoverUrl(). */
+  coverUrl: string | null;
   meta: string;
 };
 
@@ -55,7 +58,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
           const content = (
             <>
               <div className="h-[46px] w-[34px] shrink-0 overflow-hidden rounded-[5px]">
-                <BookCover id={book.id} title={book.title} genre={book.genre} />
+                <BookCover id={book.id} title={book.title} genre={book.genre} coverUrl={book.coverUrl} />
               </div>
               <div className="min-w-0">
                 <div

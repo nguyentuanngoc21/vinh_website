@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowSquareOutIcon, CoinsIcon, PlusIcon, TrashIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
+import { BookCoverUpload } from "@/components/author/book-cover-upload";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type OverviewChapter = {
@@ -23,6 +24,9 @@ type BookOverviewProps = {
   bookSlug: string;
   bookPublished: boolean;
   bookIsExclusive: boolean;
+  /** null = chưa gắn bìa thật, đã resolve sẵn từ page.tsx qua
+   * resolveBookCoverUrl() — component này không tự query Supabase. */
+  coverUrl: string | null;
   /** Đã order by order_index asc từ page.tsx. */
   chapters: OverviewChapter[];
 };
@@ -39,6 +43,7 @@ export function BookOverview({
   bookSlug,
   bookPublished,
   bookIsExclusive,
+  coverUrl,
   chapters,
 }: BookOverviewProps) {
   const router = useRouter();
@@ -121,13 +126,16 @@ export function BookOverview({
         )}
       </div>
 
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <div className="font-[family-name:var(--font-lora)] text-[27px] font-bold text-brand-ink">
-            {bookTitle}
-          </div>
-          <div className="mt-1 text-[13.5px] text-stone-alt">
-            {chapters.length} chương · {publishedCount} đã đăng
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex items-end gap-4">
+          <BookCoverUpload bookId={bookId} bookTitle={bookTitle} bookGenre={bookGenre} coverUrl={coverUrl} />
+          <div>
+            <div className="font-[family-name:var(--font-lora)] text-[27px] font-bold text-brand-ink">
+              {bookTitle}
+            </div>
+            <div className="mt-1 text-[13.5px] text-stone-alt">
+              {chapters.length} chương · {publishedCount} đã đăng
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 gap-2.5">
