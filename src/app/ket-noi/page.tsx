@@ -60,17 +60,30 @@ export default async function ConnectPage() {
   const supabase = createServiceRoleClient();
   const viewerId = await getAuthedUserId(supabase);
 
-  const { data: profileRows } = await supabase
+  const { data: profileRows, error: profilesError } = await supabase
     .from("author_public_profiles")
     .select("id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags")
     .order("created_at", { ascending: false })
     .limit(PEOPLE_LIMIT);
+  if (profilesError) {
+    // Lỗi phổ biến nhất ở đây: chưa chạy
+    // migrations/20260828_extend_author_public_profiles.sql (view cũ
+    // chưa có cột bio/created_at) — select lỗi, data về null, trang vẫn
+    // render bình thường nhưng hiện "Chưa có người dùng nào" dù profiles
+    // rõ ràng có dữ liệu. Log ra để không im lặng nuốt lỗi như vậy nữa.
+    console.error("[ket-noi] author_public_profiles query failed:", profilesError);
+  }
   const people = profileRows ?? [];
   const peopleIds = people.map((p) => p.id);
 
-  const [{ data: followRows }, { data: bookRows }, { data: audioRows }, { data: designRows }] =
+  const [
+    { data: followRows, error: followError },
+    { data: bookRows, error: bookError },
+    { data: audioRows, error: audioError },
+    { data: designRows, error: designError },
+  ] =
     peopleIds.length === 0
-      ? [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+      ? [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }, { data: [], error: null }]
       : await Promise.all([
           supabase.from("author_follows").select("follower_id, author_id").in("author_id", peopleIds),
           supabase
@@ -91,6 +104,10 @@ export default async function ConnectPage() {
             .in("illustrator_id", peopleIds)
             .order("created_at", { ascending: false }),
         ]);
+  if (followError) console.error("[ket-noi] author_follows query failed:", followError);
+  if (bookError) console.error("[ket-noi] books query failed:", bookError);
+  if (audioError) console.error("[ket-noi] public_audio_narrations query failed:", audioError);
+  if (designError) console.error("[ket-noi] public_design_items query failed:", designError);
 
   const followerCountById = new Map<string, number>();
   const followingByViewer = new Set<string>();
