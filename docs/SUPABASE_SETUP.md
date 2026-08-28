@@ -119,24 +119,45 @@ sẽ âm thầm rớt `redirectTo` về Site URL mặc định:
 1. Vào **Authentication → URL Configuration → Redirect URLs**, thêm:
    - `http://localhost:3000/api/auth/confirm` (dev)
    - `https://<domain-thật>/api/auth/confirm` (production)
-2. Email template "Reset Password" mặc định của Supabase đã dùng đúng biến
-   `{{ .ConfirmationURL }}` nối với `redirectTo` ở trên — không cần sửa gì
-   thêm để chạy thử. Muốn email trông giống gửi từ Vịnh (nội dung + tên
-   người gửi) thay vì mặc định của Supabase, xem
-   [`docs/supabase/email-templates/`](./supabase/email-templates/README.md)
-   — có sẵn file HTML để dán vào Dashboard và hướng dẫn cấu hình SMTP riêng.
 
-Luồng hoạt động (xem comment trong từng file để biết lý do từng bước):
+   (Vẫn cần khai báo dù giờ không còn email nào trỏ tới `/api/auth/confirm`
+   nữa — xem lý do bên dưới — vì Supabase vẫn kiểm tra `redirectTo`/
+   `emailRedirectTo` mà `signUp()`/`resetPasswordForEmail()` gửi lên có nằm
+   trong danh sách này hay không, dù `{{ .ConfirmationURL }}` không được
+   hiển thị trong template.)
+2. Dán template ở [`docs/supabase/email-templates/`](./supabase/email-templates/README.md)
+   vào Dashboard (bắt buộc, không phải tuỳ chọn) — template mặc định của
+   Supabase chỉ có nút bấm/link, không có `{{ .Token }}`, nên nếu không dán
+   lại thì người dùng không có cách nào nhập mã.
+
+**Chỉ dùng mã 6 số (OTP), không dùng link** — bản trước từng có cả nút bấm
+(link PKCE) song song với mã, nhưng đã bỏ nút đó khỏi email: link PKCE chỉ
+đổi được session nếu mở ĐÚNG browser đã gửi request `resetPasswordForEmail`/
+`signUp` (cần cookie `code_verifier` của browser đó). Trên mobile, bấm link
+từ app Gmail/Outlook thường mở sang browser khác của máy → luôn báo "hết hạn
+hoặc không hợp lệ" dù mail vừa gửi (đây gần như luôn là nguyên nhân thật của
+lỗi 400 ở `POST /auth/v1/token?grant_type=pkce` trong Supabase Auth Logs, chứ
+không phải mã thật sự hết hạn) — có cả 2 lựa chọn trong 1 email mà 1 luôn
+lỗi gây nhầm lẫn hơn là giúp. Luồng hoạt động (xem comment trong từng file
+để biết lý do từng bước):
 
 ```
-/quen-mat-khau (form nhập email)
-  → POST /api/auth/forgot-password → supabase.auth.resetPasswordForEmail()
-  → email tới người dùng, link trỏ tới /api/auth/confirm?code=...&next=/dat-lai-mat-khau
-  → GET /api/auth/confirm → exchangeCodeForSession(code) → set cookie sb-* → redirect
+/dang-ky (submit form → màn "Cần bạn xác thực tài khoản" hiện ra ngay,
+          có sẵn ô nhập mã — không cần rời trang)
+  → nhập mã 6 số → POST /api/auth/verify-otp {email, token, type:"signup"}
+  → supabase.auth.verifyOtp() → set cookie vinh_session → đăng nhập luôn
+/quen-mat-khau (submit email → màn "Kiểm tra email của bạn", có sẵn ô nhập mã)
+  → nhập mã 6 số → POST /api/auth/verify-otp {email, token, type:"recovery"}
+  → supabase.auth.verifyOtp() → set cookie sb-* → redirect /dat-lai-mat-khau
 /dat-lai-mat-khau (form mật khẩu mới)
   → POST /api/auth/reset-password → supabase.auth.updateUser({ password })
   → set lại cookie vinh_session → đăng nhập luôn, redirect về "/"
+"Gửi lại mã" → POST /api/auth/resend-otp → supabase.auth.resend() (signup)
+  hoặc resetPasswordForEmail() lại (recovery, không có resend() cho type này)
 ```
+
+`/api/auth/confirm` (route đổi PKCE code cũ) vẫn còn trong code nhưng không
+còn email nào trỏ tới nó — giữ lại không hại gì, xoá sau nếu muốn dọn dẹp.
 
 Route `/api/auth/forgot-password` luôn trả về cùng một thông báo thành công
 chung chung dù email có tồn tại hay không (giống hành vi mặc định của

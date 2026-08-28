@@ -168,6 +168,98 @@ export async function resetPassword(password: string): Promise<AuthResult> {
 }
 
 /**
+ * Calls POST /api/auth/verify-otp with type "signup" — the manual-code
+ * alternative to clicking the link in the confirmation email (see that
+ * route for why the link alone isn't reliable on mobile). Returns a full
+ * Session on success, same shape as login/register, since the backend
+ * signs the user in immediately once the code checks out.
+ */
+export async function verifySignupOtp(email: string, token: string): Promise<AuthResult> {
+  let res: Response;
+  try {
+    res = await fetch("/api/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, token, type: "signup" }),
+    });
+  } catch {
+    return { ok: false, error: "Không thể kết nối máy chủ. Vui lòng thử lại sau." };
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    return {
+      ok: false,
+      error: (data && typeof data.error === "string" && data.error) || "Mã xác nhận không đúng. Vui lòng thử lại.",
+    };
+  }
+
+  return { ok: true, session: data as Session };
+}
+
+/**
+ * Calls POST /api/auth/verify-otp with type "recovery" — the manual-code
+ * alternative to the emailed reset-password link. Unlike verifySignupOtp,
+ * this doesn't return a Session: it only establishes the recovery session
+ * (cookie) that /dat-lai-mat-khau expects to already be there, same as
+ * following the link would. The actual password change + sign-in still
+ * happens at resetPassword() below, after the user picks a new password.
+ */
+export async function verifyRecoveryOtp(email: string, token: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  let res: Response;
+  try {
+    res = await fetch("/api/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, token, type: "recovery" }),
+    });
+  } catch {
+    return { ok: false, error: "Không thể kết nối máy chủ. Vui lòng thử lại sau." };
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    return {
+      ok: false,
+      error: (data && typeof data.error === "string" && data.error) || "Mã xác nhận không đúng. Vui lòng thử lại.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Calls POST /api/auth/resend-otp — re-sends the confirmation/reset email
+ * (same underlying code+link) when the previous one expired or never
+ * arrived. `type` mirrors verifySignupOtp/verifyRecoveryOtp above.
+ */
+export async function resendOtp(
+  email: string,
+  type: "signup" | "recovery"
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  let res: Response;
+  try {
+    res = await fetch("/api/auth/resend-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, type }),
+    });
+  } catch {
+    return { ok: false, error: "Không thể kết nối máy chủ. Vui lòng thử lại sau." };
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    return {
+      ok: false,
+      error: (data && typeof data.error === "string" && data.error) || "Gửi lại mã thất bại. Vui lòng thử lại.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
  * Clears the server-side session cookie. Best-effort: logout should still
  * clear the client-side session (localStorage/sessionStorage, in role.tsx)
  * even if this request fails, so it's never awaited from a place that

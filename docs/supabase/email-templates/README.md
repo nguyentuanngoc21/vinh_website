@@ -31,8 +31,8 @@ Subject/Body sẽ mở khoá.
 ## 2. Áp dụng template nội dung
 
 1. Mở [`reset-password.html`](./reset-password.html), sửa chữ/màu nếu muốn
-   (giữ nguyên `{{ .ConfirmationURL }}`, `{{ .Email }}` — đây là biến
-   Supabase tự điền, không phải chữ thường).
+   (giữ nguyên `{{ .Token }}`, `{{ .Email }}` — đây là biến Supabase tự
+   điền, không phải chữ thường).
 2. Vào Supabase Dashboard → **Authentication → Emails → Reset password**.
 3. Ô **Subject**: đặt ví dụ `Đặt lại mật khẩu — Vịnh`.
 4. Ô **Body**: bấm **Source** (chuyển sang chế độ sửa HTML thô — mặc định
@@ -46,9 +46,22 @@ Các biến dùng được trong mọi template (không phải chỉ Reset Passw
 `{{ .TokenHash }}`. Chi tiết: [Supabase Auth Email Templates
 docs](https://supabase.com/docs/guides/auth/auth-email-templates).
 
+Cả hai template dưới đây chỉ hiển thị **mã 6 số** (`{{ .Token }}`), KHÔNG
+còn nút bấm/link (`{{ .ConfirmationURL }}`) — bản trước có cả hai song song,
+nhưng link một mình không đủ tin cậy trên mobile: PKCE link chỉ đổi được
+session nếu mở ĐÚNG browser đã bắt đầu request (có cookie `code_verifier`),
+còn bấm link từ app Gmail/Outlook trên điện thoại thường mở sang browser
+khác → luôn báo "hết hạn hoặc không hợp lệ" dù mail vừa gửi. Có cả 2 lựa
+chọn trong 1 email (1 cái luôn lỗi) gây nhầm lẫn hơn là giúp, nên giờ chỉ
+còn đúng một cách: nhập mã. Mã đi qua `verifyOtp` (`/api/auth/verify-otp`),
+không cần browser nào cả, nên luôn hoạt động — không cần cấu hình gì thêm
+trên Dashboard, `{{ .Token }}` đã tự có sẵn, chỉ cần dán lại template đã
+cập nhật.
+
 Email xác nhận đăng ký ("Confirm signup") cũng dùng chung cơ chế trên: mở
 [`confirm-signup.html`](./confirm-signup.html), dán vào Supabase Dashboard →
-**Authentication → Emails → Confirm signup**. Route `signUp()` trong
-`src/app/api/auth/register/route.ts` đã set `emailRedirectTo` trỏ về
-`/api/auth/confirm?next=/` — cùng route xử lý code với luồng quên mật khẩu,
-chỉ khác `next` đích đến sau khi đổi code lấy session.
+**Authentication → Emails → Confirm signup**.
+
+`/api/auth/confirm` (route xử lý link cũ) vẫn còn trong code nhưng không
+còn email nào trỏ tới nó nữa — an toàn để giữ lại (không ai gọi tới), hoặc
+xoá sau nếu muốn dọn dẹp; không bắt buộc phải xoá ngay.

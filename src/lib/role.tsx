@@ -6,6 +6,7 @@ import {
   logout as logoutRequest,
   register as registerRequest,
   resetPassword as resetPasswordRequest,
+  verifySignupOtp as verifySignupOtpRequest,
   type RegisterPayload,
   type Session,
 } from "@/lib/auth";
@@ -21,6 +22,10 @@ type RoleContextValue = {
   isAdmin: boolean;
   login: (identifier: string, password: string, remember: boolean) => Promise<AuthOutcome>;
   register: (payload: RegisterPayload) => Promise<AuthOutcome>;
+  /** Manual-code alternative to bấm link trong email xác nhận đăng ký — xem
+   * verifySignupOtp() ở lib/auth.ts và /api/auth/verify-otp cho lý do tồn
+   * tại (link PKCE mở sai browser trên mobile thì luôn báo hết hạn). */
+  verifySignupCode: (email: string, token: string) => Promise<AuthOutcome>;
   resetPassword: (password: string) => Promise<AuthOutcome>;
   logout: () => void;
   /** Patches just `session.name` in the cached session after a successful
@@ -123,6 +128,16 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     return { ok: true as const };
   }, []);
 
+  // Cùng cách resetPassword() bên dưới ghi session khi thành công — verify
+  // xong là coi như vừa đăng nhập thật (giống bấm link trong mail), "nhớ
+  // đăng nhập" mặc định như register/confirm route đã làm.
+  const verifySignupCode = useCallback(async (email: string, token: string) => {
+    const result = await verifySignupOtpRequest(email, token);
+    if (!result.ok) return result;
+    writeSession(result.session, true);
+    return { ok: true as const };
+  }, []);
+
   // Reached only after the recovery-link session is already in place (see
   // /api/auth/confirm); a successful reset signs the user straight in,
   // same "remember by default" treatment as a fresh registration.
@@ -153,6 +168,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         isAdmin: session?.role === "admin",
         login,
         register,
+        verifySignupCode,
         resetPassword,
         logout,
         updateSessionName,
