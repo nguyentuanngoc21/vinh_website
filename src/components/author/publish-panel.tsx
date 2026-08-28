@@ -60,7 +60,7 @@ export function PublishPanel({
   onTagsChange,
 }: PublishPanelProps) {
   return (
-    <div className="flex flex-col overflow-y-auto border-l border-cream-border bg-white">
+    <div className="flex flex-col border-t border-cream-border bg-white lg:overflow-y-auto lg:border-l lg:border-t-0">
       <div className="flex gap-2.5 border-b border-cream-border px-[22px] py-5">
         <button
           type="button"

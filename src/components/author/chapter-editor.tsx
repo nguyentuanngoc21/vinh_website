@@ -92,14 +92,14 @@ export function ChapterEditor({
   };
 
   return (
-    <div className="flex flex-col overflow-hidden bg-[#FBF8F1]">
-      <div className="flex items-center justify-between border-b border-cream-border bg-[#FBF8F1] px-7 py-3.5">
-        <div className="flex items-center gap-2.5 text-[13px] font-medium text-stone-alt">
-          <span>{bookTitle}</span>
-          <CaretRightIcon size={12} />
-          <span className="font-semibold text-brand-ink">{title || "Chương mới"}</span>
+    <div className="flex flex-col bg-[#FBF8F1] lg:overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cream-border bg-[#FBF8F1] px-4 py-3.5 lg:px-7">
+        <div className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-stone-alt">
+          <span className="truncate">{bookTitle}</span>
+          <CaretRightIcon size={12} className="shrink-0" />
+          <span className="truncate font-semibold text-brand-ink">{title || "Chương mới"}</span>
         </div>
-        <div className="flex items-center gap-3.5 text-[13px] font-medium text-stone-alt">
+        <div className="flex shrink-0 items-center gap-3.5 text-[13px] font-medium text-stone-alt">
           {bookPublished && (
             <Link
               href={`/truyen/${bookSlug}`}
@@ -119,8 +119,8 @@ export function ChapterEditor({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-9">
-        <div className="mx-auto max-w-[660px] px-7">
+      <div className="flex-1 py-6 lg:overflow-y-auto lg:py-9">
+        <div className="mx-auto max-w-[660px] px-4 lg:px-7">
           <Field
             label={null}
             value={title}

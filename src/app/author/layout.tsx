@@ -72,10 +72,10 @@ export default async function AuthorLayout({ children }: LayoutProps<"/author">)
 
   return (
     <div
-      className={`${lora.variable} grid flex-1 grid-cols-[264px_1fr] overflow-hidden bg-[#FBF8F1] text-brand-ink`}
+      className={`${lora.variable} flex flex-1 flex-col bg-[#FBF8F1] text-brand-ink lg:grid lg:grid-cols-[264px_1fr] lg:overflow-hidden`}
     >
       <WorksSidebar books={books} />
-      <div className="grid grid-cols-[1fr_320px] overflow-hidden">{children}</div>
+      <div className="flex flex-1 flex-col lg:grid lg:grid-cols-[1fr_320px] lg:overflow-hidden">{children}</div>
     </div>
   );
 }

@@ -102,7 +102,7 @@ export function BookOverview({
   };
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto bg-[#FBF8F1] px-9 py-7">
+    <div className="flex flex-1 flex-col bg-[#FBF8F1] px-4 py-5 lg:overflow-y-auto lg:px-9 lg:py-7">
       <div className="mb-1 flex items-center gap-2.5">
         {bookGenre && (
           <span className="rounded-full bg-neutral-bg px-3 py-1 text-xs font-medium text-ink">{bookGenre}</span>
@@ -138,7 +138,7 @@ export function BookOverview({
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 gap-2.5">
+        <div className="flex shrink-0 flex-wrap gap-2.5">
           <button
             type="button"
             onClick={handleDelete}

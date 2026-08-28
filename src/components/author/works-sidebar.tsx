@@ -3,7 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowSquareOutIcon, PlusIcon, GearIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowSquareOutIcon,
+  PlusIcon,
+  GearIcon,
+  UploadSimpleIcon,
+  ListIcon,
+  XIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { BookCover } from "@/components/covers/book-cover";
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
@@ -31,18 +38,70 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
   const activeBookId = pathname?.split("/")[2];
   const { session } = useRole();
   const [showImport, setShowImport] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Đóng drawer mỗi khi chuyển trang — layout.tsx (cha) không remount khi
+  // điều hướng trong cùng /author/*, nên state mobileOpen sẽ còn nguyên
+  // (mở) nếu không tự đóng ở đây. Set state trong lúc render (thay vì
+  // useEffect) theo đúng pattern React khuyến nghị cho "reset state khi 1
+  // giá trị đổi" — xem https://react.dev/learn/you-might-not-need-an-effect.
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setMobileOpen(false);
+  }
 
   return (
-    <aside className="flex flex-col overflow-hidden bg-brand-ink-dark text-sidebar-text">
-      <div className="flex items-center gap-[9px] border-b border-white/8 px-5 py-[18px]">
-        <Link href="/" className="flex flex-1 items-center gap-[9px] no-underline">
-          <VinhMark size={30} tone="cream" />
-          <span className="text-[19px] font-extrabold text-white">Vịnh</span>
-        </Link>
+    <>
+      {/* Thanh trên cùng — CHỈ hiện dưới lg (aside bên dưới ẩn hẳn khỏi
+          màn hình bằng transform ở mobile, nên cần 1 lối vào riêng để mở
+          lại). Từ lg trở lên aside luôn hiện tại chỗ, thanh này ẩn đi. */}
+      <div className="flex items-center gap-3 border-b border-white/8 bg-brand-ink-dark px-4 py-3 text-white lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Mở menu tác giả"
+          className="cursor-pointer rounded-md p-1 text-white"
+        >
+          <ListIcon size={22} />
+        </button>
+        <VinhMark size={24} tone="cream" />
+        <span className="text-[15px] font-extrabold">Vịnh</span>
         <span className="ml-auto rounded-[5px] border border-brand-gold-light/40 px-[7px] py-0.5 text-[11px] font-medium text-brand-gold-light">
           Tác giả
         </span>
       </div>
+
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+          className="fixed inset-0 z-40 bg-black/45 lg:hidden"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[264px] -translate-x-full flex-col overflow-hidden bg-brand-ink-dark text-sidebar-text transition-transform duration-200 lg:static lg:z-auto lg:w-auto lg:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : ""
+        }`}
+      >
+        <div className="flex items-center gap-[9px] border-b border-white/8 px-5 py-[18px]">
+          <Link href="/" className="flex flex-1 items-center gap-[9px] no-underline">
+            <VinhMark size={30} tone="cream" />
+            <span className="text-[19px] font-extrabold text-white">Vịnh</span>
+          </Link>
+          <span className="rounded-[5px] border border-brand-gold-light/40 px-[7px] py-0.5 text-[11px] font-medium text-brand-gold-light">
+            Tác giả
+          </span>
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Đóng menu"
+            className="cursor-pointer rounded-md p-1 text-sidebar-text-dim lg:hidden"
+          >
+            <XIcon size={18} />
+          </button>
+        </div>
 
       <div className="px-3.5 pb-2 pt-4 text-[11px] font-bold tracking-wide text-[#6f8794]">
         TÁC PHẨM CỦA TÔI
@@ -150,6 +209,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
           <GearIcon size={18} />
         </Link>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
