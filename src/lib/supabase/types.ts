@@ -43,7 +43,31 @@ export type TransactionType =
   // Added by migrations/20260807_wallet_ledger_extension.sql.
   | "purchase_credit" // author's revenue-share leg of a purchase_chapter debit — starts 'pending'
   | "withdrawal"
-  | "platform_bonus";
+  | "platform_bonus"
+  // Added by migrations/20260827_add_quest_reward_transaction_type.sql —
+  // reference_type = 'quest', reference_id = task_templates.id or
+  // hidden_quests.id. No separate quest ledger; reuses apply_transaction().
+  | "quest_reward"
+  // Added by migrations/20260827_add_streak_bonus_transaction_type.sql —
+  // reference_type = 'streak_milestone', reference_id = streak_milestones.id.
+  // Deliberately separate from 'quest_reward' — not tied to any quest,
+  // never a multiplier on task_templates/hidden_quests rewards.
+  | "streak_bonus"
+  // Added by migrations/20260827_add_streak_rescue_transaction_type.sql —
+  // a DEBIT (negative amount), reference_type = 'streak_rescue'. Paid by
+  // the user to save a streak after missing exactly 1 day with an empty
+  // rest-day bank. Separate from 'streak_bonus' (a credit) for the same
+  // reason purchase_chapter/purchase_credit are separate.
+  | "streak_rescue";
+
+// Quest System taxonomy — see migrations/20260827_extend_task_templates_for_quests.sql.
+// Same 6 values used by task_templates.quest_type and quest_examples_pool.quest_type.
+export type QuestType = "discovery" | "engagement" | "lore_hunt" | "cross_compare" | "prediction" | "topup";
+
+// Polymorphic discriminator for quest_id columns (quest_reset_events,
+// anchored_comments) — disambiguates task_templates.id vs hidden_quests.id.
+// No FK, same pattern as purchase_transactions.chapter_id.
+export type QuestSource = "task_template" | "hidden_quest";
 
 // See migrations/20260807_wallet_ledger_extension.sql part 2. Every row
 // created before that migration is 'completed' by default (backfilled).
@@ -96,6 +120,22 @@ export type Database = {
           screenshot_penalty_expires_at: string | null;
           screenshot_penalty_banned: boolean;
           screenshot_penalty_last_offense_at: string | null;
+          // Quest System — lưu sẵn, không tính lại mỗi lần đọc. Chặn write
+          // trực tiếp bởi trigger enforce_quest_streak_authority (giống
+          // role/cccd_verified) — xem
+          // migrations/20260827_add_quest_streak_to_profiles.sql. KHÔNG có
+          // trong Insert/Update, client không tự set được. Cả 4 cột chỉ
+          // đổi qua sync_reading_streak()/rescue_streak_with_tokens() —
+          // xem migrations/20260827_add_streak_sync_functions.sql.
+          current_quest_streak: number;
+          streak_updated_at: string | null;
+          // Kho "thẻ nghỉ" tích lũy (+1/7 ngày streak liên tục, trần tăng
+          // theo mốc streak, tối đa 31) — dùng để bù 1 ngày lỡ mà không
+          // mất streak, không tốn token.
+          streak_rest_days_banked: number;
+          // NULL = streak khoẻ mạnh. Có giá trị = vừa lỡ 1 ngày, hết thẻ
+          // nghỉ, đang trong 48h ân hạn để trả token cứu.
+          streak_at_risk_since: string | null;
           created_at: string;
         };
         Insert: {
@@ -461,6 +501,20 @@ export type Database = {
           target_count: number;
           reward_tokens: number;
           active: boolean;
+          // Quest System columns — NULL/'manual' for pre-existing daily
+          // task rows, which are not part of the quest taxonomy. See
+          // migrations/20260827_extend_task_templates_for_quests.sql.
+          quest_type: QuestType | null;
+          // {chapter_id, paragraph_index, char_start, char_end} — no FK,
+          // paragraph_index is a client-computed split index, not a
+          // paragraph table (none exists).
+          chapter_ref: Record<string, unknown> | null;
+          genre: string | null;
+          author_id: string | null;
+          generated_by: string;
+          quality_flag: string | null;
+          similarity_to_pool_score: number | null;
+          auto_flag_reason: string | null;
         };
         Insert: {
           id?: string;
@@ -470,6 +524,14 @@ export type Database = {
           target_count?: number;
           reward_tokens?: number;
           active?: boolean;
+          quest_type?: QuestType | null;
+          chapter_ref?: Record<string, unknown> | null;
+          genre?: string | null;
+          author_id?: string | null;
+          generated_by?: string;
+          quality_flag?: string | null;
+          similarity_to_pool_score?: number | null;
+          auto_flag_reason?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["task_templates"]["Insert"]>;
         Relationships: [];
@@ -484,11 +546,206 @@ export type Database = {
           completed: boolean;
           claimed: boolean;
           created_at: string;
+          // Fast counter for UI (disable reset button once exhausted) —
+          // detailed history lives in quest_reset_events. See
+          // migrations/20260827_extend_task_templates_for_quests.sql.
+          reset_count: number;
         };
         // Rows are created/updated via increment_task_progress() and
         // claim_daily_task() RPCs, not direct insert/update — see
         // schema.sql section 7. `never` (not omitted) — see the comment
         // on `transactions.Insert` above for why omitting breaks everything.
+        // reset_count needs the same treatment (a new security-definer
+        // reset function, not a direct update) once the reset flow ships.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      quest_examples_pool: {
+        Row: {
+          id: string;
+          quest_type: QuestType;
+          content: string;
+          genre: string | null;
+          example_quality: "good" | "bad_counterexample";
+          spoiler_risk: "low" | "medium" | "high";
+          version: number;
+          added_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          quest_type: QuestType;
+          content: string;
+          genre?: string | null;
+          example_quality: "good" | "bad_counterexample";
+          spoiler_risk?: "low" | "medium" | "high";
+          version?: number;
+          added_by: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quest_examples_pool"]["Insert"]>;
+        Relationships: [];
+      };
+      // No reward_rules table — task_templates.reward_tokens and
+      // hidden_quests.reward_tokens each hold their own fixed amount
+      // directly, no shared lookup table. Streak bonus is entirely
+      // separate (streak_milestones below), never a multiplier on either.
+      hidden_quests: {
+        Row: {
+          id: string;
+          title: string;
+          unlock_condition: Record<string, unknown>;
+          // Fixed amount the admin sets per campaign — not affected by
+          // streak bonus, no shared rule table. See
+          // migrations/20260827_add_hidden_quests.sql.
+          reward_tokens: number;
+          campaign_name: string;
+          active_from: string;
+          active_to: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          unlock_condition: Record<string, unknown>;
+          reward_tokens: number;
+          campaign_name: string;
+          active_from: string;
+          active_to: string;
+          created_by: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["hidden_quests"]["Insert"]>;
+        Relationships: [];
+      };
+      user_hidden_quest_progress: {
+        Row: {
+          id: string;
+          user_id: string;
+          hidden_quest_id: string;
+          status: "in_progress" | "completed";
+          completed_at: string | null;
+          created_at: string;
+        };
+        // Rows are created/completed via a server route that checks
+        // unlock_condition + calls apply_transaction() — not a direct
+        // insert/update. See schema.sql section 10d.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      quest_reset_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          quest_id: string;
+          quest_source: QuestSource;
+          replaced_by_quest_id: string | null;
+          created_at: string;
+        };
+        // Written only by the server-side reset route (enforces the
+        // 1-2/day limit + cooldown) — not a direct insert.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      highlights: {
+        Row: {
+          id: string;
+          user_id: string;
+          chapter_id: string;
+          paragraph_index: number | null;
+          char_start: number;
+          char_end: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          chapter_id: string;
+          paragraph_index?: number | null;
+          char_start: number;
+          char_end: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["highlights"]["Insert"]>;
+        Relationships: [];
+      };
+      reading_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          chapter_id: string;
+          start_time: string;
+          end_time: string | null;
+          drop_off_offset: number | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          chapter_id: string;
+          start_time?: string;
+          end_time?: string | null;
+          drop_off_offset?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["reading_sessions"]["Insert"]>;
+        Relationships: [];
+      };
+      anchored_comments: {
+        Row: {
+          id: string;
+          user_id: string;
+          chapter_id: string;
+          paragraph_index: number | null;
+          char_start: number;
+          char_end: number;
+          content: string;
+          quest_id: string | null;
+          quest_source: QuestSource | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          chapter_id: string;
+          paragraph_index?: number | null;
+          char_start: number;
+          char_end: number;
+          content: string;
+          quest_id?: string | null;
+          quest_source?: QuestSource | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["anchored_comments"]["Insert"]>;
+        Relationships: [];
+      };
+      streak_milestones: {
+        Row: {
+          id: string;
+          streak_days: number;
+          reward_token: number;
+          // No badges table yet — column exists but unenforced (no FK)
+          // until it does. See migrations/20260827_add_streak_milestones.sql.
+          badge_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          streak_days: number;
+          reward_token: number;
+          badge_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["streak_milestones"]["Insert"]>;
+        Relationships: [];
+      };
+      user_streak_milestone_claims: {
+        Row: {
+          id: string;
+          user_id: string;
+          streak_milestone_id: string;
+          transaction_id: string;
+          claimed_at: string;
+        };
+        // Rows are only created via claim_streak_milestone() — not a
+        // direct insert/update.
         Insert: never;
         Update: never;
         Relationships: [];
@@ -714,6 +971,22 @@ export type Database = {
       regenerate_design_share_token: {
         Args: { p_design_item_id: string };
         Returns: string;
+      };
+      complete_hidden_quest: {
+        Args: { p_user_id: string; p_hidden_quest_id: string };
+        Returns: Database["public"]["Tables"]["transactions"]["Row"];
+      };
+      claim_streak_milestone: {
+        Args: { p_user_id: string; p_streak_milestone_id: string };
+        Returns: Database["public"]["Tables"]["transactions"]["Row"];
+      };
+      sync_reading_streak: {
+        Args: { p_user_id: string; p_activity_date?: string };
+        Returns: Database["public"]["Tables"]["profiles"]["Row"];
+      };
+      rescue_streak_with_tokens: {
+        Args: { p_user_id: string; p_token_cost: number };
+        Returns: Database["public"]["Tables"]["profiles"]["Row"];
       };
     };
   };

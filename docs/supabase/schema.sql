@@ -68,6 +68,14 @@ create policy "users can update their own profile (not their own role)"
   -- mình, cột role bị chặn riêng bằng trigger ở phần 5 (RLS không diễn tả
   -- được "cho sửa cột này, cấm sửa cột kia" trong cùng 1 policy).
 
+-- Chặn dứt điểm ở tầng GRANT — policy trên chỉ kiểm được AI được sửa
+-- hàng, không kiểm được cột nào. Toàn bộ write vào profiles trong code
+-- hiện tại đều qua server route dùng service-role client (bypass GRANT/RLS
+-- hoàn toàn) nên không cần re-grant cột nào cho authenticated — nếu sau
+-- này có route thật cần client tự update 1 cột, thêm GRANT UPDATE (cột đó)
+-- lúc đó. Xem migrations/20260827_restrict_profiles_column_grants.sql.
+revoke update on public.profiles from authenticated, anon;
+
 -- A separate public-facing view for author pages / by-lines, so the app
 -- never needs to select from `profiles` directly for anything visitor-facing
 -- (keeps phone/real_name/cccd_verified out of reach by construction).
@@ -627,6 +635,15 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- p_user_id/p_type/p_amount trần, không tự kiểm auth.uid() — hàm ghi số
+-- dư DUY NHẤT của toàn hệ thống, nghiêm trọng nhất nếu bị gọi trực tiếp.
+-- Chỉ service_role gọi được. KHÔNG ghi danh sách tham số (chỉ tên hàm) —
+-- an toàn vì tên này không bị overload, và tránh lệch chữ ký nếu chạy
+-- migration ở project chưa cập nhật hết. Xem
+-- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.apply_transaction from public, anon, authenticated;
+grant execute on function public.apply_transaction to service_role;
+
 -- Ví dụ gọi từ route /api/auth/register sau khi tạo user (dùng service role client):
 --   await supabase.rpc('apply_transaction', {
 --     p_user_id: newUser.id, p_type: 'signup_bonus', p_amount: 100,
@@ -682,6 +699,14 @@ begin
   return;
 end;
 $$ language plpgsql security definer;
+
+-- Hàm nội bộ của cron (vercel.json + api/wallet/cron/settle-pending) —
+-- không cần/không nên gọi từ client. Chỉ service_role gọi được. Xem
+-- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.settle_pending_transaction from public, anon, authenticated;
+revoke execute on function public.settle_due_pending_transactions from public, anon, authenticated;
+grant execute on function public.settle_pending_transaction to service_role;
+grant execute on function public.settle_due_pending_transactions to service_role;
 
 -- ---------------------------------------------------------------------
 -- 6c. Nạp tiền — gateway-agnostic (chưa gắn cổng thanh toán thật)
@@ -780,6 +805,13 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- p_user_id trần — nếu gọi được trực tiếp, user tự tạo yêu cầu rút tiền
+-- TRỪ số dư NGƯỜI KHÁC, chuyển vào ngân hàng do MÌNH chỉ định. Chỉ
+-- service_role gọi được. Xem
+-- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.create_withdrawal_request from public, anon, authenticated;
+grant execute on function public.create_withdrawal_request to service_role;
+
 -- Idempotent — no-op nếu request không còn 'processing' (đã được 1 lời
 -- gọi callback trước đó xử lý), nhờ row lock + kiểm tra status ngay sau.
 create function public.mark_withdrawal_result(
@@ -825,6 +857,15 @@ begin
   return v_request;
 end;
 $$ language plpgsql security definer;
+
+-- Idempotent theo status, nhưng KHÔNG kiểm người gọi có phải chủ request
+-- hay không — nếu gọi được trực tiếp, user tự gọi p_success=false trên
+-- request CỦA CHÍNH MÌNH (id tự xem được qua policy select) để tự tạo
+-- hoàn tiền giả trong khi giao dịch rút tiền thật vẫn có thể được xử lý
+-- song song ở gateway thật (double-dip). Chỉ service_role gọi được. Xem
+-- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.mark_withdrawal_result from public, anon, authenticated;
+grant execute on function public.mark_withdrawal_result to service_role;
 
 -- ---------------------------------------------------------------------
 -- 6e. Mua chương (chia sẻ doanh thu tác giả) & thưởng nền tảng
@@ -916,6 +957,14 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- buyer_id/author_id trần, không tự kiểm auth.uid() — nếu gọi được trực
+-- tiếp, user tự đặt author_id = mình, buyer_id = NGƯỜI KHÁC để trừ tiền
+-- người khác, cộng doanh thu cho mình mà không cần mua gì. Chỉ
+-- service_role gọi được. Xem
+-- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.create_purchase from public, anon, authenticated;
+grant execute on function public.create_purchase to service_role;
+
 -- Thưởng cuộc thi / bonus công ty — quỹ công ty, không hold, không trừ
 -- token của ai. Audit trail (ai duyệt, vì sao) nằm ở bảng riêng dưới đây,
 -- không lẫn vào doanh thu chia sẻ tác giả khi báo cáo tài chính.
@@ -970,6 +1019,18 @@ begin
   return v_txn;
 end;
 $$ language plpgsql security definer;
+
+-- Check role bên trong hàm dựa vào p_admin_id (THAM SỐ), KHÔNG dựa vào
+-- auth.uid() của người gọi thật — nếu gọi được trực tiếp, truyền
+-- p_admin_id = id của 1 admin thật (tra được qua author_public_profiles/
+-- byline) là qua được check, tự thưởng bất kỳ số token cho bất kỳ ai.
+-- REVOKE dưới đây chặn được đường gọi trực tiếp; check lỗi thiết kế dựa
+-- theo tham số vẫn còn nếu sau này có endpoint khác gọi hàm này mà không
+-- tự resolve p_admin_id từ session — xem note trong migration. Chỉ
+-- service_role gọi được. Xem
+-- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.grant_platform_bonus from public, anon, authenticated;
+grant execute on function public.grant_platform_bonus to service_role;
 
 -- ---------------------------------------------------------------------
 -- 7. Nhiệm vụ hàng ngày
@@ -1046,6 +1107,12 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- p_user_id trần — nếu gọi được trực tiếp, user tự ghi/hoàn thành tiến
+-- trình nhiệm vụ hàng ngày của NGƯỜI KHÁC. Chỉ service_role gọi được. Xem
+-- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.increment_task_progress from public, anon, authenticated;
+grant execute on function public.increment_task_progress to service_role;
+
 -- Gọi khi user bấm "nhận thưởng" trên UI — kiểm tra đã hoàn thành & chưa
 -- nhận trước khi cộng token, tránh nhận thưởng 2 lần.
 create function public.claim_daily_task(p_user_id uuid, p_task_id uuid)
@@ -1072,6 +1139,13 @@ begin
   return public.apply_transaction(p_user_id, 'daily_task_reward', v_template.reward_tokens, 'daily_task', p_task_id);
 end;
 $$ language plpgsql security definer;
+
+-- p_user_id trần — mức hại thấp hơn các hàm khác ở trên (chỉ cho phép
+-- ép claim thưởng CỦA NGƯỜI KHÁC, tiền vẫn về đúng người đó, không bị
+-- cướp), nhưng vẫn không nên gọi trực tiếp từ client. Chỉ service_role
+-- gọi được. Xem migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+revoke execute on function public.claim_daily_task from public, anon, authenticated;
+grant execute on function public.claim_daily_task to service_role;
 
 -- Tuỳ chọn: nếu muốn nhiệm vụ được TẠO SẴN cho mọi user lúc 0h (thay vì
 -- lazy-create ở lần hành động đầu tiên trong ngày — cách trên đã đủ dùng,
@@ -1679,3 +1753,615 @@ create policy "narrators update their own audio files"
 --   -- book-covers bucket cũ (nếu có) không còn dùng, để nguyên vô hại
 --   -- hoặc xoá thủ công qua Dashboard → Storage nếu muốn dọn sạch.
 -- =======================================================================
+
+-- ---------------------------------------------------------------------
+-- 10. Hệ thống Nhiệm vụ Vịnh (Quest System)
+-- ---------------------------------------------------------------------
+-- Quest system KHÔNG tạo bảng system_quests/user_quest_progress riêng —
+-- task_templates + user_daily_tasks (phần 7) đã làm đúng việc đó. Chỉ mở
+-- rộng cặp bảng cũ + apply_transaction() (phần 6) làm đường ghi thưởng
+-- duy nhất, KHÔNG có ledger riêng cho quest.
+
+-- --- 10a. Mở rộng task_templates cho taxonomy quest. quest_type NULL =
+-- nhiệm vụ hàng ngày cũ, không thuộc Quest System. Xem
+-- migrations/20260827_extend_task_templates_for_quests.sql. ---
+alter table public.task_templates add column quest_type text;
+
+alter table public.task_templates
+  add constraint task_templates_quest_type_check
+  check (quest_type is null or quest_type in (
+    'discovery', 'engagement', 'lore_hunt', 'cross_compare', 'prediction', 'topup'
+  ));
+
+-- Vị trí neo trong chương — {chapter_id, paragraph_index, char_start,
+-- char_end}. paragraph_index KHÔNG phải FK (chapters.content là 1 cột
+-- text, không có bảng paragraph) — chỉ số tính phía client lúc render.
+alter table public.task_templates add column chapter_ref jsonb;
+
+alter table public.task_templates add column genre text;
+
+alter table public.task_templates add column author_id uuid references auth.users (id);
+
+alter table public.task_templates add column generated_by text not null default 'manual';
+
+alter table public.task_templates add column quality_flag text;
+
+alter table public.task_templates add column similarity_to_pool_score double precision;
+
+alter table public.task_templates
+  add constraint task_templates_similarity_score_check
+  check (similarity_to_pool_score is null or similarity_to_pool_score between 0 and 1);
+
+alter table public.task_templates add column auto_flag_reason text;
+
+-- Track lượt reset — lịch sử chi tiết ở quest_reset_events (10e).
+alter table public.user_daily_tasks add column reset_count integer not null default 0;
+
+alter table public.user_daily_tasks
+  add constraint user_daily_tasks_reset_count_check check (reset_count >= 0);
+
+-- --- 10b. quest_examples_pool — pool mẫu thủ công, few-shot cho AI sinh
+-- quest (Phase 2+). Bảng mới, không có tương đương cũ. Xem
+-- migrations/20260827_add_quest_examples_pool.sql. ---
+create table public.quest_examples_pool (
+  id uuid primary key default gen_random_uuid(),
+  quest_type text not null check (quest_type in (
+    'discovery', 'engagement', 'lore_hunt', 'cross_compare', 'prediction', 'topup'
+  )),
+  content text not null,
+  genre text,
+  -- 'good' | 'bad_counterexample' — pool phải có cả 2 loại cho mỗi
+  -- (quest_type, genre), enforce ở quy trình soạn pool, không phải CHECK.
+  example_quality text not null check (example_quality in ('good', 'bad_counterexample')),
+  spoiler_risk text not null default 'low' check (spoiler_risk in ('low', 'medium', 'high')),
+  version integer not null default 1,
+  added_by uuid not null references auth.users (id),
+  created_at timestamptz not null default now()
+);
+
+create index quest_examples_pool_type_genre_idx
+  on public.quest_examples_pool (quest_type, genre);
+
+alter table public.quest_examples_pool enable row level security;
+
+-- Admin-only — Python service đọc qua service role, client không cần
+-- SELECT trực tiếp.
+create policy "admins manage quest examples pool"
+  on public.quest_examples_pool for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- --- 10c. hidden_quests — nhiệm vụ ẩn theo campaign, KHÔNG nằm trong
+-- random pool hàng ngày. reward_tokens là số CỐ ĐỊNH admin tự nhập lúc
+-- soạn campaign — KHÔNG qua 1 bảng "reward_rules" chung, và KHÔNG cộng
+-- streak bonus (streak bonus tách bạch hoàn toàn, xem 10i/10j). Kèm
+-- user_hidden_quest_progress riêng (KHÔNG dùng chung user_daily_tasks —
+-- campaign theo khoảng thời gian, không theo nhịp ngày). Xem
+-- migrations/20260827_add_hidden_quests.sql. ---
+create table public.hidden_quests (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  -- Điều kiện mở khoá tự định nghĩa theo campaign — kiểm ở tầng app, shape
+  -- thay đổi theo từng campaign nên không CHECK cứng.
+  unlock_condition jsonb not null,
+  reward_tokens integer not null check (reward_tokens >= 0),
+  campaign_name text not null,
+  active_from timestamptz not null,
+  active_to timestamptz not null check (active_to > active_from),
+  created_by uuid not null references auth.users (id),
+  created_at timestamptz not null default now()
+);
+
+create index hidden_quests_active_window_idx on public.hidden_quests (active_from, active_to);
+
+alter table public.hidden_quests enable row level security;
+
+-- Admin-only select — client chỉ biết hidden_quests đã mở khoá qua 1 API
+-- route (service role, kiểm unlock_condition ở tầng app), không query
+-- thẳng bảng gốc bằng anon key.
+create policy "admins manage hidden quests"
+  on public.hidden_quests for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create table public.user_hidden_quest_progress (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  hidden_quest_id uuid not null references public.hidden_quests (id) on delete cascade,
+  status text not null default 'in_progress' check (status in ('in_progress', 'completed')),
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (user_id, hidden_quest_id)
+);
+
+alter table public.user_hidden_quest_progress enable row level security;
+
+create policy "users view their own hidden quest progress"
+  on public.user_hidden_quest_progress for select
+  using (auth.uid() = user_id);
+
+create policy "admins view all hidden quest progress"
+  on public.user_hidden_quest_progress for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Không có policy insert/update cho "authenticated" — hoàn thành phải đi
+-- qua hàm dưới đây (reward engine tự kiểm unlock_condition ở tầng app
+-- TRƯỚC khi gọi — hàm này không tự validate shape jsonb đó, chỉ đảm bảo
+-- atomic + chống thưởng 2 lần).
+create function public.complete_hidden_quest(p_user_id uuid, p_hidden_quest_id uuid)
+returns public.transactions as $$
+declare
+  v_quest public.hidden_quests;
+  v_txn public.transactions;
+  v_row_id uuid;
+begin
+  select * into v_quest from public.hidden_quests where id = p_hidden_quest_id;
+  if v_quest is null then
+    raise exception 'Hidden quest not found';
+  end if;
+
+  if now() < v_quest.active_from or now() > v_quest.active_to then
+    raise exception 'Hidden quest % is not currently active', p_hidden_quest_id;
+  end if;
+
+  insert into public.user_hidden_quest_progress (user_id, hidden_quest_id, status, completed_at)
+  values (p_user_id, p_hidden_quest_id, 'completed', now())
+  on conflict (user_id, hidden_quest_id) do nothing
+  returning id into v_row_id;
+
+  if v_row_id is null then
+    update public.user_hidden_quest_progress
+      set status = 'completed', completed_at = now()
+      where user_id = p_user_id and hidden_quest_id = p_hidden_quest_id and status <> 'completed'
+      returning id into v_row_id;
+
+    if v_row_id is null then
+      raise exception 'Hidden quest already completed';
+    end if;
+  end if;
+
+  v_txn := public.apply_transaction(p_user_id, 'quest_reward', v_quest.reward_tokens, 'quest', p_hidden_quest_id);
+  return v_txn;
+end;
+$$ language plpgsql security definer;
+
+-- p_user_id là tham số trần — chỉ service_role gọi được (xem lý do đầy
+-- đủ ở 10k).
+revoke execute on function public.complete_hidden_quest from public, anon, authenticated;
+grant execute on function public.complete_hidden_quest to service_role;
+
+-- --- 10d. quest_reset_events — lịch sử chi tiết reset (loại quest bị
+-- reset, quest thay thế, tần suất theo user) — hành vi né tránh cũng là
+-- dữ liệu cần track, không chỉ hành vi hoàn thành. Xem
+-- migrations/20260827_add_quest_reset_events.sql. ---
+create table public.quest_reset_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  -- Polymorphic: task_templates.id hoặc hidden_quests.id, phân biệt qua
+  -- quest_source. Không FK — cùng pattern purchase_transactions.chapter_id
+  -- (phần 6e).
+  quest_id uuid not null,
+  quest_source text not null check (quest_source in ('task_template', 'hidden_quest')),
+  replaced_by_quest_id uuid,
+  created_at timestamptz not null default now()
+);
+
+create index quest_reset_events_user_id_idx on public.quest_reset_events (user_id, created_at);
+create index quest_reset_events_quest_idx on public.quest_reset_events (quest_id, quest_source);
+
+alter table public.quest_reset_events enable row level security;
+
+create policy "users view their own quest reset events"
+  on public.quest_reset_events for select
+  using (auth.uid() = user_id);
+
+create policy "admins view all quest reset events"
+  on public.quest_reset_events for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- --- 10e. highlights + reading_sessions — dữ liệu hành vi đọc nền tảng,
+-- công trình PHẢI XÂY MỚI (không có sẵn trước Quest System). Passive
+-- signal — không gắn KPI ép buộc. Xem
+-- migrations/20260827_add_reading_behavior_tables.sql. ---
+create table public.highlights (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  paragraph_index integer,
+  char_start integer not null check (char_start >= 0),
+  char_end integer not null check (char_end > char_start),
+  created_at timestamptz not null default now()
+);
+
+create index highlights_chapter_id_idx on public.highlights (chapter_id);
+create index highlights_user_id_idx on public.highlights (user_id);
+
+alter table public.highlights enable row level security;
+
+create policy "users manage their own highlights"
+  on public.highlights for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table public.reading_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  start_time timestamptz not null default now(),
+  end_time timestamptz,
+  drop_off_offset integer,
+  check (end_time is null or end_time >= start_time),
+  check (drop_off_offset is null or drop_off_offset >= 0)
+);
+
+create index reading_sessions_chapter_id_idx on public.reading_sessions (chapter_id);
+create index reading_sessions_user_id_idx on public.reading_sessions (user_id, start_time);
+
+alter table public.reading_sessions enable row level security;
+
+create policy "users manage their own reading sessions"
+  on public.reading_sessions for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- --- 10f. anchored_comments — comment neo vị trí, cơ chế trả lời DUY
+-- NHẤT cho quest cần "câu trả lời" (không trắc nghiệm/điền text tự do).
+-- Dùng chung vị trí neo với highlights. Xem
+-- migrations/20260827_add_anchored_comments.sql. ---
+create table public.anchored_comments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  paragraph_index integer,
+  char_start integer not null check (char_start >= 0),
+  char_end integer not null check (char_end > char_start),
+  content text not null check (char_length(trim(content)) > 0),
+  -- Polymorphic, giống quest_reset_events.quest_id — NULL cho comment
+  -- thường (không trả lời quest nào).
+  quest_id uuid,
+  quest_source text check (quest_source is null or quest_source in ('task_template', 'hidden_quest')),
+  created_at timestamptz not null default now(),
+  check ((quest_id is null) = (quest_source is null))
+);
+
+create index anchored_comments_chapter_id_idx on public.anchored_comments (chapter_id);
+create index anchored_comments_quest_idx on public.anchored_comments (quest_id, quest_source) where quest_id is not null;
+
+alter table public.anchored_comments enable row level security;
+
+-- Nội dung công khai dưới chương — ai cũng xem được, không cần đăng nhập.
+create policy "anchored comments are publicly readable"
+  on public.anchored_comments for select
+  using (true);
+
+create policy "users write their own anchored comments"
+  on public.anchored_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users update their own anchored comments"
+  on public.anchored_comments for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own anchored comments"
+  on public.anchored_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate anchored comments"
+  on public.anchored_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- --- 10g. Thưởng quest — thêm loại giao dịch, KHÔNG có ledger riêng.
+-- Reward engine (service layer) đọc trực tiếp task_templates.reward_tokens
+-- (nhiệm vụ hàng ngày/rotate, mức cố định) hoặc hidden_quests.reward_tokens
+-- (campaign, admin tự nhập) rồi gọi apply_transaction() — reference_type =
+-- 'quest', reference_id = task_templates.id hoặc hidden_quests.id. KHÔNG
+-- có bảng "reward_rules" chung — cả 2 nguồn đều tự giữ số token cố định
+-- ngay trên bảng định nghĩa quest của mình, không tra qua bảng nào khác,
+-- và KHÔNG cộng streak bonus (streak bonus tách bạch hoàn toàn, xem 10i).
+-- Xem migrations/20260827_add_quest_reward_transaction_type.sql. ---
+alter type public.transaction_type add value if not exists 'quest_reward';
+
+-- --- 10h. Streak — lưu sẵn trên profiles (đọc thường xuyên, ghi ít),
+-- bảo vệ trigger giống role/cccd_verified (phần 5). Kèm 2 cột phục vụ
+-- luật nghỉ/cứu streak (chốt qua trao đổi trực tiếp, không có trong bản
+-- phác spec gốc) — chi tiết luật ở 10l. Xem
+-- migrations/20260827_add_quest_streak_to_profiles.sql. ---
+alter table public.profiles add column current_quest_streak integer not null default 0;
+alter table public.profiles add column streak_updated_at date;
+-- Kho "thẻ nghỉ" tích lũy — xem công thức tích luỹ/trần ở sync_reading_streak() (10l).
+alter table public.profiles add column streak_rest_days_banked integer not null default 0;
+-- Mốc bắt đầu ân hạn khi lỡ 1 ngày và hết thẻ nghỉ — NULL = đang khoẻ mạnh.
+alter table public.profiles add column streak_at_risk_since timestamptz;
+
+alter table public.profiles
+  add constraint profiles_current_quest_streak_check check (current_quest_streak >= 0);
+
+alter table public.profiles
+  add constraint profiles_streak_rest_days_banked_check check (streak_rest_days_banked >= 0);
+
+create function public.enforce_quest_streak_authority()
+returns trigger as $$
+begin
+  if new.current_quest_streak is distinct from old.current_quest_streak
+     or new.streak_updated_at is distinct from old.streak_updated_at
+     or new.streak_rest_days_banked is distinct from old.streak_rest_days_banked
+     or new.streak_at_risk_since is distinct from old.streak_at_risk_since then
+    if auth.uid() is not null and not exists (
+      select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+    ) then
+      raise exception 'streak columns can only be set by a trusted server context or an admin';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger enforce_quest_streak_authority
+  before update on public.profiles
+  for each row execute function public.enforce_quest_streak_authority();
+
+-- --- 10i. streak_bonus — loại giao dịch riêng cho thưởng mốc streak,
+-- TÁCH khỏi 'quest_reward' (10g) vì bản chất khác: không gắn với 1 quest
+-- cụ thể nào, chỉ gắn với chuỗi ngày đọc liên tục. Xem
+-- migrations/20260827_add_streak_bonus_transaction_type.sql. ---
+alter type public.transaction_type add value if not exists 'streak_bonus';
+
+-- --- 10j. streak_milestones — mốc thưởng đọc-liên-tục kiểu Duolingo,
+-- định nghĩa 1 lần (7/14/30/60 ngày...), thưởng CỐ ĐỊNH của riêng mốc đó
+-- — KHÔNG liên quan/không cộng-nhân vào công thức thưởng của task_template
+-- hay hidden_quest (10c, 10g). profiles.current_quest_streak (10h) chỉ
+-- lưu số ngày hiện tại — bảng này định nghĩa CÁC MỐC, không lưu tiến
+-- trình. Xem migrations/20260827_add_streak_milestones.sql. ---
+create table public.streak_milestones (
+  id uuid primary key default gen_random_uuid(),
+  streak_days integer not null unique check (streak_days > 0),
+  reward_token integer not null check (reward_token >= 0),
+  -- Chưa có bảng badges trong schema hiện tại — cột giữ chỗ, KHÔNG có FK
+  -- ở đây. Thêm FK bằng 1 migration riêng sau khi bảng badges tồn tại.
+  badge_id uuid,
+  created_at timestamptz not null default now()
+);
+
+alter table public.streak_milestones enable row level security;
+
+create policy "authenticated users can view streak milestones"
+  on public.streak_milestones for select
+  to authenticated
+  using (true);
+
+create policy "admins manage streak milestones"
+  on public.streak_milestones for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Chống nhận thưởng 1 mốc nhiều lần — current_quest_streak chỉ là 1 số
+-- hiện tại (có thể tụt về 0 rồi lên lại), không tự nói mốc nào đã thưởng.
+create table public.user_streak_milestone_claims (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  streak_milestone_id uuid not null references public.streak_milestones (id),
+  transaction_id uuid not null references public.transactions (id),
+  claimed_at timestamptz not null default now(),
+  unique (user_id, streak_milestone_id)
+);
+
+alter table public.user_streak_milestone_claims enable row level security;
+
+create policy "users view their own streak milestone claims"
+  on public.user_streak_milestone_claims for select
+  using (auth.uid() = user_id);
+
+create policy "admins view all streak milestone claims"
+  on public.user_streak_milestone_claims for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Duy nhất đường ghi — kiểm streak hiện tại đã tới mốc chưa, kiểm chưa
+-- claim mốc này lần nào, rồi gọi apply_transaction() giống mọi đường
+-- thưởng khác — không có ledger riêng.
+create function public.claim_streak_milestone(p_user_id uuid, p_streak_milestone_id uuid)
+returns public.transactions as $$
+declare
+  v_milestone public.streak_milestones;
+  v_current_streak integer;
+  v_txn public.transactions;
+begin
+  select * into v_milestone from public.streak_milestones where id = p_streak_milestone_id;
+  if v_milestone is null then
+    raise exception 'Streak milestone not found';
+  end if;
+
+  select current_quest_streak into v_current_streak from public.profiles where id = p_user_id;
+  if v_current_streak is null or v_current_streak < v_milestone.streak_days then
+    raise exception 'User % has not reached streak_days %', p_user_id, v_milestone.streak_days;
+  end if;
+
+  if exists (
+    select 1 from public.user_streak_milestone_claims
+    where user_id = p_user_id and streak_milestone_id = p_streak_milestone_id
+  ) then
+    raise exception 'Streak milestone already claimed';
+  end if;
+
+  v_txn := public.apply_transaction(
+    p_user_id, 'streak_bonus', v_milestone.reward_token,
+    'streak_milestone', p_streak_milestone_id
+  );
+
+  insert into public.user_streak_milestone_claims (user_id, streak_milestone_id, transaction_id)
+  values (p_user_id, p_streak_milestone_id, v_txn.id);
+
+  return v_txn;
+end;
+$$ language plpgsql security definer;
+
+-- p_user_id là tham số trần — chỉ service_role gọi được (xem lý do đầy
+-- đủ ở 10l).
+revoke execute on function public.claim_streak_milestone from public, anon, authenticated;
+grant execute on function public.claim_streak_milestone to service_role;
+
+-- --- 10k. streak_rescue — loại giao dịch TRỪ token khi user trả token
+-- cứu streak (rescue_streak_with_tokens(), 10l) — tách khỏi 'streak_bonus'
+-- (10i, khoản CỘNG) để báo cáo/đối soát đọc trực quan hơn, giống
+-- purchase_chapter/purchase_credit. Xem
+-- migrations/20260827_add_streak_rescue_transaction_type.sql. ---
+alter type public.transaction_type add value if not exists 'streak_rescue';
+
+-- --- 10l. sync_reading_streak() + rescue_streak_with_tokens() — state
+-- machine đầy đủ cho streak, chốt qua trao đổi trực tiếp:
+--   - Kho thẻ nghỉ (streak_rest_days_banked, 10h): +1 thẻ mỗi 7 ngày
+--     streak liên tục, TRẦN = min(31, 1 + floor(streak_days / 100)) —
+--     trần tăng theo mốc streak (100 ngày -> trần 2, ..., 3000 ngày ->
+--     trần tối đa 31). "31 ngày nghỉ" là TRẦN CỦA KHO, không phải
+--     quota/tuần.
+--   - Lỡ ĐÚNG 1 ngày: có thẻ -> tự trừ 1, streak KHÔNG tăng cho ngày đó
+--     (giống streak freeze — "vô hình") nhưng KHÔNG reset. Hết thẻ ->
+--     "at risk" (streak_at_risk_since), ĐÓNG BĂNG streak, chờ trả token
+--     cứu trong 48h — hết hạn không cứu thì reset thật.
+--   - Lỡ ≥ 2 ngày liên tiếp mà kho không đủ bù hết: KHÔNG có cứu (rescue
+--     chỉ áp dụng lỡ đúng 1 ngày) — reset ngay, không ân hạn.
+-- Xem migrations/20260827_add_streak_sync_functions.sql. ---
+create function public.sync_reading_streak(p_user_id uuid, p_activity_date date default current_date)
+returns public.profiles as $$
+declare
+  v_profile public.profiles;
+  v_gap integer;
+  v_needed integer;
+  v_cap integer;
+begin
+  select * into v_profile from public.profiles where id = p_user_id for update;
+  if v_profile is null then
+    raise exception 'User % not found', p_user_id;
+  end if;
+
+  if v_profile.streak_updated_at is null then
+    update public.profiles set
+      current_quest_streak = 1, streak_updated_at = p_activity_date,
+      streak_rest_days_banked = 0, streak_at_risk_since = null
+    where id = p_user_id
+    returning * into v_profile;
+    return v_profile;
+  end if;
+
+  -- Event trễ/trùng với ngày CŨ HƠN ngày đã ghi nhận — no-op, không lùi
+  -- lại tính lại (tránh undo tiến trình do retry/lệch giờ client).
+  if p_activity_date < v_profile.streak_updated_at then
+    return v_profile;
+  end if;
+
+  v_gap := p_activity_date - v_profile.streak_updated_at;
+
+  if v_gap = 0 then
+    if v_profile.streak_at_risk_since is not null then
+      update public.profiles set streak_at_risk_since = null where id = p_user_id returning * into v_profile;
+    end if;
+    return v_profile;
+  end if;
+
+  if v_gap = 1 then
+    v_profile.current_quest_streak := v_profile.current_quest_streak + 1;
+    v_cap := least(31, 1 + (v_profile.current_quest_streak / 100));
+    if v_profile.current_quest_streak % 7 = 0 then
+      v_profile.streak_rest_days_banked := least(v_cap, v_profile.streak_rest_days_banked + 1);
+    end if;
+    update public.profiles set
+      current_quest_streak = v_profile.current_quest_streak, streak_updated_at = p_activity_date,
+      streak_rest_days_banked = v_profile.streak_rest_days_banked, streak_at_risk_since = null
+    where id = p_user_id
+    returning * into v_profile;
+    return v_profile;
+  end if;
+
+  v_needed := v_gap - 1;
+
+  if v_profile.streak_rest_days_banked >= v_needed then
+    update public.profiles set
+      current_quest_streak = current_quest_streak + 1,
+      streak_rest_days_banked = streak_rest_days_banked - v_needed,
+      streak_updated_at = p_activity_date, streak_at_risk_since = null
+    where id = p_user_id
+    returning * into v_profile;
+    return v_profile;
+  end if;
+
+  if v_needed = 1 then
+    if v_profile.streak_at_risk_since is null then
+      update public.profiles set streak_at_risk_since = now() where id = p_user_id returning * into v_profile;
+    end if;
+    return v_profile;
+  end if;
+
+  update public.profiles set
+    current_quest_streak = 1, streak_updated_at = p_activity_date,
+    streak_rest_days_banked = 0, streak_at_risk_since = null
+  where id = p_user_id
+  returning * into v_profile;
+  return v_profile;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.sync_reading_streak from public, anon, authenticated;
+grant execute on function public.sync_reading_streak to service_role;
+
+-- p_token_cost do caller (TS, src/lib/quests/config.ts) truyền vào —
+-- KHÔNG hardcode số ở đây, giống create_withdrawal_request() nhận
+-- p_amount_vnd đã tính sẵn từ tokensToVnd() thay vì tự tính lại trong SQL.
+create function public.rescue_streak_with_tokens(p_user_id uuid, p_token_cost integer)
+returns public.profiles as $$
+declare
+  v_profile public.profiles;
+begin
+  if p_token_cost <= 0 then
+    raise exception 'p_token_cost must be positive, got %', p_token_cost;
+  end if;
+
+  select * into v_profile from public.profiles where id = p_user_id for update;
+  if v_profile is null then
+    raise exception 'User % not found', p_user_id;
+  end if;
+
+  if v_profile.streak_at_risk_since is null then
+    raise exception 'Streak is not at risk — nothing to rescue';
+  end if;
+
+  if now() > v_profile.streak_at_risk_since + interval '48 hours' then
+    update public.profiles set
+      current_quest_streak = 0, streak_rest_days_banked = 0,
+      streak_at_risk_since = null, streak_updated_at = null
+    where id = p_user_id;
+    raise exception 'Grace period expired — streak already reset';
+  end if;
+
+  perform public.apply_transaction(p_user_id, 'streak_rescue', -p_token_cost, 'streak_rescue', null);
+
+  update public.profiles set
+    streak_updated_at = current_date - 1, streak_at_risk_since = null
+  where id = p_user_id
+  returning * into v_profile;
+
+  return v_profile;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.rescue_streak_with_tokens from public, anon, authenticated;
+grant execute on function public.rescue_streak_with_tokens to service_role;
+
+-- "Không giới hạn số lần rescue" là quyết định chủ động (đã hỏi lại) —
+-- hệ quả: current_quest_streak KHÔNG còn phản ánh hành vi đọc thật 100%
+-- nếu user đủ token trả liên tục. Dùng streak cho chân dung độc giả thì
+-- cân nhắc lọc riêng theo transactions.type = 'streak_rescue'.
+--
+-- LƯU Ý (ngoài phạm vi Quest System, chỉ ghi lại để theo dõi): các hàm
+-- reward CŨ hơn nhận p_user_id trần (apply_transaction, claim_daily_task,
+-- create_withdrawal_request, grant_platform_bonus...) dường như KHÔNG có
+-- REVOKE EXECUTE FROM PUBLIC tường minh nào trong file này — mặc định
+-- Postgres cấp EXECUTE cho PUBLIC khi tạo hàm mới. Nếu Supabase không tự
+-- revoke ngầm ở cấp project (chưa xác minh trên project thật), user đăng
+-- nhập có thể gọi thẳng các RPC này bằng anon key + JWT của chính họ, tự
+-- chọn p_user_id là NGƯỜI KHÁC — nghiêm trọng hơn lỗ hổng GRANT trên
+-- profiles đã vá (phần 1). Cần xác minh trực tiếp trên project Supabase
+-- thật và vá riêng, không phải việc của Quest System.
+--
+-- Lỗ hổng "user tự PATCH token_balance/screenshot_penalty_*/... qua REST
+-- API bằng anon key" (phát hiện lúc soát schema cho Quest System, ngoài
+-- phạm vi quest) đã được vá ở phần 1 (revoke update on public.profiles) —
+-- xem migrations/20260827_restrict_profiles_column_grants.sql.

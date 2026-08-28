@@ -86,6 +86,9 @@ const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   purchase_credit: "Doanh thu bán truyện",
   withdrawal: "Rút token",
   platform_bonus: "Thưởng từ Vịnh",
+  quest_reward: "Thưởng nhiệm vụ",
+  streak_bonus: "Thưởng đọc liên tục",
+  streak_rescue: "Trả token cứu streak",
 };
 
 export function transactionTypeLabel(type: TransactionType): string {
