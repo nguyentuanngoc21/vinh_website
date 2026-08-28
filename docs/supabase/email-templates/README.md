@@ -46,8 +46,11 @@ Các biến dùng được trong mọi template (không phải chỉ Reset Passw
 `{{ .TokenHash }}`. Chi tiết: [Supabase Auth Email Templates
 docs](https://supabase.com/docs/guides/auth/auth-email-templates).
 
-Cả hai template dưới đây chỉ hiển thị **mã 6 số** (`{{ .Token }}`), KHÔNG
-còn nút bấm/link (`{{ .ConfirmationURL }}`) — bản trước có cả hai song song,
+Cả hai template dưới đây chỉ hiển thị **mã OTP** (`{{ .Token }}` — độ dài
+do setting "OTP Length" của project quyết định, xem Dashboard →
+Authentication → Sign In / Providers → Email; mặc định 6 nhưng có thể khác,
+FE không hardcode con số này), KHÔNG còn nút bấm/link (`{{ .ConfirmationURL }}`)
+— bản trước có cả hai song song,
 nhưng link một mình không đủ tin cậy trên mobile: PKCE link chỉ đổi được
 session nếu mở ĐÚNG browser đã bắt đầu request (có cookie `code_verifier`),
 còn bấm link từ app Gmail/Outlook trên điện thoại thường mở sang browser

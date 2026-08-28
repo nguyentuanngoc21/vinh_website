@@ -20,8 +20,10 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  // Mã 6 số trong cùng email đặt lại mật khẩu — thay thế cho việc bấm link
-  // khi link mở sai browser (xem /api/auth/verify-otp cho lý do đầy đủ).
+  // Mã OTP trong email đặt lại mật khẩu (độ dài do setting "OTP Length"
+  // của project Supabase quyết định, không cố định) — thay cho việc bấm
+  // link khi link mở sai browser (xem /api/auth/verify-otp cho lý do đầy
+  // đủ).
   const [otp, setOtp] = useState("");
   const [otpPending, setOtpPending] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -78,20 +80,21 @@ export function ForgotPasswordForm() {
         </div>
         <div className="mt-2 text-[14.5px] leading-[1.6] text-stone">
           Nếu <span className="font-medium text-slate">{email.trim()}</span> tồn tại trong hệ
-          thống, chúng tôi đã gửi một email chứa liên kết đặt lại mật khẩu. Liên kết có hiệu lực
-          trong thời gian ngắn — hoặc nhập mã 6 số cũng có trong email vào ô dưới đây.
+          thống, chúng tôi đã gửi một email chứa mã xác nhận. Nhập mã đó vào ô dưới đây.
         </div>
 
         <form onSubmit={handleVerifyOtp} className="mt-5">
           <Field
-            label="Mã xác nhận (6 số)"
+            label="Mã xác nhận"
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
             value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            placeholder="123456"
-            className="text-center text-[18px] tracking-[6px]"
+            // Không hardcode 1 độ dài cố định — xem comment ở
+            // register-form.tsx cho lý do đầy đủ.
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            placeholder="Nhập mã trong email"
+            className="text-center text-[18px] tracking-[4px]"
           />
           {otpError && (
             <div className="mt-3">
