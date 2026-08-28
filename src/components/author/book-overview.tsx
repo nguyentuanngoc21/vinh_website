@@ -103,7 +103,7 @@ export function BookOverview({
 
   return (
     <div className="flex flex-1 flex-col bg-[#FBF8F1] px-4 py-5 lg:overflow-y-auto lg:px-9 lg:py-7">
-      <div className="mb-1 flex items-center gap-2.5">
+      <div className="mb-1 flex flex-wrap items-center gap-2.5">
         {bookGenre && (
           <span className="rounded-full bg-neutral-bg px-3 py-1 text-xs font-medium text-ink">{bookGenre}</span>
         )}
@@ -126,11 +126,11 @@ export function BookOverview({
         )}
       </div>
 
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div className="flex items-end gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="flex min-w-0 items-end gap-4">
           <BookCoverUpload bookId={bookId} bookTitle={bookTitle} bookGenre={bookGenre} coverUrl={coverUrl} />
-          <div>
-            <div className="font-[family-name:var(--font-lora)] text-[27px] font-bold text-brand-ink">
+          <div className="min-w-0">
+            <div className="break-words font-[family-name:var(--font-lora)] text-2xl font-bold text-brand-ink sm:text-[27px]">
               {bookTitle}
             </div>
             <div className="mt-1 text-[13.5px] text-stone-alt">
@@ -138,7 +138,7 @@ export function BookOverview({
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2.5">
+        <div className="flex flex-wrap gap-2.5">
           <button
             type="button"
             onClick={handleDelete}
@@ -185,7 +185,10 @@ export function BookOverview({
       )}
 
       <div className="overflow-hidden rounded-[12px] border border-cream-border bg-white">
-        <div className="grid grid-cols-[40px_1fr_100px_90px] gap-3 border-b border-cream-border bg-cream-card px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-stone-alt">
+        {/* Header cột chỉ có ý nghĩa ở layout lưới 4 cột (sm:+) — trên
+            điện thoại mỗi chương đã hiển thị dạng thẻ 2 dòng tự giải
+            thích, không cần nhãn cột nữa. */}
+        <div className="hidden border-b border-cream-border bg-cream-card px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-stone-alt sm:grid sm:grid-cols-[40px_1fr_100px_90px] sm:gap-3">
           <span />
           <span>CHƯƠNG</span>
           <span>TRẠNG THÁI</span>
@@ -195,26 +198,35 @@ export function BookOverview({
           <Link
             key={c.id}
             href={`/author/${bookId}/${c.id}`}
-            className="grid grid-cols-[40px_1fr_100px_90px] items-center gap-3 border-b border-[#F2ECE0] px-4 py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card"
+            className="flex flex-col gap-1.5 border-b border-[#F2ECE0] px-4 py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card sm:grid sm:grid-cols-[40px_1fr_100px_90px] sm:items-center sm:gap-3"
           >
-            <span className="text-[11.5px] font-bold text-stone-alt">{c.order_index}</span>
-            <span className="truncate text-[13.5px] font-semibold text-brand-ink">{c.title}</span>
-            <span
-              className={`w-fit rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
-                c.published ? "bg-[#E4F1EA] text-[#256B4C]" : "bg-cream-card-alt text-stone-dark"
-              }`}
-            >
-              {c.published ? "Đã đăng" : "Bản nháp"}
-            </span>
-            <span className="flex items-center gap-1 text-[13px] font-semibold text-stone-dark">
-              {c.price > 0 ? (
-                <>
-                  <CoinsIcon size={13} color="var(--color-brand-gold)" /> {c.price}
-                </>
-              ) : (
-                "Miễn phí"
-              )}
-            </span>
+            {/* sm:contents — bỏ 2 div bọc khỏi box model từ sm trở lên, để
+                4 <span> bên trong thành item trực tiếp của grid 4 cột
+                (khớp layout gốc); dưới sm chúng chỉ là 2 dòng flex thường. */}
+            <div className="flex min-w-0 items-center gap-2 sm:contents">
+              <span className="shrink-0 text-[11.5px] font-bold text-stone-alt">{c.order_index}</span>
+              <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-brand-ink sm:flex-none">
+                {c.title}
+              </span>
+            </div>
+            <div className="flex items-center gap-2.5 sm:contents">
+              <span
+                className={`w-fit rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
+                  c.published ? "bg-[#E4F1EA] text-[#256B4C]" : "bg-cream-card-alt text-stone-dark"
+                }`}
+              >
+                {c.published ? "Đã đăng" : "Bản nháp"}
+              </span>
+              <span className="flex items-center gap-1 text-[13px] font-semibold text-stone-dark">
+                {c.price > 0 ? (
+                  <>
+                    <CoinsIcon size={13} color="var(--color-brand-gold)" /> {c.price}
+                  </>
+                ) : (
+                  "Miễn phí"
+                )}
+              </span>
+            </div>
           </Link>
         ))}
         {chapters.length === 0 && (
