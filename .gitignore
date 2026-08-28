@@ -43,3 +43,8 @@ next-env.d.ts
 # tesseract.js (src/lib/ocr.ts) caches its Vietnamese language data as a
 # plain file in the working directory on Node — not source, don't commit it
 *.traineddata
+
+# python-service/ (Quest System Phase 2 worker)
+python-service/.venv
+python-service/**/__pycache__
+*.pyc

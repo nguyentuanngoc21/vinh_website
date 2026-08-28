@@ -38,22 +38,6 @@ export function transactionTypeLabel(type: TransactionType): string {
   return TRANSACTION_TYPE_LABELS[type] ?? type;
 }
 
-export type DailyTask = {
-  id: string;
-  title: string;
-  desc: string;
-  icon: "book" | "comment" | "headphones" | "share";
-  reward: number;
-  progress: number;
-};
-
-export const DAILY_TASKS: DailyTask[] = [
-  { id: "t1", title: "Đọc 3 chương truyện", desc: "Đã đọc 3/3 chương hôm nay", icon: "book", reward: 20, progress: 1 },
-  { id: "t2", title: "Bình luận cho tác giả", desc: "Đã gửi 1/2 bình luận", icon: "comment", reward: 15, progress: 0.5 },
-  { id: "t3", title: "Nghe 15 phút audio", desc: "Đã nghe 6/15 phút", icon: "headphones", reward: 25, progress: 0.4 },
-  { id: "t4", title: "Chia sẻ một tác phẩm", desc: "Chưa hoàn thành", icon: "share", reward: 10, progress: 0 },
-];
-
 // Chỉ còn dùng bởi lib/topup.ts (luồng nạp token vẫn mock, chưa nối DB) —
 // "Thông tin cá nhân"/ProfileHeader giờ lấy số dư thật qua
 // GET /api/wallet/balance (xem edit-profile-tab.tsx, profile-page.tsx),

@@ -665,8 +665,44 @@ export type Database = {
           replaced_by_quest_id: string | null;
           created_at: string;
         };
-        // Written only by the server-side reset route (enforces the
-        // 1-2/day limit + cooldown) — not a direct insert.
+        // Written only by reset_quest_pool_slot() (enforces the shared
+        // 3/day budget + cooldown) — not a direct insert. See
+        // migrations/20260828_add_user_quest_pool.sql.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      user_quest_pool: {
+        Row: {
+          id: string;
+          user_id: string;
+          pool_date: string;
+          task_template_id: string;
+          slot_index: number;
+          created_at: string;
+        };
+        // Rows are only created/updated via create_quest_pool_for_today()
+        // and reset_quest_pool_slot() — not a direct insert/update. See
+        // migrations/20260828_add_user_quest_pool.sql.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      quest_generation_jobs: {
+        Row: {
+          id: string;
+          chapter_id: string;
+          status: "queued" | "processing" | "done" | "failed";
+          attempts: number;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        // Written by the Python worker (its own service-role key) and,
+        // eventually, the chapter-publish route — not the TS wallet/quest
+        // services. Kept typed here anyway so Next.js can read/debug via
+        // the Supabase client if needed. See
+        // migrations/20260828_add_quest_generation_jobs.sql.
         Insert: never;
         Update: never;
         Relationships: [];
@@ -1012,6 +1048,20 @@ export type Database = {
       rescue_streak_with_tokens: {
         Args: { p_user_id: string; p_token_cost: number };
         Returns: Database["public"]["Tables"]["profiles"]["Row"];
+      };
+      create_quest_pool_for_today: {
+        Args: { p_user_id: string; p_pool_date: string; p_task_template_ids: string[] };
+        Returns: Database["public"]["Tables"]["user_quest_pool"]["Row"][];
+      };
+      reset_quest_pool_slot: {
+        Args: {
+          p_user_id: string;
+          p_pool_date: string;
+          p_task_template_id: string;
+          p_replacement_template_id: string;
+          p_max_resets_per_day: number;
+        };
+        Returns: Database["public"]["Tables"]["user_quest_pool"]["Row"];
       };
     };
   };

@@ -2397,18 +2397,214 @@ grant execute on function public.rescue_streak_with_tokens to service_role;
 -- nếu user đủ token trả liên tục. Dùng streak cho chân dung độc giả thì
 -- cân nhắc lọc riêng theo transactions.type = 'streak_rescue'.
 --
--- LƯU Ý (ngoài phạm vi Quest System, chỉ ghi lại để theo dõi): các hàm
--- reward CŨ hơn nhận p_user_id trần (apply_transaction, claim_daily_task,
--- create_withdrawal_request, grant_platform_bonus...) dường như KHÔNG có
--- REVOKE EXECUTE FROM PUBLIC tường minh nào trong file này — mặc định
--- Postgres cấp EXECUTE cho PUBLIC khi tạo hàm mới. Nếu Supabase không tự
--- revoke ngầm ở cấp project (chưa xác minh trên project thật), user đăng
--- nhập có thể gọi thẳng các RPC này bằng anon key + JWT của chính họ, tự
--- chọn p_user_id là NGƯỜI KHÁC — nghiêm trọng hơn lỗ hổng GRANT trên
--- profiles đã vá (phần 1). Cần xác minh trực tiếp trên project Supabase
--- thật và vá riêng, không phải việc của Quest System.
---
--- Lỗ hổng "user tự PATCH token_balance/screenshot_penalty_*/... qua REST
--- API bằng anon key" (phát hiện lúc soát schema cho Quest System, ngoài
--- phạm vi quest) đã được vá ở phần 1 (revoke update on public.profiles) —
--- xem migrations/20260827_restrict_profiles_column_grants.sql.
+-- 2 lỗ hổng phát hiện lúc soát schema cho Quest System (ngoài phạm vi
+-- quest, đã VÁ và verify trên cả staging + production):
+--   1. User tự PATCH token_balance/screenshot_penalty_*/... qua REST API
+--      bằng anon key — vá ở phần 1 (revoke update on public.profiles) —
+--      xem migrations/20260827_restrict_profiles_column_grants.sql.
+--   2. Các hàm reward cũ (apply_transaction, claim_daily_task,
+--      create_withdrawal_request, grant_platform_bonus, settle_*,
+--      increment_task_progress) không có REVOKE EXECUTE FROM PUBLIC
+--      tường minh — Postgres mặc định cấp PUBLIC execute khi tạo hàm
+--      mới, cho phép gọi thẳng RPC bằng anon key, tự chọn p_user_id là
+--      người khác — vá ở đúng vị trí định nghĩa mỗi hàm (phần 6/6b/6c/
+--      6d/6e/7 ở trên) — xem
+--      migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+--      Đi kèm: apply_transaction từng có 3 overload cùng tồn tại (mỗi
+--      lần CREATE OR REPLACE đổi chữ ký lại tạo thêm bản mới, không ghi
+--      đè được bản cũ) — dọn về đúng 1 bản, xem
+--      migrations/20260827_drop_stale_apply_transaction_overloads.sql.
+
+-- ---------------------------------------------------------------------
+-- 10m. user_quest_pool — random pool hàng ngày (mục 1.3), chốt qua trao
+-- đổi trực tiếp (không có trong bản phác spec gốc). Khoảng trống thiết
+-- kế: task_templates/user_daily_tasks (phần 7) là mô hình LAZY-PULL,
+-- spec mục 1.3 cần mô hình PUSH (chốt sẵn N quest/ngày, cho reset đổi) —
+-- cần bảng mới, KHÔNG dùng chung user_daily_tasks (vẫn giữ vai trò track
+-- progress cũ). Xem migrations/20260828_add_user_quest_pool.sql.
+-- ---------------------------------------------------------------------
+create table public.user_quest_pool (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  pool_date date not null default current_date,
+  task_template_id uuid not null references public.task_templates (id),
+  -- 0-based, ổn định qua reset — reset chỉ đổi task_template_id của
+  -- đúng 1 dòng, không xáo lại vị trí các dòng khác trong ngày.
+  slot_index integer not null check (slot_index >= 0),
+  created_at timestamptz not null default now(),
+  unique (user_id, pool_date, slot_index),
+  unique (user_id, pool_date, task_template_id)
+);
+
+create index user_quest_pool_user_date_idx on public.user_quest_pool (user_id, pool_date);
+
+alter table public.user_quest_pool enable row level security;
+
+create policy "users view their own quest pool"
+  on public.user_quest_pool for select
+  using (auth.uid() = user_id);
+
+create policy "admins view all quest pools"
+  on public.user_quest_pool for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Chốt pool hôm nay — TS layer (QuestPoolService.generateTodayPool) tự
+-- tính danh sách task_template_id (trọng số theo quest_type + cooldown +
+-- ràng buộc tối thiểu discovery/engagement/khác), hàm này chỉ ghi ATOMIC.
+-- pg_advisory_xact_lock chống race 2 lời gọi đồng thời cùng user+ngày.
+create function public.create_quest_pool_for_today(
+  p_user_id uuid,
+  p_pool_date date,
+  p_task_template_ids uuid[]
+) returns setof public.user_quest_pool as $$
+declare
+  v_existing_count integer;
+  v_id uuid;
+  v_idx integer := 0;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || p_pool_date::text, 0));
+
+  select count(*) into v_existing_count
+    from public.user_quest_pool
+    where user_id = p_user_id and pool_date = p_pool_date;
+
+  if v_existing_count > 0 then
+    return query
+      select * from public.user_quest_pool
+      where user_id = p_user_id and pool_date = p_pool_date
+      order by slot_index;
+    return;
+  end if;
+
+  if p_task_template_ids is null or array_length(p_task_template_ids, 1) is null then
+    raise exception 'p_task_template_ids must not be empty';
+  end if;
+
+  foreach v_id in array p_task_template_ids loop
+    insert into public.user_quest_pool (user_id, pool_date, task_template_id, slot_index)
+    values (p_user_id, p_pool_date, v_id, v_idx);
+
+    insert into public.user_daily_tasks (user_id, template_id, task_date)
+      values (p_user_id, v_id, p_pool_date)
+      on conflict (user_id, template_id, task_date) do nothing;
+
+    v_idx := v_idx + 1;
+  end loop;
+
+  return query
+    select * from public.user_quest_pool
+    where user_id = p_user_id and pool_date = p_pool_date
+    order by slot_index;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.create_quest_pool_for_today from public, anon, authenticated;
+grant execute on function public.create_quest_pool_for_today to service_role;
+
+-- Đổi 1 quest trong pool hôm nay — p_replacement_template_id do TS layer
+-- chọn sẵn (CÙNG quest_type với quest bị thay ra — bắt buộc, không thì
+-- reset có thể phá ràng buộc tối thiểu discovery/engagement/khác của
+-- ngày đó). Ngân sách reset CHUNG 3 lần/ngày cho cả pool (không phải mỗi
+-- quest riêng) — đếm trực tiếp quest_reset_events, không cột counter
+-- riêng nào (tránh lệch nguồn sự thật).
+create function public.reset_quest_pool_slot(
+  p_user_id uuid,
+  p_pool_date date,
+  p_task_template_id uuid,
+  p_replacement_template_id uuid,
+  p_max_resets_per_day integer
+) returns public.user_quest_pool as $$
+declare
+  v_pool_row public.user_quest_pool;
+  v_resets_today integer;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || p_pool_date::text, 0));
+
+  select * into v_pool_row
+    from public.user_quest_pool
+    where user_id = p_user_id and pool_date = p_pool_date and task_template_id = p_task_template_id
+    for update;
+  if v_pool_row is null then
+    raise exception 'Quest % not found in % pool for user %', p_task_template_id, p_pool_date, p_user_id;
+  end if;
+
+  if p_task_template_id = p_replacement_template_id then
+    raise exception 'Replacement quest must differ from the quest being reset';
+  end if;
+
+  if exists (
+    select 1 from public.user_quest_pool
+    where user_id = p_user_id and pool_date = p_pool_date and task_template_id = p_replacement_template_id
+  ) then
+    raise exception 'Replacement quest is already in today''s pool';
+  end if;
+
+  if exists (
+    select 1 from public.user_daily_tasks
+    where user_id = p_user_id and template_id = p_task_template_id and task_date = p_pool_date and completed
+  ) then
+    raise exception 'Cannot reset a quest already completed today';
+  end if;
+
+  select count(*) into v_resets_today
+    from public.quest_reset_events
+    where user_id = p_user_id and quest_source = 'task_template' and created_at::date = p_pool_date;
+  if v_resets_today >= p_max_resets_per_day then
+    raise exception 'Daily reset limit (%) reached', p_max_resets_per_day;
+  end if;
+
+  update public.user_quest_pool
+    set task_template_id = p_replacement_template_id
+    where id = v_pool_row.id
+    returning * into v_pool_row;
+
+  insert into public.user_daily_tasks (user_id, template_id, task_date)
+    values (p_user_id, p_replacement_template_id, p_pool_date)
+    on conflict (user_id, template_id, task_date) do nothing;
+
+  insert into public.quest_reset_events (user_id, quest_id, quest_source, replaced_by_quest_id)
+    values (p_user_id, p_task_template_id, 'task_template', p_replacement_template_id);
+
+  update public.user_daily_tasks
+    set reset_count = reset_count + 1
+    where user_id = p_user_id and template_id = p_task_template_id and task_date = p_pool_date;
+
+  return v_pool_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.reset_quest_pool_slot from public, anon, authenticated;
+grant execute on function public.reset_quest_pool_slot to service_role;
+
+-- ---------------------------------------------------------------------
+-- 11. Hạ tầng Python — quest_generation_jobs (Phase 2, xem prompt triển
+-- khai Quest System, mục "Hạ tầng Python server"). Postgres table làm
+-- queue (poll định kỳ), KHÔNG dùng Redis/RabbitMQ — đúng khuyến nghị
+-- "đơn giản, không cần thêm hạ tầng ở giai đoạn này". Chưa wire route
+-- publish chương của Next.js tự insert job (quyết định chủ động, test
+-- tay trước) — xem python-service/. Xem
+-- migrations/20260828_add_quest_generation_jobs.sql.
+-- ---------------------------------------------------------------------
+create table public.quest_generation_jobs (
+  id uuid primary key default gen_random_uuid(),
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  status text not null default 'queued' check (status in ('queued', 'processing', 'done', 'failed')),
+  attempts integer not null default 0 check (attempts >= 0),
+  error_message text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index quest_generation_jobs_poll_idx
+  on public.quest_generation_jobs (created_at)
+  where status = 'queued';
+
+alter table public.quest_generation_jobs enable row level security;
+
+create policy "admins view quest generation jobs"
+  on public.quest_generation_jobs for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Không có policy insert/update cho "authenticated" — bảng hoàn toàn nội
+-- bộ, chỉ Python worker (service role key RIÊNG, không dùng chung anon
+-- key với frontend) và (sau này) route publish chương viết.

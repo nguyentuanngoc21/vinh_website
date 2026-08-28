@@ -1,0 +1,8 @@
+# Không pin version cụ thể — cài mới nhất lúc `pip install`, rồi tự
+# `pip freeze > requirements.lock.txt` (không commit) nếu cần khoá lại
+# đúng bản đã test trước khi deploy production.
+fastapi
+uvicorn[standard]
+supabase
+anthropic
+python-dotenv

@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("username, nickname, bio, nickname_updated_at, created_at, cover_image_url")
+    .select("username, nickname, bio, nickname_updated_at, created_at, cover_image_url, current_quest_streak")
     .eq("id", userId)
     .single();
   if (error || !data) {
@@ -44,6 +44,10 @@ export async function GET() {
     nicknameUpdatedAt: data.nickname_updated_at,
     createdAt: data.created_at,
     coverImageUrl: data.cover_image_url,
+    // Quest System — xem migrations/20260827_add_quest_streak_to_profiles.sql.
+    // Chỉ đọc ở đây, không có đường ghi (route POST không nhận field này) —
+    // streak chỉ đổi qua sync_reading_streak()/rescue_streak_with_tokens().
+    currentQuestStreak: data.current_quest_streak,
     followingCount: followingCount ?? 0,
     followerCount: followerCount ?? 0,
   });
