@@ -196,6 +196,22 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      agreement_acceptances: {
+        Row: {
+          user_id: string;
+          agreement_id: string;
+          accepted_at: string;
+          accepted_version: string;
+        };
+        Insert: {
+          user_id: string;
+          agreement_id: string;
+          accepted_at?: string;
+          accepted_version: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["agreement_acceptances"]["Insert"]>;
+        Relationships: [];
+      };
       books: {
         Row: {
           id: string;

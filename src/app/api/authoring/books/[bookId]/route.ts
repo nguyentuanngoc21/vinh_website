@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
+import { hasAcceptedExclusivityPolicy, EXCLUSIVITY_AGREEMENT_ERROR } from "@/lib/authoring/exclusivity-agreement";
 import type { BookGenre } from "@/lib/supabase/types";
 
 function isBookGenre(value: unknown): value is BookGenre {
@@ -78,6 +79,15 @@ export async function PATCH(
           },
           { status: 403 }
         );
+      }
+    } else {
+      // Bật độc quyền (false -> true, hoặc giữ true) — yêu cầu đã xác
+      // nhận Chính sách độc quyền xuất bản, cùng version hiện tại. Cần
+      // auth.getUser() ở đây vì PATCH thường không fetch user (RLS "authors
+      // update their own books" đã tự chặn ownership rồi).
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user || !(await hasAcceptedExclusivityPolicy(supabase, userData.user.id))) {
+        return NextResponse.json({ error: EXCLUSIVITY_AGREEMENT_ERROR }, { status: 403 });
       }
     }
     update.is_exclusive = body.is_exclusive;

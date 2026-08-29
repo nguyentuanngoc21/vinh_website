@@ -7,6 +7,7 @@ import { ProfileTabs } from "@/components/profile/profile-tabs";
 import { FollowingTab } from "@/components/profile/following-tab";
 import { ChatTab } from "@/components/profile/chat-tab";
 import { EditProfileTab } from "@/components/profile/edit-profile-tab";
+import { AgreementsTab } from "@/components/profile/agreements-tab";
 import { DailyTasksTab } from "@/components/profile/daily-tasks-tab";
 import type { ProfileTab } from "@/lib/profile";
 
@@ -94,6 +95,8 @@ export function ProfilePage() {
       )}
 
       {tab === "edit" && <EditProfileTab onNicknameSaved={setNickname} />}
+
+      {tab === "agree" && <AgreementsTab />}
 
       {tab === "tasks" && <DailyTasksTab />}
     </>
