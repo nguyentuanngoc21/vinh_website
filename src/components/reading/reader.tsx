@@ -997,7 +997,9 @@ export function Reader({
             {copyBubble && <span className="text-xs font-medium text-brand-gold-dark">{copyBubble}</span>}
           </div>
 
-          <div className="mt-[30px] flex gap-3.5">
+          {/* Ẩn trên mobile — bottom bar cố định (xem <nav> cuối trang) đã
+              đảm nhiệm điều hướng chương trước/sau ở đó rồi, để tránh lặp. */}
+          <div className="mt-[30px] hidden gap-3.5 sm:flex">
             {prevChapterId ? (
               <Link
                 href={`/read/${bookSlug}/${prevChapterId}`}
