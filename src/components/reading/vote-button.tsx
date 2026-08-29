@@ -27,7 +27,7 @@ export function VoteButton({ variant, voted, voteCount, pending, onToggle, c }: 
         aria-label="Bấm bình chọn nhanh"
         aria-pressed={voted}
         style={{ color: voted ? "var(--color-brand-gold-dark)" : c?.ink }}
-        className="flex cursor-pointer items-center gap-1 transition-colors hover:text-brand-gold-dark disabled:cursor-default"
+        className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-1 rounded-full px-2 transition-colors hover:text-brand-gold-dark disabled:cursor-default"
       >
         <StarIcon size={20} weight={voted ? "fill" : "regular"} />
         <span className="text-[13px] font-semibold">{voteCount}</span>

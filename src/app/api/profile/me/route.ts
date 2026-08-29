@@ -15,7 +15,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("username, nickname, bio, nickname_updated_at, created_at, cover_image_url, current_quest_streak")
+    .select(
+      "username, nickname, bio, nickname_updated_at, created_at, cover_image_url, current_quest_streak, real_name, phone, date_of_birth, address"
+    )
     .eq("id", userId)
     .single();
   if (error || !data) {
@@ -50,6 +52,14 @@ export async function GET() {
     currentQuestStreak: data.current_quest_streak,
     followingCount: followingCount ?? 0,
     followerCount: followerCount ?? 0,
+    // Dùng để tự điền "BÊN A" trong Hợp đồng khai thác tác phẩm độc
+    // quyền (xem contract-info-form.tsx) — cùng field trả về ở
+    // GET /api/profile/contract-info, không cần route riêng cho form
+    // chỉnh sửa vì đây chỉ là dữ liệu thô, không tổng hợp CCCD/email.
+    realName: data.real_name ?? "",
+    phone: data.phone ?? "",
+    dateOfBirth: data.date_of_birth,
+    address: data.address ?? "",
   });
 }
 
@@ -63,6 +73,18 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const nicknameRaw = typeof body?.nickname === "string" ? body.nickname.trim() : undefined;
   const bioRaw = typeof body?.bio === "string" ? body.bio.slice(0, BIO_MAX) : undefined;
+  // realName/phone/dateOfBirth/address: dữ kiện thật để tự điền "BÊN A"
+  // trong Hợp đồng khai thác tác phẩm độc quyền (registry.ts
+  // 'chinh-sach-doc-quyen') — không cooldown như nickname (đây không phải
+  // danh xưng công khai, đổi lại khi sai không ảnh hưởng người khác).
+  const realNameRaw = typeof body?.realName === "string" ? body.realName.trim().slice(0, 100) : undefined;
+  const phoneRaw = typeof body?.phone === "string" ? body.phone.trim().slice(0, 20) : undefined;
+  const addressRaw = typeof body?.address === "string" ? body.address.trim().slice(0, 300) : undefined;
+  // yyyy-MM-dd (giá trị thô của <input type="date">) hoặc "" để xoá.
+  const dateOfBirthRaw =
+    typeof body?.dateOfBirth === "string" && (body.dateOfBirth === "" || /^\d{4}-\d{2}-\d{2}$/.test(body.dateOfBirth))
+      ? body.dateOfBirth
+      : undefined;
 
   if (nicknameRaw !== undefined && (nicknameRaw.length === 0 || nicknameRaw.length > NICKNAME_MAX)) {
     return NextResponse.json(
@@ -70,7 +92,14 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (nicknameRaw === undefined && bioRaw === undefined) {
+  if (
+    nicknameRaw === undefined &&
+    bioRaw === undefined &&
+    realNameRaw === undefined &&
+    phoneRaw === undefined &&
+    addressRaw === undefined &&
+    dateOfBirthRaw === undefined
+  ) {
     return NextResponse.json({ error: "Không có gì để lưu." }, { status: 400 });
   }
 
@@ -83,7 +112,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Không tìm thấy hồ sơ." }, { status: 404 });
   }
 
-  const update: { nickname?: string; nickname_updated_at?: string; bio?: string } = {};
+  const update: {
+    nickname?: string;
+    nickname_updated_at?: string;
+    bio?: string;
+    real_name?: string;
+    phone?: string;
+    date_of_birth?: string | null;
+    address?: string;
+  } = {};
 
   // Chỉ đụng tới nickname_updated_at khi nickname THỰC SỰ đổi giá trị —
   // gửi lại đúng nickname cũ (form submit không đổi gì) không tính là 1
@@ -107,6 +144,10 @@ export async function POST(request: Request) {
   if (bioRaw !== undefined) {
     update.bio = bioRaw;
   }
+  if (realNameRaw !== undefined) update.real_name = realNameRaw;
+  if (phoneRaw !== undefined) update.phone = phoneRaw;
+  if (addressRaw !== undefined) update.address = addressRaw;
+  if (dateOfBirthRaw !== undefined) update.date_of_birth = dateOfBirthRaw === "" ? null : dateOfBirthRaw;
 
   const { error } = await supabase.from("profiles").update(update).eq("id", userId);
   if (error) {

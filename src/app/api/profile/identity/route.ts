@@ -19,11 +19,28 @@ export async function GET() {
     return NextResponse.json({ error: "Không tìm thấy hồ sơ." }, { status: 404 });
   }
 
+  // cccd_issued_at ("cấp ngày") sống ở identity_verifications, không phải
+  // profiles — chỉ có khi đã xác minh, nên chỉ cần query khi verified.
+  let cccdIssuedAt: string | null = null;
+  if (data.cccd_verified) {
+    const { data: verification } = await supabase
+      .from("identity_verifications")
+      .select("cccd_issued_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    cccdIssuedAt = verification?.cccd_issued_at ?? null;
+  }
+
   return NextResponse.json({
     cccdVerified: data.cccd_verified,
     // Không trả số CCCD đầy đủ hay ảnh ra client — giữ đúng tinh thần
-    // "không over-select dữ liệu nhạy cảm" đã ghi trong schema.sql.
+    // "không over-select dữ liệu nhạy cảm" đã ghi trong schema.sql. Số
+    // đầy đủ chỉ trả qua GET /api/profile/contract-info (chủ hồ sơ tự
+    // xem lại để điền hợp đồng độc quyền), không phải ở đây.
     cccdNumberMasked: data.cccd_last4 ? `********${data.cccd_last4}` : null,
+    cccdIssuedAt,
   });
 }
 
@@ -42,6 +59,11 @@ export async function POST(request: Request) {
   const cccd = String(form.get("cccd") ?? "").trim();
   const front = form.get("cccdFront");
   const back = form.get("cccdBack");
+  // "Cấp ngày" — không bắt buộc (nhiều người không nhớ/không mang thẻ để
+  // tra), chỉ dùng để tự điền Hợp đồng khai thác tác phẩm độc quyền sau
+  // này; thiếu vẫn xác minh CCCD bình thường.
+  const cccdIssuedAtRaw = String(form.get("cccdIssuedAt") ?? "").trim();
+  const cccdIssuedAt = /^\d{4}-\d{2}-\d{2}$/.test(cccdIssuedAtRaw) ? cccdIssuedAtRaw : null;
 
   if (!/^\d{12}$/.test(cccd)) {
     return NextResponse.json({ error: "Số căn cước công dân phải gồm đúng 12 chữ số." }, { status: 400 });
@@ -78,6 +100,7 @@ export async function POST(request: Request) {
   const { error: verificationError } = await supabase.from("identity_verifications").insert({
     user_id: userId,
     cccd_number: cccd,
+    cccd_issued_at: cccdIssuedAt,
     cccd_front_path: frontPath,
     cccd_back_path: backPath,
     status: "approved",
@@ -100,5 +123,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Cập nhật hồ sơ thất bại: ${profileError.message}` }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, cccdVerified: true, cccdNumberMasked: `********${cccd.slice(-4)}` });
+  return NextResponse.json({
+    ok: true,
+    cccdVerified: true,
+    cccdNumberMasked: `********${cccd.slice(-4)}`,
+    cccdIssuedAt,
+  });
 }

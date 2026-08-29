@@ -18,6 +18,9 @@ export function IdentityForm({ onVerified }: { onVerified?: (verified: boolean) 
   const [verified, setVerified] = useState(false);
   const [maskedNumber, setMaskedNumber] = useState<string | null>(null);
   const [cccd, setCccd] = useState("");
+  // "Cấp ngày" — không bắt buộc để xác minh CCCD, chỉ cần để tự điền Hợp
+  // đồng khai thác tác phẩm độc quyền sau này (xem contract-info-form.tsx).
+  const [cccdIssuedAt, setCccdIssuedAt] = useState("");
   const [files, setFiles] = useState<Record<CccdSlotKey, File | null>>({ front: null, back: null });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +58,7 @@ export function IdentityForm({ onVerified }: { onVerified?: (verified: boolean) 
     setError(null);
     const body = new FormData();
     body.set("cccd", cccdDigits);
+    if (cccdIssuedAt) body.set("cccdIssuedAt", cccdIssuedAt);
     body.set("cccdFront", files.front);
     body.set("cccdBack", files.back);
     const res = await fetch("/api/profile/identity", { method: "POST", body });
@@ -92,6 +96,13 @@ export function IdentityForm({ onVerified }: { onVerified?: (verified: boolean) 
         placeholder="12 chữ số"
         className="tracking-[1px]"
         hint="Nhập đúng 12 chữ số trên thẻ CCCD gắn chip"
+      />
+      <Field
+        label="Ngày cấp (nếu có)"
+        type="date"
+        value={cccdIssuedAt}
+        onChange={(e) => setCccdIssuedAt(e.target.value)}
+        hint="Dùng để tự điền hợp đồng khi cần — có thể bỏ trống."
       />
       <CccdUploadTiles files={files} onFile={onFile} />
       {error && <Alert tone="error">{error}</Alert>}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChapterEditor } from "@/components/author/chapter-editor";
 import { PublishPanel } from "@/components/author/publish-panel";
+import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
 import type { BookGenre } from "@/lib/supabase/types";
 
 /**
@@ -32,6 +33,14 @@ export function NewWorkWorkspace() {
   const [isLastChapter, setIsLastChapter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Server chặn tạo sách mới ở chế độ độc quyền (isExclusive mặc định
+  // true ở trang này) khi chưa xác nhận Hợp đồng khai thác tác phẩm độc
+  // quyền — 403 kèm missingAgreementIds, xem
+  // src/lib/authoring/exclusivity-agreement.ts và author-workspace.tsx
+  // (cùng pattern). Giữ lại `published` của lần bấm bị chặn để bấm lại
+  // đúng hành động đó (Lưu nháp hoặc Xuất bản) sau khi đã xác nhận xong.
+  const [missingAgreementIds, setMissingAgreementIds] = useState<string[] | null>(null);
+  const [pendingPublished, setPendingPublished] = useState(false);
 
   const save = async (published: boolean) => {
     if (saving) return;
@@ -63,7 +72,12 @@ export function NewWorkWorkspace() {
 
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.bookId || !data?.chapterId) {
-      setError((data && typeof data.error === "string" && data.error) || "Không tạo được truyện. Vui lòng thử lại.");
+      if (Array.isArray(data?.missingAgreementIds) && data.missingAgreementIds.length > 0) {
+        setPendingPublished(published);
+        setMissingAgreementIds(data.missingAgreementIds);
+      } else {
+        setError((data && typeof data.error === "string" && data.error) || "Không tạo được truyện. Vui lòng thử lại.");
+      }
       setSaving(false);
       return;
     }
@@ -109,6 +123,16 @@ export function NewWorkWorkspace() {
         tags={tags}
         onTagsChange={setTags}
       />
+      {missingAgreementIds && (
+        <RequiredAgreementsModal
+          missingAgreementIds={missingAgreementIds}
+          onClose={() => setMissingAgreementIds(null)}
+          onAllAccepted={() => {
+            setMissingAgreementIds(null);
+            save(pendingPublished);
+          }}
+        />
+      )}
     </>
   );
 }

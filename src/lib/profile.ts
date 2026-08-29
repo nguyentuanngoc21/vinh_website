@@ -1,11 +1,12 @@
 import type { TransactionType } from "@/lib/supabase/types";
 
-export type ProfileTab = "following" | "chat" | "edit" | "tasks";
+export type ProfileTab = "following" | "chat" | "edit" | "agree" | "tasks";
 
 export const PROFILE_TABS: { id: ProfileTab; label: string; icon: string }[] = [
   { id: "edit", label: "Thông tin cá nhân", icon: "pencil" },
   { id: "chat", label: "Hội thoại", icon: "chat" },
   { id: "following", label: "Đang theo dõi", icon: "users" },
+  { id: "agree", label: "Cam kết & Thỏa thuận", icon: "seal" },
   { id: "tasks", label: "Nhiệm vụ ngày", icon: "target" },
 ];
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChapterEditor } from "@/components/author/chapter-editor";
 import { PublishPanel } from "@/components/author/publish-panel";
+import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import type { BookGenre } from "@/lib/supabase/types";
 
@@ -68,6 +69,13 @@ export function AuthorWorkspace({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Server chặn "Xuất bản" (403 kèm missingAgreementIds — xem
+  // src/lib/authoring/exclusivity-agreement.ts) khi sách đang độc quyền
+  // mà tác giả chưa xác nhận (hoặc xác nhận đã lỗi thời) hợp đồng liên
+  // quan. Popup RequiredAgreementsModal đọc + xác nhận NGAY TẠI ĐÂY, xong
+  // tự bấm lại "Xuất bản" giúp — không hiện lẫn vào `error` inline như
+  // các lỗi lưu khác vì cần UI có link "Đi tới Cam kết & Thỏa thuận".
+  const [missingAgreementIds, setMissingAgreementIds] = useState<string[] | null>(null);
 
   const save = async (nextPublished: boolean) => {
     if (saving) return;
@@ -95,7 +103,11 @@ export function AuthorWorkspace({
 
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      setError((data && typeof data.error === "string" && data.error) || "Lưu thất bại. Vui lòng thử lại.");
+      if (Array.isArray(data?.missingAgreementIds) && data.missingAgreementIds.length > 0) {
+        setMissingAgreementIds(data.missingAgreementIds);
+      } else {
+        setError((data && typeof data.error === "string" && data.error) || "Lưu thất bại. Vui lòng thử lại.");
+      }
       setSaving(false);
       return;
     }
@@ -229,6 +241,16 @@ export function AuthorWorkspace({
         tags={tags}
         onTagsChange={handleTagsChange}
       />
+      {missingAgreementIds && (
+        <RequiredAgreementsModal
+          missingAgreementIds={missingAgreementIds}
+          onClose={() => setMissingAgreementIds(null)}
+          onAllAccepted={() => {
+            setMissingAgreementIds(null);
+            save(true);
+          }}
+        />
+      )}
     </>
   );
 }

@@ -138,7 +138,7 @@ export function PublishPanel({
                     : "border border-cream-border bg-white text-stone-alt"
                 }`}
               >
-                Không độc quyền
+                Tự do
               </button>
             </div>
             <div className="mt-2 text-[12px] text-stone-alt">

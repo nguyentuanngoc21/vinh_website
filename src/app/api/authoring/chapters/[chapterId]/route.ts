@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  hasAcceptedExclusivityPolicy,
+  EXCLUSIVITY_AGREEMENT_ERROR,
+  EXCLUSIVITY_AGREEMENT_ID,
+} from "@/lib/authoring/exclusivity-agreement";
 
 /**
  * PATCH /api/authoring/chapters/:chapterId — dùng cho cả "Lưu nháp"
@@ -58,6 +63,38 @@ export async function PATCH(
         { error: "Không thể bỏ đánh dấu chương cuối sau khi đã lưu." },
         { status: 400 }
       );
+    }
+  }
+
+  // Chặn XUẤT BẢN (không chặn lưu nháp) 1 chương của sách ĐANG độc quyền
+  // nếu tác giả chưa xác nhận (hoặc xác nhận đã lỗi thời — hợp đồng vừa
+  // cập nhật) Hợp đồng khai thác tác phẩm độc quyền. Cần kiểm TRƯỚC khi
+  // update — khác PATCH /api/authoring/books/[bookId] (chặn lúc BẬT
+  // is_exclusive), route này phải chặn cả trường hợp sách đã bật
+  // is_exclusive TỪ TRƯỚC (kể cả trước khi tính năng này tồn tại) mà tác
+  // giả chưa từng xác nhận, rồi giờ xuất bản thêm chương mới — is_exclusive
+  // không đổi nên PATCH books/[bookId] không có cơ hội chặn lại.
+  if (update.published === true) {
+    const { data: chapterBook } = await supabase
+      .from("chapters")
+      .select("book_id")
+      .eq("id", chapterId)
+      .maybeSingle();
+    if (chapterBook) {
+      const { data: book } = await supabase
+        .from("books")
+        .select("is_exclusive")
+        .eq("id", chapterBook.book_id)
+        .maybeSingle();
+      if (book?.is_exclusive) {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user || !(await hasAcceptedExclusivityPolicy(supabase, userData.user.id))) {
+          return NextResponse.json(
+            { error: EXCLUSIVITY_AGREEMENT_ERROR, missingAgreementIds: [EXCLUSIVITY_AGREEMENT_ID] },
+            { status: 403 }
+          );
+        }
+      }
     }
   }
 
