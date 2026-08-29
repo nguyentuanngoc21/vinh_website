@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { SealCheckIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
 import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
+import { fillPartyBlanksIntoHtml } from "@/lib/legal/fill-party-blanks";
 import type { AgreementId } from "@/lib/legal/registry";
 
 export type AgreementRow = {
@@ -98,6 +99,19 @@ export function AgreementDocumentViewer({
       cancelled = true;
     };
   }, [needsContractInfo]);
+
+  // Điền trực tiếp vào các dòng "....." trong chính nội dung — chỉ khi
+  // đã tải xong VÀ không lỗi; giữ nguyên `html` gốc lúc đang tải để
+  // không nhấp nháy giữa 2 bản khi contractInfo về sau. Xem
+  // fill-party-blanks.ts để biết vì sao an toàn với nhãn lặp lại
+  // (Địa chỉ/Điện thoại/Email ở cả Bên A lẫn Bên B).
+  const displayHtml = useMemo(() => {
+    if (!partyInfoSpec || !contractInfo || contractInfoError) return html;
+    return fillPartyBlanksIntoHtml(html, partyInfoSpec, {
+      author: contractInfo,
+      platform: contractInfo.platformParty,
+    });
+  }, [html, partyInfoSpec, contractInfo, contractInfoError]);
 
   return createPortal(
     <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
@@ -209,8 +223,8 @@ export function AgreementDocumentViewer({
           )}
 
           <div
-            className="text-[14px] leading-[1.7] text-stone-dark [&_em]:text-stone [&_h1]:mt-6 [&_h1]:text-[16px] [&_h1]:font-bold [&_h1]:text-brand-ink [&_h1:first-child]:mt-0 [&_li]:mb-1.5 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_strong]:font-semibold [&_strong]:text-brand-ink [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5"
-            dangerouslySetInnerHTML={{ __html: html }}
+            className="text-[14px] leading-[1.7] text-stone-dark [&_em]:text-stone [&_h1]:mt-6 [&_h1]:text-[16px] [&_h1]:font-bold [&_h1]:text-brand-ink [&_h1:first-child]:mt-0 [&_li]:mb-1.5 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_strong]:font-semibold [&_strong]:text-brand-ink [&_u]:rounded [&_u]:bg-cream-card [&_u]:px-1 [&_u]:font-semibold [&_u]:text-brand-ink [&_u]:no-underline [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5"
+            dangerouslySetInnerHTML={{ __html: displayHtml }}
           />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3.5 border-t border-[#f0f0ef] bg-[#fdfdfc] px-[26px] py-4">

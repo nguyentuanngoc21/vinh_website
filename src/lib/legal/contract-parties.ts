@@ -62,7 +62,10 @@ export const AGREEMENT_PARTY_INFO: Partial<Record<AgreementId, AgreementPartyInf
       { key: "address", label: "Địa chỉ" },
       { key: "phone", label: "Điện thoại" },
       { key: "email", label: "Email" },
-      { key: "penName", label: "Bút danh" },
+      // Đúng nguyên văn "Bút danh (nếu có):" trong văn bản — không rút
+      // gọn thành "Bút danh", nếu không sẽ không khớp được dòng trống
+      // thật để điền vào (xem fill-party-blanks.ts).
+      { key: "penName", label: "Bút danh (nếu có)" },
     ],
     platform: [
       { key: "name", label: "Tên tổ chức/cá nhân" },
