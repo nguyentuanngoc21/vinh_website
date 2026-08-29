@@ -6,7 +6,7 @@ import { SealCheckIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react/d
 import {
   AUTHOR_PARTY_FIELD_LABELS,
   EXCLUSIVITY_CONTRACT_AGREEMENT_ID,
-  PLATFORM_PARTY_INFO,
+  PLATFORM_PARTY_FIELD_LABELS,
 } from "@/lib/legal/contract-parties";
 
 export type AgreementRow = {
@@ -20,6 +20,15 @@ export type AgreementRow = {
   acceptedAt: string | null;
 };
 
+type PlatformParty = {
+  name: string | null;
+  idNumber: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+};
+
 type ContractInfo = {
   penName: string;
   realName: string | null;
@@ -29,6 +38,7 @@ type ContractInfo = {
   email: string | null;
   cccdNumber: string | null;
   cccdIssuedAt: string | null;
+  platformParty: PlatformParty;
 };
 
 export function formatVi(iso: string): string {
@@ -160,8 +170,8 @@ export function AgreementDocumentViewer({
                     </div>
                     {contractInfo && AUTHOR_PARTY_FIELD_LABELS.some(({ key }) => !contractInfo[key]) && (
                       <div className="mt-2 text-[11.5px] leading-[1.5] text-stone">
-                        Bổ sung các trường còn thiếu ở mục &quot;Thông tin hợp đồng&quot; và &quot;Căn cước công dân&quot;
-                        trong tab Thông tin cá nhân.
+                        Bổ sung các trường còn thiếu ở mục &quot;Chỉnh sửa thông tin cá nhân&quot; và &quot;Căn cước công
+                        dân&quot; trong tab Thông tin cá nhân.
                       </div>
                     )}
                   </>
@@ -171,14 +181,21 @@ export function AgreementDocumentViewer({
                 <div className="mb-2 text-[11px] font-bold tracking-[1px] text-brand-gold-dark">
                   BÊN B · BÊN KHAI THÁC (VỊNH CÂU CHUYỆN)
                 </div>
-                <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
-                  {PLATFORM_PARTY_INFO.map(({ label, value }) => (
-                    <div key={label} className="flex justify-between gap-3">
-                      <span className="text-stone-light">{label}</span>
-                      <span className="text-right font-medium text-ink">{value}</span>
-                    </div>
-                  ))}
-                </div>
+                {!contractInfoError && (
+                  <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
+                    {PLATFORM_PARTY_FIELD_LABELS.map(({ key, label }) => {
+                      const value = contractInfo?.platformParty[key];
+                      return (
+                        <div key={key} className="flex justify-between gap-3">
+                          <span className="text-stone-light">{label}</span>
+                          <span className="text-right font-medium text-ink">
+                            {value || (contractInfo ? "Chưa cập nhật" : "…")}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -7,7 +7,6 @@ import { transactionTypeLabel } from "@/lib/profile";
 import { Field, Button, Alert } from "@/components/ui";
 import { BankInfoForm } from "@/components/profile/bank-info-form";
 import { IdentityForm } from "@/components/profile/identity-form";
-import { ContractInfoForm } from "@/components/profile/contract-info-form";
 import { useRole } from "@/lib/role";
 import type { TransactionType } from "@/lib/supabase/types";
 
@@ -42,6 +41,20 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
   const [savedNickname, setSavedNickname] = useState("");
   const [bio, setBio] = useState("");
   const [savedBio, setSavedBio] = useState("");
+  // Họ tên thật/Ngày sinh/SĐT/Địa chỉ — không hiển thị công khai (khác
+  // Nickname/Bio ở trên), nhưng gộp chung 1 khối/1 nút Lưu với chúng thay
+  // vì tách thành mục "Thông tin hợp đồng" riêng: đây vẫn chỉ là thông
+  // tin hồ sơ nói chung, hệ thống tự chọn field phù hợp để điền vào từng
+  // hợp đồng (vd Hợp đồng khai thác tác phẩm độc quyền) khi cần — xem
+  // GET /api/profile/contract-info, agreement-document-viewer.tsx.
+  const [realName, setRealName] = useState("");
+  const [savedRealName, setSavedRealName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [savedDateOfBirth, setSavedDateOfBirth] = useState("");
+  const [phone, setPhone] = useState("");
+  const [savedPhone, setSavedPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [savedAddress, setSavedAddress] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -62,6 +75,14 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
         setSavedNickname(me.nickname ?? "");
         setBio(me.bio ?? "");
         setSavedBio(me.bio ?? "");
+        setRealName(me.realName ?? "");
+        setSavedRealName(me.realName ?? "");
+        setDateOfBirth(me.dateOfBirth ?? "");
+        setSavedDateOfBirth(me.dateOfBirth ?? "");
+        setPhone(me.phone ?? "");
+        setSavedPhone(me.phone ?? "");
+        setAddress(me.address ?? "");
+        setSavedAddress(me.address ?? "");
       }
       if (balance) setTokenBalance(balance.available ?? null);
       if (txns) setTransactions(txns.entries ?? []);
@@ -72,7 +93,13 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
     };
   }, []);
 
-  const dirty = nickname.trim() !== savedNickname || bio !== savedBio;
+  const dirty =
+    nickname.trim() !== savedNickname ||
+    bio !== savedBio ||
+    realName.trim() !== savedRealName ||
+    dateOfBirth !== savedDateOfBirth ||
+    phone.trim() !== savedPhone ||
+    address.trim() !== savedAddress;
   const ready = nickname.trim().length > 0 && dirty && !pending;
 
   const handleSave = async () => {
@@ -83,7 +110,14 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
     const res = await fetch("/api/profile/me", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nickname: nickname.trim(), bio }),
+      body: JSON.stringify({
+        nickname: nickname.trim(),
+        bio,
+        realName: realName.trim(),
+        dateOfBirth,
+        phone: phone.trim(),
+        address: address.trim(),
+      }),
     });
     const data = await res.json().catch(() => null);
     setPending(false);
@@ -94,6 +128,10 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
     const newNickname = data.nickname ?? nickname.trim();
     setSavedNickname(newNickname);
     setSavedBio(bio);
+    setSavedRealName(realName.trim());
+    setSavedDateOfBirth(dateOfBirth);
+    setSavedPhone(phone.trim());
+    setSavedAddress(address.trim());
     setSaved(true);
     updateSessionName(newNickname);
     onNicknameSaved?.(newNickname);
@@ -102,6 +140,10 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
   const handleCancel = () => {
     setNickname(savedNickname);
     setBio(savedBio);
+    setRealName(savedRealName);
+    setDateOfBirth(savedDateOfBirth);
+    setPhone(savedPhone);
+    setAddress(savedAddress);
     setError(null);
     setSaved(false);
   };
@@ -157,6 +199,42 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
                 />
                 <div className="mt-1.5 text-xs text-stone">{bio.length}/280 ký tự</div>
               </label>
+
+              {/* Không hiển thị công khai — hệ thống tự chọn field phù
+                  hợp trong số này để điền vào các hợp đồng cần đến (vd
+                  Hợp đồng khai thác tác phẩm độc quyền), không cần khai
+                  riêng cho từng hợp đồng. */}
+              <Field
+                label="Họ và tên thật"
+                value={realName}
+                onChange={(e) => setRealName(e.target.value)}
+                className="px-3.5 py-3 text-sm"
+                placeholder="Nguyễn Văn A"
+                hint="Không hiển thị công khai — dùng khi cần điền vào hợp đồng với Vịnh."
+              />
+              <Field
+                label="Ngày sinh"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className="px-3.5 py-3 text-sm"
+              />
+              <Field
+                label="Số điện thoại"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="px-3.5 py-3 text-sm"
+                placeholder="09xxxxxxxx"
+              />
+              <Field
+                label="Địa chỉ"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="px-3.5 py-3 text-sm"
+                placeholder="Số nhà, đường, phường/xã, tỉnh/thành phố"
+              />
+
               {saved && !dirty && (
                 <div className="text-[13px] font-medium text-[#2F7A4F]">Đã lưu thay đổi.</div>
               )}
@@ -182,17 +260,6 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="rounded-[18px] border border-cream p-[26px]">
-          <div className="text-[19px] font-bold text-brand-ink">Thông tin hợp đồng</div>
-          <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
-            Không hiển thị công khai — dùng để tự điền thông tin của bạn (Bên A) khi ký các hợp đồng với
-            Vịnh, ví dụ Hợp đồng khai thác tác phẩm độc quyền.
-          </div>
-          <div className="mt-[22px]">
-            <ContractInfoForm />
-          </div>
         </div>
 
         <div className="rounded-[18px] border border-cream p-[26px]">
