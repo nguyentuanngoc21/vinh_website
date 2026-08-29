@@ -9,16 +9,26 @@ import { ChatTab } from "@/components/profile/chat-tab";
 import { EditProfileTab } from "@/components/profile/edit-profile-tab";
 import { AgreementsTab } from "@/components/profile/agreements-tab";
 import { DailyTasksTab } from "@/components/profile/daily-tasks-tab";
-import type { ProfileTab } from "@/lib/profile";
+import { PROFILE_TABS, type ProfileTab } from "@/lib/profile";
+
+function isProfileTab(value: string | null): value is ProfileTab {
+  return !!value && PROFILE_TABS.some((t) => t.id === value);
+}
 
 export function ProfilePage() {
   // ?chat=<userId> — deep link "Nhắn tin" từ /ket-noi hoặc following-tab.tsx
-  // (nút đó điều hướng tới đây thay vì mở modal riêng). useSearchParams()
-  // cần Suspense boundary ở cha — xem app/ca-nhan/page.tsx.
+  // (nút đó điều hướng tới đây thay vì mở modal riêng). ?tab=<id> — lối
+  // tắt chung sang 1 tab bất kỳ (vd "?tab=agree" từ nút "Đi tới Cam kết &
+  // Thỏa thuận" ở required-agreements-modal.tsx khi chặn xuất bản độc
+  // quyền). useSearchParams() cần Suspense boundary ở cha — xem
+  // app/ca-nhan/page.tsx.
   const searchParams = useSearchParams();
   const chatWithParam = searchParams.get("chat");
+  const tabParam = searchParams.get("tab");
 
-  const [tab, setTab] = useState<ProfileTab>(chatWithParam ? "chat" : "edit");
+  const [tab, setTab] = useState<ProfileTab>(
+    chatWithParam ? "chat" : isProfileTab(tabParam) ? tabParam : "edit"
+  );
   const [activeUserId, setActiveUserId] = useState<string | null>(chatWithParam);
   const [mobileView, setMobileView] = useState<"list" | "thread">(chatWithParam ? "thread" : "list");
 

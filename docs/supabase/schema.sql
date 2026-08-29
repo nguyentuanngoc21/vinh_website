@@ -52,6 +52,11 @@ create table public.profiles (
   creator_tags public.creator_tag[] not null default '{}',
   real_name text,
   phone text,
+  -- migrations/20260829_add_author_contract_fields.sql — dùng để tự điền
+  -- "BÊN A" trong Hợp đồng khai thác tác phẩm độc quyền (xem
+  -- src/lib/legal/registry.ts) mà không cần tác giả gõ tay lại.
+  date_of_birth date,
+  address text,
   cccd_verified boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -188,6 +193,9 @@ create table public.identity_verifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   cccd_number text not null,
+  -- migrations/20260829_add_author_contract_fields.sql — "cấp ngày" trong
+  -- Hợp đồng khai thác tác phẩm độc quyền, gắn cùng lúc xác minh CCCD.
+  cccd_issued_at date,
   cccd_front_path text not null,
   cccd_back_path text not null,
   status public.verification_status not null default 'pending',

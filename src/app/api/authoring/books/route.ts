@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { slugifyTitle } from "@/lib/authoring/slugify";
 import { BOOK_GENRES } from "@/lib/covers/genre-styles";
-import { hasAcceptedExclusivityPolicy, EXCLUSIVITY_AGREEMENT_ERROR } from "@/lib/authoring/exclusivity-agreement";
+import {
+  hasAcceptedExclusivityPolicy,
+  EXCLUSIVITY_AGREEMENT_ERROR,
+  EXCLUSIVITY_AGREEMENT_ID,
+} from "@/lib/authoring/exclusivity-agreement";
 import type { BookGenre } from "@/lib/supabase/types";
 
 function isBookGenre(value: unknown): value is BookGenre {
@@ -59,7 +63,10 @@ export async function POST(request: Request) {
   }
 
   if (isExclusive && !(await hasAcceptedExclusivityPolicy(supabase, userData.user.id))) {
-    return NextResponse.json({ error: EXCLUSIVITY_AGREEMENT_ERROR }, { status: 403 });
+    return NextResponse.json(
+      { error: EXCLUSIVITY_AGREEMENT_ERROR, missingAgreementIds: [EXCLUSIVITY_AGREEMENT_ID] },
+      { status: 403 }
+    );
   }
 
   const { data: book, error: bookError } = await supabase

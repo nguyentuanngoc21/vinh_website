@@ -51,8 +51,11 @@ export const AGREEMENTS: AgreementDefinition[] = [
   },
   {
     id: "chinh-sach-doc-quyen",
-    name: "Chính sách độc quyền xuất bản",
-    desc: "Điều kiện, quyền lợi và thời hạn khi đăng tác phẩm ở chế độ độc quyền.",
+    // Tên hiển thị khớp ĐÚNG tiêu đề văn bản thật ("HỢP ĐỒNG KHUNG KHAI
+    // THÁC TÁC PHẨM ĐỘC QUYỀN") — id giữ nguyên "chinh-sach-doc-quyen" vì
+    // lý do lịch sử, xem comment trong scripts/convert-legal-docs.mjs.
+    name: "Hợp đồng khai thác tác phẩm độc quyền",
+    desc: "Hợp đồng cấp quyền khai thác độc quyền: phạm vi, thời hạn 5 năm, doanh thu 90%, quyền và nghĩa vụ hai bên.",
     html: chinhSachDocQuyenHtml,
     updatedAt: chinhSachDocQuyenUpdatedAt,
     requiredForFeature: "Đăng truyện độc quyền",

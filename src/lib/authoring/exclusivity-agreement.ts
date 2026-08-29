@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAgreement } from "@/lib/legal/registry";
 import type { Database } from "@/lib/supabase/types";
 
-const EXCLUSIVITY_AGREEMENT_ID = "chinh-sach-doc-quyen";
+export const EXCLUSIVITY_AGREEMENT_ID = "chinh-sach-doc-quyen";
 
 /**
  * Chặn bật books.is_exclusive = true khi tác giả chưa xác nhận (hoặc xác

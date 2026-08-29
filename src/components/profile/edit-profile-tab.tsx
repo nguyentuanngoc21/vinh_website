@@ -7,6 +7,7 @@ import { transactionTypeLabel } from "@/lib/profile";
 import { Field, Button, Alert } from "@/components/ui";
 import { BankInfoForm } from "@/components/profile/bank-info-form";
 import { IdentityForm } from "@/components/profile/identity-form";
+import { ContractInfoForm } from "@/components/profile/contract-info-form";
 import { useRole } from "@/lib/role";
 import type { TransactionType } from "@/lib/supabase/types";
 
@@ -181,6 +182,17 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
               </div>
             </div>
           )}
+        </div>
+
+        <div className="rounded-[18px] border border-cream p-[26px]">
+          <div className="text-[19px] font-bold text-brand-ink">Thông tin hợp đồng</div>
+          <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
+            Không hiển thị công khai — dùng để tự điền thông tin của bạn (Bên A) khi ký các hợp đồng với
+            Vịnh, ví dụ Hợp đồng khai thác tác phẩm độc quyền.
+          </div>
+          <div className="mt-[22px]">
+            <ContractInfoForm />
+          </div>
         </div>
 
         <div className="rounded-[18px] border border-cream p-[26px]">

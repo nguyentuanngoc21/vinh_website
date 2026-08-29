@@ -43,6 +43,19 @@ const DOCS = [
     outFile: "chinh-sach-hoat-dong-tac-gia.ts",
     exportName: "chinhSachHoatDongTacGiaHtml",
   },
+  {
+    // Tên file/outFile/exportName vẫn giữ "chinh-sach-doc-quyen" (lịch sử —
+    // trước khi có bản .docx thật, đây từng là 1 bản nháp viết tay cùng
+    // tên) dù văn bản thật là 1 HỢP ĐỒNG, không phải "chính sách". Đổi lại
+    // 3 chỗ này sẽ kéo theo đổi registry.ts's AgreementId, mọi hàng
+    // agreement_acceptances đã lưu (agreement_id = 'chinh-sach-doc-quyen')
+    // và exclusivity-agreement.ts — không đáng, vì đây chỉ là slug nội bộ.
+    // Tên HIỂN THỊ thật ("Hợp đồng khai thác tác phẩm độc quyền") nằm ở
+    // registry.ts, không phải ở đây.
+    source: path.join(ROOT, "docs", "Hợp đồng khai thác tác phẩm độc quyền - UTD 29082026.docx"),
+    outFile: "chinh-sach-doc-quyen.ts",
+    exportName: "chinhSachDocQuyenHtml",
+  },
 ];
 
 // "... - UTD 22082026.docx" -> { key: "22082026", iso: "2026-08-22", label: "22-08-2026" }

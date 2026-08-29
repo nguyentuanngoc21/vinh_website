@@ -94,6 +94,10 @@ export type Database = {
           creator_tags: CreatorTag[];
           real_name: string | null;
           phone: string | null;
+          // migrations/20260829_add_author_contract_fields.sql — điền
+          // "BÊN A" trong Hợp đồng khai thác tác phẩm độc quyền.
+          date_of_birth: string | null;
+          address: string | null;
           cccd_last4: string | null; // last 4 digits only — see schema.sql note
           cccd_verified: boolean;
           // Ngân hàng thụ hưởng để rút token — xem
@@ -148,6 +152,8 @@ export type Database = {
           creator_tags?: CreatorTag[];
           real_name?: string | null;
           phone?: string | null;
+          date_of_birth?: string | null;
+          address?: string | null;
           cccd_last4?: string | null;
           cccd_verified?: boolean;
           bank_code?: string | null;
@@ -171,6 +177,9 @@ export type Database = {
           id: string;
           user_id: string;
           cccd_number: string;
+          // migrations/20260829_add_author_contract_fields.sql — "cấp
+          // ngày" trong Hợp đồng khai thác tác phẩm độc quyền.
+          cccd_issued_at: string | null;
           cccd_front_path: string;
           cccd_back_path: string;
           status: "pending" | "approved" | "rejected";
@@ -182,6 +191,7 @@ export type Database = {
           id?: string;
           user_id: string;
           cccd_number: string;
+          cccd_issued_at?: string | null;
           cccd_front_path: string;
           cccd_back_path: string;
           // Mặc định DB là 'pending', nhưng route server chủ động insert
