@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -11,6 +12,7 @@ import {
   ShareNetworkIcon,
   TextAaIcon,
   ShieldCheckIcon,
+  XIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { ChapterPicker, type ReaderChapterSummary } from "./chapter-picker";
 import { VoteButton } from "./vote-button";
@@ -94,6 +96,39 @@ const PARAGRAPHS = [
 
 const WATERMARK_TEXT = "Minh Khôi · @minhkhoi · ID 88245    ".repeat(60);
 const PENALTY_STORAGE_KEY = "vinh_screenshot_penalty";
+const READER_PREFS_KEY = "vinh_reader_prefs";
+
+type ReaderPrefs = { fontSize: number; theme: ThemeName; lineHeight: number };
+
+const DEFAULT_LINE_HEIGHT = 2;
+
+// Nhớ cỡ chữ/nền/giãn dòng người đọc đã chọn giữa các chương — không thì
+// mỗi lần sang chương mới, panel lại reset về mặc định (19px/cream/giãn
+// dòng 2), rất khó chịu với người quen đọc nền tối/chữ to/dòng thưa.
+function getReaderPrefs(): ReaderPrefs | null {
+  try {
+    const raw = localStorage.getItem(READER_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ReaderPrefs>;
+    if (typeof parsed.fontSize !== "number") return null;
+    if (parsed.theme !== "cream" && parsed.theme !== "sepia" && parsed.theme !== "dark") return null;
+    // lineHeight là field thêm sau — bản lưu cũ (trước khi có tuỳ chỉnh
+    // giãn dòng) sẽ không có field này, rơi về mặc định thay vì coi cả
+    // object là hỏng.
+    const lineHeight = typeof parsed.lineHeight === "number" ? parsed.lineHeight : DEFAULT_LINE_HEIGHT;
+    return { fontSize: parsed.fontSize, theme: parsed.theme, lineHeight };
+  } catch {
+    return null;
+  }
+}
+
+function saveReaderPrefs(prefs: ReaderPrefs) {
+  try {
+    localStorage.setItem(READER_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // ignore storage failures
+  }
+}
 
 type PenaltyRule = { percent: number; durationDays: number };
 type NextPenalty = PenaltyRule | { ban: true; durationDays: number };
@@ -257,9 +292,11 @@ export function Reader({
   initialVoted = false,
   initialVoteCount = 0,
 }: ReaderProps) {
+  const router = useRouter();
   const [fontSize, setFontSize] = useState(19);
   const [theme, setTheme] = useState<ThemeName>("cream");
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [lineHeight, setLineHeight] = useState(DEFAULT_LINE_HEIGHT);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [penalty, setPenalty] = useState<PenaltyState>({ count: 0, expiresAt: null, banned: false, lastOffenseAt: null, deductedAmount: null });
   const [screenshotDetected, setScreenshotDetected] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
@@ -294,6 +331,7 @@ export function Reader({
   const [copyBubble, setCopyBubble] = useState<string | null>(null);
   const [visibleParagraph, setVisibleParagraph] = useState(paragraphs[0] ?? "");
   const paragraphRefs = useRef<Array<HTMLParagraphElement | null>>([]);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const showCopyBubble = (label: string) => {
     setCopyBubble(label);
@@ -361,6 +399,83 @@ export function Reader({
     });
     if (result === "copied") showCopyBubble("Đã sao chép liên kết");
   };
+
+  // Vuốt trái/phải trên khung đọc để sang chương — chỉ trên cảm ứng (chuột
+  // không phát sinh touch event nên không ảnh hưởng desktop). Bỏ qua khi có
+  // panel/modal đang mở (tránh xung đột thao tác) và khi vuốt bắt đầu sát
+  // mép trái/phải màn hình (nhường cho cử chỉ "back" của trình duyệt/hệ
+  // điều hành). Ngưỡng dx so với dy để phân biệt với cuộn dọc thông thường.
+  const SWIPE_MIN_DISTANCE = 70;
+  const SWIPE_EDGE_GUARD = 24;
+
+  const handleContentTouchStart = (event: React.TouchEvent) => {
+    if (panelOpen || chapterPickerOpen || listModalOpen) {
+      touchStartRef.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleContentTouchEnd = (event: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || !bookSlug) return;
+    if (start.x < SWIPE_EDGE_GUARD || start.x > window.innerWidth - SWIPE_EDGE_GUARD) return;
+
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_MIN_DISTANCE || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+    if (dx < 0 && nextChapterId) {
+      router.push(`/read/${bookSlug}/${nextChapterId}`);
+    } else if (dx > 0 && prevChapterId) {
+      router.push(`/read/${bookSlug}/${prevChapterId}`);
+    }
+  };
+
+  // Nạp cỡ chữ/nền/giãn dòng đã lưu từ chương trước (nếu có) — chạy 1 lần
+  // lúc mount, TRƯỚC effect ghi ở dưới nên không bị effect ghi đè lại giá
+  // trị mặc định. setTimeout(0) thay vì gọi setState đồng bộ ngay trong
+  // thân effect — react-hooks/set-state-in-effect, cùng cách xử lý với
+  // effect "now" ở dưới và reading-list-modal.tsx.
+  //
+  // Nếu CHƯA từng lưu gì (lần đầu ghé trang đọc) — dùng theme tối làm mặc
+  // định khi hệ điều hành/trình duyệt đang ở chế độ tối, thay vì luôn ép
+  // "cream". Chỉ áp dụng cho lần đầu — một khi đã có prefs đã lưu (kể cả
+  // do chính effect này lưu mặc định), luôn tôn trọng lựa chọn đã lưu.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const prefs = getReaderPrefs();
+      if (prefs) {
+        setFontSize(prefs.fontSize);
+        setTheme(prefs.theme);
+        setLineHeight(prefs.lineHeight);
+      } else if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
+        setTheme("dark");
+      }
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    saveReaderPrefs({ fontSize, theme, lineHeight });
+  }, [fontSize, theme, lineHeight]);
+
+  // Đóng panel cỡ chữ/nền hoặc panel chọn chương bằng phím Esc — cùng với
+  // backdrop bấm-ra-ngoài-để-đóng bên dưới, đây là 2 cách đóng ngoài việc
+  // bấm lại icon đã mở nó.
+  useEffect(() => {
+    if (!panelOpen && !chapterPickerOpen) return;
+    const onEscapeKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setPanelOpen(false);
+      setChapterPickerOpen(false);
+    };
+    document.addEventListener("keydown", onEscapeKeyDown);
+    return () => document.removeEventListener("keydown", onEscapeKeyDown);
+  }, [panelOpen, chapterPickerOpen]);
 
   useEffect(() => {
     const loadPenalty = async () => {
@@ -509,145 +624,222 @@ export function Reader({
 
   return (
     <div style={{ background: c.pageBg }} className="min-h-screen">
-      <div
-        style={{ background: c.barBg, borderColor: c.hair }}
-        className="sticky top-0 z-30 flex items-center justify-between border-b px-7 py-3"
-      >
-        <div className="flex min-w-0 items-center gap-4.5">
-          <Link href={bookSlug ? `/truyen/${bookSlug}` : "/"}>
-            <ArrowLeftIcon
-              size={22}
-              style={{ color: c.ink }}
-              className="cursor-pointer transition-colors hover:text-brand-gold-dark"
-            />
-          </Link>
-          <div className="flex min-w-0 items-center gap-2.5">
-            <VinhMark size={30} style={{ color: c.ink }} className="shrink-0" />
-            <div className="min-w-0">
-              <div
-                style={{ color: c.ink }}
-                className="truncate text-[15px] font-semibold"
-              >
-                {bookTitle}
-              </div>
-              <div style={{ color: c.inkSoft }} className="text-xs">
-                Chương {chapterPosition} · {chapterTitle}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3.5">
-          <Link
-            href="/audio/now-playing"
-            style={{ borderColor: c.hair, color: c.ink }}
-            className="flex items-center gap-2 rounded-full border px-[15px] py-1.5 text-[13px] font-semibold no-underline transition-colors hover:border-brand-ink"
-          >
-            <HeadphonesIcon /> Nghe
-          </Link>
-          <ListBulletsIcon
-            size={22}
-            role="button"
-            aria-label="Chọn chương"
-            tabIndex={0}
-            style={{ color: c.ink }}
-            className="cursor-pointer transition-colors hover:text-brand-gold-dark"
-            onClick={() => {
-              // 2 panel nổi (chọn chương/cỡ chữ) đè lên nhau nếu cùng mở —
-              // loại trừ nhau, giống tab, cho gọn.
-              setChapterPickerOpen((v) => !v);
-              setPanelOpen(false);
-            }}
-          />
-          <VoteButton variant="compact" voted={voted} voteCount={voteCount} pending={voting} onToggle={handleToggleVote} c={c} />
-          <TextAaIcon
-            size={23}
-            role="button"
-            aria-label="Tuỳ chỉnh cỡ chữ và nền"
-            tabIndex={0}
-            style={{ color: c.ink }}
-            className="cursor-pointer transition-colors hover:text-brand-gold-dark"
-            onClick={() => {
-              setPanelOpen((v) => !v);
-              setChapterPickerOpen(false);
-            }}
-          />
-        </div>
-      </div>
-
-      <div style={{ background: c.hair }} className="h-[3px]">
-        <div className="h-full w-[62%] bg-brand-gold" />
-      </div>
-
-      {panelOpen && (
+      {/* Bọc header + progress bar + 2 panel nổi trong 1 wrapper sticky
+          chung: panel định vị bằng "absolute top-full" thay vì toạ độ px
+          cứng (top-[58px] cũ) — tự khớp chiều cao thật của header trên mọi
+          kích thước màn hình, không vỡ layout khi header xuống dòng/co giãn
+          trên điện thoại. */}
+      <div className="sticky top-0 z-30">
         <div
           style={{ background: c.barBg, borderColor: c.hair }}
-          className="fixed right-6 top-[58px] z-40 w-[280px] rounded-[14px] border p-5 shadow-[0_8px_30px_rgba(0,0,0,.18)]"
+          className="flex items-center justify-between gap-2 border-b px-4 py-2.5 sm:px-7 sm:py-3"
         >
-          <div
-            style={{ color: c.inkSoft }}
-            className="mb-3 text-[13px] font-bold tracking-wide"
-          >
-            CỠ CHỮ
-          </div>
-          <div className="mb-5 flex gap-2.5">
-            <button
-              type="button"
-              onClick={() => setFontSize((s) => Math.max(15, s - 1))}
-              style={{ borderColor: c.hair, color: c.ink }}
-              className="flex-1 cursor-pointer rounded-lg border py-2.5 text-center text-[15px] font-semibold transition-colors hover:border-brand-ink"
+          <div className="flex min-w-0 items-center gap-0.5 sm:gap-4.5">
+            <Link
+              href={bookSlug ? `/truyen/${bookSlug}` : "/"}
+              aria-label="Quay lại"
+              className="flex size-11 shrink-0 items-center justify-center sm:h-auto sm:w-auto"
             >
-              A−
-            </button>
-            <div
-              style={{ borderColor: c.hair, color: c.inkSoft }}
-              className="flex-1 rounded-lg border py-2.5 text-center text-sm font-semibold"
-            >
-              {fontSize}px
-            </div>
-            <button
-              type="button"
-              onClick={() => setFontSize((s) => Math.min(26, s + 1))}
-              style={{ borderColor: c.hair, color: c.ink }}
-              className="flex-1 cursor-pointer rounded-lg border py-2.5 text-center text-lg font-semibold transition-colors hover:border-brand-ink"
-            >
-              A+
-            </button>
-          </div>
-          <div
-            style={{ color: c.inkSoft }}
-            className="mb-3 text-[13px] font-bold tracking-wide"
-          >
-            NỀN
-          </div>
-          <div className="flex gap-2.5">
-            {(Object.keys(THEMES) as ThemeName[]).map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setTheme(name)}
-                style={{
-                  background: THEMES[name].swatch,
-                  borderColor:
-                    theme === name ? THEMES[name].swatchBorder : "transparent",
-                }}
-                className="h-[46px] flex-1 cursor-pointer rounded-lg border-2"
+              <ArrowLeftIcon
+                size={22}
+                style={{ color: c.ink }}
+                className="cursor-pointer transition-colors hover:text-brand-gold-dark"
               />
-            ))}
+            </Link>
+            <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+              <VinhMark size={30} style={{ color: c.ink }} className="hidden shrink-0 sm:block" />
+              <div className="min-w-0">
+                <div
+                  style={{ color: c.ink }}
+                  className="truncate text-[14px] font-semibold sm:text-[15px]"
+                >
+                  {bookTitle}
+                </div>
+                <div style={{ color: c.inkSoft }} className="truncate text-xs">
+                  Chương {chapterPosition} · {chapterTitle}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-3.5">
+            <Link
+              href="/audio/now-playing"
+              aria-label="Nghe audio"
+              style={{ borderColor: c.hair, color: c.ink }}
+              className="flex size-11 items-center justify-center gap-2 rounded-full text-[13px] font-semibold no-underline transition-colors sm:h-auto sm:w-auto sm:border sm:px-[15px] sm:py-1.5 sm:hover:border-brand-ink"
+            >
+              <HeadphonesIcon size={20} className="sm:hidden" />
+              <HeadphonesIcon className="hidden sm:block" />
+              <span className="hidden sm:inline">Nghe</span>
+            </Link>
+            <button
+              type="button"
+              aria-label="Chọn chương"
+              style={{ color: c.ink }}
+              className="flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors hover:text-brand-gold-dark"
+              onClick={() => {
+                // 2 panel nổi (chọn chương/cỡ chữ) đè lên nhau nếu cùng mở —
+                // loại trừ nhau, giống tab, cho gọn.
+                setChapterPickerOpen((v) => !v);
+                setPanelOpen(false);
+              }}
+            >
+              <ListBulletsIcon size={22} />
+            </button>
+            <VoteButton variant="compact" voted={voted} voteCount={voteCount} pending={voting} onToggle={handleToggleVote} c={c} />
+            <button
+              type="button"
+              aria-label="Tuỳ chỉnh cỡ chữ và nền"
+              style={{ color: c.ink }}
+              className="flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors hover:text-brand-gold-dark"
+              onClick={() => {
+                setPanelOpen((v) => !v);
+                setChapterPickerOpen(false);
+              }}
+            >
+              <TextAaIcon size={23} />
+            </button>
           </div>
         </div>
-      )}
 
-      {chapterPickerOpen && (
-        <ChapterPicker
-          chapters={chapters}
-          currentChapterId={chapterId}
-          bookSlug={bookSlug}
-          onClose={() => setChapterPickerOpen(false)}
-          c={c}
+        <div style={{ background: c.hair }} className="h-[3px]">
+          <div className="h-full w-[62%] bg-brand-gold" />
+        </div>
+
+        {panelOpen && (
+          <div
+            style={{ background: c.barBg, borderColor: c.hair }}
+            className="absolute right-4 top-full z-40 mt-2 w-[min(280px,calc(100vw-32px))] rounded-[14px] border p-5 shadow-[0_8px_30px_rgba(0,0,0,.18)] sm:right-6"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div
+                style={{ color: c.inkSoft }}
+                className="text-[13px] font-bold tracking-wide"
+              >
+                CỠ CHỮ
+              </div>
+              <button
+                type="button"
+                onClick={() => setPanelOpen(false)}
+                aria-label="Đóng"
+                style={{ color: c.inkSoft }}
+                className="-m-2.5 flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors hover:text-brand-gold-dark"
+              >
+                <XIcon size={16} />
+              </button>
+            </div>
+            <div className="mb-5 flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setFontSize((s) => Math.max(15, s - 1))}
+                aria-label="Giảm cỡ chữ"
+                style={{ borderColor: c.hair, color: c.ink }}
+                className="min-h-11 flex-1 cursor-pointer rounded-lg border py-2.5 text-center text-[15px] font-semibold transition-colors hover:border-brand-ink"
+              >
+                A−
+              </button>
+              <div
+                style={{ borderColor: c.hair, color: c.inkSoft }}
+                className="flex min-h-11 flex-1 items-center justify-center rounded-lg border text-center text-sm font-semibold"
+              >
+                {fontSize}px
+              </div>
+              <button
+                type="button"
+                onClick={() => setFontSize((s) => Math.min(26, s + 1))}
+                aria-label="Tăng cỡ chữ"
+                style={{ borderColor: c.hair, color: c.ink }}
+                className="min-h-11 flex-1 cursor-pointer rounded-lg border py-2.5 text-center text-lg font-semibold transition-colors hover:border-brand-ink"
+              >
+                A+
+              </button>
+            </div>
+            <div
+              style={{ color: c.inkSoft }}
+              className="mb-3 text-[13px] font-bold tracking-wide"
+            >
+              GIÃN DÒNG
+            </div>
+            <div className="mb-5 flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setLineHeight((v) => Math.round(Math.max(1.5, v - 0.1) * 10) / 10)}
+                aria-label="Giảm giãn dòng"
+                style={{ borderColor: c.hair, color: c.ink }}
+                className="min-h-11 flex-1 cursor-pointer rounded-lg border py-2.5 text-center text-lg font-semibold transition-colors hover:border-brand-ink"
+              >
+                −
+              </button>
+              <div
+                style={{ borderColor: c.hair, color: c.inkSoft }}
+                className="flex min-h-11 flex-1 items-center justify-center rounded-lg border text-center text-sm font-semibold"
+              >
+                {lineHeight.toFixed(1)}
+              </div>
+              <button
+                type="button"
+                onClick={() => setLineHeight((v) => Math.round(Math.min(2.6, v + 0.1) * 10) / 10)}
+                aria-label="Tăng giãn dòng"
+                style={{ borderColor: c.hair, color: c.ink }}
+                className="min-h-11 flex-1 cursor-pointer rounded-lg border py-2.5 text-center text-lg font-semibold transition-colors hover:border-brand-ink"
+              >
+                +
+              </button>
+            </div>
+            <div
+              style={{ color: c.inkSoft }}
+              className="mb-3 text-[13px] font-bold tracking-wide"
+            >
+              NỀN
+            </div>
+            <div className="flex gap-2.5">
+              {(Object.keys(THEMES) as ThemeName[]).map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setTheme(name)}
+                  aria-label={`Nền ${name}`}
+                  style={{
+                    background: THEMES[name].swatch,
+                    borderColor:
+                      theme === name ? THEMES[name].swatchBorder : "transparent",
+                  }}
+                  className="h-[46px] flex-1 cursor-pointer rounded-lg border-2"
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {chapterPickerOpen && (
+          <ChapterPicker
+            chapters={chapters}
+            currentChapterId={chapterId}
+            bookSlug={bookSlug}
+            onClose={() => setChapterPickerOpen(false)}
+            c={c}
+          />
+        )}
+      </div>
+
+      {/* Backdrop: bấm ra ngoài để đóng panel — z-20, thấp hơn header/panel
+          (z-30/40) nên header vẫn dùng được, chỉ nội dung phía dưới bị mờ. */}
+      {(panelOpen || chapterPickerOpen) && (
+        <div
+          aria-hidden="true"
+          onClick={() => {
+            setPanelOpen(false);
+            setChapterPickerOpen(false);
+          }}
+          className="fixed inset-0 z-20 bg-black/30"
         />
       )}
 
-      <div className="mx-auto max-w-[1160px]">
+      <div
+        className="mx-auto max-w-[1160px]"
+        onTouchStart={handleContentTouchStart}
+        onTouchEnd={handleContentTouchEnd}
+      >
         <div className="grid grid-cols-1 xl:grid-cols-[220px_720px_220px] xl:justify-center xl:gap-8">
           <aside className="hidden xl:block">
             <div className="sticky top-[90px]">
@@ -666,7 +858,7 @@ export function Reader({
             </div>
           </aside>
 
-          <div className="relative mx-auto max-w-[720px] overflow-hidden px-8 py-[54px] pb-20">
+          <div className="relative mx-auto max-w-[720px] overflow-hidden px-5 py-8 pb-24 sm:px-8 sm:py-[54px] sm:pb-20">
         <div className="relative z-[2] mb-6 xl:hidden">
           <AuthorPanel
             variant="inline"
@@ -708,19 +900,26 @@ export function Reader({
           </div>
           <h1
             style={{ color: c.ink }}
-            className="mb-1.5 mt-2.5 font-[family-name:var(--font-lora)] text-[34px] font-semibold leading-[1.25]"
+            className="mb-1.5 mt-2.5 font-[family-name:var(--font-lora)] text-[26px] font-semibold leading-[1.25] sm:text-[30px] lg:text-[34px]"
           >
             {chapterTitle}
           </h1>
+          {/* flex-wrap: hết chỗ thì xuống dòng thay vì tràn/đè lên nhau.
+              Nhóm "số chữ · phút đọc" gói trong 1 span whitespace-nowrap để
+              2 mục này luôn xuống dòng CÙNG NHAU, tách khỏi tên tác giả —
+              tên tác giả dài (điện thoại hẹp) sẽ tự chiếm 1 dòng riêng. */}
           <div
             style={{ color: c.inkSoft }}
-            className="mb-2 flex items-center gap-3.5 text-[13px]"
+            className="mb-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px]"
           >
-            <span>{authorName}</span>
-            <span>·</span>
-            <span>{wordCount.toLocaleString("vi-VN")} chữ</span>
-            <span>·</span>
-            <span>{readMinutes} phút đọc</span>
+            <span className="min-w-0 truncate">
+              {authorName} <span aria-hidden="true">·</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-3.5 whitespace-nowrap">
+              <span>{wordCount.toLocaleString("vi-VN")} chữ</span>
+              <span>·</span>
+              <span>{readMinutes} phút đọc</span>
+            </span>
           </div>
 
           <div
@@ -753,8 +952,8 @@ export function Reader({
 
           <div className="relative">
             <div
-              style={{ fontSize: `${fontSize}px`, color: c.body }}
-              className="font-[family-name:var(--font-lora)] leading-[2]"
+              style={{ fontSize: `${fontSize}px`, color: c.body, lineHeight }}
+              className="font-[family-name:var(--font-lora)]"
             >
               {paragraphs.map((p, i) => (
                 <p
@@ -836,6 +1035,79 @@ export function Reader({
           <div className="hidden xl:block" />
         </div>
       </div>
+
+      {/* Thanh điều hướng nhanh cho điện thoại — chương trước/sau + mở
+          panel cỡ chữ/mục lục mà KHÔNG cần cuộn lên đầu trang. 2 panel vẫn
+          neo theo header sticky (xem wrapper "sticky top-0" ở trên) nên mở
+          từ đây vẫn hiện ngay trong khung nhìn dù trang đang cuộn xuống
+          sâu. Ẩn ở sm+ vì đã có đủ điều hướng trong nội dung/header. */}
+      <nav
+        style={{ background: c.barBg, borderColor: c.hair }}
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t pb-[env(safe-area-inset-bottom)] sm:hidden"
+      >
+        {prevChapterId ? (
+          <Link
+            href={`/read/${bookSlug}/${prevChapterId}`}
+            style={{ color: c.ink }}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium no-underline"
+          >
+            <ArrowLeftIcon size={20} />
+            Trước
+          </Link>
+        ) : (
+          <div
+            style={{ color: c.inkSoft }}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium opacity-40"
+          >
+            <ArrowLeftIcon size={20} />
+            Trước
+          </div>
+        )}
+        <button
+          type="button"
+          aria-label="Chọn chương"
+          onClick={() => {
+            setChapterPickerOpen((v) => !v);
+            setPanelOpen(false);
+          }}
+          style={{ color: c.ink }}
+          className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium"
+        >
+          <ListBulletsIcon size={20} />
+          Mục lục
+        </button>
+        <button
+          type="button"
+          aria-label="Tuỳ chỉnh cỡ chữ và nền"
+          onClick={() => {
+            setPanelOpen((v) => !v);
+            setChapterPickerOpen(false);
+          }}
+          style={{ color: c.ink }}
+          className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium"
+        >
+          <TextAaIcon size={20} />
+          Cỡ chữ
+        </button>
+        {nextChapterId ? (
+          <Link
+            href={`/read/${bookSlug}/${nextChapterId}`}
+            style={{ color: c.ink }}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium no-underline"
+          >
+            <ArrowRightIcon size={20} />
+            Sau
+          </Link>
+        ) : (
+          <div
+            style={{ color: c.inkSoft }}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium opacity-40"
+          >
+            <ArrowRightIcon size={20} />
+            Sau
+          </div>
+        )}
+      </nav>
 
       {bookId && (
         <ReadingListModal
