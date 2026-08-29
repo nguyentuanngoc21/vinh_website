@@ -3,11 +3,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { SealCheckIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
-import {
-  AUTHOR_PARTY_FIELD_LABELS,
-  EXCLUSIVITY_CONTRACT_AGREEMENT_ID,
-  PLATFORM_PARTY_FIELD_LABELS,
-} from "@/lib/legal/contract-parties";
+import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
+import type { AgreementId } from "@/lib/legal/registry";
 
 export type AgreementRow = {
   id: string;
@@ -54,12 +51,14 @@ export function formatVi(iso: string): string {
  * quyền (required-agreements-modal.tsx), nên tách khỏi agreements-tab.tsx
  * thay vì để riêng ở đó.
  *
- * Với ĐÚNG 'chinh-sach-doc-quyen' (Hợp đồng khai thác tác phẩm độc quyền):
- * hiện thêm khối "Thông tin các bên" ở đầu nội dung — BÊN A tự lấy từ hồ
- * sơ tác giả (GET /api/profile/contract-info), BÊN B cố định
- * (contract-parties.ts) — để tác giả thấy ngay thông tin sẽ điền vào hợp
- * đồng mà không cần gõ tay. Các văn bản khác không có khái niệm 2 bên nên
- * không hiện khối này.
+ * Với BẤT KỲ văn bản nào có khai báo trong AGREEMENT_PARTY_INFO
+ * (contract-parties.ts) — hiện tại là Hợp đồng khai thác tác phẩm độc
+ * quyền (Bên A + Bên B) và Cam kết quyền sở hữu & chống đạo nhái (chỉ
+ * Bên A) — hiện thêm khối "Thông tin các bên" ở đầu nội dung: Bên A tự
+ * lấy từ hồ sơ tác giả đang xem, Bên B (nếu văn bản có) tự lấy từ hồ sơ
+ * super_admin, đều qua GET /api/profile/contract-info. Văn bản không
+ * khai báo gì ở đó (Điều khoản sử dụng, Chính sách bảo mật...) không có
+ * chỗ trống nào cần điền nên không hiện khối này và không gọi API này.
  */
 export function AgreementDocumentViewer({
   row,
@@ -74,7 +73,8 @@ export function AgreementDocumentViewer({
   onAccept: () => void;
   accepting: boolean;
 }) {
-  const isExclusivityContract = row.id === EXCLUSIVITY_CONTRACT_AGREEMENT_ID;
+  const partyInfoSpec = AGREEMENT_PARTY_INFO[row.id as AgreementId];
+  const needsContractInfo = !!partyInfoSpec;
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   // Phân biệt "đang tải" (contractInfo null, contractInfoError null — hiện
   // "…") với "tải lỗi" (contractInfoError có giá trị — hiện thông báo rõ
@@ -84,7 +84,7 @@ export function AgreementDocumentViewer({
   const [contractInfoError, setContractInfoError] = useState(false);
 
   useEffect(() => {
-    if (!isExclusivityContract) return;
+    if (!needsContractInfo) return;
     let cancelled = false;
     fetch("/api/profile/contract-info")
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
@@ -97,7 +97,7 @@ export function AgreementDocumentViewer({
     return () => {
       cancelled = true;
     };
-  }, [isExclusivityContract]);
+  }, [needsContractInfo]);
 
   return createPortal(
     <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
@@ -136,67 +136,75 @@ export function AgreementDocumentViewer({
             </div>
           )}
 
-          {isExclusivityContract && (
-            <div className="mb-6 grid grid-cols-1 gap-4 rounded-xl border border-cream-border bg-cream-card p-4 sm:grid-cols-2">
-              <div>
-                <div className="mb-2 text-[11px] font-bold tracking-[1px] text-brand-gold-dark">
-                  BÊN A · TÁC GIẢ (BẠN)
-                </div>
-                {contractInfoError ? (
-                  <div className="text-[12.5px] leading-[1.5] text-[#B02A37]">
-                    Không tải được thông tin của bạn. Vui lòng thử tải lại trang; nếu vẫn lỗi, báo cho quản trị
-                    viên.
+          {partyInfoSpec && (
+            <div
+              className={`mb-6 grid grid-cols-1 gap-4 rounded-xl border border-cream-border bg-cream-card p-4 ${
+                partyInfoSpec.author && partyInfoSpec.platform ? "sm:grid-cols-2" : ""
+              }`}
+            >
+              {partyInfoSpec.author && (
+                <div>
+                  <div className="mb-2 text-[11px] font-bold tracking-[1px] text-brand-gold-dark">
+                    BÊN A · TÁC GIẢ (BẠN)
                   </div>
-                ) : (
-                  <>
+                  {contractInfoError ? (
+                    <div className="text-[12.5px] leading-[1.5] text-[#B02A37]">
+                      Không tải được thông tin của bạn. Vui lòng thử tải lại trang; nếu vẫn lỗi, báo cho quản trị
+                      viên.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
+                        {partyInfoSpec.author.map(({ key, label }) => {
+                          const value = contractInfo?.[key];
+                          const display =
+                            key === "dateOfBirth" || key === "cccdIssuedAt"
+                              ? value
+                                ? formatVi(value)
+                                : null
+                              : value;
+                          return (
+                            <div key={key} className="flex justify-between gap-3">
+                              <span className="text-stone-light">{label}</span>
+                              <span className="text-right font-medium text-ink">
+                                {display || (contractInfo ? "Chưa cập nhật" : "…")}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {contractInfo && partyInfoSpec.author.some(({ key }) => !contractInfo[key]) && (
+                        <div className="mt-2 text-[11.5px] leading-[1.5] text-stone">
+                          Bổ sung các trường còn thiếu ở mục &quot;Chỉnh sửa thông tin cá nhân&quot; và &quot;Căn cước
+                          công dân&quot; trong tab Thông tin cá nhân.
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+              {partyInfoSpec.platform && (
+                <div>
+                  <div className="mb-2 text-[11px] font-bold tracking-[1px] text-brand-gold-dark">
+                    BÊN B · BÊN KHAI THÁC (VỊNH CÂU CHUYỆN)
+                  </div>
+                  {!contractInfoError && (
                     <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
-                      {AUTHOR_PARTY_FIELD_LABELS.map(({ key, label }) => {
-                        const value = contractInfo?.[key];
-                        const display =
-                          key === "dateOfBirth" || key === "cccdIssuedAt"
-                            ? value
-                              ? formatVi(value)
-                              : null
-                            : value;
+                      {partyInfoSpec.platform.map(({ key, label }) => {
+                        const value = contractInfo?.platformParty[key];
                         return (
                           <div key={key} className="flex justify-between gap-3">
                             <span className="text-stone-light">{label}</span>
                             <span className="text-right font-medium text-ink">
-                              {display || (contractInfo ? "Chưa cập nhật" : "…")}
+                              {value || (contractInfo ? "Chưa cập nhật" : "…")}
                             </span>
                           </div>
                         );
                       })}
                     </div>
-                    {contractInfo && AUTHOR_PARTY_FIELD_LABELS.some(({ key }) => !contractInfo[key]) && (
-                      <div className="mt-2 text-[11.5px] leading-[1.5] text-stone">
-                        Bổ sung các trường còn thiếu ở mục &quot;Chỉnh sửa thông tin cá nhân&quot; và &quot;Căn cước công
-                        dân&quot; trong tab Thông tin cá nhân.
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              <div>
-                <div className="mb-2 text-[11px] font-bold tracking-[1px] text-brand-gold-dark">
-                  BÊN B · BÊN KHAI THÁC (VỊNH CÂU CHUYỆN)
+                  )}
                 </div>
-                {!contractInfoError && (
-                  <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
-                    {PLATFORM_PARTY_FIELD_LABELS.map(({ key, label }) => {
-                      const value = contractInfo?.platformParty[key];
-                      return (
-                        <div key={key} className="flex justify-between gap-3">
-                          <span className="text-stone-light">{label}</span>
-                          <span className="text-right font-medium text-ink">
-                            {value || (contractInfo ? "Chưa cập nhật" : "…")}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
 

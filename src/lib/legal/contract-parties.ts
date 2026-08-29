@@ -1,58 +1,92 @@
-// "BÊN A"/"BÊN B" cho Hợp đồng khai thác tác phẩm độc quyền (registry.ts
-// id 'chinh-sach-doc-quyen') — CHỈ văn bản này cần điền 2 bên; các văn
-// bản khác (điều khoản, chính sách...) không có khái niệm này nên không
-// cần một field chung trong AgreementDefinition — nơi gọi tự kiểm
-// `agreementId === EXCLUSIVITY_CONTRACT_AGREEMENT_ID` (xem
-// agreement-document-viewer.tsx).
+import type { AgreementId } from "./registry";
 
-export const EXCLUSIVITY_CONTRACT_AGREEMENT_ID = "chinh-sach-doc-quyen";
+// Field cần tự điền cho "Bên A"/"Bên B" khi 1 văn bản có chỗ trống kiểu
+// "Họ và tên: ....." trong chính nội dung của nó — CHỈ những văn bản có
+// thật sự cần (không phải mọi văn bản, vd Điều khoản sử dụng/Chính sách
+// bảo mật là quy định chung, không có ô nào để điền). Khai báo TỪNG văn
+// bản riêng ở AGREEMENT_PARTY_INFO bên dưới, vì tập field và CÁCH GHI
+// NHÃN khác nhau giữa các văn bản (vd Hợp đồng khai thác... tách riêng
+// "Số CCCD/Hộ chiếu" + "Cấp ngày" và có khối Bên B, còn Cam kết quyền sở
+// hữu gộp chung "CCCD/Hộ chiếu/Mã định danh" thành 1 dòng và không có
+// Bên B) — dùng đúng chữ trong file .docx nguồn, không suy ra máy móc.
 
-/** Field "BÊN A: TÁC GIẢ/CHỦ SỞ HỮU TÁC PHẨM" — thứ tự và nhãn khớp đúng
- *  văn bản gốc. Giá trị lấy từ GET /api/profile/contract-info (khoá theo
- *  đúng tên field của response đó). */
-export const AUTHOR_PARTY_FIELD_LABELS: { key: "realName" | "dateOfBirth" | "cccdNumber" | "cccdIssuedAt" | "address" | "phone" | "email" | "penName"; label: string }[] = [
-  { key: "realName", label: "Họ và tên" },
-  { key: "dateOfBirth", label: "Ngày sinh" },
-  { key: "cccdNumber", label: "Số CCCD/Hộ chiếu" },
-  { key: "cccdIssuedAt", label: "Cấp ngày" },
-  { key: "address", label: "Địa chỉ" },
-  { key: "phone", label: "Điện thoại" },
-  { key: "email", label: "Email" },
-  { key: "penName", label: "Bút danh" },
-];
+export type AuthorInfoKey =
+  | "realName"
+  | "dateOfBirth"
+  | "cccdNumber"
+  | "cccdIssuedAt"
+  | "address"
+  | "phone"
+  | "email"
+  | "penName";
+
+export type PlatformInfoKey = "name" | "idNumber" | "address" | "phone" | "email" | "website";
+
+type PartyFieldSpec<K extends string> = { key: K; label: string };
+
+export type AgreementPartyInfo = {
+  /** "Bên A"/Tác giả — người đang xem văn bản. */
+  author?: PartyFieldSpec<AuthorInfoKey>[];
+  /**
+   * "Bên B"/Vịnh Câu Chuyện — CHỈ set nếu văn bản có khái niệm 2 bên
+   * (hợp đồng song phương); văn bản 1 phía (cam kết đơn phương của tác
+   * giả) bỏ trống, không hiện khối này.
+   *
+   * name/idNumber/address/phone lấy ĐỘNG từ hồ sơ super_admin (đứng tên
+   * cá nhân, cùng field/cùng chỗ chỉnh sửa "Chỉnh sửa thông tin cá
+   * nhân" như bất kỳ tác giả nào khác) — xem
+   * GET /api/profile/contract-info. Giả định đúng 1 tài khoản
+   * role='super_admin' đại diện Bên B; nếu sau này có nhiều super_admin
+   * không cùng là Bên B, thay bằng 1 cột đánh dấu riêng thay vì suy luận
+   * theo role. email/website là sự kiện CỦA TỔ CHỨC, không phải field
+   * hồ sơ cá nhân nên vẫn hằng số ở PLATFORM_FIXED_INFO.
+   */
+  platform?: PartyFieldSpec<PlatformInfoKey>[];
+};
 
 /**
- * "BÊN B: BÊN KHAI THÁC" — đứng tên CÁ NHÂN (không phải pháp nhân doanh
- * nghiệp) nên không có "Đại diện bởi"/"Chức vụ" — bỏ tạm 2 field này cho
- * bản hiện tại; thêm lại nếu sau này Bên B chuyển sang đứng tên công ty.
- *
- * name/idNumber/address/phone lấy ĐỘNG từ hồ sơ super_admin (real_name,
- * identity_verifications.cccd_number, address, phone) — xem
- * GET /api/profile/contract-info — KHÔNG hardcode ở đây nữa, vì đó vẫn
- * là "thông tin cá nhân" của người đứng tên Bên B, cùng field/cùng chỗ
- * chỉnh sửa (Thông tin cá nhân) như bất kỳ tác giả nào khác (Bên A).
- * email/website là sự kiện CỦA TỔ CHỨC, không phải field trong hồ sơ cá
- * nhân (không có cột "email liên hệ doanh nghiệp"/"website" nào trên
- * profiles) nên vẫn là hằng số cố định ở đây.
- *
- * Giả định: đúng 1 tài khoản role='super_admin' đại diện Bên B (lấy
- * hàng cũ nhất nếu có nhiều — xem route). Nếu sau này có nhiều
- * super_admin không cùng là Bên B, thay bằng 1 cột đánh dấu riêng trên
- * đúng 1 hồ sơ thay vì suy luận theo role.
+ * Nguồn khai báo duy nhất mà agreement-document-viewer.tsx đọc để quyết
+ * định: có hiện khối "Thông tin các bên" cho văn bản đang mở không, và
+ * nếu có thì hiện field nào, nhãn gì. Thêm văn bản mới cần điền thông
+ * tin: thêm 1 entry ở đây theo ĐÚNG nhãn trong .docx nguồn (xem
+ * src/lib/legal/*.ts do scripts/convert-legal-docs.mjs sinh ra để đối
+ * chiếu) — không cần đổi gì ở viewer.
  */
-export const PLATFORM_PARTY_FIELD_LABELS: {
-  key: "name" | "idNumber" | "address" | "phone" | "email" | "website";
-  label: string;
-}[] = [
-  { key: "name", label: "Tên tổ chức/cá nhân" },
-  { key: "idNumber", label: "Mã số doanh nghiệp/CCCD" },
-  { key: "address", label: "Địa chỉ" },
-  { key: "phone", label: "Điện thoại" },
-  { key: "email", label: "Email" },
-  { key: "website", label: "Website/Ứng dụng" },
-];
+export const AGREEMENT_PARTY_INFO: Partial<Record<AgreementId, AgreementPartyInfo>> = {
+  "chinh-sach-doc-quyen": {
+    author: [
+      { key: "realName", label: "Họ và tên" },
+      { key: "dateOfBirth", label: "Ngày sinh" },
+      { key: "cccdNumber", label: "Số CCCD/Hộ chiếu" },
+      { key: "cccdIssuedAt", label: "Cấp ngày" },
+      { key: "address", label: "Địa chỉ" },
+      { key: "phone", label: "Điện thoại" },
+      { key: "email", label: "Email" },
+      { key: "penName", label: "Bút danh" },
+    ],
+    platform: [
+      { key: "name", label: "Tên tổ chức/cá nhân" },
+      { key: "idNumber", label: "Mã số doanh nghiệp/CCCD" },
+      { key: "address", label: "Địa chỉ" },
+      { key: "phone", label: "Điện thoại" },
+      { key: "email", label: "Email" },
+      { key: "website", label: "Website/Ứng dụng" },
+    ],
+  },
+  "cam-ket-quyen-so-huu": {
+    // Cam kết ĐƠN PHƯƠNG (chỉ tác giả ký) — không có khối "Bên B" trong
+    // văn bản gốc, nên bỏ trống `platform`.
+    author: [
+      { key: "realName", label: "Họ và tên" },
+      { key: "penName", label: "Bút danh/Tên tác giả" },
+      { key: "dateOfBirth", label: "Ngày sinh" },
+      { key: "cccdNumber", label: "CCCD/Hộ chiếu/Mã định danh" },
+      { key: "email", label: "Email" },
+    ],
+  },
+};
 
-/** 2 field không thuộc hồ sơ cá nhân nào — sự kiện cố định của tổ chức. */
+/** 2 field Bên B không thuộc hồ sơ cá nhân nào — sự kiện cố định của tổ chức. */
 export const PLATFORM_FIXED_INFO = {
   email: "vinhcauchuyen@gmail.com",
   website: "vinhcauchuyen.vn",
