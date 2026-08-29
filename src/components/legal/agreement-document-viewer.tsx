@@ -66,14 +66,23 @@ export function AgreementDocumentViewer({
 }) {
   const isExclusivityContract = row.id === EXCLUSIVITY_CONTRACT_AGREEMENT_ID;
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
+  // Phân biệt "đang tải" (contractInfo null, contractInfoError null — hiện
+  // "…") với "tải lỗi" (contractInfoError có giá trị — hiện thông báo rõ
+  // thay vì để "…" treo mãi, vd khi DB production còn thiếu cột
+  // date_of_birth/address/cccd_issued_at do chưa chạy
+  // migrations/20260829_add_author_contract_fields.sql).
+  const [contractInfoError, setContractInfoError] = useState(false);
 
   useEffect(() => {
     if (!isExclusivityContract) return;
     let cancelled = false;
     fetch("/api/profile/contract-info")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: ContractInfo | null) => {
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((data: ContractInfo) => {
         if (!cancelled) setContractInfo(data);
+      })
+      .catch(() => {
+        if (!cancelled) setContractInfoError(true);
       });
     return () => {
       cancelled = true;
@@ -123,32 +132,40 @@ export function AgreementDocumentViewer({
                 <div className="mb-2 text-[11px] font-bold tracking-[1px] text-brand-gold-dark">
                   BÊN A · TÁC GIẢ (BẠN)
                 </div>
-                <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
-                  {AUTHOR_PARTY_FIELD_LABELS.map(({ key, label }) => {
-                    const value = contractInfo?.[key];
-                    const display =
-                      key === "dateOfBirth" || key === "cccdIssuedAt"
-                        ? value
-                          ? formatVi(value)
-                          : null
-                        : value;
-                    return (
-                      <div key={key} className="flex justify-between gap-3">
-                        <span className="text-stone-light">{label}</span>
-                        <span className="text-right font-medium text-ink">
-                          {display || (contractInfo ? "Chưa cập nhật" : "…")}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {contractInfo &&
-                  AUTHOR_PARTY_FIELD_LABELS.some(({ key }) => !contractInfo[key]) && (
-                    <div className="mt-2 text-[11.5px] leading-[1.5] text-stone">
-                      Bổ sung các trường còn thiếu ở mục &quot;Thông tin hợp đồng&quot; và &quot;Căn cước công dân&quot;
-                      trong tab Thông tin cá nhân.
+                {contractInfoError ? (
+                  <div className="text-[12.5px] leading-[1.5] text-[#B02A37]">
+                    Không tải được thông tin của bạn. Vui lòng thử tải lại trang; nếu vẫn lỗi, báo cho quản trị
+                    viên.
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
+                      {AUTHOR_PARTY_FIELD_LABELS.map(({ key, label }) => {
+                        const value = contractInfo?.[key];
+                        const display =
+                          key === "dateOfBirth" || key === "cccdIssuedAt"
+                            ? value
+                              ? formatVi(value)
+                              : null
+                            : value;
+                        return (
+                          <div key={key} className="flex justify-between gap-3">
+                            <span className="text-stone-light">{label}</span>
+                            <span className="text-right font-medium text-ink">
+                              {display || (contractInfo ? "Chưa cập nhật" : "…")}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+                    {contractInfo && AUTHOR_PARTY_FIELD_LABELS.some(({ key }) => !contractInfo[key]) && (
+                      <div className="mt-2 text-[11.5px] leading-[1.5] text-stone">
+                        Bổ sung các trường còn thiếu ở mục &quot;Thông tin hợp đồng&quot; và &quot;Căn cước công dân&quot;
+                        trong tab Thông tin cá nhân.
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
               <div>
                 <div className="mb-2 text-[11px] font-bold tracking-[1px] text-brand-gold-dark">
