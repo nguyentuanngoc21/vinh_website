@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { getAgreement } from "@/lib/legal/registry";
+import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
+import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
 
 /**
  * POST /api/profile/agreements/:agreementId/accept — ghi nhận việc người
@@ -9,6 +11,15 @@ import { getAgreement } from "@/lib/legal/registry";
  * trong popup xem văn bản) một thỏa thuận, ở ĐÚNG version hiện tại của nó
  * (registry.ts AGREEMENTS[...].updatedAt) — không nhận version từ client,
  * tránh việc client tự gửi version cũ để "xác nhận khống".
+ *
+ * CHỐT CHẶN THẬT (không chỉ dựa vào client): nếu văn bản có khai báo
+ * field "Bên A" ở AGREEMENT_PARTY_INFO (contract-parties.ts) — tức văn
+ * bản có chỗ trống cần điền thông tin thật của tác giả — chỉ cho xác
+ * nhận khi TẤT CẢ field đó đã có giá trị trong hồ sơ. Thiếu field nào,
+ * trả 400 kèm `missingFields` để client tự điều hướng qua trang Thông
+ * tin cá nhân, kéo tới đúng ô còn thiếu (xem accept-agreement.ts,
+ * agreement-document-viewer.tsx, edit-profile-tab.tsx) — không chặn
+ * bằng cách disable nút ở client rồi thôi, vì có thể gọi thẳng API này.
  *
  * upsert theo primary key (user_id, agreement_id): xác nhận lại một văn
  * bản đã từng xác nhận (ví dụ sau khi nó được cập nhật) chỉ ghi đè, không
@@ -29,6 +40,21 @@ export async function POST(
   const userId = await getAuthedUserId(supabase);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const authorFields = AGREEMENT_PARTY_INFO[agreementId as keyof typeof AGREEMENT_PARTY_INFO]?.author;
+  if (authorFields && authorFields.length > 0) {
+    const info = await resolveAuthorContractInfo(supabase, userId);
+    const missingFields = authorFields.filter(({ key }) => !info?.[key]);
+    if (!info || missingFields.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Bạn cần điền đủ thông tin (${missingFields.map((f) => f.label).join(", ")}) ở Thông tin cá nhân trước khi xác nhận "${agreement.name}".`,
+          missingFields,
+        },
+        { status: 400 }
+      );
+    }
   }
 
   const acceptedAt = new Date().toISOString();

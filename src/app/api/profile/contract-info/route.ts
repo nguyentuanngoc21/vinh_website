@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { PLATFORM_FIXED_INFO } from "@/lib/legal/contract-parties";
+import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
 
 /**
  * GET /api/profile/contract-info — toàn bộ field "BÊN A" (tác giả đang
@@ -24,25 +25,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [
-    { data: profile, error: profileError },
-    { data: verification },
-    { data: userData },
-    { data: platformAdmin },
-  ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("nickname, real_name, phone, date_of_birth, address")
-      .eq("id", userId)
-      .single(),
-    supabase
-      .from("identity_verifications")
-      .select("cccd_number, cccd_issued_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase.auth.admin.getUserById(userId),
+  const [authorInfo, { data: platformAdmin }] = await Promise.all([
+    resolveAuthorContractInfo(supabase, userId),
     // Bên B = hồ sơ super_admin (đứng tên cá nhân) — xem
     // contract-parties.ts. Lấy hàng CŨ NHẤT nếu lỡ có nhiều super_admin,
     // để ổn định (không đổi Bên B ngẫu nhiên giữa các lần gọi).
@@ -55,7 +39,7 @@ export async function GET() {
       .maybeSingle(),
   ]);
 
-  if (profileError || !profile) {
+  if (!authorInfo) {
     return NextResponse.json({ error: "Không tìm thấy hồ sơ." }, { status: 404 });
   }
 
@@ -72,14 +56,7 @@ export async function GET() {
     : null;
 
   return NextResponse.json({
-    penName: profile.nickname,
-    realName: profile.real_name,
-    dateOfBirth: profile.date_of_birth,
-    address: profile.address,
-    phone: profile.phone,
-    email: userData.user?.email ?? null,
-    cccdNumber: verification?.cccd_number ?? null,
-    cccdIssuedAt: verification?.cccd_issued_at ?? null,
+    ...authorInfo,
     platformParty: {
       name: platformAdmin?.real_name ?? null,
       idNumber: platformCccd,

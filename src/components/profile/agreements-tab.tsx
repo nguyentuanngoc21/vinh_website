@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert } from "@/components/ui";
 import { AGREEMENTS } from "@/lib/legal/registry";
 import { AgreementDocumentViewer, formatVi, type AgreementRow } from "@/components/legal/agreement-document-viewer";
+import { acceptAgreement, missingInfoUrl } from "@/lib/legal/accept-agreement";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -17,6 +19,7 @@ type LoadState = "loading" | "ready" | "error";
  * updatedSincePending=true) — xem GET /api/profile/agreements.
  */
 export function AgreementsTab() {
+  const router = useRouter();
   const [state, setState] = useState<LoadState>("loading");
   const [rows, setRows] = useState<AgreementRow[]>([]);
   const [query, setQuery] = useState("");
@@ -61,10 +64,16 @@ export function AgreementsTab() {
     setPendingId(id);
     setError(null);
     try {
-      const res = await fetch(`/api/profile/agreements/${id}/accept`, { method: "POST" });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError(body?.error ?? "Xác nhận thất bại. Vui lòng thử lại.");
+      const result = await acceptAgreement(id);
+      if (!result.ok) {
+        // Thiếu thông tin bắt buộc — server đã chặn thật (route accept),
+        // đây chỉ là điều hướng người dùng tới đúng chỗ để điền, không
+        // hiện lỗi chung chung rồi để họ tự đoán cần làm gì.
+        if (result.missingFields?.length) {
+          router.push(missingInfoUrl(id, result.missingFields));
+          return;
+        }
+        setError(result.error);
         return;
       }
       await load();

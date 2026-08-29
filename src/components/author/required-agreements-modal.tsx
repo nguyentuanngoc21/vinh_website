@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { WarningCircleIcon, ArrowSquareOutIcon } from "@phosphor-icons/react/dist/ssr";
 import { AGREEMENTS } from "@/lib/legal/registry";
 import { AgreementDocumentViewer, type AgreementRow } from "@/components/legal/agreement-document-viewer";
+import { acceptAgreement, missingInfoUrl } from "@/lib/legal/accept-agreement";
 
 /**
  * Chặn "Xuất bản" khi truyện đang ở chế độ độc quyền nhưng tác giả chưa
@@ -27,6 +29,7 @@ export function RequiredAgreementsModal({
   onClose: () => void;
   onAllAccepted: () => void;
 }) {
+  const router = useRouter();
   const [rows, setRows] = useState<AgreementRow[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -65,8 +68,14 @@ export function RequiredAgreementsModal({
   async function accept(id: string) {
     setAcceptingId(id);
     try {
-      const res = await fetch(`/api/profile/agreements/${id}/accept`, { method: "POST" });
-      if (res.ok) await reload();
+      const result = await acceptAgreement(id);
+      if (!result.ok) {
+        if (result.missingFields?.length) {
+          router.push(missingInfoUrl(id, result.missingFields));
+        }
+        return;
+      }
+      await reload();
     } finally {
       setAcceptingId(null);
     }

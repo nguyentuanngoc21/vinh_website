@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { SealCheckIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
 import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
 import { fillPartyBlanksIntoHtml } from "@/lib/legal/fill-party-blanks";
+import { missingInfoUrl } from "@/lib/legal/accept-agreement";
 import type { AgreementId } from "@/lib/legal/registry";
 
 export type AgreementRow = {
@@ -74,6 +76,7 @@ export function AgreementDocumentViewer({
   onAccept: () => void;
   accepting: boolean;
 }) {
+  const router = useRouter();
   const partyInfoSpec = AGREEMENT_PARTY_INFO[row.id as AgreementId];
   const needsContractInfo = !!partyInfoSpec;
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
@@ -112,6 +115,27 @@ export function AgreementDocumentViewer({
       platform: contractInfo.platformParty,
     });
   }, [html, partyInfoSpec, contractInfo, contractInfoError]);
+
+  // Chặn xác nhận khi hồ sơ tác giả chưa đủ field văn bản này cần —
+  // server (POST .../accept) vẫn là chốt chặn thật (phòng trường hợp dữ
+  // liệu ở đây lỗi thời hoặc gọi thẳng API), đây chỉ là kiểm tra sớm để
+  // KHÔNG cần round-trip: đã có sẵn contractInfo nên biết ngay thiếu gì,
+  // đổi hẳn nút "Tôi đồng ý" thành nút điều hướng đi điền — đúng yêu cầu
+  // "tự động navigate tới trang thông tin" thay vì chỉ disable rồi im.
+  const authorInfoLoading = !!partyInfoSpec?.author && !contractInfo && !contractInfoError;
+  const missingAuthorFields =
+    partyInfoSpec?.author && contractInfo && !contractInfoError
+      ? partyInfoSpec.author.filter(({ key }) => !contractInfo[key])
+      : [];
+
+  function handleAcceptClick() {
+    if (missingAuthorFields.length > 0) {
+      router.push(missingInfoUrl(row.id, missingAuthorFields));
+      onClose();
+      return;
+    }
+    onAccept();
+  }
 
   return createPortal(
     <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
@@ -227,36 +251,47 @@ export function AgreementDocumentViewer({
             dangerouslySetInnerHTML={{ __html: displayHtml }}
           />
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3.5 border-t border-[#f0f0ef] bg-[#fdfdfc] px-[26px] py-4">
-          <div
-            className="flex items-center gap-1.5 text-[13px] font-semibold"
-            style={{ color: row.accepted ? "#2F7A4F" : row.updatedSincePending ? "#B7791F" : "var(--color-stone-light)" }}
-          >
-            {row.accepted && <SealCheckIcon weight="fill" size={16} />}
-            {row.accepted
-              ? `Đã xác nhận ngày ${row.acceptedAt ? formatVi(row.acceptedAt) : ""}`
-              : row.updatedSincePending
-                ? `Đã cập nhật ngày ${formatVi(row.updatedAt)} — cần xác nhận lại`
-                : "Chưa xác nhận"}
-          </div>
-          <div className="flex gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded-full border border-cream-border px-5 py-2.5 text-[13.5px] font-medium text-stone-dark"
+        <div className="flex flex-col gap-2.5 border-t border-[#f0f0ef] bg-[#fdfdfc] px-[26px] py-4">
+          {missingAuthorFields.length > 0 && (
+            <div className="text-[12px] leading-[1.5] text-[#B02A37]">
+              Cần điền: {missingAuthorFields.map((f) => f.label).join(", ")} trước khi xác nhận.
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3.5">
+            <div
+              className="flex items-center gap-1.5 text-[13px] font-semibold"
+              style={{ color: row.accepted ? "#2F7A4F" : row.updatedSincePending ? "#B7791F" : "var(--color-stone-light)" }}
             >
-              Đóng
-            </button>
-            {!row.accepted && (
+              {row.accepted && <SealCheckIcon weight="fill" size={16} />}
+              {row.accepted
+                ? `Đã xác nhận ngày ${row.acceptedAt ? formatVi(row.acceptedAt) : ""}`
+                : row.updatedSincePending
+                  ? `Đã cập nhật ngày ${formatVi(row.updatedAt)} — cần xác nhận lại`
+                  : "Chưa xác nhận"}
+            </div>
+            <div className="flex gap-2.5">
               <button
                 type="button"
-                onClick={onAccept}
-                disabled={accepting}
-                className="cursor-pointer rounded-full bg-brand-gold px-[22px] py-2.5 text-[13.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                onClick={onClose}
+                className="cursor-pointer rounded-full border border-cream-border px-5 py-2.5 text-[13.5px] font-medium text-stone-dark"
               >
-                Tôi đồng ý
+                Đóng
               </button>
-            )}
+              {!row.accepted && (
+                <button
+                  type="button"
+                  onClick={handleAcceptClick}
+                  disabled={accepting || authorInfoLoading}
+                  className="cursor-pointer rounded-full bg-brand-gold px-[22px] py-2.5 text-[13.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                >
+                  {authorInfoLoading
+                    ? "Đang tải…"
+                    : missingAuthorFields.length > 0
+                      ? "Điền thông tin còn thiếu"
+                      : "Tôi đồng ý"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
