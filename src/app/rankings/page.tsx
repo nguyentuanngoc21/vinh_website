@@ -4,6 +4,8 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { DevelopmentOverlay } from "@/components/development-overlay";
 import { RankingsBoard } from "@/components/rankings/rankings-board";
+import { createClient } from "@/lib/supabase/server";
+import { getBookRankings } from "@/lib/rankings/get-book-rankings";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -15,14 +17,17 @@ export const metadata: Metadata = {
   title: "Bảng xếp hạng — Vịnh",
 };
 
-export default function RankingsPage() {
+export default async function RankingsPage() {
+  const supabase = await createClient();
+  const bookRankings = await getBookRankings(supabase);
+
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
         <SiteHeader />
         <DevelopmentOverlay>
           <main>
-            <RankingsBoard />
+            <RankingsBoard bookRankings={bookRankings} />
 
             <section className="px-11 pb-[46px] pt-[26px]">
               <div className="flex items-center justify-between rounded-[20px] bg-brand-ink-dark px-10 py-8 text-white">

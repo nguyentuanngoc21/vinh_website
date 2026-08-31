@@ -6,10 +6,17 @@
 -- direct messages, and the connect directory (all real now — the
 -- directory's "Truyện chữ"/"Audio"/"Design" sections read
 -- books/public_audio_narrations/public_design_items by real author id;
--- see author_follows/direct_messages/author_public_profiles). Still NOT
--- modeled: blog, rankings — those remain mock data in src/lib/*.ts (the
--- connect directory's "Blog" section was removed from the UI rather than
--- shown with fabricated numbers, see src/components/connect/connect-directory.tsx);
+-- see author_follows/direct_messages/author_public_profiles). /rankings'
+-- "Truyện chữ" tab is real too now (src/lib/rankings/get-book-rankings.ts):
+-- week/month/quarter (+ ▲/▼ vs the equal-length window before it) come
+-- from book_read_counts_daily, a day-bucketed public aggregate over
+-- reading_history (see that view's comment, and
+-- migrations/20260831_add_book_read_counts_daily.sql); the all-time board
+-- still ranks by books.view_count directly. Still NOT modeled: blog, and
+-- /rankings' "Audio"/"Blog" tabs — those remain mock data in
+-- src/lib/rankings-data.ts and src/lib/blog.ts (the connect directory's
+-- "Blog" section was removed from the UI rather than shown with
+-- fabricated numbers, see src/components/connect/connect-directory.tsx);
 -- add a table for it the same way as you wire that section up for real.
 --
 -- Run with: supabase db push  (or paste into the SQL editor)
@@ -1269,6 +1276,16 @@ create policy "users manage their own reading history"
   on public.reading_history for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- View công khai, đã ẩn danh (không có user_id) — số lượt đọc mỗi SÁCH
+-- theo TỪNG NGÀY, dùng để tính bảng xếp hạng tuần/tháng/quý thật ở
+-- /rankings (src/lib/rankings/get-book-rankings.ts). Cùng lý do
+-- chapter_vote_counts ở dưới không bị RLS bảng gốc chặn: view chạy với
+-- quyền OWNER. Xem migrations/20260831_add_book_read_counts_daily.sql.
+create view public.book_read_counts_daily as
+  select book_id, date_trunc('day', read_at)::date as read_date, count(*)::integer as read_count
+  from public.reading_history
+  group by book_id, date_trunc('day', read_at)::date;
 
 -- --- Vote theo-chương, dạng toggle (bấm lại = bỏ vote) — nút "Bình chọn"
 -- trên trang đọc CHƯA được xây (phase sau); schema này chuẩn bị trước để

@@ -952,6 +952,18 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Xem migrations/20260831_add_book_read_counts_daily.sql. Ẩn danh
+      // (không có user_id) — số lượt đọc mỗi sách theo từng ngày, dùng để
+      // tính bảng xếp hạng tuần/tháng/quý thật ở /rankings
+      // (src/lib/rankings/get-book-rankings.ts).
+      book_read_counts_daily: {
+        Row: {
+          book_id: string;
+          read_date: string;
+          read_count: number;
+        };
+        Relationships: [];
+      };
       chapter_vote_counts: {
         Row: {
           chapter_id: string;
