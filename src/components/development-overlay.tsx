@@ -2,14 +2,20 @@ import { type ReactNode } from "react";
 import { WrenchIcon } from "@phosphor-icons/react/dist/ssr";
 
 /**
- * Wraps a section's mock content (Audio, Blog, Thiết kế, Kết nối, Bảng xếp
- * hạng — see their page.tsx files; none of these are wired to real data
- * yet) in a blurred, dimmed, non-interactive layer labelled "Đang phát
- * triển". The content stays in the DOM — so the layout/design work
- * already done isn't thrown away, just blurred and unreachable — `inert`
- * drops it from focus/tab order and the accessibility tree on top of the
- * visual blur. Unwrap (delete this import, keep the children) once a
- * section is actually wired up.
+ * Wraps a section's mock content (Audio, Blog, Thiết kế, Kết nối — see
+ * their page.tsx files, none of these are wired to real data yet) in a
+ * blurred, dimmed, non-interactive layer labelled "Đang phát triển". The
+ * content stays in the DOM — so the layout/design work already done isn't
+ * thrown away, just blurred and unreachable — `inert` drops it from
+ * focus/tab order and the accessibility tree on top of the visual blur.
+ * Unwrap (delete this import, keep the children) once a section is
+ * actually wired up.
+ *
+ * /rankings no longer wraps its whole page in this — its "Truyện chữ" tab
+ * is real (src/lib/rankings/get-book-rankings.ts); only the "Audio"/"Blog"
+ * tabs' result area still uses it, applied inside rankings-board.tsx
+ * (MaybeBlurred) so the still-mock tabs blur without hiding the (real,
+ * interactive) tab/period/genre controls around them.
  */
 export function DevelopmentOverlay({ children }: { children: ReactNode }) {
   return (
