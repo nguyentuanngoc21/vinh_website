@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CheckCircleIcon,
@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { genres as REAL_GENRES } from "@/lib/books";
 import { BookCover } from "@/components/covers/book-cover";
+import { DevelopmentOverlay } from "@/components/development-overlay";
 import { REAL_PERIODS, type BookRankingsData, type RealPeriodId } from "@/lib/rankings/get-book-rankings";
 import {
   KINDS,
@@ -28,6 +29,14 @@ import {
 } from "@/lib/rankings-data";
 
 const MEDAL_BG = ["var(--color-brand-gold)", "var(--color-sidebar-text-dim-2)", "#C08552"];
+
+// "Truyện chữ" is real now (see get-book-rankings.ts); "Audio" and "Blog"
+// are still the mock bank, so only those two stay behind the blurred
+// "Đang phát triển" overlay — page.tsx no longer wraps the whole page in
+// it (see development-overlay.tsx's own "unwrap once wired up" note).
+function MaybeBlurred({ blurred, children }: { blurred: boolean; children: ReactNode }) {
+  return blurred ? <DevelopmentOverlay>{children}</DevelopmentOverlay> : <>{children}</>;
+}
 
 // Rows thật (tuần/tháng/quý/toàn thời gian) không có số biến động bịa —
 // ▲/▼ là rank change có thật giữa kỳ này và kỳ liền trước (null cho "Toàn
@@ -210,7 +219,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
           </div>
         </div>
       ) : (
-        <>
+        <MaybeBlurred blurred={!isReal}>
           <div
             style={{ gridTemplateColumns: `repeat(${Math.max(Math.min(listLength, 3), 1)}, 1fr)` }}
             className="grid items-end gap-[22px] px-11 pt-[22px]"
@@ -472,7 +481,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
               </div>
             </div>
           </div>
-        </>
+        </MaybeBlurred>
       )}
     </>
   );
