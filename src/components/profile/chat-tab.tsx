@@ -7,9 +7,11 @@ import {
   CaretLeftIcon,
   PaperPlaneRightIcon,
   UserCircleIcon,
+  WarningCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { AVATAR_TONES } from "@/lib/profile";
 import { Field, Button, Alert } from "@/components/ui";
+import { OrderCard, type OrderRow } from "@/components/profile/order-card";
 
 type Conversation = {
   userId: string;
@@ -20,7 +22,7 @@ type Conversation = {
   unreadCount: number;
 };
 
-type ThreadMessage = { id: string; body: string; createdAt: string; mine: boolean };
+type ThreadMessage = { id: string; body: string; createdAt: string; mine: boolean; flagged?: boolean };
 
 type Counterparty = { userId: string; nickname: string; username: string; avatarUrl: string | null };
 
@@ -92,6 +94,10 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
 
   const [counterparty, setCounterparty] = useState<Counterparty | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  // Đơn hàng gắn với cặp (mình, counterparty) — không có bảng conversations
+  // riêng, xem ghi chú ở src/app/api/orders/route.ts (GET). Chỉ hiện đơn
+  // gần nhất chưa 'cancelled' (đơn cũ đã hủy không còn cần thao tác gì).
+  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -144,6 +150,24 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
           setConversations((prev) =>
             prev.map((c) => (c.userId === activeUserId ? { ...c, unreadCount: 0 } : c))
           );
+        });
+    load();
+    const interval = setInterval(load, THREAD_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeUserId]);
+
+  useEffect(() => {
+    if (!activeUserId) return;
+    let cancelled = false;
+    const load = () =>
+      fetch(`/api/orders?withUserId=${activeUserId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (cancelled || !data) return;
+          setOrders(data.orders ?? []);
         });
     load();
     const interval = setInterval(load, THREAD_POLL_MS);
@@ -313,9 +337,20 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
                   <div className="mt-0.5 text-xs text-stone">@{counterparty.username}</div>
                 </div>
               </div>
+              {orders
+                .filter((o) => o.status !== "cancelled")
+                .slice(0, 1)
+                .map((o) => (
+                  <OrderCard
+                    key={o.id}
+                    order={o}
+                    viewerId={o.buyer_id === counterparty.userId ? o.seller_id : o.buyer_id}
+                    onChanged={(updated) => setOrders((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))}
+                  />
+                ))}
               <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-[18px] py-5">
                 {messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
+                  <div key={m.id} className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
                     <div
                       style={{
                         background: m.mine ? "var(--color-brand-ink)" : "#f2f1ee",
@@ -326,6 +361,14 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
                     >
                       {m.body}
                     </div>
+                    {m.mine && m.flagged && (
+                      <div
+                        title="Tin nhắn có thể chứa thông tin liên hệ/giao dịch ngoài nền tảng — chỉ mình bạn thấy cảnh báo này."
+                        className="mt-1 flex items-center gap-1 text-[10.5px] text-[#A9781A]"
+                      >
+                        <WarningCircleIcon weight="fill" size={11} /> Có thể chứa thông tin ngoài nền tảng
+                      </div>
+                    )}
                   </div>
                 ))}
                 {messages.length === 0 && (

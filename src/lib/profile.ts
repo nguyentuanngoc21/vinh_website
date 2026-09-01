@@ -1,11 +1,12 @@
 import type { TransactionType } from "@/lib/supabase/types";
 
-export type ProfileTab = "following" | "chat" | "edit" | "agree" | "tasks";
+export type ProfileTab = "following" | "chat" | "edit" | "services" | "agree" | "tasks";
 
 export const PROFILE_TABS: { id: ProfileTab; label: string; icon: string }[] = [
   { id: "edit", label: "Thông tin cá nhân", icon: "pencil" },
   { id: "chat", label: "Hội thoại", icon: "chat" },
   { id: "following", label: "Đang theo dõi", icon: "users" },
+  { id: "services", label: "Dịch vụ", icon: "briefcase" },
   { id: "agree", label: "Cam kết & Thỏa thuận", icon: "seal" },
   { id: "tasks", label: "Nhiệm vụ ngày", icon: "target" },
 ];
@@ -33,6 +34,9 @@ const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   quest_reward: "Thưởng nhiệm vụ",
   streak_bonus: "Thưởng đọc liên tục",
   streak_rescue: "Trả token cứu streak",
+  order_payment: "Đặt cọc/thanh toán đơn dịch vụ",
+  order_earning: "Doanh thu đơn dịch vụ",
+  order_refund: "Hoàn tiền đơn dịch vụ",
 };
 
 export function transactionTypeLabel(type: TransactionType): string {

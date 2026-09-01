@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowSquareOutIcon, CoinsIcon, PlusIcon, TrashIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
 import { BookCoverUpload } from "@/components/author/book-cover-upload";
+import { ShareManuscriptPanel, type ManuscriptGrant } from "@/components/author/share-manuscript-panel";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type OverviewChapter = {
@@ -29,6 +30,8 @@ type BookOverviewProps = {
   coverUrl: string | null;
   /** Đã order by order_index asc từ page.tsx. */
   chapters: OverviewChapter[];
+  bookFinalized: boolean;
+  initialManuscriptGrant: ManuscriptGrant | null;
 };
 
 /**
@@ -45,6 +48,8 @@ export function BookOverview({
   bookIsExclusive,
   coverUrl,
   chapters,
+  bookFinalized,
+  initialManuscriptGrant,
 }: BookOverviewProps) {
   const router = useRouter();
   const [creatingChapter, setCreatingChapter] = useState(false);
@@ -169,6 +174,8 @@ export function BookOverview({
           </button>
         </div>
       </div>
+
+      <ShareManuscriptPanel bookId={bookId} finalized={bookFinalized} initialGrant={initialManuscriptGrant} />
 
       {latest && (
         <Link

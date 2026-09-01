@@ -40,6 +40,35 @@ function parseTags(value: unknown): string[] {
  * their own books" (docs/supabase/schema.sql) cho phép insert bình
  * thường, không cần bypass RLS.
  */
+/** GET /api/authoring/books — danh sách truyện CỦA CHÍNH MÌNH (id/title
+ * tối giản) — dùng bởi book-picker khi seller gắn 1 truyện vào đơn
+ * ghostwriting (src/components/profile/order-card.tsx). RLS-scoped, dựa
+ * hẳn vào policy "authors manage their own books" (chỉ chủ sách select
+ * được sách CHƯA published qua nhánh auth.uid()=author_id của policy đó;
+ * sách published thì ai cũng select được nhưng ở đây không lọc theo
+ * published nên vẫn đúng — chỉ cần đủ 2 field, không rò rỉ gì thêm).
+ */
+export async function GET() {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("books")
+    .select("id, title")
+    .eq("author_id", userData.user.id)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[authoring] list books failed:", error);
+    return NextResponse.json({ error: "Không tải được danh sách truyện." }, { status: 500 });
+  }
+
+  return NextResponse.json({ books: data ?? [] });
+}
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const title = (typeof body?.title === "string" ? body.title.trim() : "") || DEFAULT_TITLE;

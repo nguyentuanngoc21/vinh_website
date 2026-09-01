@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { isLikelyOffPlatform } from "@/lib/orders/off-platform-detector";
 
 const THREAD_MESSAGE_LIMIT = 200;
 const BODY_MAX = 4000;
@@ -34,7 +35,7 @@ export async function GET(
 
   const { data: rows, error } = await supabase
     .from("direct_messages")
-    .select("id, sender_id, body, created_at")
+    .select("id, sender_id, body, created_at, flagged_off_platform")
     .or(
       `and(sender_id.eq.${userId},recipient_id.eq.${counterpartyId}),and(sender_id.eq.${counterpartyId},recipient_id.eq.${userId})`
     )
@@ -71,6 +72,9 @@ export async function GET(
       body: m.body,
       createdAt: m.created_at,
       mine: m.sender_id === userId,
+      // Mục 8 đặc tả: cảnh báo chỉ dành cho CHÍNH người gửi thấy — không
+      // trả cờ này cho tin của đối phương.
+      flagged: m.sender_id === userId ? m.flagged_off_platform : false,
     })),
   });
 }
@@ -110,9 +114,12 @@ export async function POST(
     return NextResponse.json({ error: "Không tìm thấy người dùng." }, { status: 404 });
   }
 
+  // Mục 8 đặc tả — chỉ gắn nhãn, KHÔNG chặn gửi (xem off-platform-detector.ts).
+  const flagged = isLikelyOffPlatform(text);
+
   const { data: message, error } = await supabase
     .from("direct_messages")
-    .insert({ sender_id: userId, recipient_id: recipientId, body: text })
+    .insert({ sender_id: userId, recipient_id: recipientId, body: text, flagged_off_platform: flagged })
     .select("id, created_at")
     .single();
   if (error || !message) {
@@ -120,7 +127,15 @@ export async function POST(
     return NextResponse.json({ error: "Gửi tin nhắn thất bại." }, { status: 500 });
   }
 
+  // Chỉ tính lại Trust Score khi THỰC SỰ bị gắn nhãn (hiếm) — tránh chạy
+  // 1 hàm tổng hợp nặng trên mọi tin nhắn gửi đi. Không chặn phản hồi.
+  if (flagged) {
+    supabase.rpc("recalculate_trust_score", { p_user_id: userId }).then(({ error: trustError }) => {
+      if (trustError) console.error("[messages] recalculate trust score failed:", trustError);
+    });
+  }
+
   return NextResponse.json({
-    message: { id: message.id, body: text, createdAt: message.created_at, mine: true },
+    message: { id: message.id, body: text, createdAt: message.created_at, mine: true, flagged },
   });
 }

@@ -3,6 +3,10 @@
     {
       "path": "/api/wallet/cron/settle-pending",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/orders/cron/auto-confirm",
+      "schedule": "0 20 * * *"
     }
   ]
 }
