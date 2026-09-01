@@ -81,14 +81,23 @@ export default async function ConnectPage() {
     { data: bookRows, error: bookError },
     { data: audioRows, error: audioError },
     { data: designRows, error: designError },
+    { data: serviceRows, error: serviceError },
+    { data: nameAgreementRows, error: nameAgreementError },
   ] =
     peopleIds.length === 0
-      ? [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }, { data: [], error: null }]
+      ? [
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+        ]
       : await Promise.all([
           supabase.from("author_follows").select("follower_id, author_id").in("author_id", peopleIds),
           supabase
             .from("books")
-            .select("id, title, slug, genre, author_id, cover_design_item_id, created_at")
+            .select("id, title, slug, genre, author_id, cover_design_item_id, created_at, is_ghostwritten")
             .in("author_id", peopleIds)
             .eq("published", true)
             .is("deleted_at", null)
@@ -103,11 +112,30 @@ export default async function ConnectPage() {
             .select("id, illustrator_id, title, image_url, created_at")
             .in("illustrator_id", peopleIds)
             .order("created_at", { ascending: false }),
+          // Chỉ thẻ gig ĐANG nhận đơn (đủ 11/11 trường, xem
+          // src/lib/orders/service-listing-service.ts) — listing chưa đủ
+          // điều kiện không lộ ra ở Kết nối dù không riêng tư.
+          supabase
+            .from("service_listings")
+            .select("id, seller_id, service_type, name, price_tiers, delivery_days")
+            .in("seller_id", peopleIds)
+            .eq("is_accepting_orders", true)
+            .eq("is_private", false),
+          // Ẩn 2 chiều (yêu cầu bổ sung #2): truyện viết thuê chỉ lộ ra ở
+          // list "Truyện chữ" của ghostwriter nếu ghostwriter_sample_visible,
+          // và chỉ lộ dưới hồ sơ CUSTOMER nếu customer_profile_visible —
+          // xem migrations/20260901_add_ghostwriting_authorship.sql.
+          supabase
+            .from("author_name_agreements")
+            .select("book_id, ghostwriter_id, customer_id, ghostwriter_sample_visible, customer_profile_visible")
+            .or(`ghostwriter_id.in.(${peopleIds.join(",")}),customer_id.in.(${peopleIds.join(",")})`),
         ]);
   if (followError) console.error("[ket-noi] author_follows query failed:", followError);
   if (bookError) console.error("[ket-noi] books query failed:", bookError);
   if (audioError) console.error("[ket-noi] public_audio_narrations query failed:", audioError);
   if (designError) console.error("[ket-noi] public_design_items query failed:", designError);
+  if (serviceError) console.error("[ket-noi] service_listings query failed:", serviceError);
+  if (nameAgreementError) console.error("[ket-noi] author_name_agreements query failed:", nameAgreementError);
 
   const followerCountById = new Map<string, number>();
   const followingByViewer = new Set<string>();
@@ -117,18 +145,31 @@ export default async function ConnectPage() {
   }
 
   const bookCoverUrls = await Promise.all((bookRows ?? []).map((b) => resolveBookCoverUrl(supabase, b)));
+  const nameAgreementByBook = new Map((nameAgreementRows ?? []).map((r) => [r.book_id, r]));
   const booksByAuthor = new Map<string, ConnectPerson["works"]["truyen"]>();
+  const pushBook = (personId: string, item: ConnectPerson["works"]["truyen"][number]) => {
+    const list = booksByAuthor.get(personId) ?? [];
+    list.push(item);
+    booksByAuthor.set(personId, list);
+  };
   (bookRows ?? []).forEach((b, i) => {
-    const list = booksByAuthor.get(b.author_id) ?? [];
-    list.push({
+    const item = {
       id: b.id,
       title: b.title,
       meta: b.genre ?? "Truyện chữ",
       date: formatShortDate(b.created_at),
       href: `/truyen/${b.slug}`,
       imageUrl: bookCoverUrls[i],
-    });
-    booksByAuthor.set(b.author_id, list);
+    };
+    if (!b.is_ghostwritten) {
+      pushBook(b.author_id, item);
+      return;
+    }
+    // Truyện viết thuê — MẶC ĐỊNH ẨN ở cả 2 phía, chỉ lộ ra đúng phía đã
+    // được đồng ý qua thỏa thuận đứng tên (yêu cầu bổ sung #2).
+    const agreement = nameAgreementByBook.get(b.id);
+    if (agreement?.ghostwriter_sample_visible) pushBook(b.author_id, item);
+    if (agreement?.customer_profile_visible) pushBook(agreement.customer_id, item);
   });
 
   const audioByAuthor = new Map<string, ConnectPerson["works"]["audio"]>();
@@ -162,6 +203,21 @@ export default async function ConnectPage() {
     designByAuthor.set(d.illustrator_id, list);
   }
 
+  const servicesBySeller = new Map<string, ConnectPerson["services"]>();
+  for (const s of serviceRows ?? []) {
+    const list = servicesBySeller.get(s.seller_id) ?? [];
+    const tiers = Array.isArray(s.price_tiers) ? s.price_tiers : [];
+    const prices = tiers.map((t) => Number((t as { price?: unknown })?.price)).filter((n) => Number.isFinite(n) && n > 0);
+    list.push({
+      id: s.id,
+      serviceType: s.service_type,
+      name: s.name,
+      minPrice: prices.length ? Math.min(...prices) : null,
+      deliveryDays: s.delivery_days,
+    });
+    servicesBySeller.set(s.seller_id, list);
+  }
+
   const connectPeople: ConnectPerson[] = people.map((p) => ({
     id: p.id,
     nickname: p.nickname,
@@ -173,6 +229,7 @@ export default async function ConnectPage() {
     creatorTags: p.creator_tags,
     followerCount: followerCountById.get(p.id) ?? 0,
     isFollowingByViewer: followingByViewer.has(p.id),
+    services: servicesBySeller.get(p.id) ?? [],
     works: {
       truyen: booksByAuthor.get(p.id) ?? [],
       audio: audioByAuthor.get(p.id) ?? [],

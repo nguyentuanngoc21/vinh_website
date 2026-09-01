@@ -9,16 +9,20 @@ import {
   UsersThreeIcon,
   ShieldCheckIcon,
   GearIcon,
+  WarningOctagonIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { VinhMark } from "@/components/ui";
 
-// Chỉ "Tổng quan" và "Nội dung" có trang thật — còn lại vẫn là placeholder,
-// cho href một khi /admin/<route>/page.tsx tồn tại, active-state check
-// dưới đây (so theo pathname thật) sẽ tự nhận ra.
+// Chỉ "Tổng quan", "Nội dung" và "Tranh chấp" có trang thật — còn lại vẫn
+// là placeholder, cho href một khi /admin/<route>/page.tsx tồn tại,
+// active-state check dưới đây (so theo pathname thật) sẽ tự nhận ra.
 const NAV_ITEMS = [
   { label: "Tổng quan", icon: ChartLineUpIcon, href: "/admin" },
   { label: "Giao dịch", icon: ReceiptIcon, href: null },
   { label: "Nội dung", icon: BooksIcon, href: "/admin/noi-dung" },
+  // Mục 9 đặc tả (Hệ thống giao dịch commission) — xem
+  // migrations/20260901_add_trust_and_disputes.sql.
+  { label: "Tranh chấp", icon: WarningOctagonIcon, href: "/admin/tranh-chap" },
   { label: "Người dùng", icon: UsersThreeIcon, href: null },
   { label: "Bản quyền", icon: ShieldCheckIcon, href: null },
   { label: "Cài đặt", icon: GearIcon, href: null },

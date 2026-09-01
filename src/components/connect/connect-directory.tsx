@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MagnifyingGlassIcon,
   CaretRightIcon,
@@ -26,6 +26,14 @@ export type ConnectWorkItem = {
   audioUrl?: string | null;
 };
 
+export type ConnectService = {
+  id: string;
+  serviceType: "illustration" | "voice" | "ghostwriting";
+  name: string;
+  minPrice: number | null;
+  deliveryDays: number | null;
+};
+
 export type ConnectPerson = {
   id: string;
   nickname: string;
@@ -37,6 +45,9 @@ export type ConnectPerson = {
   creatorTags: CreatorTag[];
   followerCount: number;
   isFollowingByViewer: boolean;
+  /** Chỉ gồm listing is_accepting_orders=true & không riêng tư — xem
+   * src/app/ket-noi/page.tsx (GET service_listings). */
+  services: ConnectService[];
   works: {
     truyen: ConnectWorkItem[];
     audio: ConnectWorkItem[];
@@ -63,9 +74,13 @@ const CREATOR_TAG_LABELS: Record<CreatorTag, string> = {
   author: "Tác giả",
   illustrator: "Họa sĩ",
   narrator: "Lồng tiếng",
+  // Chỉ là nhãn lọc tự khai, không có mục tác phẩm "Blog" đi kèm — repo
+  // chưa có bảng blog_posts thật (xem ghi chú đầu docs/supabase/schema.sql,
+  // mục "Blog" đã bị gỡ khỏi UI này để không hiển thị số liệu bịa).
+  blogger: "Blogger",
 };
 
-const FILTER_TAGS = ["Tất cả", "Đọc giả", "Tác giả", "Họa sĩ", "Lồng tiếng"] as const;
+const FILTER_TAGS = ["Tất cả", "Đọc giả", "Tác giả", "Họa sĩ", "Lồng tiếng", "Blogger"] as const;
 type FilterTag = (typeof FILTER_TAGS)[number];
 
 // creator_tags là tự khai báo thủ công (chưa có UI nào để user tự set,
@@ -125,6 +140,9 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
   const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({ truyen: true, audio: false, design: false });
+  const [orderingId, setOrderingId] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const router = useRouter();
 
   const filteredPeople = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -163,6 +181,31 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
   const toggleAll = () => {
     const next = openCount !== SECTION_KEYS.length;
     setOpen({ truyen: next, audio: next, design: next });
+  };
+
+  // "Đặt dịch vụ" — tạo Order thật (POST /api/orders, xem
+  // src/app/api/orders/route.ts) rồi điều hướng thẳng vào Hội thoại với
+  // đúng người bán, nơi thẻ đơn hàng (order-card.tsx) hiện ra để đi tiếp
+  // luồng chọn phạm vi quyền sử dụng/brief/đặt cọc.
+  const placeOrder = async (listingId: string, sellerId: string) => {
+    if (!viewerId) {
+      router.push("/dang-nhap");
+      return;
+    }
+    setOrderingId(listingId);
+    setOrderError(null);
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId, priceTierIndex: 0 }),
+    });
+    const data = await res.json().catch(() => null);
+    setOrderingId(null);
+    if (!res.ok) {
+      setOrderError((data && data.error) || "Không tạo được đơn hàng.");
+      return;
+    }
+    router.push(`/ca-nhan?chat=${sellerId}`);
   };
 
   return (
@@ -316,6 +359,41 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                   </div>
                 ))}
               </div>
+
+              {selected.services.length > 0 && (
+                <div className="border-b border-[#f1efec] px-[22px] py-4">
+                  <div className="text-xs font-bold tracking-[1.1px] text-stone">DỊCH VỤ NHẬN ĐẶT</div>
+                  {orderError && (
+                    <div className="mt-2 text-xs font-semibold text-[#B02A37]">{orderError}</div>
+                  )}
+                  <div className="mt-2.5 flex flex-col gap-2">
+                    {selected.services.map((s) => (
+                      <div
+                        key={s.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cream px-3.5 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-[13.5px] font-semibold text-ink">{s.name}</div>
+                          <div className="mt-0.5 text-xs text-stone">
+                            {s.minPrice ? `Từ ${s.minPrice.toLocaleString("vi-VN")}₫` : "Liên hệ giá"}
+                            {s.deliveryDays ? ` · ${s.deliveryDays} ngày` : ""}
+                          </div>
+                        </div>
+                        {!isSelf && (
+                          <button
+                            type="button"
+                            disabled={orderingId === s.id}
+                            onClick={() => placeOrder(s.id, selected.id)}
+                            className="shrink-0 cursor-pointer rounded-full bg-brand-gold px-4 py-1.5 text-xs font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                          >
+                            {orderingId === s.id ? "Đang tạo…" : "Đặt dịch vụ"}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center justify-between gap-3 px-[22px] pt-[18px]">
                 <div className="truncate text-xs font-bold tracking-[1.1px] text-stone">

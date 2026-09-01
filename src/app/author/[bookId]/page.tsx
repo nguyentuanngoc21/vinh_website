@@ -34,7 +34,7 @@ export default async function AuthorBookOverviewPage({
 
   const { data: book } = await supabase
     .from("books")
-    .select("id, title, genre, slug, published, author_id, is_exclusive, deleted_at, cover_design_item_id")
+    .select("id, title, genre, slug, published, author_id, is_exclusive, deleted_at, cover_design_item_id, finalized_at")
     .eq("id", bookId)
     .maybeSingle();
 
@@ -44,14 +44,25 @@ export default async function AuthorBookOverviewPage({
     notFound();
   }
 
-  const [{ data: chapters }, coverUrl] = await Promise.all([
+  const [{ data: chapters }, coverUrl, { data: grantRow }] = await Promise.all([
     supabase
       .from("chapters")
       .select("id, title, order_index, published, price, is_last_chapter")
       .eq("book_id", bookId)
       .order("order_index", { ascending: true }),
     resolveBookCoverUrl(supabase, book),
+    // Chỉ có nhiều nhất 1 grant đang hoạt động/book (partial unique index,
+    // xem migrations/20260901_add_manuscript_share.sql) — join sang
+    // profiles để hiện @username thay vì chỉ uuid.
+    supabase
+      .from("manuscript_access_grants")
+      .select("granted_at, profiles:granted_to_user_id(username, nickname)")
+      .eq("book_id", bookId)
+      .is("revoked_at", null)
+      .maybeSingle(),
   ]);
+
+  const grantProfile = grantRow?.profiles as unknown as { username: string; nickname: string } | null;
 
   return (
     <BookOverview
@@ -63,6 +74,12 @@ export default async function AuthorBookOverviewPage({
       bookIsExclusive={book.is_exclusive}
       coverUrl={coverUrl}
       chapters={chapters ?? []}
+      bookFinalized={!!book.finalized_at}
+      initialManuscriptGrant={
+        grantRow && grantProfile
+          ? { username: grantProfile.username, nickname: grantProfile.nickname, grantedAt: grantRow.granted_at }
+          : null
+      }
     />
   );
 }

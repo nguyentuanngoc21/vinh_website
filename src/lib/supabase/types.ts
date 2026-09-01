@@ -10,7 +10,14 @@
  */
 
 export type Role = "user" | "admin" | "super_admin";
-export type CreatorTag = "author" | "illustrator" | "narrator";
+export type CreatorTag =
+  | "author"
+  | "illustrator"
+  | "narrator"
+  // Added by migrations/20260901_add_blogger_creator_tag.sql — chỉ là nhãn
+  // lọc ở Kết nối, KHÔNG kéo theo mục "Blog" trong danh sách tác phẩm (repo
+  // chưa có bảng blog_posts thật, xem ghi chú đầu docs/supabase/schema.sql).
+  | "blogger";
 
 export type ContentSource = "independent" | "story_upload";
 
@@ -58,7 +65,33 @@ export type TransactionType =
   // the user to save a streak after missing exactly 1 day with an empty
   // rest-day bank. Separate from 'streak_bonus' (a credit) for the same
   // reason purchase_chapter/purchase_credit are separate.
-  | "streak_rescue";
+  | "streak_rescue"
+  // Hệ thống giao dịch commission (schema.sql phần 12) — xem
+  // migrations/20260901_add_order_payment_transaction_type.sql,
+  // 20260901_add_order_earning_transaction_type.sql. 'order_payment' = vế
+  // trừ ngay-lập-tức của buyer (status luôn 'completed', KHÔNG 'pending').
+  // 'order_earning' = vế cộng (pending, hold period) của seller, ghi tại
+  // buyer_confirmed/auto_confirmed — KHÔNG ghi lúc đặt cọc.
+  | "order_payment"
+  | "order_earning"
+  // Hoàn tiền khi hủy Order (Mục 5.1) — cộng ngay, không hold period. Thêm
+  // bởi migrations/20260901_add_order_refund_transaction_type.sql.
+  | "order_refund";
+
+// schema.sql phần 12. Giữ đủ 8 giá trị đúng sơ đồ đặc tả dù
+// 'brief_confirmed'/'deposit_paid' chỉ dừng lại rất ngắn trong thực tế —
+// xem record_order_payment() trong migrations/20260901_add_order_system_core.sql.
+export type OrderStatus =
+  | "draft"
+  | "brief_confirmed"
+  | "deposit_paid"
+  | "in_progress"
+  | "delivered"
+  | "completed"
+  | "cancelled"
+  | "disputed";
+
+export type ServiceType = "illustration" | "voice" | "ghostwriting";
 
 // Quest System taxonomy — see migrations/20260827_extend_task_templates_for_quests.sql.
 // Same 6 values used by task_templates.quest_type and quest_examples_pool.quest_type.
@@ -124,6 +157,15 @@ export type Database = {
           screenshot_penalty_expires_at: string | null;
           screenshot_penalty_banned: boolean;
           screenshot_penalty_last_offense_at: string | null;
+          // Độ uy tín (Module 7 đặc tả) — CHỈ đổi qua recalculate_trust_score()
+          // (security definer, tính lại từ nguồn dữ liệu gốc mỗi lần gọi,
+          // không phải increment rải rác) — xem
+          // migrations/20260901_add_trust_and_disputes.sql. Không có trong
+          // Insert/Update, client không tự set được.
+          trust_orders_completed: number;
+          trust_orders_cancelled_at_fault: number;
+          trust_off_platform_flags: number;
+          trust_violations_resolved: number;
           // Quest System — lưu sẵn, không tính lại mỗi lần đọc. Chặn write
           // trực tiếp bởi trigger enforce_quest_streak_authority (giống
           // role/cccd_verified) — xem
@@ -255,6 +297,21 @@ export type Database = {
           // null = còn sống. Soft-delete — không có DELETE thật. Xem
           // migrations/20260826_add_book_soft_delete.sql.
           deleted_at: string | null;
+          // "Hoàn thiện" — Share bản thảo kiểu Drive (một chiều, trigger DB
+          // chặn unset — giống is_last_chapter ở chapters). Khi chuyển
+          // null -> not null, TỰ ĐỘNG khóa mọi manuscript_access_grants
+          // đang hoạt động của book này (trigger
+          // lock_manuscript_grants_on_finalize). Xem
+          // migrations/20260901_add_manuscript_share.sql.
+          finalized_at: string | null;
+          // Module 5+6 đặc tả — luôn true nếu sách sinh ra từ 1 Order
+          // ghostwriting (set bởi attach_order_book(), KHÔNG phụ thuộc
+          // author_display). Xem migrations/20260901_add_ghostwriting_authorship.sql.
+          is_ghostwritten: boolean;
+          // 'pen_name' (mặc định) | 'anonymous' | 'customer_name' |
+          // 'co_authorship' — 2 giá trị sau CHỈ được set qua
+          // confirm_author_name_agreement() khi đủ 2 xác nhận.
+          author_display: "pen_name" | "anonymous" | "customer_name" | "co_authorship";
           // pgvector column — the JS client returns/accepts this as a
           // plain number[] (or null), Postgres handles the vector type.
           embedding: number[] | null;
@@ -272,6 +329,7 @@ export type Database = {
           published?: boolean;
           is_exclusive?: boolean;
           deleted_at?: string | null;
+          finalized_at?: string | null;
           embedding?: number[] | null;
         };
         Update: Partial<Database["public"]["Tables"]["books"]["Insert"]>;
@@ -368,6 +426,10 @@ export type Database = {
           // null = người nhận chưa đọc. Xem
           // migrations/20260828_add_direct_messages.sql.
           read_at: string | null;
+          // Mục 8 đặc tả — nghi ngờ trao đổi giao dịch ngoài nền tảng (regex
+          // ở route, xem migrations/20260901_add_trust_and_disputes.sql).
+          // KHÔNG chặn gửi, chỉ gắn nhãn cho chính người gửi thấy.
+          flagged_off_platform: boolean;
           created_at: string;
         };
         Insert: {
@@ -375,6 +437,7 @@ export type Database = {
           sender_id: string;
           recipient_id: string;
           body: string;
+          flagged_off_platform?: boolean;
         };
         // Update chỉ dùng để set read_at (đánh dấu đã đọc) — route server
         // tự giới hạn field, type ở đây rộng hơn 1 chút cho đơn giản.
@@ -407,6 +470,310 @@ export type Database = {
           book_id: string;
         };
         // Thêm/xoá sách khỏi danh sách = insert/delete — không có update.
+        Update: never;
+        Relationships: [];
+      };
+      // Hệ thống giao dịch commission (schema.sql phần 12) — xem
+      // migrations/20260901_add_order_system_core.sql. service_listings/
+      // service_samples viết trực tiếp qua .insert()/.update() (không RPC,
+      // giống direct_messages — không phải ledger, không cần atomic đa
+      // bảng); orders/order_events CHỈ ghi qua các RPC ở Functions bên
+      // dưới, y hệt nguyên tắc của transactions.
+      service_listings: {
+        Row: {
+          id: string;
+          seller_id: string;
+          service_type: ServiceType;
+          name: string;
+          scope_description: string;
+          price_tiers: Record<string, unknown>[];
+          deposit_pct: number | null;
+          delivery_days: number | null;
+          revisions_max: number | null;
+          tags: Record<string, unknown>;
+          default_usage_scope: string | null;
+          // null = seller chưa tự khai. Từ migrations/20260901_add_order_cancel_system.sql
+          // PHẢI là object 4 key cố định: { before_draft, draft_pending,
+          // draft_approved, delivered } (mỗi giá trị 0-100) — calculate_refund()
+          // tra thẳng key này, không so khớp text tự do nữa (xem ghi chú
+          // đầu migration đó).
+          refund_policy: { before_draft: number; draft_pending: number; draft_approved: number; delivered: number } | null;
+          lost_contact_days: number;
+          accepted_content: string | null;
+          rejected_content: string | null;
+          is_private: boolean;
+          // Chỉ được set true bởi src/lib/orders/service-listing-service.ts
+          // sau khi validate đủ 11/11 trường — không phải validate ở đây.
+          is_accepting_orders: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          seller_id: string;
+          service_type: ServiceType;
+          name?: string;
+          scope_description?: string;
+          price_tiers?: Record<string, unknown>[];
+          deposit_pct?: number | null;
+          delivery_days?: number | null;
+          revisions_max?: number | null;
+          tags?: Record<string, unknown>;
+          default_usage_scope?: string | null;
+          refund_policy?: { before_draft: number; draft_pending: number; draft_approved: number; delivered: number } | null;
+          lost_contact_days?: number;
+          accepted_content?: string | null;
+          rejected_content?: string | null;
+          is_private?: boolean;
+        };
+        // is_accepting_orders CỐ Ý không có ở Update — chỉ set qua
+        // service-layer sau khi validate 11 trường, xem ghi chú Row ở trên.
+        Update: Partial<
+          Omit<Database["public"]["Tables"]["service_listings"]["Insert"], "seller_id">
+        > & { is_accepting_orders?: boolean; updated_at?: string };
+        Relationships: [];
+      };
+      service_samples: {
+        Row: {
+          id: string;
+          listing_id: string;
+          source: "upload" | "auto" | "external";
+          file_url: string;
+          unverified_external: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          source?: "upload" | "auto" | "external";
+          file_url: string;
+          unverified_external?: boolean;
+        };
+        Update: never; // gỡ/thêm lại = delete/insert, không update.
+        Relationships: [];
+      };
+      orders: {
+        Row: {
+          id: string;
+          code: string;
+          buyer_id: string;
+          seller_id: string;
+          listing_id: string;
+          status: OrderStatus;
+          usage_scope: "personal" | "commercial_limited" | "commercial_full" | null;
+          scope_note: string | null;
+          brief: string;
+          brief_locked_at: string | null;
+          price: number;
+          paid: number;
+          deposit_pct: number;
+          revisions_max: number;
+          revisions_used: number;
+          draft_number: number;
+          drafts_approved: number;
+          delivered_at: string | null;
+          auto_confirm_at: string | null;
+          completed_at: string | null;
+          cancelled_at: string | null;
+          tos_snapshot: Record<string, unknown>;
+          // migrations/20260901_add_service_tag_catalog.sql — 1 đơn
+          // completed có được dùng làm sample tự động (Mục 2.2) hay đưa
+          // vào bảng xếp hạng/gợi ý hay không. Toggle route chưa làm ở
+          // Phase 2 (thuộc Module 4/6) — cột có sẵn để truy vấn "auto"
+          // sample ngay, KHÔNG route nào set giá trị khác false hiện tại.
+          is_private: boolean;
+          // Chỉ đơn ghostwriting mới gắn — biết đang viết cho đúng truyện
+          // nào (route attach-book). Xem
+          // migrations/20260901_add_manuscript_share.sql.
+          book_id: string | null;
+          created_at: string;
+        };
+        // Rows chỉ được tạo/sửa qua các RPC ở Functions (create_order,
+        // record_order_payment, deliver_order, confirm_order_received...) —
+        // xem ghi chú ở transactions.Insert bên dưới, lý do y hệt.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      order_events: {
+        Row: {
+          id: string;
+          order_id: string;
+          event_type: string;
+          actor_id: string | null; // null = hệ thống/cron
+          payload: Record<string, unknown>;
+          created_at: string;
+        };
+        // Bất biến — chỉ các RPC ở orders mới insert (INSERT bên trong
+        // cùng transaction với UPDATE orders), không route nào insert
+        // thẳng bảng này.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Danh mục tag cố định cho service_listings (Mục 2.2 đặc tả) — xem
+      // migrations/20260901_add_service_tag_catalog.sql.
+      service_tag_options: {
+        Row: {
+          id: string;
+          service_type: ServiceType;
+          group_key: string;
+          group_label: string;
+          label: string;
+          sort_order: number;
+          created_at: string;
+        };
+        // Không route nào insert/update trực tiếp — chỉ ghi qua duyệt
+        // service_tag_suggestions (service-role, phase admin review) hoặc
+        // thao tác tay trong SQL Editor.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      service_tag_suggestions: {
+        Row: {
+          id: string;
+          submitted_by: string;
+          service_type: ServiceType;
+          group_key: string;
+          label: string;
+          status: "pending" | "approved" | "rejected";
+          resolved_by: string | null;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          submitted_by: string;
+          service_type: ServiceType;
+          group_key: string;
+          label: string;
+        };
+        Update: { status?: "pending" | "approved" | "rejected"; resolved_by?: string | null; resolved_at?: string | null };
+        Relationships: [];
+      };
+      // Share bản thảo kiểu Drive (yêu cầu bổ sung #1) — xem
+      // migrations/20260901_add_manuscript_share.sql. Tối đa 1 dòng ĐANG
+      // HOẠT ĐỘNG (revoked_at is null and locked_at is null) mỗi book_id,
+      // ép bằng partial unique index — không phải check ở app.
+      manuscript_access_grants: {
+        Row: {
+          id: string;
+          book_id: string;
+          order_id: string | null;
+          granted_to_user_id: string;
+          granted_by_user_id: string;
+          granted_at: string;
+          revoked_at: string | null;
+          locked_at: string | null;
+        };
+        // Insert qua RLS-scoped client (chủ sách tự grant) HOẶC qua RPC
+        // attach_order_book (ghostwriting) — cả 2 đều là insert thật, giữ
+        // Insert có shape thay vì never.
+        Insert: {
+          id?: string;
+          book_id: string;
+          order_id?: string | null;
+          granted_to_user_id: string;
+          granted_by_user_id: string;
+        };
+        // Chỉ revoked_at nằm trong GRANT cho authenticated — locked_at chỉ
+        // trigger lock_manuscript_grants_on_finalize set được.
+        Update: { revoked_at?: string | null };
+        Relationships: [];
+      };
+      // Bàn giao illustration/voice (Mục 4.1-4.2) — xem
+      // migrations/20260901_add_order_delivery_assets.sql. ghostwriting
+      // dùng manuscript_access_grants (không cần asset ở đây).
+      order_delivered_assets: {
+        Row: {
+          id: string;
+          order_id: string;
+          kind: "illustration_preview" | "illustration_original" | "voice_stream" | "voice_original";
+          storage_path: string;
+          created_at: string;
+        };
+        // KHÔNG qua RPC (khác orders/order_events) — watermark xử lý bằng
+        // sharp ở tầng Next.js route (src/app/api/orders/[orderId]/deliver),
+        // Postgres không xử lý ảnh được. Chỉ route đó (service-role) insert.
+        Insert: { id?: string; order_id: string; kind: string; storage_path: string };
+        Update: never;
+        Relationships: [];
+      };
+      order_file_requests: {
+        Row: {
+          id: string;
+          order_id: string;
+          requested_by: string;
+          status: "pending" | "agreed" | "declined";
+          created_at: string;
+          resolved_at: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Tính hoàn tiền + hủy đơn (Mục 5.1) — xem
+      // migrations/20260901_add_order_cancel_system.sql.
+      order_cancel_requests: {
+        Row: {
+          id: string;
+          order_id: string;
+          requested_by: string;
+          cancelled_by: "buyer" | "seller";
+          refund_amount: number;
+          status: "pending" | "agreed" | "declined";
+          created_at: string;
+          resolved_at: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Đứng tên tác giả thay (Module 5 đặc tả) — xem
+      // migrations/20260901_add_ghostwriting_authorship.sql.
+      author_name_agreements: {
+        Row: {
+          id: string;
+          order_id: string;
+          book_id: string;
+          ghostwriter_id: string;
+          ghostwriter_confirmed_at: string | null;
+          ghostwriter_statement_text: string | null;
+          customer_id: string;
+          customer_confirmed_at: string | null;
+          customer_statement_text: string | null;
+          author_display_choice: "customer_name" | "co_authorship";
+          ghostwriter_sample_visible: boolean;
+          customer_profile_visible: boolean;
+          created_at: string;
+        };
+        // Chỉ ghi qua initiate_author_name_agreement()/
+        // confirm_author_name_agreement() (RPC) — bất biến sau khi đủ 2
+        // xác nhận, không route nào update/insert trực tiếp.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Báo cáo vi phạm/Tranh chấp (Module 9 đặc tả) — xem
+      // migrations/20260901_add_trust_and_disputes.sql.
+      disputes: {
+        Row: {
+          id: string;
+          order_id: string;
+          reporter_id: string;
+          reason_category: string;
+          description: string;
+          status: "open" | "resolved";
+          evidence_snapshot: Record<string, unknown>;
+          resolution_note: string | null;
+          at_fault_user_id: string | null;
+          resolved_by: string | null;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        // Chỉ ghi qua open_dispute()/resolve_dispute() (RPC).
+        Insert: never;
         Update: never;
         Relationships: [];
       };
@@ -1100,6 +1467,142 @@ export type Database = {
           p_max_resets_per_day: number;
         };
         Returns: Database["public"]["Tables"]["user_quest_pool"]["Row"];
+      };
+      // Hệ thống giao dịch commission — xem
+      // migrations/20260901_add_order_system_core.sql (nguồn sự thật cho
+      // thân hàm, không lặp lại logic ở đây).
+      create_order: {
+        Args: {
+          p_buyer_id: string;
+          p_seller_id: string;
+          p_listing_id: string;
+          p_price: number;
+          p_deposit_pct: number;
+          p_revisions_max: number;
+          p_tos_snapshot: Record<string, unknown>;
+        };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      set_order_scope: {
+        Args: {
+          p_order_id: string;
+          p_actor_id: string;
+          p_usage_scope: string;
+          p_scope_note?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      set_order_brief: {
+        Args: { p_order_id: string; p_actor_id: string; p_brief: string };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      confirm_order_brief: {
+        Args: { p_order_id: string; p_actor_id: string };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      record_order_payment: {
+        Args: { p_order_id: string; p_actor_id: string; p_amount: number };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      submit_order_draft: {
+        Args: { p_order_id: string; p_actor_id: string; p_asset: Record<string, unknown> };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      approve_order_draft: {
+        Args: { p_order_id: string; p_actor_id: string };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      request_order_revision: {
+        Args: { p_order_id: string; p_actor_id: string; p_note?: string | null };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      deliver_order: {
+        Args: { p_order_id: string; p_actor_id: string; p_asset?: Record<string, unknown> | null };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      confirm_order_received: {
+        Args: {
+          p_order_id: string;
+          p_actor_id?: string | null;
+          p_is_system?: boolean | null;
+          p_hold_days?: number | null;
+        };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      attach_order_book: {
+        Args: { p_order_id: string; p_actor_id: string; p_book_id: string };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      request_order_file: {
+        Args: { p_order_id: string; p_actor_id: string };
+        Returns: Database["public"]["Tables"]["order_file_requests"]["Row"];
+      };
+      resolve_order_file_request: {
+        Args: { p_request_id: string; p_actor_id: string; p_agree: boolean };
+        Returns: Database["public"]["Tables"]["order_file_requests"]["Row"];
+      };
+      calculate_refund: {
+        Args: { p_order_id: string; p_cancelled_by: "buyer" | "seller" };
+        Returns: {
+          stage: string | null;
+          pct: number;
+          refund_amount: number;
+          seller_amount: number;
+          cancelled_by: string;
+          // true = số này lấy từ bảng % sàn của Nền tảng (seller chưa tự
+          // khai đủ cho mốc/vai trò này) — xem
+          // migrations/20260901_add_order_refund_minimum_table.sql.
+          used_platform_minimum: boolean;
+        };
+      };
+      request_order_cancel: {
+        Args: { p_order_id: string; p_actor_id: string };
+        Returns: Database["public"]["Tables"]["order_cancel_requests"]["Row"];
+      };
+      resolve_order_cancel_request: {
+        Args: { p_request_id: string; p_actor_id: string; p_agree: boolean };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      record_order_reminder: {
+        Args: { p_order_id: string; p_actor_id: string; p_target_user_id: string };
+        Returns: Database["public"]["Tables"]["order_events"]["Row"];
+      };
+      record_lost_contact_report: {
+        Args: { p_order_id: string; p_actor_id: string };
+        Returns: Database["public"]["Tables"]["order_events"]["Row"];
+      };
+      initiate_author_name_agreement: {
+        Args: {
+          p_order_id: string;
+          p_actor_id: string;
+          p_choice: "customer_name" | "co_authorship";
+          p_ghostwriter_sample_visible?: boolean | null;
+          p_customer_profile_visible?: boolean | null;
+        };
+        Returns: Database["public"]["Tables"]["author_name_agreements"]["Row"];
+      };
+      confirm_author_name_agreement: {
+        Args: { p_agreement_id: string; p_actor_id: string };
+        Returns: Database["public"]["Tables"]["author_name_agreements"]["Row"];
+      };
+      recalculate_trust_score: {
+        Args: { p_user_id: string };
+        Returns: Database["public"]["Tables"]["profiles"]["Row"];
+      };
+      open_dispute: {
+        Args: { p_order_id: string; p_reporter_id: string; p_reason_category: string; p_description: string };
+        Returns: Database["public"]["Tables"]["disputes"]["Row"];
+      };
+      resolve_dispute: {
+        Args: {
+          p_dispute_id: string;
+          p_admin_id: string;
+          p_resolution_note: string;
+          p_at_fault_user_id?: string | null;
+          p_resume_status?: OrderStatus | null;
+          p_refund_amount?: number | null;
+        };
+        Returns: Database["public"]["Tables"]["disputes"]["Row"];
       };
     };
   };

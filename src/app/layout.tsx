@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RoleProvider } from "@/lib/role";
 import "./globals.css";
 
@@ -20,6 +22,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="vi" className={`${beVietnamPro.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-white font-sans text-ink">
         <RoleProvider>{children}</RoleProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
