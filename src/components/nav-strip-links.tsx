@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MegaMenu, type MegaMenuColumn } from "@/components/mega-menu";
+import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 
 export type NavKey = "home" | "audio" | "blog" | "design" | "connect" | "rankings";
 
@@ -17,11 +18,17 @@ const NAV_ITEMS: NavItem[] = [
   { key: "rankings", label: "Bảng xếp hạng", href: "/rankings" },
 ];
 
-// Đúng nội dung mega-menu trong Vịnh Trang chủ.dc.html (.vn-mega/.vn-pop)
-// — CHỈ Audio/Thiết kế có dropdown này, "Truyện chữ" giữ nguyên không đổi
-// (yêu cầu ban đầu: giữ thể loại truyện chữ như hiện tại, không theo
-// thiết kế cho mục này).
+// Audio/Thiết kế: đúng nội dung mega-menu trong Vịnh Trang chủ.dc.html
+// (.vn-mega/.vn-pop). "Truyện chữ": KHÔNG lấy nội dung design mock — dùng
+// BOOK_GENRES (src/lib/covers/genre-styles.ts, nguồn thể loại DUY NHẤT
+// của hệ thống) để giữ đúng yêu cầu ban đầu "giữ thể loại truyện chữ như
+// hiện tại", chỉ thêm hiển thị hover đang thiếu chứ không đổi danh sách
+// thể loại. Mọi mục (kể cả từng thể loại) đều trỏ về `href` KHÔNG lọc —
+// giống hệt cách Audio/Thiết kế đang làm (chưa có route lọc theo thể
+// loại/loại hình thật), nên bấm vào tiêu đề hay bấm vào 1 mục con đều ra
+// cùng 1 trang "tất cả", không có mục nào lọc ra kết quả khác nhau.
 const MEGA_MENUS: Partial<Record<NavKey, MegaMenuColumn[]>> = {
+  home: [{ title: "Thể loại", items: [...BOOK_GENRES] }],
   audio: [
     { title: "Lồng tiếng", items: ["Người kể chuyện", "Thoại nhân vật một giọng", "Thoại nhân vật nhiều giọng"] },
     { title: "Nhạc cụ", items: ["Sáo", "Piano", "Trống"] },

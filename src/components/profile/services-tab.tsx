@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   PaletteIcon,
   WaveformIcon,
@@ -143,7 +144,22 @@ export function ServicesTab() {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
   const [pending, setPending] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // Menu "..." render qua portal ra document.body (đúng lý do như
+  // MegaMenu — src/components/mega-menu.tsx) vì danh sách dịch vụ nằm
+  // trong khung overflow-hidden để bo góc, nên absolute tại chỗ sẽ bị cắt
+  // mất khi dropdown cao hơn phần còn lại của bảng bên dưới.
+  const [openMenu, setOpenMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = () => setOpenMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [openMenu]);
 
   const loadListings = () =>
     fetch("/api/profile/services")
@@ -384,51 +400,63 @@ export function ServicesTab() {
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setOpenMenuId((cur) => (cur === l.id ? null : l.id))}
+                    onClick={(e) => {
+                      if (openMenu?.id === l.id) {
+                        setOpenMenu(null);
+                        return;
+                      }
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setOpenMenu({ id: l.id, top: rect.bottom + 6, left: rect.right - 178 });
+                    }}
                     className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-cream text-stone-dark hover:bg-cream-card"
                   >
                     <DotsThreeVerticalIcon size={16} weight="bold" />
                   </button>
-                  {openMenuId === l.id && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                      <div className="absolute right-0 top-9 z-20 min-w-[178px] rounded-xl border border-cream bg-white p-1 shadow-lg">
-                        <RowMenuItem
-                          icon={<PencilSimpleIcon size={15} weight="bold" />}
-                          label="Sửa dịch vụ"
-                          onClick={() => {
-                            openListing(l.id);
-                            setOpenMenuId(null);
-                          }}
-                        />
-                        <RowMenuItem
-                          icon={l.is_accepting_orders ? <PauseIcon size={15} weight="bold" /> : <PlayIcon size={15} weight="bold" />}
-                          label={l.is_accepting_orders ? "Tắt nhận đơn" : "Bật nhận đơn"}
-                          onClick={() => {
-                            toggleAcceptingFor(l);
-                            setOpenMenuId(null);
-                          }}
-                        />
-                        <RowMenuItem
-                          icon={<CopyIcon size={15} weight="bold" />}
-                          label="Nhân bản"
-                          onClick={() => {
-                            void duplicateListing(l);
-                            setOpenMenuId(null);
-                          }}
-                        />
-                        <RowMenuItem
-                          icon={<TrashIcon size={15} weight="bold" />}
-                          label="Xóa dịch vụ"
-                          danger
-                          onClick={() => {
-                            void deleteListing(l);
-                            setOpenMenuId(null);
-                          }}
-                        />
-                      </div>
-                    </>
-                  )}
+                  {openMenu?.id === l.id &&
+                    createPortal(
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(null)} />
+                        <div
+                          style={{ position: "fixed", top: openMenu.top, left: openMenu.left, zIndex: 50 }}
+                          className="min-w-[178px] rounded-xl border border-cream bg-white p-1 shadow-[0_12px_30px_rgba(20,59,77,0.14)]"
+                        >
+                          <RowMenuItem
+                            icon={<PencilSimpleIcon size={15} weight="bold" />}
+                            label="Sửa dịch vụ"
+                            onClick={() => {
+                              openListing(l.id);
+                              setOpenMenu(null);
+                            }}
+                          />
+                          <RowMenuItem
+                            icon={l.is_accepting_orders ? <PauseIcon size={15} weight="bold" /> : <PlayIcon size={15} weight="bold" />}
+                            label={l.is_accepting_orders ? "Tắt nhận đơn" : "Bật nhận đơn"}
+                            onClick={() => {
+                              toggleAcceptingFor(l);
+                              setOpenMenu(null);
+                            }}
+                          />
+                          <RowMenuItem
+                            icon={<CopyIcon size={15} weight="bold" />}
+                            label="Nhân bản"
+                            onClick={() => {
+                              void duplicateListing(l);
+                              setOpenMenu(null);
+                            }}
+                          />
+                          <RowMenuItem
+                            icon={<TrashIcon size={15} weight="bold" />}
+                            label="Xóa dịch vụ"
+                            danger
+                            onClick={() => {
+                              void deleteListing(l);
+                              setOpenMenu(null);
+                            }}
+                          />
+                        </div>
+                      </>,
+                      document.body
+                    )}
                 </div>
               </div>
             );
