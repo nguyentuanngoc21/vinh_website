@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { AuthorWorkspace } from "@/components/author/author-workspace";
+import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 
 export async function generateMetadata({
   params,
@@ -59,6 +60,8 @@ export default async function AuthorChapterPage({
     notFound();
   }
 
+  const linkedAudio = await getChapterAudio(supabase, chapter.id);
+
   return (
     <AuthorWorkspace
       bookId={book.id}
@@ -70,6 +73,7 @@ export default async function AuthorChapterPage({
       bookIsExclusive={book.is_exclusive}
       bookPublishedAt={book.published_at}
       chapter={chapter}
+      linkedAudio={linkedAudio}
     />
   );
 }

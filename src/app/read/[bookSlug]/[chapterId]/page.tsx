@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { Reader } from "@/components/reading/reader";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 
 export async function generateMetadata({
   params,
@@ -41,19 +42,21 @@ export default async function ReadChapterPage({
   // (src/lib/wallet/session.ts) — nhất quán với các route khác trong repo
   // (penalty, wallet), thay vì chỉ supabase.auth.getUser(). Resolve 1 lần,
   // dùng lại cho cả render (vote/follow đã có chưa) và after() (book_progress).
-  const [{ data: authorProfile }, { data: siblings }, { data: voteCountRow }, viewerId] = await Promise.all([
-    supabase.from("author_public_profiles").select("nickname, avatar_url").eq("id", book.author_id).maybeSingle(),
-    // Lấy luôn `title` — dùng chung cho tính prev/next VÀ danh sách chọn
-    // chương (ChapterPicker), không thêm 1 query riêng cho việc đó.
-    supabase
-      .from("chapters")
-      .select("id, title, order_index")
-      .eq("book_id", book.id)
-      .eq("published", true)
-      .order("order_index", { ascending: true }),
-    supabase.from("chapter_vote_counts").select("vote_count").eq("chapter_id", chapter.id).maybeSingle(),
-    getAuthedUserId(serviceClient),
-  ]);
+  const [{ data: authorProfile }, { data: siblings }, { data: voteCountRow }, viewerId, linkedAudio] =
+    await Promise.all([
+      supabase.from("author_public_profiles").select("nickname, avatar_url").eq("id", book.author_id).maybeSingle(),
+      // Lấy luôn `title` — dùng chung cho tính prev/next VÀ danh sách chọn
+      // chương (ChapterPicker), không thêm 1 query riêng cho việc đó.
+      supabase
+        .from("chapters")
+        .select("id, title, order_index")
+        .eq("book_id", book.id)
+        .eq("published", true)
+        .order("order_index", { ascending: true }),
+      supabase.from("chapter_vote_counts").select("vote_count").eq("chapter_id", chapter.id).maybeSingle(),
+      getAuthedUserId(serviceClient),
+      getChapterAudio(supabase, chapter.id),
+    ]);
 
   const ordered = siblings ?? [];
   const idx = ordered.findIndex((c) => c.id === chapter.id);
@@ -114,6 +117,7 @@ export default async function ReadChapterPage({
       chapters={ordered.map((c, i) => ({ id: c.id, title: c.title, position: i + 1 }))}
       initialVoted={!!votedRow}
       initialVoteCount={voteCountRow?.vote_count ?? 0}
+      linkedAudio={linkedAudio}
     />
   );
 }

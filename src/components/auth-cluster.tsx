@@ -10,7 +10,13 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 
-export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: string }) {
+export function AuthCluster({
+  ctaLabel = "Viết truyện",
+  ctaHref = "/author/new",
+}: {
+  ctaLabel?: string;
+  ctaHref?: string;
+}) {
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -46,7 +52,7 @@ export function AuthCluster({ ctaLabel = "Viết truyện" }: { ctaLabel?: strin
         // chỉ thật sự được tạo lúc bấm Lưu/Xuất bản lần đầu ở đó (xem
         // new-work-workspace.tsx + POST /api/authoring/books).
         <Link
-          href="/author/new"
+          href={ctaHref}
           className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
         >
           {ctaLabel}

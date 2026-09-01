@@ -3,10 +3,16 @@
 import { CoinsIcon } from "@phosphor-icons/react/dist/ssr";
 import { CopyrightSettings } from "@/components/author/copyright-settings";
 import { TagInput } from "@/components/author/tag-input";
+import { ChapterAudioPanel } from "@/components/author/chapter-audio-panel";
 import { Field, GenreSelect } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
+import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 
 type PublishPanelProps = {
+  /** Rỗng ở /author/new — chương chưa thật sự tồn tại trong DB (chưa bấm
+   * Lưu nháp/Xuất bản lần đầu), nên chưa có gì để gắn audio vào cả. */
+  chapterId?: string;
+  linkedAudio?: AudioTrack[];
   published: boolean;
   saving: boolean;
   error: string | null;
@@ -40,6 +46,8 @@ type PublishPanelProps = {
  * có cách nào chọn genre cho sách.
  */
 export function PublishPanel({
+  chapterId = "",
+  linkedAudio = [],
   published,
   saving,
   error,
@@ -172,6 +180,11 @@ export function PublishPanel({
 
         <CopyrightSettings />
       </div>
+
+      {/* Chưa có chapterId thật (đang ở /author/new, chưa từng Lưu nháp/
+          Xuất bản) — chưa có gì để gắn audio vào, ẩn hẳn thay vì hiện 1
+          panel không hoạt động được. */}
+      {chapterId && <ChapterAudioPanel chapterId={chapterId} initialLinkedAudio={linkedAudio} />}
     </div>
   );
 }

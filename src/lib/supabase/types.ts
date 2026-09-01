@@ -21,6 +21,9 @@ export type CreatorTag =
 
 export type ContentSource = "independent" | "story_upload";
 
+// Xem migrations/20260901_add_design_item_gallery_metadata.sql.
+export type DesignItemCategory = "bia_truyen" | "minh_hoa" | "fan_art" | "poster_audio";
+
 // Dùng bởi hệ thống sinh bìa tự động (src/lib/covers/genre-styles.ts) khi
 // books.cover_design_item_id còn null. 10 giá trị = taxonomy CHÍNH THỨC
 // của nền tảng (migrations/20260825_update_book_genres.sql, thay cho 8
@@ -1231,6 +1234,10 @@ export type Database = {
           illustrator_id: string;
           title: string;
           image_url: string;
+          // Xem migrations/20260901_add_design_item_gallery_metadata.sql.
+          category: DesignItemCategory | null;
+          description: string | null;
+          share_count: number;
           source: ContentSource;
           // Chỉ chủ sở hữu select được cột này (RLS chặn người khác) —
           // không bao giờ hiện ở view public_design_items.
@@ -1242,9 +1249,19 @@ export type Database = {
           illustrator_id: string;
           title: string;
           image_url: string;
+          category?: DesignItemCategory | null;
+          description?: string | null;
+          share_count?: number;
           source?: ContentSource;
         };
         Update: Partial<Database["public"]["Tables"]["design_items"]["Insert"]>;
+        Relationships: [];
+      };
+      design_item_likes: {
+        Row: { design_item_id: string; user_id: string; created_at: string };
+        Insert: { design_item_id: string; user_id: string };
+        // Không update — chỉ insert (thích) hoặc delete (bỏ thích).
+        Update: never;
         Relationships: [];
       };
       audio_narrations: {
@@ -1254,6 +1271,9 @@ export type Database = {
           title: string;
           audio_url: string;
           duration_seconds: number | null;
+          // Xem migrations/20260901_add_audio_narration_hub_metadata.sql.
+          genre: BookGenre | null;
+          play_count: number;
           source: ContentSource;
           share_token: string;
           created_at: string;
@@ -1264,9 +1284,31 @@ export type Database = {
           title: string;
           audio_url: string;
           duration_seconds?: number | null;
+          genre?: BookGenre | null;
+          play_count?: number;
           source?: ContentSource;
         };
         Update: Partial<Database["public"]["Tables"]["audio_narrations"]["Insert"]>;
+        Relationships: [];
+      };
+      audio_progress: {
+        Row: {
+          user_id: string;
+          audio_narration_id: string;
+          position_seconds: number;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          audio_narration_id: string;
+          position_seconds?: number;
+          // upsert()'s ON CONFLICT DO UPDATE only touches columns present
+          // in the payload — updated_at's default now() applies at insert
+          // only, so callers set this explicitly on every save. See
+          // src/app/api/audio/progress/route.ts.
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["audio_progress"]["Insert"]>;
         Relationships: [];
       };
       chapter_audio_links: {
@@ -1309,9 +1351,17 @@ export type Database = {
           illustrator_id: string;
           title: string;
           image_url: string;
+          category: DesignItemCategory | null;
+          description: string | null;
           source: ContentSource;
+          share_count: number;
           created_at: string;
         };
+        Relationships: [];
+      };
+      // Xem migrations/20260901_add_design_item_gallery_metadata.sql.
+      design_item_like_counts: {
+        Row: { design_item_id: string; like_count: number };
         Relationships: [];
       };
       public_audio_narrations: {
@@ -1321,6 +1371,8 @@ export type Database = {
           title: string;
           audio_url: string;
           duration_seconds: number | null;
+          genre: BookGenre | null;
+          play_count: number;
           source: ContentSource;
           created_at: string;
         };
@@ -1349,6 +1401,16 @@ export type Database = {
     Functions: {
       increment_book_view_count: {
         Args: { p_book_id: string };
+        Returns: void;
+      };
+      // Xem migrations/20260901_add_design_item_gallery_metadata.sql /
+      // migrations/20260901_add_audio_narration_hub_metadata.sql.
+      increment_design_item_share_count: {
+        Args: { p_design_item_id: string };
+        Returns: void;
+      };
+      increment_audio_play_count: {
+        Args: { p_audio_narration_id: string };
         Returns: void;
       };
       apply_transaction: {

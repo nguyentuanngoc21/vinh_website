@@ -20,6 +20,8 @@ import { AuthorPanel } from "./author-panel";
 import { ReadingListModal } from "./reading-list-modal";
 import { shareOrCopy } from "@/lib/share";
 import { VinhMark } from "@/components/ui";
+import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
+import { useNowPlaying } from "@/lib/audio/now-playing-context";
 
 type ThemeName = "cream" | "sepia" | "dark";
 
@@ -269,6 +271,10 @@ export type ReaderProps = {
   chapters?: ReaderChapterSummary[];
   initialVoted?: boolean;
   initialVoteCount?: number;
+  /** Audio thật đã gắn cho chương này qua chapter_audio_links (xem
+   * src/lib/audio/get-chapter-audio.ts) — [] thì nút "Nghe" ẩn hẳn, không
+   * dẫn tới trình phát rỗng. */
+  linkedAudio?: AudioTrack[];
 };
 
 export function Reader({
@@ -291,8 +297,10 @@ export function Reader({
   chapters = [],
   initialVoted = false,
   initialVoteCount = 0,
+  linkedAudio = [],
 }: ReaderProps) {
   const router = useRouter();
+  const { play } = useNowPlaying();
   const [fontSize, setFontSize] = useState(19);
   const [theme, setTheme] = useState<ThemeName>("cream");
   const [lineHeight, setLineHeight] = useState(DEFAULT_LINE_HEIGHT);
@@ -322,6 +330,13 @@ export function Reader({
   // --- State cho chọn chương/vote/danh sách đọc/follow/share — hoàn toàn
   // mới, KHÔNG đụng tới state/effect hệ thống chống chụp màn hình ở trên. ---
   const [chapterPickerOpen, setChapterPickerOpen] = useState(false);
+  const [audioPickerOpen, setAudioPickerOpen] = useState(false);
+
+  const playChapterAudio = (track: AudioTrack) => {
+    play(track);
+    setAudioPickerOpen(false);
+    router.push("/audio/now-playing");
+  };
   const [voted, setVoted] = useState(initialVoted);
   const [voteCount, setVoteCount] = useState(initialVoteCount);
   const [voting, setVoting] = useState(false);
@@ -662,16 +677,56 @@ export function Reader({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-0.5 sm:gap-3.5">
-            <Link
-              href="/audio/now-playing"
-              aria-label="Nghe audio"
-              style={{ borderColor: c.hair, color: c.ink }}
-              className="flex size-11 items-center justify-center gap-2 rounded-full text-[13px] font-semibold no-underline transition-colors sm:h-auto sm:w-auto sm:border sm:px-[15px] sm:py-1.5 sm:hover:border-brand-ink"
-            >
-              <HeadphonesIcon size={20} className="sm:hidden" />
-              <HeadphonesIcon className="hidden sm:block" />
-              <span className="hidden sm:inline">Nghe</span>
-            </Link>
+            {/* Chỉ hiện khi chương này thật sự có audio gắn qua
+                chapter_audio_links (linkedAudio) — không dẫn tới trình
+                phát rỗng nữa. 1 bản thu: phát thẳng. Nhiều bản thu (nhiều
+                giọng đọc): mở panel chọn, cùng cơ chế loại-trừ với
+                chapterPickerOpen/panelOpen ở dưới. */}
+            {linkedAudio.length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Nghe audio"
+                  style={{ borderColor: c.hair, color: c.ink }}
+                  className="flex size-11 cursor-pointer items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-colors sm:h-auto sm:w-auto sm:border sm:px-[15px] sm:py-1.5 sm:hover:border-brand-ink"
+                  onClick={() => {
+                    if (linkedAudio.length === 1) {
+                      playChapterAudio(linkedAudio[0]);
+                      return;
+                    }
+                    setAudioPickerOpen((v) => !v);
+                    setChapterPickerOpen(false);
+                    setPanelOpen(false);
+                  }}
+                >
+                  <HeadphonesIcon size={20} className="sm:hidden" />
+                  <HeadphonesIcon className="hidden sm:block" />
+                  <span className="hidden sm:inline">Nghe</span>
+                </button>
+                {audioPickerOpen && linkedAudio.length > 1 && (
+                  <div
+                    style={{ background: c.barBg, borderColor: c.hair }}
+                    className="absolute right-0 top-[calc(100%+8px)] z-40 w-[240px] overflow-hidden rounded-2xl border shadow-[0_14px_34px_rgba(0,0,0,.16)]"
+                  >
+                    <div style={{ color: c.inkSoft }} className="px-4 pb-1.5 pt-3 text-[11px] font-semibold tracking-[.5px]">
+                      CHỌN GIỌNG ĐỌC
+                    </div>
+                    {linkedAudio.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => playChapterAudio(t)}
+                        style={{ color: c.ink }}
+                        className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left text-[13.5px] font-medium transition-colors hover:bg-black/5"
+                      >
+                        <HeadphonesIcon size={15} />
+                        {t.narratorName}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <button
               type="button"
               aria-label="Chọn chương"

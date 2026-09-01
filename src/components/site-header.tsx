@@ -11,6 +11,10 @@ type SiteHeaderProps = {
   showSearch?: boolean;
   searchPlaceholder?: string;
   ctaLabel?: string;
+  /** Where the CTA button goes — defaults to "viết truyện mới". Audio/Thiết
+   * kế pages override this to their own upload flow (/audio/new,
+   * /thiet-ke/new) so the label and destination actually match. */
+  ctaHref?: string;
 };
 
 export function SiteHeader({
@@ -18,6 +22,7 @@ export function SiteHeader({
   showSearch = true,
   searchPlaceholder = "Tìm truyện, tác giả…",
   ctaLabel = "Viết truyện",
+  ctaHref = "/author/new",
 }: SiteHeaderProps = {}) {
   return (
     <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11">
@@ -45,7 +50,7 @@ export function SiteHeader({
           size={21}
           className="cursor-default text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
         />
-        <AuthCluster ctaLabel={ctaLabel} />
+        <AuthCluster ctaLabel={ctaLabel} ctaHref={ctaHref} />
       </div>
     </header>
   );

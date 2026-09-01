@@ -4,11 +4,13 @@ import { BookCoverflow } from "@/components/book-coverflow";
 import { HeroTrending } from "@/components/hero-trending";
 import { RankingGenres } from "@/components/ranking-genres";
 import { NewWorksGrid } from "@/components/new-works-grid";
+import { AudioSpotlight } from "@/components/audio-spotlight";
 import { CopyrightBand } from "@/components/copyright-band";
 import { AuthorCta } from "@/components/author-cta";
 import { SiteFooter } from "@/components/site-footer";
 import { createClient } from "@/lib/supabase/server";
 import { getHomepageData } from "@/lib/home/get-homepage-books";
+import { getAudioCatalog } from "@/lib/audio/get-audio-catalog";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -18,7 +20,14 @@ const lora = Lora({
 
 export default async function Home() {
   const supabase = await createClient();
-  const { featured, trending, newest, weeklyRanking } = await getHomepageData(supabase);
+  const [{ featured, trending, newest, weeklyRanking }, audioTracks] = await Promise.all([
+    getHomepageData(supabase),
+    getAudioCatalog(supabase),
+  ]);
+  // "Nổi bật" = nghe nhiều nhất trong kho — thật, không còn hardcode "Vũng
+  // Vịnh Cuối Trời — Chương 14". Rỗng thì không render section, không bịa.
+  const spotlightTrack =
+    audioTracks.length > 0 ? [...audioTracks].sort((a, b) => b.playCount - a.playCount)[0] : null;
 
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
@@ -29,13 +38,7 @@ export default async function Home() {
           <HeroTrending book={trending} />
           <RankingGenres weeklyRanking={weeklyRanking} />
           <NewWorksGrid books={newest} />
-          {/* AudioSpotlight tạm bỏ khỏi trang chủ — nội dung của nó vẫn
-              hardcode cứng ("Vũng Vịnh Cuối Trời — Chương 14"), chưa nối
-              chapter_audio_links/audio_narrations thật. DevelopmentOverlay
-              (dùng cho /audio, /rankings, /blog) không hợp để bọc 1 section
-              giữa trang — nó pin theo VIEWPORT nên đè lên section khác khi
-              cuộn trang, không chỉ đè lên đúng AudioSpotlight. Thêm lại
-              <AudioSpotlight /> ở đây khi audio có data thật. */}
+          {spotlightTrack && <AudioSpotlight track={spotlightTrack} />}
           <CopyrightBand />
           <AuthorCta />
         </main>
