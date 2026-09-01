@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr";
 
 export type MegaMenuColumn = { title: string; items: string[] };
 
@@ -14,10 +15,20 @@ type MegaMenuProps = {
 };
 
 /**
- * Dropdown khi hover "Audio"/"Thiết kế" ở nav dùng chung (đúng thiết kế
- * Vịnh Trang chủ.dc.html — mega-menu .vn-mega/.vn-pop). "Truyện chữ" CỐ Ý
- * không có dropdown này — giữ nguyên như hiện tại theo yêu cầu ban đầu
- * (không đổi cách hiển thị thể loại), chỉ Audio/Thiết kế được thêm.
+ * Dropdown khi hover 1 mục ở nav dùng chung — Audio/Thiết kế lấy đúng nội
+ * dung mega-menu trong Vịnh Trang chủ.dc.html (.vn-mega/.vn-pop); "Truyện
+ * chữ" dùng danh sách thể loại THẬT của hệ thống (BOOK_GENRES, xem
+ * src/lib/covers/genre-styles.ts) thay vì nội dung design mock — bám đúng
+ * yêu cầu ban đầu "giữ thể loại truyện chữ như hiện tại", chỉ thêm phần
+ * hiển thị hover còn đang thiếu.
+ *
+ * Icon mũi tên (không dùng glyph Unicode "▾" nữa — render mờ/trông như
+ * dấu chấm ở size nhỏ tùy font) báo cho người dùng biết mục này có danh
+ * sách con khi hover; chỉ những mục truyền `columns` mới có icon này.
+ *
+ * `columns.length === 1` (trường hợp Truyện chữ — 1 danh sách thể loại
+ * phẳng, không chia 2 nhóm như Audio/Thiết kế) thì bỏ lưới 2 cột, dùng 1
+ * cột dọc cho gọn thay vì để trống nửa còn lại.
  *
  * Render qua createPortal vào document.body thay vì position:absolute
  * tại chỗ — nav strip cha có overflow-x-auto (cuộn ngang trên mobile),
@@ -52,7 +63,7 @@ export function MegaMenu({ label, href, triggerClassName, columns }: MegaMenuPro
         onMouseLeave={scheduleHide}
       >
         {label}
-        <span className={`text-[10px] transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+        <CaretDownIcon size={11} weight="bold" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </Link>
       {open &&
         createPortal(
@@ -60,9 +71,11 @@ export function MegaMenu({ label, href, triggerClassName, columns }: MegaMenuPro
             onMouseEnter={show}
             onMouseLeave={scheduleHide}
             style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 70 }}
-            className="min-w-[420px] rounded-2xl border border-cream bg-white p-6 shadow-[0_18px_44px_rgba(20,59,77,0.18)]"
+            className={`rounded-2xl border border-cream bg-white p-6 shadow-[0_18px_44px_rgba(20,59,77,0.18)] ${
+              columns.length > 1 ? "min-w-[420px]" : "min-w-[240px]"
+            }`}
           >
-            <div className="grid grid-cols-2 gap-8">
+            <div className={columns.length > 1 ? "grid grid-cols-2 gap-8" : "flex flex-col"}>
               {columns.map((col) => (
                 <div key={col.title}>
                   <div className="mb-3 text-[13.5px] font-bold text-brand-ink">{col.title}</div>
