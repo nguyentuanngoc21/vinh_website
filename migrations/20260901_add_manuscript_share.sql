@@ -15,7 +15,7 @@ BEGIN;
 -- "Hoàn thiện" — khóa 1 chiều, giống hệt trigger prevent_unset_last_chapter
 -- (schema.sql phần 3) nhưng ở cấp BOOK thay vì chapter. Set 1 lần, không
 -- unset lại được.
-alter table public.books add column finalized_at timestamptz;
+alter table public.books add column if not exists finalized_at timestamptz;
 
 -- Client (authenticated) cần sửa được finalized_at qua RLS-scoped client
 -- (route mirror đúng pattern PATCH /api/authoring/books/[bookId] hiện có)
@@ -111,7 +111,7 @@ create trigger lock_manuscript_grants_on_finalize_trigger
 -- đơn ghostwriting mới gắn book_id — route attach-book (phase này) validate
 -- listing.service_type = 'ghostwriting' + book.author_id = seller trước
 -- khi cho gắn.
-alter table public.orders add column book_id uuid references public.books (id);
+alter table public.orders add column if not exists book_id uuid references public.books (id);
 
 -- Gắn 1 truyện của seller vào 1 đơn ghostwriting VÀ cấp quyền xem cho
 -- buyer CÙNG LÚC, atomically — Mục 4.3 đặc tả: "Nút Cấp quyền xem chỉ có

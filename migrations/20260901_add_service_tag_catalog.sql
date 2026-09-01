@@ -86,7 +86,7 @@ create index service_tag_suggestions_status_idx on public.service_tag_suggestion
 -- 1 trong 2 bên chủ động đánh dấu riêng tư (UI đánh dấu này thuộc phase
 -- Module 4/6, cột thêm ở đây trước để Phase 2 truy vấn "auto" query được
 -- ngay, không phải rồi lại ALTER TABLE lần nữa).
-alter table public.orders add column is_private boolean not null default false;
+alter table public.orders add column if not exists is_private boolean not null default false;
 
 COMMIT;
 

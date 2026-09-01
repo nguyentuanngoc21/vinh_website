@@ -8,6 +8,7 @@ import {
   PlusCircleIcon,
   ArrowLeftIcon,
   TrashIcon,
+  WarningCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Field, Alert, Checkbox } from "@/components/ui";
 
@@ -20,7 +21,9 @@ type Listing = {
   deposit_pct: number | null;
   delivery_days: number | null;
   revisions_max: number | null;
-  tags: Record<string, string[]>;
+  // multi-select group -> string[]; single-select group (multi:false, vd
+  // "Mức độ hoàn thiện") -> string. Xem TagGroup bên dưới.
+  tags: Record<string, string[] | string>;
   default_usage_scope: string | null;
   refund_policy: { before_draft: number; draft_pending: number; draft_approved: number; delivered: number } | null;
   lost_contact_days: number;
@@ -31,7 +34,18 @@ type Listing = {
 };
 
 type Sample = { id: string; file_url: string; source: string; unverified_external: boolean };
-type TagGroup = { key: string; label: string; options: string[] };
+// Đối chiếu TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html — "4 tầng
+// thẻ", không phải danh sách phẳng. multi=false (vd "Mức độ hoàn thiện")
+// chỉ chọn được đúng 1 lựa chọn.
+type TagGroup = {
+  key: string;
+  label: string;
+  tier: string | null;
+  rule: string | null;
+  multi: boolean;
+  optional: boolean;
+  options: { label: string; warnText: string | null }[];
+};
 type MissingField = { key: string; label: string };
 
 const TYPE_META = {
@@ -130,11 +144,17 @@ export function ServicesTab() {
     }
   };
 
-  const toggleTag = (groupKey: string, label: string) => {
+  const toggleTag = (group: TagGroup, label: string) => {
     if (!selected) return;
-    const current = selected.tags[groupKey] ?? [];
+    if (!group.multi) {
+      // Chọn 1 (vd "Mức độ hoàn thiện") — bấm lại lựa chọn đang chọn thì bỏ chọn.
+      const current = selected.tags[group.key];
+      patch({ tags: { ...selected.tags, [group.key]: current === label ? "" : label } });
+      return;
+    }
+    const current = (selected.tags[group.key] as string[] | undefined) ?? [];
     const next = current.includes(label) ? current.filter((v) => v !== label) : [...current, label];
-    patch({ tags: { ...selected.tags, [groupKey]: next } });
+    patch({ tags: { ...selected.tags, [group.key]: next } });
   };
 
   const uploadSample = async (file: File) => {
@@ -329,28 +349,46 @@ export function ServicesTab() {
           </div>
         </div>
 
-        {tagGroups.map((g) => (
-          <div key={g.key}>
-            <div className="mb-1.5 text-[13px] font-semibold text-slate">{g.label}</div>
-            <div className="flex flex-wrap gap-1.5">
-              {g.options.map((label) => {
-                const checked = (selected.tags[g.key] ?? []).includes(label);
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => toggleTag(g.key, label)}
-                    className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium ${
-                      checked ? "border-brand-ink bg-brand-ink text-white" : "border-cream text-ink"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+        {tagGroups.map((g) => {
+          const currentVal = selected.tags[g.key];
+          const isChecked = (label: string) => (g.multi ? ((currentVal as string[] | undefined) ?? []).includes(label) : currentVal === label);
+          const activeWarning = g.options.find((o) => o.warnText && isChecked(o.label))?.warnText ?? null;
+          return (
+            <div key={g.key}>
+              <div className="flex flex-wrap items-center gap-2">
+                {g.tier && (
+                  <span className="rounded-full bg-neutral-bg px-2.5 py-0.5 text-[11px] font-bold text-stone-dark">{g.tier}</span>
+                )}
+                <span className="text-[13px] font-semibold text-slate">{g.label}</span>
+                {g.optional && <span className="text-[11px] text-stone-light">(không bắt buộc riêng)</span>}
+              </div>
+              {g.rule && <div className="mt-0.5 text-[11.5px] leading-[1.5] text-stone-light">{g.rule}</div>}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {g.options.map((o) => {
+                  const checked = isChecked(o.label);
+                  return (
+                    <button
+                      key={o.label}
+                      type="button"
+                      onClick={() => toggleTag(g, o.label)}
+                      className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium ${
+                        checked ? "border-brand-ink bg-brand-ink text-white" : "border-cream text-ink"
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {activeWarning && (
+                <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#F0D9B5] bg-[#FDF3E7] px-3 py-2">
+                  <WarningCircleIcon weight="fill" size={15} className="mt-0.5 shrink-0 text-[#A9781A]" />
+                  <div className="text-[11.5px] leading-[1.6] text-[#7a5a12]">{activeWarning}</div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

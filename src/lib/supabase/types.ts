@@ -622,6 +622,13 @@ export type Database = {
           label: string;
           sort_order: number;
           created_at: string;
+          // Đối chiếu TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html —
+          // xem migrations/20260901_add_service_tag_option_metadata.sql.
+          tier: string | null;
+          rule: string | null;
+          multi: boolean;
+          optional: boolean;
+          warn_text: string | null;
         };
         // Không route nào insert/update trực tiếp — chỉ ghi qua duyệt
         // service_tag_suggestions (service-role, phase admin review) hoặc
