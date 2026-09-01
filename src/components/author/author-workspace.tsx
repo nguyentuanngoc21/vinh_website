@@ -6,6 +6,7 @@ import { PublishPanel } from "@/components/author/publish-panel";
 import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import type { BookGenre } from "@/lib/supabase/types";
+import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 
 export type WorkspaceChapter = {
   id: string;
@@ -28,6 +29,7 @@ type AuthorWorkspaceProps = {
   bookIsExclusive: boolean;
   bookPublishedAt: string | null;
   chapter: WorkspaceChapter;
+  linkedAudio: AudioTrack[];
 };
 
 /**
@@ -47,6 +49,7 @@ export function AuthorWorkspace({
   bookIsExclusive,
   bookPublishedAt,
   chapter,
+  linkedAudio,
 }: AuthorWorkspaceProps) {
   const [bookTitle, setBookTitle] = useState(initialBookTitle);
   // Server truyền trạng thái published của SÁCH lúc trang tải — chương
@@ -222,6 +225,8 @@ export function AuthorWorkspace({
         bookPublished={isBookPublished}
       />
       <PublishPanel
+        chapterId={chapter.id}
+        linkedAudio={linkedAudio}
         published={published}
         saving={saving}
         error={error}

@@ -12,12 +12,22 @@
 -- from book_read_counts_daily, a day-bucketed public aggregate over
 -- reading_history (see that view's comment, and
 -- migrations/20260831_add_book_read_counts_daily.sql); the all-time board
--- still ranks by books.view_count directly. Still NOT modeled: blog, and
--- /rankings' "Audio"/"Blog" tabs — those remain mock data in
--- src/lib/rankings-data.ts and src/lib/blog.ts (the connect directory's
--- "Blog" section was removed from the UI rather than shown with
--- fabricated numbers, see src/components/connect/connect-directory.tsx);
--- add a table for it the same way as you wire that section up for real.
+-- still ranks by books.view_count directly. /audio and /thiet-ke are real
+-- now too (src/lib/audio/get-audio-catalog.ts,
+-- src/lib/design/get-design-gallery.ts) — design_items grew
+-- category/description/share_count + a design_item_likes table
+-- (migrations/20260901_add_design_item_gallery_metadata.sql),
+-- audio_narrations grew genre/play_count + an audio_progress table for
+-- real "Nghe tiếp"/"Audio đang nghe" state
+-- (migrations/20260901_add_audio_narration_hub_metadata.sql), and both
+-- gained independent-upload routes (/thiet-ke/new, /audio/new) since
+-- neither table ever got a row outside the book-cover/story_upload flow
+-- before that. Still NOT modeled: blog — src/lib/blog.ts and /rankings'
+-- "Audio"/"Blog" tabs (src/lib/rankings-data.ts) remain mock data, and the
+-- connect directory's "Blog" section stays removed from the UI rather than
+-- shown with fabricated numbers (src/components/connect/connect-directory.tsx);
+-- add a blog_posts table the same way as you wire that section up for
+-- real.
 --
 -- Run with: supabase db push  (or paste into the SQL editor)
 
@@ -1357,6 +1367,28 @@ create policy "users manage their own book progress"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- --- "Đang nghe dở" cho Audio hub — cùng shape/lý do với book_progress ở
+-- trên, nhưng cho audio_narrations thay vì books/chapters: 1 dòng/(user,
+-- audio), upsert khi lưu (không phải log append-only). Powers "Audio đang
+-- nghe" (dòng updated_at mới nhất) và "Nghe tiếp" (vài dòng kế tiếp) trên
+-- /audio bằng dữ liệu thật — không có dòng nào thì không hiện gì, không
+-- bịa số. Xem migrations/20260901_add_audio_narration_hub_metadata.sql. ---
+create table public.audio_progress (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
+  position_seconds integer not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, audio_narration_id),
+  constraint audio_progress_position_seconds_check check (position_seconds >= 0)
+);
+
+alter table public.audio_progress enable row level security;
+
+create policy "users manage their own audio progress"
+  on public.audio_progress for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 -- --- "Danh sách đọc" kiểu playlist YouTube — mỗi danh sách chứa nguyên
 -- SÁCH (không phải chương lẻ), 1 user có nhiều danh sách. 2 bảng, giống
 -- quan hệ books/chapters: 1 bảng cha (metadata danh sách) + 1 bảng con FK
@@ -1487,11 +1519,20 @@ create table public.design_items (
   illustrator_id uuid not null references auth.users (id) on delete cascade,
   title text not null,
   image_url text not null, -- path trong bucket 'design-images'
+  -- Nullable: ảnh bìa tạo tự động qua luồng story_upload không hỏi họa sĩ
+  -- điền gì — chỉ nội dung đăng độc lập ở /thiet-ke/new mới bắt buộc chọn.
+  -- Xem migrations/20260901_add_design_item_gallery_metadata.sql.
+  category text,
+  description text,
+  share_count integer not null default 0,
   source public.content_source not null default 'independent',
   -- Chuỗi bí mật để chia sẻ quyền link — 48 ký tự hex (192 bit), không
   -- đoán được. Đừng lộ cột này ra bất kỳ view/API công khai nào.
   share_token text not null default encode(extensions.gen_random_bytes(24), 'hex'),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint design_items_share_count_check check (share_count >= 0),
+  constraint design_items_category_check
+    check (category is null or category in ('bia_truyen', 'minh_hoa', 'fan_art', 'poster_audio'))
 );
 
 alter table public.design_items enable row level security;
@@ -1517,8 +1558,43 @@ create policy "illustrators delete their own design items"
 -- View công khai cho trang "duyệt kho Thiết kế" — CỐ Ý không có
 -- share_token. Đây là view app dùng để hiện danh sách công khai.
 create view public.public_design_items as
-  select id, illustrator_id, title, image_url, source, created_at
+  select id, illustrator_id, title, image_url, source, created_at, category, description, share_count
   from public.design_items;
+
+-- Bảng riêng cho lượt thích (toggle, 1 dòng/(tác phẩm, người thích)) —
+-- cùng pattern "aggregate qua view riêng, bảng gốc owner-only RLS" như
+-- chapter_votes/chapter_vote_counts. Xem
+-- migrations/20260901_add_design_item_gallery_metadata.sql.
+create table public.design_item_likes (
+  design_item_id uuid not null references public.design_items (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (design_item_id, user_id)
+);
+
+create index design_item_likes_design_item_id_idx on public.design_item_likes (design_item_id);
+
+alter table public.design_item_likes enable row level security;
+
+create policy "users manage their own design item likes"
+  on public.design_item_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.design_item_like_counts as
+  select design_item_id, count(*)::integer as like_count
+  from public.design_item_likes
+  group by design_item_id;
+
+-- security definer: tăng share_count an toàn dưới race condition, không
+-- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 tác phẩm/lần gọi.
+-- Không yêu cầu đăng nhập, giống increment_book_view_count.
+create function public.increment_design_item_share_count(p_design_item_id uuid)
+returns void as $$
+  update public.design_items set share_count = share_count + 1 where id = p_design_item_id;
+$$ language sql security definer set search_path = public;
+
+grant execute on function public.increment_design_item_share_count(uuid) to anon, authenticated;
 
 -- --- Kho Audio ---
 create table public.audio_narrations (
@@ -1527,9 +1603,22 @@ create table public.audio_narrations (
   title text not null,
   audio_url text not null, -- path trong bucket 'audio-narrations'
   duration_seconds integer,
+  -- Người nghe chọn ở /audio/new; với audio gắn vào chương sách qua
+  -- chapter_audio_links, app tự điền lại từ genre của sách đó thay vì hỏi
+  -- 2 lần — xem src/lib/audio/get-audio-catalog.ts. Cùng danh sách giá trị
+  -- với books.genre (không dùng chung constraint vì khác bảng).
+  genre text,
+  play_count integer not null default 0,
   source public.content_source not null default 'independent',
   share_token text not null default encode(extensions.gen_random_bytes(24), 'hex'),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint audio_narrations_play_count_check check (play_count >= 0),
+  constraint audio_narrations_genre_check
+    check (genre is null or genre in (
+      'Linh dị', 'Cổ tích & Thần thoại', 'Dã sử', 'Trinh thám',
+      'Tâm lý - tội phạm', 'Tình cảm', 'Đời sống - Xã hội',
+      'Khoa học viễn tưởng', 'Tiên hiệp/ kiếm hiệp', 'Kỳ ảo'
+    ))
 );
 
 alter table public.audio_narrations enable row level security;
@@ -1551,8 +1640,18 @@ create policy "narrators delete their own audio narrations"
   using (auth.uid() = narrator_id);
 
 create view public.public_audio_narrations as
-  select id, narrator_id, title, audio_url, duration_seconds, source, created_at
+  select id, narrator_id, title, audio_url, duration_seconds, source, created_at, genre, play_count
   from public.audio_narrations;
+
+-- security definer: tăng play_count an toàn dưới race condition, không
+-- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 bản ghi/lần gọi.
+-- Không yêu cầu đăng nhập, giống increment_book_view_count.
+create function public.increment_audio_play_count(p_audio_narration_id uuid)
+returns void as $$
+  update public.audio_narrations set play_count = play_count + 1 where id = p_audio_narration_id;
+$$ language sql security definer set search_path = public;
+
+grant execute on function public.increment_audio_play_count(uuid) to anon, authenticated;
 
 -- --- Liên kết chương ↔ audio (nhiều-nhiều) ---
 -- Bảng này TỰ NÓ không nhạy cảm (không có share_token), nên select công

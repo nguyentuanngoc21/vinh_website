@@ -17,6 +17,15 @@ import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
  * homepage, this one resolves every published book for the full,
  * genre-filterable rankings list.
  *
+ * audio_narrations gained genre/play_count since the paragraph above was
+ * written (migrations/20260901_add_audio_narration_hub_metadata.sql) —
+ * the "Audio" tab COULD be wired to real all-time totals now the same way
+ * "toanthoigian" ranks books by view_count. It isn't yet: play_count has
+ * no day-bucketed history (no audio equivalent of book_read_counts_daily),
+ * so only an all-time board would be real, not week/month/quarter — and
+ * "Blog" still has nothing to read at all (no blog_posts table). Left as
+ * future work rather than wiring one tab of four.
+ *
  * "tuan"/"thang"/"quy" are real, day-bucketed windows over
  * book_read_counts_daily (see migrations/20260831_add_book_read_counts_daily.sql
  * — a public aggregate over reading_history's real read_at). "toanthoigian"
