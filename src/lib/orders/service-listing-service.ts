@@ -6,6 +6,27 @@ type ServiceListing = Database["public"]["Tables"]["service_listings"]["Row"];
 
 export type MissingField = { key: string; label: string };
 
+// Đối chiếu TAXONOMY/ANY_OF trong Vịnh Cá nhân.dc.html — illustration cần
+// ĐỦ CẢ 4 tầng (g1-g4), voice chỉ cần ÍT NHẤT 1 trong 2 tầng (v1 hoặc v2)
+// có chọn (ghi rõ trong rule: "bỏ trống nếu bạn chỉ nhận [tầng kia]").
+// ghostwriting KHÔNG có tầng tag nào (thiết kế gốc không đưa 'write' vào
+// TAXONOMY) — không validate gì thêm ở đây cho loại đó.
+const REQUIRED_TAG_GROUPS: Record<string, { keys: string[]; anyOf: boolean }> = {
+  illustration: { keys: ["g1", "g2", "g3", "g4"], anyOf: false },
+  voice: { keys: ["v1", "v2"], anyOf: true },
+};
+
+function isTagGroupFilled(tags: Record<string, unknown>, key: string): boolean {
+  const v = tags[key];
+  return Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim().length > 0 : false;
+}
+
+function hasRequiredTags(serviceType: string, tags: Record<string, unknown>): boolean {
+  const spec = REQUIRED_TAG_GROUPS[serviceType];
+  if (!spec) return true; // ghostwriting — không có tầng tag nào để đòi hỏi
+  return spec.anyOf ? spec.keys.some((k) => isTagGroupFilled(tags, k)) : spec.keys.every((k) => isTagGroupFilled(tags, k));
+}
+
 /**
  * 11 trường bắt buộc của Mục 2.1 đặc tả — validate ở ĐÂY (service layer),
  * không chỉ UI, vì is_accepting_orders là ràng buộc pháp lý (Mục 2), y
@@ -24,6 +45,12 @@ export function computeMissingFields(listing: ServiceListing): MissingField[] {
   });
 
   if (!listing.name.trim()) missing.push({ key: "name", label: "Tên gói dịch vụ" });
+  if (!hasRequiredTags(listing.service_type, listing.tags)) {
+    missing.push({
+      key: "tags",
+      label: listing.service_type === "voice" ? "Phân loại gói (Lồng tiếng/Nhạc cụ)" : "Phân loại gói dịch vụ (đủ 4 tầng thẻ)",
+    });
+  }
   if (!listing.scope_description.trim()) missing.push({ key: "scope_description", label: "Phạm vi công việc" });
   if (!hasValidTier) missing.push({ key: "price_tiers", label: "Giá/thanh toán" });
   if (listing.deposit_pct == null) missing.push({ key: "deposit_pct", label: "Mốc cọc" });

@@ -16,10 +16,10 @@
 BEGIN;
 
 alter table public.profiles
-  add column trust_orders_completed integer not null default 0,
-  add column trust_orders_cancelled_at_fault integer not null default 0,
-  add column trust_off_platform_flags integer not null default 0,
-  add column trust_violations_resolved integer not null default 0;
+  add column if not exists trust_orders_completed integer not null default 0,
+  add column if not exists trust_orders_cancelled_at_fault integer not null default 0,
+  add column if not exists trust_off_platform_flags integer not null default 0,
+  add column if not exists trust_violations_resolved integer not null default 0;
 
 -- Đọc lại TOÀN BỘ nguồn dữ liệu, ghi đè 4 cột — idempotent, gọi lại bao
 -- nhiêu lần cũng ra cùng kết quả (không phải increment/decrement rải rác
@@ -77,7 +77,7 @@ grant execute on function public.recalculate_trust_score to service_role;
 -- (src/app/api/messages/[userId]/route.ts), không ở DB — cột này chỉ lưu
 -- kết quả. KHÔNG chặn gửi tin (Mục 8: false positive với trao đổi hợp lệ
 -- như kích thước/số đo), chỉ gắn nhãn.
-alter table public.direct_messages add column flagged_off_platform boolean not null default false;
+alter table public.direct_messages add column if not exists flagged_off_platform boolean not null default false;
 
 -- Mục 9 — Báo cáo vi phạm/Tranh chấp.
 create table public.disputes (

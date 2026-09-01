@@ -12,8 +12,8 @@
 BEGIN;
 
 alter table public.books
-  add column is_ghostwritten boolean not null default false,
-  add column author_display text not null default 'pen_name'
+  add column if not exists is_ghostwritten boolean not null default false,
+  add column if not exists author_display text not null default 'pen_name'
     check (author_display in ('pen_name', 'anonymous', 'customer_name', 'co_authorship'));
 
 -- Client (authenticated) không tự sửa 2 cột này qua REST API trực tiếp —

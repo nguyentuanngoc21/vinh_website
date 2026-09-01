@@ -2859,7 +2859,9 @@ create index order_events_order_idx on public.order_events (order_id, created_at
 
 -- 12d. Danh mục tag cố định cho service_listings (Mục 2.2 đặc tả) — xem
 -- migrations/20260901_add_service_tag_catalog.sql,
--- scripts/seed_service_tag_options.sql (dữ liệu seed).
+-- scripts/seed_service_tag_options.sql (dữ liệu seed). tier/rule/multi/
+-- optional/warn_text thêm bởi migrations/20260901_add_service_tag_option_metadata.sql
+-- (đối chiếu lại TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html).
 create table public.service_tag_options (
   id uuid primary key default gen_random_uuid(),
   service_type public.service_type not null,
@@ -2868,6 +2870,11 @@ create table public.service_tag_options (
   label text not null,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
+  tier text,
+  rule text,
+  multi boolean not null default true,
+  optional boolean not null default false,
+  warn_text text,
   unique (service_type, group_key, label)
 );
 

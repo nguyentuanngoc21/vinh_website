@@ -192,3 +192,12 @@ select '20260901_add_order_refund_minimum_table',
     where n.nspname = 'public' and p.proname = 'calculate_refund'
       and p.prosrc like '%when ''draft_pending'' then 90%'
   )
+union all
+-- Metadata tier/rule/multi/optional/warn_text thêm cho service_tag_options
+-- (đối chiếu lại TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html sau
+-- khi người dùng báo giao diện tag sai — xem
+-- migrations/20260901_add_service_tag_option_metadata.sql).
+select '20260901_add_service_tag_option_metadata',
+  exists(select 1 from information_schema.columns where table_schema='public' and table_name='service_tag_options' and column_name='tier')
+  and exists(select 1 from information_schema.columns where table_schema='public' and table_name='service_tag_options' and column_name='warn_text')
+order by 1;
