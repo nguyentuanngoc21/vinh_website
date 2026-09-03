@@ -24,22 +24,22 @@ const OUT_DIR = path.join(ROOT, "src", "lib", "legal");
 
 const DOCS = [
   {
-    source: path.join(ROOT, "docs", "Điều khoản sử dụng - UTD 22082026.docx"),
+    source: path.join(ROOT, "docs", "Điều khoản sử dụng - UTD 03092026.docx"),
     outFile: "dieu-khoan-su-dung.ts",
     exportName: "dieuKhoanSuDungHtml",
   },
   {
-    source: path.join(ROOT, "docs", "Chính sách bảo mật - UTD 22082026.docx"),
+    source: path.join(ROOT, "docs", "Chính sách bảo mật - UTD 03092026.docx"),
     outFile: "chinh-sach-bao-mat.ts",
     exportName: "chinhSachBaoMatHtml",
   },
   {
-    source: path.join(ROOT, "docs", "Cam kết quyền sở hữu & chống đạo nhái - UTD 29082026.docx"),
+    source: path.join(ROOT, "docs", "Cam kết quyền sở hữu & chống đạo nhái - UTD 03092026.docx"),
     outFile: "cam-ket-quyen-so-huu.ts",
     exportName: "camKetQuyenSoHuuHtml",
   },
   {
-    source: path.join(ROOT, "docs", "Chính sách hoạt động cho Tác giả - UTD 29082026.docx"),
+    source: path.join(ROOT, "docs", "Chính sách hoạt động cho Tác giả - UTD 03092026.docx"),
     outFile: "chinh-sach-hoat-dong-tac-gia.ts",
     exportName: "chinhSachHoatDongTacGiaHtml",
   },
@@ -52,11 +52,43 @@ const DOCS = [
     // và exclusivity-agreement.ts — không đáng, vì đây chỉ là slug nội bộ.
     // Tên HIỂN THỊ thật ("Hợp đồng khai thác tác phẩm độc quyền") nằm ở
     // registry.ts, không phải ở đây.
-    source: path.join(ROOT, "docs", "Hợp đồng khai thác tác phẩm độc quyền - UTD 29082026.docx"),
+    source: path.join(ROOT, "docs", "Hợp đồng khai thác tác phẩm độc quyền - UTD 03092026.docx"),
     outFile: "chinh-sach-doc-quyen.ts",
     exportName: "chinhSachDocQuyenHtml",
   },
+  {
+    source: path.join(ROOT, "docs", "Bộ quy tắc giao dịch Commission - UTD 03092026.docx"),
+    outFile: "bo-quy-tac-commission.ts",
+    exportName: "boQuyTacCommissionHtml",
+  },
 ];
+
+// Từ bản UTD 03092026 trở đi, các dòng "Nhãn: ....." cần tự điền (Họ và
+// tên, CCCD, Địa chỉ...) không còn gõ dấu chấm thật trong .docx — được
+// thay bằng viền dưới đoạn văn (Word: "Borders > Bottom Border" áp cho cả
+// paragraph) để nhìn liền mạch hơn. mammoth không có mapping cho paragraph
+// border nên bản HTML sinh ra mất sạch dấu hiệu "đây là chỗ trống", khiến
+// cả phần hiển thị (đường kẻ) lẫn fillOne() (cần dấu chấm để nhận diện chỗ
+// trống, xem fill-party-blanks.ts) đều hỏng.
+//
+// Khôi phục bằng cách chèn lại dấu chấm: paragraph nào có toàn bộ nội dung
+// là "<strong>Nhãn:</strong>" (không có gì khác sau dấu ":") — đúng hình
+// dạng 1 dòng trống kiểu này — được coi là 1 chỗ cần điền, bất kể có khai
+// báo tự điền ở AGREEMENT_PARTY_INFO hay không (có những dòng dạng này chưa
+// có nguồn dữ liệu để tự điền, ví dụ "Phương án được lựa chọn" ở Điều 4 hợp
+// đồng khai thác độc quyền — vẫn cần hiện đường chấm để người đọc biết đây
+// là chỗ trống, chỉ là phải điền tay/qua kênh khác, không phải lỗi hiển
+// thị). Đã rà bằng tay qua cả 6 văn bản UTD 03092026 để chắc quy tắc này
+// không khớp nhầm bất kỳ đoạn nào khác (không có đoạn nội dung thật nào
+// hình dạng "<strong>cụm ngắn:</strong>" đứng riêng 1 mình).
+const BLANK_LINE_DOTS = "....................................";
+
+function restoreBorderBlankLines(html) {
+  // Dấu chấm đặt SAU </strong> (không in đậm) — giữ đúng kiểu trình bày cũ
+  // "<strong>Họ và tên:</strong> ....." (xem src/lib/legal/cam-ket-quyen-so-huu.ts
+  // bản trước UTD 03092026), không phải in đậm cả cụm dấu chấm.
+  return html.replace(/(<p><strong>[^<:]{1,60}:)\s*<\/strong><\/p>/g, `$1</strong> ${BLANK_LINE_DOTS}</p>`);
+}
 
 // "... - UTD 22082026.docx" -> { key: "22082026", iso: "2026-08-22", label: "22-08-2026" }
 function parseUtd(fileName) {
@@ -76,10 +108,11 @@ async function convertOne({ source, outFile, exportName }) {
   }
 
   const buffer = await readFile(source);
-  const { value: html, messages } = await mammoth.convertToHtml(
+  const { value: rawHtml, messages } = await mammoth.convertToHtml(
     { buffer },
     { includeDefaultStyleMap: true },
   );
+  const html = restoreBorderBlankLines(rawHtml);
 
   for (const message of messages) {
     if (message.type === "warning") {

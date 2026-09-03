@@ -123,10 +123,19 @@ export function AgreementDocumentViewer({
   // đổi hẳn nút "Tôi đồng ý" thành nút điều hướng đi điền — đúng yêu cầu
   // "tự động navigate tới trang thông tin" thay vì chỉ disable rồi im.
   const authorInfoLoading = !!partyInfoSpec?.author && !contractInfo && !contractInfoError;
-  const missingAuthorFields =
-    partyInfoSpec?.author && contractInfo && !contractInfoError
-      ? partyInfoSpec.author.filter(({ key }) => !contractInfo[key])
-      : [];
+  // `mergedWith` (contract-parties.ts) gộp 2 field hồ sơ vào chung 1 chỗ
+  // trống trong văn bản — thiếu field phụ đó cũng phải chặn xác nhận, và
+  // cần liệt kê ĐÚNG tên riêng của nó (không phải nhãn gộp) ở banner "Cần
+  // điền: ...". Server (.../accept/route.ts) áp dụng cùng logic này.
+  const missingAuthorFields: { key: string; label: string }[] = [];
+  if (partyInfoSpec?.author && contractInfo && !contractInfoError) {
+    for (const field of partyInfoSpec.author) {
+      if (!contractInfo[field.key]) missingAuthorFields.push({ key: field.key, label: field.label });
+      if (field.mergedWith && !contractInfo[field.mergedWith.key]) {
+        missingAuthorFields.push({ key: field.mergedWith.key, label: field.mergedWith.label });
+      }
+    }
+  }
 
   function handleAcceptClick() {
     if (missingAuthorFields.length > 0) {
@@ -193,10 +202,15 @@ export function AgreementDocumentViewer({
                   ) : (
                     <>
                       <div className="flex flex-col gap-1 text-[12.5px] text-stone-dark">
-                        {partyInfoSpec.author.map(({ key, label }) => {
+                        {partyInfoSpec.author.map(({ key, label, mergedWith }) => {
                           const value = contractInfo?.[key];
-                          const display =
-                            key === "dateOfBirth" || key === "cccdIssuedAt"
+                          const display = mergedWith
+                            ? // Field gộp (vd "Số CCCD/Hộ chiếu, cấp ngày") — chỉ ghép chuỗi
+                              // khi CẢ HAI giá trị đều có, xem fill-party-blanks.ts.
+                              value && contractInfo?.[mergedWith.key]
+                              ? mergedWith.join(value, contractInfo[mergedWith.key]!)
+                              : null
+                            : key === "dateOfBirth" || key === "cccdIssuedAt"
                               ? value
                                 ? formatVi(value)
                                 : null
@@ -211,7 +225,7 @@ export function AgreementDocumentViewer({
                           );
                         })}
                       </div>
-                      {contractInfo && partyInfoSpec.author.some(({ key }) => !contractInfo[key]) && (
+                      {contractInfo && missingAuthorFields.length > 0 && (
                         <div className="mt-2 text-[11.5px] leading-[1.5] text-stone">
                           Bổ sung các trường còn thiếu ở mục &quot;Chỉnh sửa thông tin cá nhân&quot; và &quot;Căn cước
                           công dân&quot; trong tab Thông tin cá nhân.

@@ -3,13 +3,15 @@ import { chinhSachBaoMatHtml, chinhSachBaoMatUpdatedAt } from "./chinh-sach-bao-
 import { chinhSachDocQuyenHtml, chinhSachDocQuyenUpdatedAt } from "./chinh-sach-doc-quyen";
 import { camKetQuyenSoHuuHtml, camKetQuyenSoHuuUpdatedAt } from "./cam-ket-quyen-so-huu";
 import { chinhSachHoatDongTacGiaHtml, chinhSachHoatDongTacGiaUpdatedAt } from "./chinh-sach-hoat-dong-tac-gia";
+import { boQuyTacCommissionHtml, boQuyTacCommissionUpdatedAt } from "./bo-quy-tac-commission";
 
 export type AgreementId =
   | "dieu-khoan-su-dung"
   | "chinh-sach-bao-mat"
   | "chinh-sach-doc-quyen"
   | "cam-ket-quyen-so-huu"
-  | "chinh-sach-hoat-dong-tac-gia";
+  | "chinh-sach-hoat-dong-tac-gia"
+  | "bo-quy-tac-commission";
 
 export type AgreementDefinition = {
   id: AgreementId;
@@ -81,6 +83,20 @@ export const AGREEMENTS: AgreementDefinition[] = [
     desc: "Quyền lợi, nghĩa vụ và quy định vận hành áp dụng cho tác giả trên Vịnh.",
     html: chinhSachHoatDongTacGiaHtml,
     updatedAt: chinhSachHoatDongTacGiaUpdatedAt,
+  },
+  {
+    id: "bo-quy-tac-commission",
+    name: "Bộ quy tắc giao dịch Commission",
+    desc: "Quy tắc giao dịch commission (vẽ minh họa, lồng tiếng, viết thuê): thanh toán, hủy đơn, quyền sở hữu và xử lý vi phạm.",
+    html: boQuyTacCommissionHtml,
+    updatedAt: boQuyTacCommissionUpdatedAt,
+    // Không có chỗ trống cá nhân nào cần điền (giống Điều khoản sử
+    // dụng/Chính sách bảo mật) nên KHÔNG có entry ở AGREEMENT_PARTY_INFO.
+    // Chưa gắn `requiredForFeature`: hiện chưa có route nào chặn bật
+    // "Nhận đơn" / đặt commission theo văn bản này (khác chinh-sach-doc-quyen
+    // đã có enforcement thật) — thêm gating là việc riêng, cần xác nhận
+    // trước vì ảnh hưởng luồng của cả người cung cấp dịch vụ lẫn khách
+    // hàng đặt commission hiện có.
   },
 ];
 
