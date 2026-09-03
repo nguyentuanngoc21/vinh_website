@@ -45,7 +45,17 @@ export async function POST(
   const authorFields = AGREEMENT_PARTY_INFO[agreementId as keyof typeof AGREEMENT_PARTY_INFO]?.author;
   if (authorFields && authorFields.length > 0) {
     const info = await resolveAuthorContractInfo(supabase, userId);
-    const missingFields = authorFields.filter(({ key }) => !info?.[key]);
+    // `mergedWith` (contract-parties.ts) gộp 2 field hồ sơ vào chung 1 chỗ
+    // trống trong văn bản (vd "Số CCCD/Hộ chiếu, cấp ngày") — thiếu field
+    // phụ đó cũng phải chặn xác nhận, liệt kê riêng bằng đúng nhãn của nó
+    // (không phải nhãn gộp) — cùng logic với agreement-document-viewer.tsx.
+    const missingFields: { key: string; label: string }[] = [];
+    for (const field of authorFields) {
+      if (!info?.[field.key]) missingFields.push({ key: field.key, label: field.label });
+      if (field.mergedWith && !info?.[field.mergedWith.key]) {
+        missingFields.push({ key: field.mergedWith.key, label: field.mergedWith.label });
+      }
+    }
     if (!info || missingFields.length > 0) {
       return NextResponse.json(
         {

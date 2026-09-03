@@ -46,7 +46,15 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
   const missingFieldLabels = useMemo(() => {
     if (!missingAgreementId || missingKeys.length === 0) return [];
     const authorFields = AGREEMENT_PARTY_INFO[missingAgreementId as keyof typeof AGREEMENT_PARTY_INFO]?.author ?? [];
-    return authorFields.filter((f) => missingKeys.includes(f.key)).map((f) => f.label);
+    const labels: string[] = [];
+    for (const f of authorFields) {
+      if (missingKeys.includes(f.key)) labels.push(f.label);
+      // `mergedWith` gộp 2 field vào chung 1 chỗ trống trong văn bản (vd
+      // "Số CCCD/Hộ chiếu, cấp ngày") nhưng vẫn 2 field RIÊNG ở đây — nêu
+      // đúng tên field phụ nếu chính nó là field còn thiếu.
+      if (f.mergedWith && missingKeys.includes(f.mergedWith.key)) labels.push(f.mergedWith.label);
+    }
+    return labels;
   }, [missingAgreementId, missingKeys]);
   const isMissing = (key: string) => missingKeys.includes(key);
   const missingHint = missingAgreementName

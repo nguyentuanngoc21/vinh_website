@@ -22,7 +22,44 @@ export type AuthorInfoKey =
 
 export type PlatformInfoKey = "name" | "idNumber" | "address" | "phone" | "email" | "website";
 
-type PartyFieldSpec<K extends string> = { key: K; label: string };
+type PartyFieldSpec<K extends string> = {
+  /** Field CHÍNH — dùng cho khối tóm tắt "Thông tin các bên"
+   * (agreement-document-viewer.tsx), check thiếu field trước khi cho xác
+   * nhận (.../accept/route.ts), và deep-link/scroll tới đúng ô ở trang
+   * Thông tin cá nhân (edit-profile-tab.tsx). */
+  key: K;
+  /** Nhãn hiển thị — ĐÚNG như dòng trống thật trong văn bản (dùng làm mốc
+   * cho fillOne() ở fill-party-blanks.ts) khi không có `mergedWith`; khi
+   * có `mergedWith`, đây là nhãn ĐẦY ĐỦ của dòng trống gộp (vd "Số
+   * CCCD/Hộ chiếu, cấp ngày"), không phải nhãn riêng của `key`. */
+  label: string;
+  /**
+   * CHỈ set khi dòng trống THẬT trong văn bản gộp `key` với 1 field KHÁC
+   * vào CHUNG 1 dòng (vd hợp đồng khai thác độc quyền gộp "Số CCCD/Hộ
+   * chiếu" + "Cấp ngày" cũ thành 1 dòng "Số CCCD/Hộ chiếu, cấp ngày:
+   * ....."). fillPartyBlanksIntoHtml() dùng `join` để ghép 2 giá trị
+   * thành 1 chuỗi điền vào ĐÚNG 1 chỗ trống đó (không tách 2 lần fillOne
+   * riêng vì văn bản chỉ còn 1 chỗ trống thật). Các nơi khác (khối tóm
+   * tắt, check thiếu field, deep-link) coi field phụ này ngang hàng
+   * field chính: thiếu 1 trong 2 vẫn tính là thiếu, và có `label` riêng
+   * để liệt kê đúng tên khi báo "Cần điền: ...".
+   */
+  mergedWith?: {
+    key: K;
+    label: string;
+    join: (primary: string, extra: string) => string;
+  };
+};
+
+// fillPartyBlanksIntoHtml() cần hiển thị "Cấp ngày" dạng dd-MM-yyyy giống
+// khối tóm tắt "Thông tin các bên" (agreement-document-viewer.tsx dùng
+// formatVi() cho việc này) — nhưng contract-parties.ts là module dữ liệu
+// thuần, không import từ 1 client component, nên lặp lại đúng 3 dòng logic
+// đó ở đây thay vì tách thêm 1 module util chỉ vì 1 chỗ dùng.
+function formatIsoDateVi(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}-${m}-${y}`;
+}
 
 export type AgreementPartyInfo = {
   /** "Bên A"/Tác giả — người đang xem văn bản. */
@@ -57,8 +94,18 @@ export const AGREEMENT_PARTY_INFO: Partial<Record<AgreementId, AgreementPartyInf
     author: [
       { key: "realName", label: "Họ và tên" },
       { key: "dateOfBirth", label: "Ngày sinh" },
-      { key: "cccdNumber", label: "Số CCCD/Hộ chiếu" },
-      { key: "cccdIssuedAt", label: "Cấp ngày" },
+      // Bản UTD 03092026 gộp 2 dòng cũ "Số CCCD/Hộ chiếu" + "Cấp ngày"
+      // thành 1 dòng trống duy nhất "Số CCCD/Hộ chiếu, cấp ngày: ....."
+      // — xem comment `mergedWith` ở PartyFieldSpec phía trên.
+      {
+        key: "cccdNumber",
+        label: "Số CCCD/Hộ chiếu, cấp ngày",
+        mergedWith: {
+          key: "cccdIssuedAt",
+          label: "Cấp ngày CCCD/Hộ chiếu",
+          join: (number, issuedAt) => `${number}, cấp ngày ${formatIsoDateVi(issuedAt)}`,
+        },
+      },
       { key: "address", label: "Địa chỉ" },
       { key: "phone", label: "Điện thoại" },
       { key: "email", label: "Email" },
@@ -83,7 +130,10 @@ export const AGREEMENT_PARTY_INFO: Partial<Record<AgreementId, AgreementPartyInf
       { key: "realName", label: "Họ và tên" },
       { key: "penName", label: "Bút danh/Tên tác giả" },
       { key: "dateOfBirth", label: "Ngày sinh" },
-      { key: "cccdNumber", label: "CCCD/Hộ chiếu/Mã định danh" },
+      // Bản UTD 03092026 đổi thành "...Mã định danh cá nhân:" (trước là
+      // "...Mã định danh:") — cập nhật đúng theo văn bản mới, nếu không
+      // fillOne() (fill-party-blanks.ts) sẽ không khớp được dòng trống.
+      { key: "cccdNumber", label: "CCCD/Hộ chiếu/Mã định danh cá nhân" },
       { key: "email", label: "Email" },
     ],
   },

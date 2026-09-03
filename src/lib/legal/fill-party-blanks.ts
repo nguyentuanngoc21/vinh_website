@@ -35,6 +35,28 @@ function fillOne(html: string, label: string, rawValue: string | null | undefine
 }
 
 /**
+ * Điền 1 field spec vào `html` — tự phân biệt field thường (1 field = 1
+ * chỗ trống, dùng thẳng `values[key]`) với field `mergedWith` (2 field hồ
+ * sơ gộp chung 1 chỗ trống, vd "Số CCCD/Hộ chiếu, cấp ngày" — xem comment
+ * `mergedWith` ở contract-parties.ts): CHỈ ghép chuỗi khi CẢ HAI giá trị
+ * đều có, để tránh điền nửa vời kiểu "001234567, cấp ngày (chưa cập
+ * nhật)" — thiếu 1 trong 2 thì coi cả dòng là chưa có gì, giữ nguyên
+ * fallback "(chưa cập nhật)" của fillOne().
+ */
+function fillField<K extends string>(
+  html: string,
+  field: { key: K; label: string; mergedWith?: { key: K; join: (primary: string, extra: string) => string } },
+  source: Record<K, string | null | undefined>
+): string {
+  const primary = source[field.key];
+  if (field.mergedWith) {
+    const extra = source[field.mergedWith.key];
+    return fillOne(html, field.label, primary && extra ? field.mergedWith.join(primary, extra) : null);
+  }
+  return fillOne(html, field.label, primary);
+}
+
+/**
  * Điền trực tiếp vào các dòng "....." NẰM TRONG chính nội dung văn bản
  * (không chỉ ở khối tóm tắt "Thông tin các bên" phía trên nó) — dùng
  * đúng field/nhãn đã khai báo cho văn bản đó ở contract-parties.ts.
@@ -58,11 +80,11 @@ export function fillPartyBlanksIntoHtml(
   }
 ): string {
   let result = html;
-  for (const { key, label } of spec.author ?? []) {
-    result = fillOne(result, label, values.author[key]);
+  for (const field of spec.author ?? []) {
+    result = fillField(result, field, values.author);
   }
-  for (const { key, label } of spec.platform ?? []) {
-    result = fillOne(result, label, values.platform?.[key]);
+  for (const field of spec.platform ?? []) {
+    result = fillField(result, field, values.platform ?? ({} as Record<PlatformInfoKey, string | null | undefined>));
   }
   return result;
 }
