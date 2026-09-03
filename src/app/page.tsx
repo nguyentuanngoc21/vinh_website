@@ -1,5 +1,6 @@
 import { Lora } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
+import { ProductTour } from "@/components/onboarding/product-tour";
 import { BookCoverflow } from "@/components/book-coverflow";
 import { HeroTrending } from "@/components/hero-trending";
 import { RankingGenres } from "@/components/ranking-genres";
@@ -32,6 +33,7 @@ export default async function Home() {
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
+        <ProductTour />
         <SiteHeader showNav={false} />
         <main>
           <BookCoverflow books={featured} />

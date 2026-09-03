@@ -40,6 +40,7 @@ export function AuthCluster({
         // author_id thật (POST /api/authoring/books).
         <Link
           href="/dang-nhap"
+          data-tour="tour-cta"
           className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
         >
           {ctaLabel}
@@ -53,6 +54,7 @@ export function AuthCluster({
         // new-work-workspace.tsx + POST /api/authoring/books).
         <Link
           href={ctaHref}
+          data-tour="tour-cta"
           className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
         >
           {ctaLabel}
@@ -73,6 +75,7 @@ export function AuthCluster({
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
             title="Trang cá nhân"
+            data-tour="tour-avatar"
             className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-brand-ink text-sm font-bold text-brand-gold-light"
           >
             {initial}
