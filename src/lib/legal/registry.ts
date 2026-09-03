@@ -92,11 +92,11 @@ export const AGREEMENTS: AgreementDefinition[] = [
     updatedAt: boQuyTacCommissionUpdatedAt,
     // Không có chỗ trống cá nhân nào cần điền (giống Điều khoản sử
     // dụng/Chính sách bảo mật) nên KHÔNG có entry ở AGREEMENT_PARTY_INFO.
-    // Chưa gắn `requiredForFeature`: hiện chưa có route nào chặn bật
-    // "Nhận đơn" / đặt commission theo văn bản này (khác chinh-sach-doc-quyen
-    // đã có enforcement thật) — thêm gating là việc riêng, cần xác nhận
-    // trước vì ảnh hưởng luồng của cả người cung cấp dịch vụ lẫn khách
-    // hàng đặt commission hiện có.
+    // Bắt buộc để bật "Nhận đơn" (cung cấp dịch vụ commission) — enforcement
+    // thật nằm ở PATCH /api/profile/services/[listingId]
+    // (src/lib/orders/commission-agreement.ts), cùng cơ chế
+    // chinh-sach-doc-quyen dùng cho is_exclusive.
+    requiredForFeature: "Cung cấp dịch vụ (commission)",
   },
 ];
 

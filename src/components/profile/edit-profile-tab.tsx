@@ -238,7 +238,12 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
             ) : (
               <>
                 <WarningCircleIcon weight="fill" size={18} color="var(--color-brand-gold-dark)" />
-                Cần hoàn tất CCCD và ngân hàng thụ hưởng bên dưới để rút token
+                {/* Nêu ĐÚNG mục nào còn thiếu — trước đây luôn ghi "CCCD và ngân
+                    hàng" dù chỉ 1 trong 2 chưa xong, khiến người đã điền xong 1
+                    mục tưởng nhầm cả 2 đều chưa lưu. */}
+                Cần hoàn tất{" "}
+                {[!cccdVerified && "CCCD", !bankSaved && "ngân hàng thụ hưởng"].filter(Boolean).join(" và ")} bên dưới
+                để rút token
               </>
             )}
           </div>
