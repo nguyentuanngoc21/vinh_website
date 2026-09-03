@@ -41,15 +41,20 @@ export function SiteHeader({
 
       <div className="flex shrink-0 items-center gap-3.5">
         {showSearch && (
-          <div className="hidden w-[240px] items-center gap-2 rounded-full bg-neutral-bg px-4 py-2.5 text-sm text-[#9a9a9a] lg:flex">
+          <div
+            data-tour="tour-search"
+            className="hidden w-[240px] items-center gap-2 rounded-full bg-neutral-bg px-4 py-2.5 text-sm text-[#9a9a9a] lg:flex"
+          >
             <MagnifyingGlassIcon size={16} />
             {searchPlaceholder}
           </div>
         )}
-        <BookmarkSimpleIcon
-          size={21}
-          className="cursor-default text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
-        />
+        <span data-tour="tour-bookmark" className="inline-flex">
+          <BookmarkSimpleIcon
+            size={21}
+            className="cursor-default text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
+          />
+        </span>
         <AuthCluster ctaLabel={ctaLabel} ctaHref={ctaHref} />
       </div>
     </header>

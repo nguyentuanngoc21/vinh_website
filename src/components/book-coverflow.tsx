@@ -115,7 +115,10 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
 
   return (
     <section className="bg-gradient-to-b from-[#fafaf9] to-white px-11 pb-2.5">
-      <nav className="-mx-11 mb-[26px] flex gap-[26px] overflow-x-auto bg-brand-ink px-11 py-3.5 text-[15px] font-medium [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav
+        data-tour="tour-nav"
+        className="-mx-11 mb-[26px] flex gap-[26px] overflow-x-auto bg-brand-ink px-11 py-3.5 text-[15px] font-medium [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <NavStripLinks />
       </nav>
 
