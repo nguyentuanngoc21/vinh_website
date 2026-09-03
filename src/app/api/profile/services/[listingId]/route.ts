@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { computeMissingFields } from "@/lib/orders/service-listing-service";
+import {
+  hasAcceptedCommissionRules,
+  COMMISSION_AGREEMENT_ERROR,
+  COMMISSION_AGREEMENT_ID,
+} from "@/lib/orders/commission-agreement";
 import type { Database } from "@/lib/supabase/types";
 
 type ListingRow = Database["public"]["Tables"]["service_listings"]["Row"];
@@ -69,6 +74,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ li
       return NextResponse.json(
         { error: "Chưa đủ 11 trường bắt buộc — không thể bật Nhận đơn.", missingFields },
         { status: 400 }
+      );
+    }
+    // Xem src/lib/orders/commission-agreement.ts — Bộ quy tắc giao dịch
+    // Commission là điều kiện bắt buộc để cung cấp dịch vụ, ngang hàng
+    // 11 trường trên nhưng validate riêng vì đây là 1 văn bản pháp lý
+    // (agreement_acceptances), không phải field của chính listing.
+    if (!(await hasAcceptedCommissionRules(supabase, userId))) {
+      return NextResponse.json(
+        { error: COMMISSION_AGREEMENT_ERROR, missingAgreementIds: [COMMISSION_AGREEMENT_ID] },
+        { status: 403 }
       );
     }
     finalAccepting = true;
