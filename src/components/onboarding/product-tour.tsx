@@ -31,7 +31,11 @@ type Rect = { top: number; left: number; width: number; height: number };
 
 const SPOTLIGHT_PADDING = 8;
 const TOOLTIP_WIDTH = 320;
-const TOOLTIP_HEIGHT_ESTIMATE = 170;
+// Ước lượng rộng rãi hơn kích thước thực tế: trên màn hẹp, tooltip co lại
+// theo bề rộng (xem TOOLTIP_WIDTH/computeTooltipLayout) nên chữ xuống dòng
+// nhiều hơn — số này chỉ dùng để chừa chỗ khi tính "top"/"bottom" placement
+// và clamp trong viewport, thà hụt còn hơn để thẻ tràn khỏi màn hình.
+const TOOLTIP_HEIGHT_ESTIMATE = 190;
 const VIEWPORT_MARGIN = 12;
 
 function measureTarget(selector: string | null): Rect | null {
@@ -46,11 +50,30 @@ function measureTarget(selector: string | null): Rect | null {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
-function computeTooltipPos(
+// Điện thoại xoay dọc thường hẹp hơn 320px tooltip + lề hai bên, và không
+// còn chỗ để đặt thẻ giải thích sang trái/phải mục tiêu (bookmark, CTA,
+// avatar đều nằm sát mép phải header). Dưới ngưỡng này, luôn ép thẻ xuống
+// dưới (hoặc lên trên nếu không đủ chỗ) thay vì left/right — bám sát mục
+// tiêu thay vì bị đẩy dạt sang một bên do code clamp phía dưới.
+const NARROW_VIEWPORT_BREAKPOINT = 640;
+
+type TooltipLayout = { top: number; left: number; width: number };
+
+function computeTooltipLayout(
   rect: Rect,
-  placement: "top" | "bottom" | "left" | "right" = "bottom"
-) {
+  requestedPlacement: "top" | "bottom" | "left" | "right" = "bottom"
+): TooltipLayout {
   const GAP = 16;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const width = Math.min(TOOLTIP_WIDTH, vw - VIEWPORT_MARGIN * 2);
+
+  let placement = requestedPlacement;
+  if (vw < NARROW_VIEWPORT_BREAKPOINT && (placement === "left" || placement === "right")) {
+    const roomBelow = vh - (rect.top + rect.height);
+    placement = roomBelow > TOOLTIP_HEIGHT_ESTIMATE + GAP ? "bottom" : "top";
+  }
+
   let top = rect.top;
   let left = rect.left;
 
@@ -65,7 +88,7 @@ function computeTooltipPos(
       break;
     case "left":
       top = rect.top;
-      left = rect.left - TOOLTIP_WIDTH - GAP;
+      left = rect.left - width - GAP;
       break;
     case "right":
       top = rect.top;
@@ -73,11 +96,11 @@ function computeTooltipPos(
       break;
   }
 
-  const maxLeft = window.innerWidth - TOOLTIP_WIDTH - VIEWPORT_MARGIN;
-  const maxTop = window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - VIEWPORT_MARGIN;
+  const maxLeft = vw - width - VIEWPORT_MARGIN;
+  const maxTop = vh - TOOLTIP_HEIGHT_ESTIMATE - VIEWPORT_MARGIN;
   left = Math.min(Math.max(left, VIEWPORT_MARGIN), Math.max(maxLeft, VIEWPORT_MARGIN));
   top = Math.min(Math.max(top, VIEWPORT_MARGIN), Math.max(maxTop, VIEWPORT_MARGIN));
-  return { top, left };
+  return { top, left, width };
 }
 
 /**
@@ -161,11 +184,13 @@ export function ProductTour() {
   };
   const back = () => setStepIndex((i) => Math.max(0, i - 1));
 
-  const tooltipPos = rect
-    ? computeTooltipPos(rect, step.placement)
+  const centeredWidth = Math.min(TOOLTIP_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
+  const tooltipLayout: TooltipLayout = rect
+    ? computeTooltipLayout(rect, step.placement)
     : {
         top: window.innerHeight / 2 - TOOLTIP_HEIGHT_ESTIMATE / 2,
-        left: window.innerWidth / 2 - TOOLTIP_WIDTH / 2,
+        left: window.innerWidth / 2 - centeredWidth / 2,
+        width: centeredWidth,
       };
 
   return (
@@ -196,15 +221,18 @@ export function ProductTour() {
       <div
         role="dialog"
         aria-modal="true"
-        className="fixed z-[201] w-[320px] rounded-2xl border border-cream bg-white p-5 shadow-[0_14px_34px_rgba(0,0,0,.24)] transition-all duration-300 ease-out"
-        style={{ top: tooltipPos.top, left: tooltipPos.left }}
+        className="fixed z-[201] max-w-[92vw] rounded-2xl border border-cream bg-white p-4 shadow-[0_14px_34px_rgba(0,0,0,.24)] transition-all duration-300 ease-out sm:p-5"
+        style={{ top: tooltipLayout.top, left: tooltipLayout.left, width: tooltipLayout.width }}
       >
         <div className="mb-1 text-[12px] font-semibold tracking-wide text-brand-gold-dark">
           BƯỚC {stepIndex + 1}/{TOUR_STEPS.length}
         </div>
         <h3 className="mb-1.5 text-[16px] font-bold text-ink">{step.title}</h3>
         <p className="mb-4 text-[14px] leading-relaxed text-stone">{step.body}</p>
-        <div className="flex items-center justify-between gap-2">
+        {/* Đảo ngược thứ tự khi xếp dọc: nhóm nút chính (Quay lại/Tiếp theo)
+            hiện phía trên, "Bỏ qua" phụ ở dưới — trên màn dọc điện thoại
+            không đủ chỗ xếp cả 3 nút trên một hàng như ở màn rộng. */}
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={finish}
@@ -217,7 +245,7 @@ export function ProductTour() {
               <button
                 type="button"
                 onClick={back}
-                className="cursor-pointer rounded-full border border-cream px-4 py-2 text-[13px] font-semibold text-ink hover:bg-cream-card"
+                className="flex-1 cursor-pointer rounded-full border border-cream px-4 py-2 text-[13px] font-semibold text-ink hover:bg-cream-card sm:flex-none"
               >
                 Quay lại
               </button>
@@ -225,7 +253,7 @@ export function ProductTour() {
             <button
               type="button"
               onClick={next}
-              className="cursor-pointer rounded-full bg-brand-gold px-4 py-2 text-[13px] font-semibold text-brand-ink hover:brightness-95"
+              className="flex-1 cursor-pointer rounded-full bg-brand-gold px-4 py-2 text-[13px] font-semibold text-brand-ink hover:brightness-95 sm:flex-none"
             >
               {isLast ? "Xong" : "Tiếp theo"}
             </button>
