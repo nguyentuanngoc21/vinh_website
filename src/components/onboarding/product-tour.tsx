@@ -57,8 +57,11 @@ function measureTarget(selector: string | null): Rect | null {
 // tiêu thay vì bị đẩy dạt sang một bên do code clamp phía dưới.
 const NARROW_VIEWPORT_BREAKPOINT = 640;
 
-type TooltipLayout = { top: number; left: number; width: number };
+type TooltipLayout = { top: number; left: number };
 
+// Bề rộng thật sự dùng lúc render là class Tailwind `w-[min(320px,92vw)]`
+// (xem JSX bên dưới) — con số 0.92 ở đây CHỈ để tính toán clamp cho đúng,
+// phải khớp với "92vw" trong class đó chứ không tự ý đổi một bên.
 function computeTooltipLayout(
   rect: Rect,
   requestedPlacement: "top" | "bottom" | "left" | "right" = "bottom"
@@ -66,7 +69,7 @@ function computeTooltipLayout(
   const GAP = 16;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const width = Math.min(TOOLTIP_WIDTH, vw - VIEWPORT_MARGIN * 2);
+  const width = Math.min(TOOLTIP_WIDTH, vw * 0.92);
 
   let placement = requestedPlacement;
   if (vw < NARROW_VIEWPORT_BREAKPOINT && (placement === "left" || placement === "right")) {
@@ -100,7 +103,7 @@ function computeTooltipLayout(
   const maxTop = vh - TOOLTIP_HEIGHT_ESTIMATE - VIEWPORT_MARGIN;
   left = Math.min(Math.max(left, VIEWPORT_MARGIN), Math.max(maxLeft, VIEWPORT_MARGIN));
   top = Math.min(Math.max(top, VIEWPORT_MARGIN), Math.max(maxTop, VIEWPORT_MARGIN));
-  return { top, left, width };
+  return { top, left };
 }
 
 /**
@@ -184,14 +187,17 @@ export function ProductTour() {
   };
   const back = () => setStepIndex((i) => Math.max(0, i - 1));
 
-  const centeredWidth = Math.min(TOOLTIP_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
-  const tooltipLayout: TooltipLayout = rect
+  // Không có rect (bước chào mừng/kết thúc) → để CSS tự canh giữa
+  // (top:50%/left:50%/translate) thay vì tự tính bằng window.innerWidth/
+  // innerHeight đọc một lần lúc render: giá trị đó có thể sai lệch nhất
+  // thời ngay lúc trang mới tải trên di động (thanh địa chỉ trình duyệt
+  // chưa ổn định chiều cao thật), và vì bước này không có rect để đổi,
+  // component sẽ không bao giờ vẽ lại để tự sửa — card bị kẹt lệch vĩnh
+  // viễn. CSS centering do trình duyệt tính lại mỗi lần reflow nên luôn
+  // đúng, không phụ thuộc thời điểm đọc window.
+  const tooltipLayout: TooltipLayout | null = rect
     ? computeTooltipLayout(rect, step.placement)
-    : {
-        top: window.innerHeight / 2 - TOOLTIP_HEIGHT_ESTIMATE / 2,
-        left: window.innerWidth / 2 - centeredWidth / 2,
-        width: centeredWidth,
-      };
+    : null;
 
   return (
     <>
@@ -221,8 +227,10 @@ export function ProductTour() {
       <div
         role="dialog"
         aria-modal="true"
-        className="fixed z-[201] max-w-[92vw] rounded-2xl border border-cream bg-white p-4 shadow-[0_14px_34px_rgba(0,0,0,.24)] transition-all duration-300 ease-out sm:p-5"
-        style={{ top: tooltipLayout.top, left: tooltipLayout.left, width: tooltipLayout.width }}
+        className={`fixed z-[201] w-[min(320px,92vw)] rounded-2xl border border-cream bg-white p-4 shadow-[0_14px_34px_rgba(0,0,0,.24)] transition-all duration-300 ease-out sm:p-5${
+          tooltipLayout ? "" : " top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+        }`}
+        style={tooltipLayout ? { top: tooltipLayout.top, left: tooltipLayout.left } : undefined}
       >
         <div className="mb-1 text-[12px] font-semibold tracking-wide text-brand-gold-dark">
           BƯỚC {stepIndex + 1}/{TOUR_STEPS.length}
