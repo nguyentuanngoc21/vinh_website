@@ -1841,8 +1841,10 @@ create index books_genre_idx
 -- 20260826_add_book_exclusivity.sql, rồi finalized_at ("Hoàn thiện" —
 -- Share bản thảo, phần 12e) bởi migrations/20260901_add_manuscript_share.sql
 -- — published_at CỐ Ý không có trong danh sách này, xem comment ở phần 3.
+-- Cột `synopsis` được cộng thêm bởi migrations/20260906_add_book_synopsis_grant.sql
+-- — tác giả sửa tóm tắt truyện qua PATCH /api/authoring/books/[bookId].
 revoke update on public.books from authenticated, anon;
-grant update (title, genre, tags, published, deleted_at, is_exclusive, finalized_at) on public.books to authenticated;
+grant update (title, genre, tags, published, deleted_at, is_exclusive, finalized_at, synopsis) on public.books to authenticated;
 
 create function public.regenerate_design_share_token(p_design_item_id uuid)
 returns text as $$

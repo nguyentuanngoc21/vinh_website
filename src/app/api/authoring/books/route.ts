@@ -15,6 +15,7 @@ function isBookGenre(value: unknown): value is BookGenre {
 
 const DEFAULT_TITLE = "Truyện mới";
 const MAX_TAGS = 20; // khớp CHECK books_tags_length_check
+const MAX_SYNOPSIS_LENGTH = 2000; // khớp route PATCH /api/authoring/books/[bookId]
 
 function parseTags(value: unknown): string[] {
   if (!Array.isArray(value) || !value.every((t) => typeof t === "string")) return [];
@@ -72,6 +73,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const title = (typeof body?.title === "string" ? body.title.trim() : "") || DEFAULT_TITLE;
+  const synopsis =
+    (typeof body?.synopsis === "string" ? body.synopsis.trim().slice(0, MAX_SYNOPSIS_LENGTH) : "") || null;
   const genre = isBookGenre(body?.genre) ? body.genre : null;
   const tags = parseTags(body?.tags);
   const isExclusive = typeof body?.isExclusive === "boolean" ? body.isExclusive : true;
@@ -104,6 +107,7 @@ export async function POST(request: Request) {
       author_id: userData.user.id,
       title,
       slug: slugifyTitle(title),
+      synopsis,
       genre,
       tags,
       is_exclusive: isExclusive,

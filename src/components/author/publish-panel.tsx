@@ -32,6 +32,11 @@ type PublishPanelProps = {
   /** Lưu tên truyện — gọi lúc blur, không phải mỗi lần gõ (khác genre/tags,
    * đổi rời rạc theo click/Enter nên PATCH ngay được). */
   onBookTitleCommit: () => void;
+  synopsis: string;
+  onSynopsisChange: (synopsis: string) => void;
+  /** Cùng cách xử lý với onBookTitleCommit — lưu lúc blur, không phải mỗi
+   * lần gõ. */
+  onSynopsisCommit: () => void;
   genre: BookGenre | null;
   onGenreChange: (genre: BookGenre) => void;
   tags: string[];
@@ -62,6 +67,9 @@ export function PublishPanel({
   bookTitle,
   onBookTitleChange,
   onBookTitleCommit,
+  synopsis,
+  onSynopsisChange,
+  onSynopsisCommit,
   genre,
   onGenreChange,
   tags,
@@ -106,6 +114,18 @@ export function PublishPanel({
               onChange={(e) => onBookTitleChange(e.target.value)}
               onBlur={onBookTitleCommit}
               placeholder="Vũng Vịnh Cuối Trời"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tóm tắt truyện</div>
+            <textarea
+              value={synopsis}
+              onChange={(e) => onSynopsisChange(e.target.value)}
+              onBlur={onSynopsisCommit}
+              placeholder="Vài dòng giới thiệu nội dung truyện cho độc giả…"
+              rows={4}
+              className="w-full resize-none rounded-lg border border-cream-border px-3 py-2.5 text-sm text-brand-ink outline-none focus:border-brand-ink"
             />
           </div>
 

@@ -34,7 +34,9 @@ export default async function AuthorBookOverviewPage({
 
   const { data: book } = await supabase
     .from("books")
-    .select("id, title, genre, slug, published, author_id, is_exclusive, deleted_at, cover_design_item_id, finalized_at")
+    .select(
+      "id, title, synopsis, genre, slug, published, author_id, is_exclusive, deleted_at, cover_design_item_id, finalized_at"
+    )
     .eq("id", bookId)
     .maybeSingle();
 
@@ -68,6 +70,7 @@ export default async function AuthorBookOverviewPage({
     <BookOverview
       bookId={book.id}
       bookTitle={book.title}
+      bookSynopsis={book.synopsis}
       bookGenre={book.genre}
       bookSlug={book.slug}
       bookPublished={book.published}

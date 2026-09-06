@@ -3,7 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowSquareOutIcon, CoinsIcon, PlusIcon, TrashIcon, UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowSquareOutIcon,
+  CoinsIcon,
+  PencilSimpleIcon,
+  PlusIcon,
+  TrashIcon,
+  UploadSimpleIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
 import { BookCoverUpload } from "@/components/author/book-cover-upload";
 import { ShareManuscriptPanel, type ManuscriptGrant } from "@/components/author/share-manuscript-panel";
@@ -21,6 +28,7 @@ export type OverviewChapter = {
 type BookOverviewProps = {
   bookId: string;
   bookTitle: string;
+  bookSynopsis: string | null;
   bookGenre: BookGenre | null;
   bookSlug: string;
   bookPublished: boolean;
@@ -42,6 +50,7 @@ type BookOverviewProps = {
 export function BookOverview({
   bookId,
   bookTitle,
+  bookSynopsis,
   bookGenre,
   bookSlug,
   bookPublished,
@@ -55,6 +64,10 @@ export function BookOverview({
   const [creatingChapter, setCreatingChapter] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [synopsis, setSynopsis] = useState(bookSynopsis ?? "");
+  const [editingSynopsis, setEditingSynopsis] = useState(false);
+  const [synopsisDraft, setSynopsisDraft] = useState(synopsis);
+  const [savingSynopsis, setSavingSynopsis] = useState(false);
 
   const latest = chapters[chapters.length - 1] ?? null;
   const publishedCount = chapters.filter((c) => c.published).length;
@@ -103,6 +116,40 @@ export function BookOverview({
     } catch {
       alert("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
       setCreatingChapter(false);
+    }
+  };
+
+  const startEditSynopsis = () => {
+    setSynopsisDraft(synopsis);
+    setEditingSynopsis(true);
+  };
+
+  const cancelEditSynopsis = () => {
+    setEditingSynopsis(false);
+  };
+
+  const saveSynopsis = async () => {
+    if (savingSynopsis) return;
+    setSavingSynopsis(true);
+    const trimmed = synopsisDraft.trim();
+    try {
+      const res = await fetch(`/api/authoring/books/${bookId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ synopsis: trimmed }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert((data && typeof data.error === "string" && data.error) || "Không lưu được. Vui lòng thử lại.");
+        setSavingSynopsis(false);
+        return;
+      }
+      setSynopsis(trimmed);
+      setEditingSynopsis(false);
+      setSavingSynopsis(false);
+    } catch {
+      alert("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
+      setSavingSynopsis(false);
     }
   };
 
@@ -173,6 +220,56 @@ export function BookOverview({
             <PlusIcon size={16} weight="fill" /> {creatingChapter ? "Đang tạo…" : "Chương mới"}
           </button>
         </div>
+      </div>
+
+      <div className="mb-6 rounded-[12px] border border-cream-border bg-white p-5">
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <div className="text-xs font-bold tracking-wide text-stone-alt">TÓM TẮT</div>
+          {!editingSynopsis && (
+            <button
+              type="button"
+              onClick={startEditSynopsis}
+              className="flex items-center gap-1 text-[12.5px] font-semibold text-brand-gold-dark transition-colors hover:text-brand-ink"
+            >
+              <PencilSimpleIcon size={14} weight="bold" /> Sửa
+            </button>
+          )}
+        </div>
+
+        {editingSynopsis ? (
+          <div>
+            <textarea
+              value={synopsisDraft}
+              onChange={(e) => setSynopsisDraft(e.target.value)}
+              placeholder="Vài dòng giới thiệu nội dung truyện cho độc giả…"
+              rows={4}
+              autoFocus
+              className="w-full resize-none rounded-lg border border-cream-border px-3 py-2.5 text-sm text-brand-ink outline-none focus:border-brand-ink"
+            />
+            <div className="mt-2.5 flex gap-2">
+              <button
+                type="button"
+                onClick={saveSynopsis}
+                disabled={savingSynopsis}
+                className="cursor-pointer rounded-[9px] bg-brand-gold px-4 py-2 text-[13px] font-bold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
+              >
+                {savingSynopsis ? "Đang lưu…" : "Lưu"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelEditSynopsis}
+                disabled={savingSynopsis}
+                className="cursor-pointer rounded-[9px] border border-cream-border bg-white px-4 py-2 text-[13px] font-semibold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        ) : synopsis ? (
+          <p className="whitespace-pre-line text-[13.5px] leading-[1.7] text-ink">{synopsis}</p>
+        ) : (
+          <p className="text-[13.5px] italic text-stone-light">Bạn chưa cập nhật mô tả truyện</p>
+        )}
       </div>
 
       <ShareManuscriptPanel bookId={bookId} finalized={bookFinalized} initialGrant={initialManuscriptGrant} />

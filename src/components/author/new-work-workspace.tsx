@@ -24,6 +24,7 @@ export function NewWorkWorkspace() {
   const router = useRouter();
 
   const [bookTitle, setBookTitle] = useState("");
+  const [synopsis, setSynopsis] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [price, setPrice] = useState(0);
@@ -54,6 +55,7 @@ export function NewWorkWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: bookTitle,
+          synopsis,
           genre,
           tags,
           isExclusive,
@@ -118,6 +120,9 @@ export function NewWorkWorkspace() {
         bookTitle={bookTitle}
         onBookTitleChange={setBookTitle}
         onBookTitleCommit={() => {}}
+        synopsis={synopsis}
+        onSynopsisChange={setSynopsis}
+        onSynopsisCommit={() => {}}
         genre={genre}
         onGenreChange={setGenre}
         tags={tags}

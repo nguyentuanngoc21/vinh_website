@@ -21,10 +21,12 @@ function parseTags(value: unknown): string[] | null {
   return cleaned.slice(0, MAX_TAGS);
 }
 
+const MAX_SYNOPSIS_LENGTH = 2000;
+
 /**
- * PATCH /api/authoring/books/:bookId — sửa title/genre/tags/is_exclusive
- * của 1 sách đã có (dùng bởi GenreSelect + toggle độc quyền trong
- * publish-panel.tsx). Không tự check ownership tay — policy "authors
+ * PATCH /api/authoring/books/:bookId — sửa title/synopsis/genre/tags/
+ * is_exclusive của 1 sách đã có (dùng bởi GenreSelect + toggle độc quyền +
+ * ô tóm tắt trong publish-panel.tsx). Không tự check ownership tay — policy "authors
  * update their own books" (docs/supabase/schema.sql) đã chặn qua RLS;
  * .update() trên hàng không thuộc về mình trả về 0 dòng, xử lý ở nhánh
  * `!data` dưới.
@@ -44,9 +46,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
-  const update: { title?: string; genre?: BookGenre; tags?: string[]; is_exclusive?: boolean } = {};
+  const update: {
+    title?: string;
+    synopsis?: string | null;
+    genre?: BookGenre;
+    tags?: string[];
+    is_exclusive?: boolean;
+  } = {};
   if (typeof body.title === "string" && body.title.trim()) {
     update.title = body.title.trim();
+  }
+  if (typeof body.synopsis === "string") {
+    // Rỗng hợp lệ (bỏ tóm tắt) — khác title, cột synopsis nullable và
+    // không có ràng buộc not-null nào ở DB.
+    const trimmed = body.synopsis.trim().slice(0, MAX_SYNOPSIS_LENGTH);
+    update.synopsis = trimmed || null;
   }
   if (isBookGenre(body.genre)) {
     update.genre = body.genre;
@@ -108,7 +122,7 @@ export async function PATCH(
     .from("books")
     .update(update)
     .eq("id", bookId)
-    .select("id, title, genre, tags, is_exclusive")
+    .select("id, title, synopsis, genre, tags, is_exclusive")
     .maybeSingle();
 
   if (error) {
