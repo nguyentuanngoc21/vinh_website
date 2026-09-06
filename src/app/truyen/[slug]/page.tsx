@@ -158,7 +158,11 @@ export default async function StoryPage({ params }: PageProps<"/truyen/[slug]">)
                 </div>
               )}
 
-              {book.synopsis && <p className="mt-4 whitespace-pre-line text-[14.5px] leading-[1.7] text-ink">{book.synopsis}</p>}
+              {book.synopsis ? (
+                <p className="mt-4 whitespace-pre-line text-[14.5px] leading-[1.7] text-ink">{book.synopsis}</p>
+              ) : (
+                <p className="mt-4 text-[14.5px] italic text-stone-light">Truyện này chưa có mô tả</p>
+              )}
             </div>
           </div>
 

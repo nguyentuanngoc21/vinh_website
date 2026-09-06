@@ -20,6 +20,7 @@ export type WorkspaceChapter = {
 type AuthorWorkspaceProps = {
   bookId: string;
   bookTitle: string;
+  bookSynopsis: string | null;
   bookGenre: BookGenre | null;
   bookTags: string[];
   bookSlug: string;
@@ -42,6 +43,7 @@ type AuthorWorkspaceProps = {
 export function AuthorWorkspace({
   bookId,
   bookTitle: initialBookTitle,
+  bookSynopsis,
   bookGenre,
   bookTags,
   bookSlug,
@@ -52,6 +54,7 @@ export function AuthorWorkspace({
   linkedAudio,
 }: AuthorWorkspaceProps) {
   const [bookTitle, setBookTitle] = useState(initialBookTitle);
+  const [synopsis, setSynopsis] = useState(bookSynopsis ?? "");
   // Server truyền trạng thái published của SÁCH lúc trang tải — chương
   // đầu tiên xuất bản thành công (nhánh dưới) khiến sách chuyển public
   // (xem src/app/api/authoring/chapters/[chapterId]/route.ts), nhưng
@@ -195,6 +198,23 @@ export function AuthorWorkspace({
     }
   };
 
+  const handleSynopsisCommit = async () => {
+    // Khác handleBookTitleCommit — synopsis nullable ở DB (books.synopsis),
+    // rỗng vẫn hợp lệ (bỏ tóm tắt), không cần rollback về giá trị cũ.
+    const trimmed = synopsis.trim();
+    setSynopsis(trimmed);
+    try {
+      await fetch(`/api/authoring/books/${bookId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ synopsis: trimmed }),
+      });
+    } catch {
+      // Cùng cách xử lý với handleGenreChange — thao tác phụ, không chặn
+      // luồng viết/lưu chương nếu lỗi mạng.
+    }
+  };
+
   const handleTagsChange = async (nextTags: string[]) => {
     setTags(nextTags);
     try {
@@ -241,6 +261,9 @@ export function AuthorWorkspace({
         bookTitle={bookTitle}
         onBookTitleChange={setBookTitle}
         onBookTitleCommit={handleBookTitleCommit}
+        synopsis={synopsis}
+        onSynopsisChange={setSynopsis}
+        onSynopsisCommit={handleSynopsisCommit}
         genre={genre}
         onGenreChange={handleGenreChange}
         tags={tags}
