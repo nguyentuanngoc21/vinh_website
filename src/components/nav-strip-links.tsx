@@ -7,9 +7,12 @@ import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 
 export type NavKey = "home" | "audio" | "blog" | "design" | "connect" | "rankings";
 
-type NavItem = { key: NavKey; label: string; href: string };
+export type NavItem = { key: NavKey; label: string; href: string };
 
-const NAV_ITEMS: NavItem[] = [
+// Exported (cùng MEGA_MENUS, deriveActive bên dưới) để mobile-nav-drawer.tsx
+// dựng lại đúng danh sách nav/mega-menu bên trong drawer mobile — dùng
+// chung 1 nguồn dữ liệu thay vì chép lại, tránh 2 nơi lệch nhau.
+export const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "Truyện chữ", href: "/" },
   { key: "audio", label: "Audio", href: "/audio" },
   { key: "blog", label: "Blog", href: "/blog" },
@@ -27,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
 // giống hệt cách Audio/Thiết kế đang làm (chưa có route lọc theo thể
 // loại/loại hình thật), nên bấm vào tiêu đề hay bấm vào 1 mục con đều ra
 // cùng 1 trang "tất cả", không có mục nào lọc ra kết quả khác nhau.
-const MEGA_MENUS: Partial<Record<NavKey, MegaMenuColumn[]>> = {
+export const MEGA_MENUS: Partial<Record<NavKey, MegaMenuColumn[]>> = {
   home: [{ title: "Thể loại", items: [...BOOK_GENRES] }],
   audio: [
     { title: "Lồng tiếng", items: ["Người kể chuyện", "Thoại nhân vật một giọng", "Thoại nhân vật nhiều giọng"] },
@@ -71,7 +74,7 @@ const MEGA_MENUS: Partial<Record<NavKey, MegaMenuColumn[]>> = {
 
 // Active tab is derived from the current route, not passed in per page —
 // so a page can never drift out of sync with where it actually lives.
-function deriveActive(pathname: string): NavKey | undefined {
+export function deriveActive(pathname: string): NavKey | undefined {
   if (pathname === "/") return "home";
   return NAV_ITEMS.find((item) => item.href !== "/" && pathname.startsWith(item.href))?.key;
 }

@@ -65,8 +65,10 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
         >
           <ListIcon size={22} />
         </button>
-        <VinhMark size={24} tone="cream" />
-        <span className="text-[15px] font-extrabold">Vịnh</span>
+        <Link href="/" className="flex items-center gap-3 no-underline">
+          <VinhMark size={24} tone="cream" />
+          <span className="text-[15px] font-extrabold">Vịnh</span>
+        </Link>
         <span className="ml-auto rounded-[5px] border border-brand-gold-light/40 px-[7px] py-0.5 text-[11px] font-medium text-brand-gold-light">
           Tác giả
         </span>

@@ -3,7 +3,7 @@
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CaretLeftIcon, CaretRightIcon, HeadphonesIcon } from "@phosphor-icons/react/dist/ssr";
-import { NavStripLinks } from "@/components/nav-strip-links";
+import { NavBarContent } from "@/components/nav-bar-content";
 import { BookCover } from "@/components/covers/book-cover";
 import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
@@ -117,9 +117,9 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
     <section className="bg-gradient-to-b from-[#fafaf9] to-white px-11 pb-2.5">
       <nav
         data-tour="tour-nav"
-        className="-mx-11 mb-[26px] flex gap-[26px] overflow-x-auto bg-brand-ink px-11 py-3.5 text-[15px] font-medium [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-11 mb-[26px] flex items-center gap-[26px] overflow-x-auto bg-brand-ink px-11 py-3.5 text-[15px] font-medium [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <NavStripLinks />
+        <NavBarContent />
       </nav>
 
       <div className="mb-2 flex flex-wrap items-end justify-between gap-3">

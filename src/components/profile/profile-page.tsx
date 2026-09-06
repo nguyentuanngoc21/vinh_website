@@ -43,6 +43,7 @@ export function ProfilePage() {
   const [joinedYear, setJoinedYear] = useState("");
   const [tokenBalance, setTokenBalance] = useState("…");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [followingCount, setFollowingCount] = useState(0);
   const [followerCount, setFollowerCount] = useState(0);
 
@@ -58,6 +59,7 @@ export function ProfilePage() {
         setUsername(me.username ?? "");
         if (me.createdAt) setJoinedYear(String(new Date(me.createdAt).getFullYear()));
         setCoverImageUrl(me.coverImageUrl ?? null);
+        setAvatarUrl(me.avatarUrl ?? null);
         setFollowingCount(me.followingCount ?? 0);
         setFollowerCount(me.followerCount ?? 0);
       }
@@ -88,6 +90,8 @@ export function ProfilePage() {
         followerCount={followerCount}
         coverImageUrl={coverImageUrl}
         onCoverSaved={setCoverImageUrl}
+        avatarUrl={avatarUrl}
+        onAvatarSaved={setAvatarUrl}
       />
       <ProfileTabs active={tab} onChange={setTab} />
 
