@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FacebookLogoIcon, YoutubeLogoIcon, InstagramLogoIcon } from "@phosphor-icons/react/dist/ssr";
 import { LegalLink } from "@/components/legal/legal-link";
 import { VinhMark } from "@/components/ui";
@@ -41,10 +42,10 @@ export function SiteFooter() {
     <footer className="bg-ink px-11 pb-9 pt-12 text-[#c9c3bd]">
       <div className="grid grid-cols-1 gap-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
-          <div className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-brand-gold">
+          <Link href="/" className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-brand-gold no-underline">
             <VinhMark size={26} tone="cream" />
             Vịnh
-          </div>
+          </Link>
           <p className="max-w-[280px] text-sm leading-[1.6]">
             Nền tảng truyện chữ, truyện audio và blog — nơi tác giả Việt sáng
             tác và được bảo hộ bản quyền.

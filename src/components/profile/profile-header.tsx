@@ -12,13 +12,17 @@ type ProfileHeaderProps = {
   followingCount: number;
   followerCount: number;
   coverImageUrl: string | null;
+  avatarUrl: string | null;
   /** Bắn lên profile-page.tsx sau khi tải/gỡ ảnh bìa thành công — cùng
    * pattern onNicknameSaved, để ProfileHeader luôn hiển thị đúng ảnh mới
    * nhất mà không cần load lại trang. */
   onCoverSaved?: (url: string | null) => void;
+  /** Cùng pattern onCoverSaved nhưng cho ảnh đại diện. */
+  onAvatarSaved?: (url: string | null) => void;
 };
 
 const COVER_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
 export function ProfileHeader({
   nickname,
@@ -28,13 +32,20 @@ export function ProfileHeader({
   followingCount,
   followerCount,
   coverImageUrl,
+  avatarUrl,
   onCoverSaved,
+  onAvatarSaved,
 }: ProfileHeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPending, setAvatarPending] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
   const handlePick = () => fileInputRef.current?.click();
+  const handlePickAvatar = () => avatarInputRef.current?.click();
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,6 +75,36 @@ export function ProfileHeader({
       return;
     }
     onCoverSaved?.(data.coverImageUrl ?? null);
+  };
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Cho phép chọn lại đúng file đó ở lần sau (onChange không bắn lại
+    // nếu value không đổi).
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Chỉ nhận file ảnh.");
+      return;
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarError("Ảnh đại diện tối đa 5MB.");
+      return;
+    }
+
+    setAvatarPending(true);
+    setAvatarError(null);
+    const body = new FormData();
+    body.set("avatar", file);
+    const res = await fetch("/api/profile/avatar", { method: "POST", body });
+    const data = await res.json().catch(() => null);
+    setAvatarPending(false);
+    if (!res.ok) {
+      setAvatarError((data && data.error) || "Tải ảnh đại diện thất bại.");
+      return;
+    }
+    onAvatarSaved?.(data.avatarUrl ?? null);
   };
 
   return (
@@ -99,10 +140,38 @@ export function ProfileHeader({
           <Alert tone="error">{error}</Alert>
         </div>
       )}
+      {avatarError && (
+        <div className="px-4 pt-2 sm:px-8 lg:px-11">
+          <Alert tone="error">{avatarError}</Alert>
+        </div>
+      )}
 
       <section className="flex flex-col items-center gap-4 px-4 pt-0 text-center sm:flex-row sm:items-end sm:gap-[22px] sm:px-8 sm:text-left lg:px-11">
-        <div className="-mt-10 flex h-[82px] w-[82px] shrink-0 items-center justify-center rounded-full border-4 border-white bg-brand-ink text-[30px] font-bold text-brand-gold-light sm:-mt-11">
-          {nickname[0]}
+        <div
+          className="relative -mt-10 flex h-[82px] w-[82px] shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-brand-ink text-[30px] font-bold text-brand-gold-light sm:-mt-11"
+          style={
+            avatarUrl
+              ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+              : undefined
+          }
+        >
+          {!avatarUrl && nickname[0]}
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleAvatarFile}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={handlePickAvatar}
+            disabled={avatarPending}
+            aria-label="Đổi ảnh đại diện"
+            className="absolute bottom-0 right-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60 disabled:cursor-default disabled:opacity-60"
+          >
+            <CameraIcon weight="fill" size={13} />
+          </button>
         </div>
         <div className="min-w-0 pt-3 sm:pt-0">
           <div className="font-[family-name:var(--font-lora)] text-2xl font-bold leading-[1.2] text-brand-ink sm:text-[28px]">
