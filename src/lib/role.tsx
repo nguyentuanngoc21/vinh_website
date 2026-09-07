@@ -165,7 +165,15 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         session,
         isGuest: session === null,
         isLogged: session !== null,
-        isAdmin: session?.role === "admin",
+        // Bug thật: trước đây chỉ so "admin", bỏ sót "super_admin" — mọi
+        // nút/khối UI dựa vào isAdmin (nút "Bảng điều khiển" ở
+        // auth-cluster.tsx, banner AdminModerationCallout ở trang chủ...)
+        // đều KHÔNG hiện với tài khoản super_admin, dù server-side
+        // (requireAdmin()/getAuthedAdminId(), proxy.ts) đã luôn chấp
+        // nhận cả 2 role đúng. Đây chỉ là cờ hiện/ẩn UI, không phải lớp
+        // bảo mật (xem REVIEW.md) — sửa ở đây không đổi gì về phân quyền
+        // thật, chỉ để super_admin THẤY được các nút vốn dành cho họ.
+        isAdmin: session?.role === "admin" || session?.role === "super_admin",
         login,
         register,
         verifySignupCode,
