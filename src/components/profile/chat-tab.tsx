@@ -12,7 +12,6 @@ import {
 import { AVATAR_TONES } from "@/lib/profile";
 import { Field, Button, Alert } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
-import { VinhMark } from "@/components/ui";
 
 type MessageContext = "personal" | "moderation";
 
@@ -22,12 +21,13 @@ type Conversation = {
   nickname: string;
   username: string;
   avatarUrl: string | null;
-  // Hòm thư "moderation" (tin gỡ chương từ tài khoản is_system) — TÁCH
-  // theo TIN NHẮN (context), không phải theo tài khoản: cùng 1 tài
-  // khoản is_system có thể vừa có hòm thư này (hiện "Đội ngũ Vịnh") vừa
-  // có hòm thư "personal" riêng (hiện đúng tên/avatar thật) nếu họ cũng
-  // tự chat bình thường. Xem migrations/20260908_add_direct_message_context.sql.
-  isModerationMailbox: boolean;
+  // Hòm thư "moderation" (tin gỡ chương) — TÁCH theo TIN NHẮN (context),
+  // không phải theo tài khoản: cùng 1 admin có thể vừa có hòm thư này
+  // vừa có hòm thư "personal" riêng nếu họ cũng tự chat bình thường với
+  // cùng tác giả. Chỉ dùng để gắn 1 nhãn nhỏ cạnh tên — danh tính (tên/
+  // avatar) LUÔN hiển thị thật, không che giấu. Xem
+  // migrations/20260908_add_direct_message_context.sql.
+  isModerationThread: boolean;
   lastMessage: { body: string; createdAt: string; mine: boolean };
   unreadCount: number;
 };
@@ -39,7 +39,7 @@ type Counterparty = {
   nickname: string;
   username: string;
   avatarUrl: string | null;
-  isModerationMailbox: boolean;
+  isModerationThread: boolean;
 };
 
 type ChatTabProps = {
@@ -77,24 +77,12 @@ function Avatar({
   nickname,
   avatarUrl,
   size,
-  isModerationMailbox,
 }: {
   userId: string;
   nickname: string;
   avatarUrl: string | null;
   size: number;
-  isModerationMailbox?: boolean;
 }) {
-  if (isModerationMailbox) {
-    return (
-      <div
-        style={{ background: "var(--color-brand-ink)", width: size, height: size }}
-        className="flex shrink-0 items-center justify-center rounded-full"
-      >
-        <VinhMark size={size * 0.56} tone="cream" />
-      </div>
-    );
-  }
   if (avatarUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -126,8 +114,8 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
   // Đơn hàng gắn với cặp (mình, counterparty) — không có bảng conversations
   // riêng, xem ghi chú ở src/app/api/orders/route.ts (GET). Chỉ hiện đơn
   // gần nhất chưa 'cancelled' (đơn cũ đã hủy không còn cần thao tác gì).
-  // Không áp dụng cho hòm thư moderation — tài khoản is_system không có
-  // đơn hàng nào, /api/orders tự trả rỗng, không cần điều kiện riêng.
+  // Hòm thư moderation (admin gỡ chương) thường không có đơn hàng nào
+  // giữa 2 bên — /api/orders tự trả rỗng, không cần điều kiện riêng.
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -229,8 +217,8 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Gửi kèm context đang mở — để reply trong hòm thư moderation nằm
-      // ĐÚNG hòm thư đó (route server tự hạ về "personal" nếu người nhận
-      // không phải tài khoản is_system, xem api/messages/[userId]/route.ts).
+      // ĐÚNG hòm thư đó (route server tự hạ về "personal" nếu không đúng
+      // điều kiện, xem api/messages/[userId]/route.ts).
       body: JSON.stringify({ body: text, context: activeContext }),
     });
     const data = await res.json().catch(() => null);
@@ -252,7 +240,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
         nickname: counterparty?.nickname ?? "",
         username: counterparty?.username ?? "",
         avatarUrl: counterparty?.avatarUrl ?? null,
-        isModerationMailbox: counterparty?.isModerationMailbox ?? false,
+        isModerationThread: counterparty?.isModerationThread ?? false,
         lastMessage: data.message,
         unreadCount: 0,
       };
@@ -308,20 +296,21 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   }}
                   className="flex w-full cursor-pointer items-center gap-3 border-l-[3px] px-4 py-3 text-left transition-colors hover:bg-cream-card"
                 >
-                  <Avatar
-                    userId={c.userId}
-                    nickname={c.nickname}
-                    avatarUrl={c.avatarUrl}
-                    size={44}
-                    isModerationMailbox={c.isModerationMailbox}
-                  />
+                  <Avatar userId={c.userId} nickname={c.nickname} avatarUrl={c.avatarUrl} size={44} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <div
-                        style={{ fontWeight: c.unreadCount > 0 ? 700 : 600 }}
-                        className="truncate text-sm text-ink"
-                      >
-                        {c.nickname}
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <div
+                          style={{ fontWeight: c.unreadCount > 0 ? 700 : 600 }}
+                          className="truncate text-sm text-ink"
+                        >
+                          {c.nickname}
+                        </div>
+                        {c.isModerationThread && (
+                          <span className="shrink-0 rounded-full bg-brand-ink px-1.5 py-0.5 text-[9.5px] font-semibold text-brand-gold-light">
+                            Kiểm duyệt
+                          </span>
+                        )}
                       </div>
                       <div className="shrink-0 text-[11.5px] text-[#a8a29e]">
                         {timeLabel(c.lastMessage.createdAt)}
@@ -374,20 +363,17 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   nickname={counterparty.nickname}
                   avatarUrl={counterparty.avatarUrl}
                   size={38}
-                  isModerationMailbox={counterparty.isModerationMailbox}
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <div className="text-[15px] font-semibold text-ink">{counterparty.nickname}</div>
-                    {counterparty.isModerationMailbox && (
+                    {counterparty.isModerationThread && (
                       <span className="rounded-full bg-brand-ink px-2 py-0.5 text-[10px] font-semibold text-brand-gold-light">
-                        Hệ thống
+                        Kiểm duyệt
                       </span>
                     )}
                   </div>
-                  {!counterparty.isModerationMailbox && (
-                    <div className="mt-0.5 text-xs text-stone">@{counterparty.username}</div>
-                  )}
+                  <div className="mt-0.5 text-xs text-stone">@{counterparty.username}</div>
                 </div>
               </div>
               {orders
@@ -472,19 +458,16 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                 nickname={counterparty.nickname}
                 avatarUrl={counterparty.avatarUrl}
                 size={68}
-                isModerationMailbox={counterparty.isModerationMailbox}
               />
               <div className="text-[15.5px] font-semibold text-ink">{counterparty.nickname}</div>
-              {/* Hòm thư kiểm duyệt không có trang Kết nối thật để xem —
-                  ẩn nút này thay vì trỏ tới 1 profile vô nghĩa. */}
-              {!counterparty.isModerationMailbox && (
-                <Link
-                  href={`/ket-noi?p=${counterparty.userId}`}
-                  className="flex items-center gap-2 rounded-full bg-brand-ink px-[18px] py-2 text-[13px] font-semibold text-white no-underline"
-                >
-                  <UserCircleIcon size={16} color="var(--color-brand-gold-light)" /> Xem Profile
-                </Link>
-              )}
+              {/* Danh tính luôn thật (kể cả hòm thư kiểm duyệt) — luôn có
+                  profile thật để xem, không cần ẩn nút này nữa. */}
+              <Link
+                href={`/ket-noi?p=${counterparty.userId}`}
+                className="flex items-center gap-2 rounded-full bg-brand-ink px-[18px] py-2 text-[13px] font-semibold text-white no-underline"
+              >
+                <UserCircleIcon size={16} color="var(--color-brand-gold-light)" /> Xem Profile
+              </Link>
             </div>
           </div>
         )}

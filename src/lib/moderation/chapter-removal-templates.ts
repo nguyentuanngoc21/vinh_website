@@ -4,8 +4,9 @@
  *   (A) Notification — dòng ngắn, hiện trong chuông Thông báo, có tính
  *       "trigger" để tác giả bấm vào.
  *   (B) Tin nhắn hệ thống — nội dung đầy đủ, gửi qua direct_messages từ
- *       tài khoản is_system=true (xem scripts/create-system-account.mjs),
- *       hiện trong Hội thoại khi tác giả bấm vào (A).
+ *       CHÍNH admin thực hiện thao tác gỡ (danh tính thật, xem
+ *       api/admin/chapters/[chapterId]/route.ts), hiện trong Hội thoại
+ *       khi tác giả bấm vào (A).
  *
  * Đơn giản hoá 1 chỗ so với đặc tả gốc: bỏ {{link_khiếu_nại}} dạng nút
  * riêng — đặc tả gốc đã tự đề xuất phương án này ("cân nhắc để

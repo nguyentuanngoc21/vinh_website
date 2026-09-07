@@ -185,12 +185,6 @@ export type Database = {
           // NULL = streak khoẻ mạnh. Có giá trị = vừa lỡ 1 ngày, hết thẻ
           // nghỉ, đang trong 48h ân hạn để trả token cứu.
           streak_at_risk_since: string | null;
-          // Tài khoản hệ thống ("Vịnh", gửi tin nhắn khi admin gỡ chương) —
-          // tối đa 1 hàng true (unique index lọc where is_system, xem
-          // migrations/20260908_add_chapter_moderation_and_notifications.sql).
-          // Hàng thật tạo bằng scripts/create-system-account.mjs, không qua
-          // Insert type này (route/script tự chèn khi tạo).
-          is_system: boolean;
           created_at: string;
         };
         Insert: {
@@ -219,7 +213,6 @@ export type Database = {
           screenshot_penalty_expires_at?: string | null;
           screenshot_penalty_banned?: boolean;
           screenshot_penalty_last_offense_at?: string | null;
-          is_system?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];
@@ -452,9 +445,9 @@ export type Database = {
           // ở route, xem migrations/20260901_add_trust_and_disputes.sql).
           // KHÔNG chặn gửi, chỉ gắn nhãn cho chính người gửi thấy.
           flagged_off_platform: boolean;
-          // "personal" | "moderation" — hòm thư riêng cho tin gỡ chương
-          // (hiện như "Đội ngũ Vịnh"), tách khỏi chat bình thường dù cùng
-          // 1 tài khoản gửi (profiles.is_system). Xem
+          // "personal" | "moderation" — hòm thư riêng cho tin gỡ chương,
+          // tách khỏi chat cá nhân dù cùng 1 admin gửi cả 2. Danh tính
+          // người gửi vẫn hiển thị thật ở cả 2 context. Xem
           // migrations/20260908_add_direct_message_context.sql.
           context: "personal" | "moderation";
           created_at: string;
@@ -1445,9 +1438,6 @@ export type Database = {
           bio: string | null;
           created_at: string;
           creator_tags: CreatorTag[];
-          // Xem migrations/20260908_add_chapter_moderation_and_notifications.sql
-          // — tối đa 1 hàng true trong toàn bộ profiles (tài khoản "Vịnh").
-          is_system: boolean;
         };
         Relationships: [];
       };

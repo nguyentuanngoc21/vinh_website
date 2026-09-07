@@ -1,39 +1,21 @@
--- Migration: admin duyệt/gỡ chương truyện + hệ thống Thông báo + tài
--- khoản hệ thống "Vịnh" gửi tin nhắn khi gỡ chương.
+-- Migration: admin duyệt/gỡ chương truyện + hệ thống Thông báo.
 --
 -- Bối cảnh: chapters trước giờ chỉ có `published` (không phân biệt được
 -- "tác giả tự để nháp" với "admin gỡ vì vi phạm"). Không có bảng
--- notifications nào. Hội thoại (direct_messages) không có khái niệm
--- "tài khoản hệ thống" — sender/recipient bắt buộc là 1 hàng thật trong
--- auth.users + profiles (route GET/POST /api/messages/:userId 404 nếu
--- không tìm thấy profile qua author_public_profiles).
+-- notifications nào.
+--
+-- Người gửi tin nhắn khi gỡ chương LÀ chính admin thực hiện thao tác đó
+-- (tài khoản thật của họ, không phải 1 tài khoản "hệ thống" ẩn danh
+-- riêng) — xem api/admin/chapters/[chapterId]/route.ts +
+-- migrations/20260908_add_direct_message_context.sql (context tách hòm
+-- thư kiểm duyệt khỏi chat cá nhân với cùng admin đó, KHÔNG che danh
+-- tính người gửi).
 --
 -- Run in the Supabase SQL editor (or via psql). Test in staging trước.
 
 BEGIN;
 
--- --- 1. Tài khoản hệ thống ---
--- Cờ đánh dấu 1 profile là tài khoản hệ thống (gửi tin nhắn thay mặt
--- "Vịnh", không phải người dùng thật) — để UI (chat-tab.tsx) hiện khác
--- biệt (logo Vịnh thay vì chữ cái đầu tên). Index unique đảm bảo tối đa
--- 1 hàng is_system = true trong toàn bộ profiles.
-alter table public.profiles add column is_system boolean not null default false;
-create unique index profiles_single_system_idx on public.profiles (is_system) where is_system;
-
--- author_public_profiles là view DUY NHẤT mà /api/messages, /api/messages/:userId
--- dùng để resolve counterparty — phải thêm is_system vào đây thì API mới
--- trả được cờ này cho UI, không cần sửa gì khác ở 2 route đó.
-create or replace view public.author_public_profiles as
-  select id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags, is_system
-  from public.profiles;
-
--- Tài khoản hệ thống THẬT được tạo bằng script (scripts/create-system-account.mjs),
--- KHÔNG tạo ở đây — insert thẳng vào auth.users bằng SQL thô không đi qua
--- GoTrue (thiếu các ràng buộc/mã hoá nội bộ Supabase quản lý), phải dùng
--- Supabase Admin API (auth.admin.createUser). Chạy script đó SAU migration
--- này (nó chỉ set is_system=true trên profile vừa tạo).
-
--- --- 2. Trạng thái gỡ/khôi phục chương (admin) ---
+-- --- 1. Trạng thái gỡ/khôi phục chương (admin) ---
 -- Tách biệt hẳn với `published` của tác giả — published=false do admin gỡ
 -- PHẢI phân biệt được với published=false vì tác giả tự để nháp. Khi gỡ:
 -- set published=false (để RLS/trang đọc ẩn ngay, không cần sửa RLS) +
@@ -45,7 +27,7 @@ alter table public.chapters
   add column removed_reason_group text,
   add column removed_reason_detail text;
 
--- --- 3. Nhật ký hành động duyệt/gỡ (audit trail) ---
+-- --- 2. Nhật ký hành động duyệt/gỡ (audit trail) ---
 -- Giữ lại MỌI lần gỡ/khôi phục, kể cả sau khi chapters.removed_* đã bị ghi
 -- đè bởi lần khôi phục/gỡ tiếp theo — tra cứu lịch sử đầy đủ, không chỉ
 -- trạng thái hiện tại.
@@ -73,7 +55,7 @@ create policy "admins view chapter moderation actions"
 create index chapter_moderation_actions_chapter_idx
   on public.chapter_moderation_actions (chapter_id, created_at);
 
--- --- 4. Thông báo ("mục Thông báo") ---
+-- --- 3. Thông báo ("mục Thông báo") ---
 -- Lớp (A) ngắn gọn trong đặc tả — chỉ có 1 dòng title + link điều hướng.
 -- Nội dung đầy đủ (lớp B) nằm ở direct_messages, KHÔNG lặp lại ở đây.
 -- `type` để mở rộng về sau (chưa có gì khác 'chapter_removed'/'chapter_restored'
@@ -111,7 +93,5 @@ COMMIT;
 -- 1. Không backfill — chương đã gỡ trước đây (nếu có, chỉ qua published=false
 --    thủ công) sẽ không có removed_at/reason, hiện đúng thực tế là
 --    "không có lịch sử ghi lại", không giả vờ có lý do.
--- 2. Sau khi chạy migration này, PHẢI chạy scripts/create-system-account.mjs
---    (cần SUPABASE_SERVICE_ROLE_KEY) để tạo tài khoản "Vịnh" thật — chưa
---    chạy thì route gỡ chương sẽ lỗi ở bước gửi tin nhắn hệ thống (không
---    tìm thấy tài khoản is_system=true nào).
+-- 2. KHÔNG cần tạo tài khoản "hệ thống" nào — route gỡ chương dùng thẳng
+--    tài khoản admin đang đăng nhập làm người gửi tin nhắn.

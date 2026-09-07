@@ -1,23 +1,13 @@
 -- Migration: tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn
--- (context), không phải theo tài khoản gửi — thay cho hướng ban đầu
--- (migrations/20260908_add_chapter_moderation_and_notifications.sql,
--- cờ profiles.is_system cố định trên 1 tài khoản).
+-- (context) — cho phép 1 admin vừa gửi tin GỠ CHƯƠNG (kiểm duyệt) vừa tự
+-- chat bình thường với CÙNG 1 tác giả, mà 2 luồng đó không bị trộn lẫn
+-- vào chung 1 hòm thư.
 --
--- Lý do đổi: admin muốn dùng THẲNG tài khoản super_admin THẬT của mình
--- làm người gửi (không tạo tài khoản giả riêng), nhưng:
---   - Khi gửi tin GỠ CHƯƠNG (hành động kiểm duyệt) -> phải hiện như tin
---     nhắn từ "Đội ngũ Vịnh" (ẩn danh tính cá nhân), VÀ dù nhiều admin
---     khác nhau cùng gỡ chương, tác giả vẫn chỉ thấy 1 kênh duy nhất.
---   - Khi CHÍNH tài khoản đó tự nhắn tin bình thường (không liên quan gỡ
---     chương) -> phải hiện như người dùng thật, không bị "dính" nhãn hệ
---     thống lên MỌI cuộc trò chuyện của họ.
--- -> is_system (cờ theo TÀI KHOẢN) không tách được 2 trường hợp trên vì
--- cùng 1 tài khoản. Cần 1 cờ theo TỪNG TIN NHẮN — context.
---
--- profiles.is_system (migration trước) VẪN GIỮ NGUYÊN, không đổi vai trò:
--- vẫn là "tài khoản nào đóng vai người gửi kiểm duyệt" — chỉ khác là giờ
--- gắn thêm context='moderation' lên tin nhắn CỤ THỂ nó gửi lúc gỡ chương,
--- thay vì mọi tin của nó đều bị coi là hệ thống.
+-- Người gửi tin gỡ chương LÀ chính tài khoản admin thực hiện thao tác đó
+-- (danh tính thật — tên/avatar thật, không che giấu) — xem
+-- api/admin/chapters/[chapterId]/route.ts. context chỉ dùng để ĐỊNH
+-- TUYẾN (routing) tin nhắn vào đúng hòm thư, không dùng để đổi cách hiển
+-- thị danh tính người gửi.
 --
 -- Run in the Supabase SQL editor (or via psql). Test in staging trước.
 
@@ -27,8 +17,8 @@ alter table public.direct_messages
   add column context text not null default 'personal' check (context in ('personal', 'moderation'));
 
 -- Đổi index thread hiện có (least/greatest + created_at) để gộp cả
--- context — 1 cặp (mình, tài khoản kiểm duyệt) giờ có THỂ có 2 hòm thư
--- tách biệt (cá nhân + kiểm duyệt), cần lọc theo context hiệu quả.
+-- context — 1 cặp (tác giả, admin) giờ có THỂ có 2 hòm thư tách biệt
+-- (cá nhân + kiểm duyệt), cần lọc theo context hiệu quả.
 drop index if exists direct_messages_thread_idx;
 create index direct_messages_thread_idx
   on public.direct_messages (
@@ -47,6 +37,9 @@ COMMIT;
 --    định context='personal', đúng thực tế vì tính năng gỡ chương chưa
 --    từng gửi tin nào trước đây.
 -- 3. Bảo mật: KHÔNG cho client tự đặt context='moderation' tuỳ ý qua
---    POST /api/messages/:userId — route đó tự hạ về 'personal' trừ khi
---    recipientId đúng là tài khoản is_system=true (xem route đó), để
---    không ai giả mạo "tin nhắn từ Vịnh" gửi cho người khác.
+--    POST /api/messages/:userId. Route đó chỉ chấp nhận khi: người nhận
+--    có role admin/super_admin VÀ đã từng có ít nhất 1 tin
+--    context='moderation' TỪ chính người nhận đó GỬI cho người đang gửi
+--    request (tức đang trả lời 1 thông báo có thật, không phải tự bịa ra
+--    1 cuộc "kiểm duyệt" với ai đó) — ngược lại tự hạ về 'personal'. Xem
+--    route đó để biết chi tiết.
