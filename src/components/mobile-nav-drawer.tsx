@@ -34,6 +34,12 @@ export function MobileNavDrawer() {
   // sẽ bị "nhốt" trong khung header thay vì phủ toàn viewport. `mounted`
   // tránh portal chạy lúc SSR (document chưa tồn tại).
   const [mounted, setMounted] = useState(false);
+  // Không thể bỏ effect này (vd đọc `typeof document` thẳng lúc render) —
+  // sẽ lệch giữa lần render server (document không tồn tại) và lần
+  // render đầu ở client (document đã có ngay cả trước khi effect chạy),
+  // gây hydration mismatch. Đây là pattern "chỉ mount ở client" chuẩn cho
+  // portal, không phải effect dùng sai chỗ.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   // Tự đóng drawer mỗi khi chuyển trang. Set state trong lúc render theo

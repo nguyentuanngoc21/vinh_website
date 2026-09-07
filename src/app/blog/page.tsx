@@ -20,6 +20,11 @@ export default function BlogPage() {
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
+        {/* searchType mặc định (truyện) — Blog vẫn là dữ liệu mock (xem
+            src/lib/blog.ts), không có tab kết quả thật để trỏ tới, nên
+            không đặt searchType="blog" giả vờ có (xem
+            src/app/tim-kiem/page.tsx, chỉ có 3 tab thật: truyện/audio/
+            thiết kế). */}
         <SiteHeader searchPlaceholder="Tìm bài viết…" ctaLabel="Viết bài" />
         <DevelopmentOverlay>
           <main>

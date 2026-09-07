@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BookmarkSimpleIcon } from "@phosphor-icons/react/dist/ssr";
-import { NavBarContent } from "@/components/nav-bar-content";
+import { NavBarContent, type SearchType } from "@/components/nav-bar-content";
 import { AuthCluster } from "@/components/auth-cluster";
 import { VinhMark } from "@/components/ui";
 
@@ -11,6 +11,10 @@ type SiteHeaderProps = {
   /** Kết nối có ô tìm người riêng — ô chung sẽ bị trùng. */
   showSearch?: boolean;
   searchPlaceholder?: string;
+  /** Tab mặc định ở /tim-kiem khi submit từ ô này — xem nav-bar-content.tsx. */
+  searchType?: SearchType;
+  /** Chỉ /tim-kiem/page.tsx truyền vào để hiện lại từ khoá vừa tìm. */
+  searchDefaultValue?: string;
   ctaLabel?: string;
   /** Where the CTA button goes — defaults to "viết truyện mới". Audio/Thiết
    * kế pages override this to their own upload flow (/audio/new,
@@ -22,6 +26,8 @@ export function SiteHeader({
   showNav = true,
   showSearch = true,
   searchPlaceholder = "Tìm truyện, tác giả…",
+  searchType = "truyen",
+  searchDefaultValue,
   ctaLabel = "Viết truyện",
   ctaHref = "/author/new",
 }: SiteHeaderProps = {}) {
@@ -53,7 +59,12 @@ export function SiteHeader({
         // phải ở MỌI kích thước (xem NavBarContent). order-3 + bleed full
         // chiều rộng để xuống hàng riêng, y hệt kỹ thuật cũ.
         <div className="order-3 -mx-4 -mb-4 flex min-w-0 flex-[0_0_calc(100%+32px)] items-center gap-5 overflow-x-auto overflow-y-hidden bg-brand-ink px-4 py-[13px] text-[15px] font-medium [scrollbar-width:none] sm:-mx-8 sm:flex-[0_0_calc(100%+64px)] sm:px-8 lg:-mx-11 lg:flex-[0_0_calc(100%+88px)] lg:px-11 [&::-webkit-scrollbar]:hidden">
-          <NavBarContent showSearch={showSearch} searchPlaceholder={searchPlaceholder} />
+          <NavBarContent
+            showSearch={showSearch}
+            searchPlaceholder={searchPlaceholder}
+            searchType={searchType}
+            searchDefaultValue={searchDefaultValue}
+          />
         </div>
       )}
     </header>
