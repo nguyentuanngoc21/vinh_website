@@ -4,11 +4,11 @@ import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
 export function NewWorksGrid({ books }: { books: HomepageBook[] }) {
   return (
-    <section className="px-11 pb-2 pt-9">
+    <section className="px-4 pb-2 pt-9 sm:px-8 lg:px-11">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-xl font-bold">Truyện mới cập nhật</h2>
         {books.length > 0 && (
-          <Link href="/rankings" className="cursor-pointer text-[13px] font-medium text-brand-gold-dark">
+          <Link href="/truyen" className="cursor-pointer text-[13px] font-medium text-brand-gold-dark">
             Xem tất cả →
           </Link>
         )}

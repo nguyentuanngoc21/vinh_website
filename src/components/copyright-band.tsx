@@ -19,11 +19,11 @@ const FEATURES = [
 ];
 
 const WATERMARK_TEXT =
-  "Minh Khôi · @minhkhoi · ID 88245   Vịnh · Bản quyền   ".repeat(20);
+  "Nguyễn Văn A · @nguyenvana · ID xxxxxxxx   Vịnh · Bản quyền   ".repeat(20);
 
 export function CopyrightBand() {
   return (
-    <section className="p-11">
+    <section className="px-4 py-11 sm:px-8 lg:px-11">
       <div className="grid grid-cols-1 items-center gap-12 rounded-[22px] bg-ink p-11 text-white lg:grid-cols-[1fr_460px]">
         <div>
           <div className="text-xs font-semibold tracking-[1px] text-brand-gold-light">

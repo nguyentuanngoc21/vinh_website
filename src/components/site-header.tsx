@@ -44,12 +44,14 @@ export function SiteHeader({
       </Link>
 
       <div className="flex items-center gap-3.5">
-        <span data-tour="tour-bookmark" className="inline-flex">
-          <BookmarkSimpleIcon
-            size={21}
-            className="cursor-default text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
-          />
-        </span>
+        <Link
+          href="/ca-nhan#bookmarks"
+          data-tour="tour-bookmark"
+          aria-label="Tác phẩm đã lưu"
+          className="inline-flex text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
+        >
+          <BookmarkSimpleIcon size={21} />
+        </Link>
         <AuthCluster ctaLabel={ctaLabel} ctaHref={ctaHref} />
       </div>
 

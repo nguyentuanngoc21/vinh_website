@@ -5,22 +5,26 @@ import { FacebookLogoIcon, YoutubeLogoIcon, InstagramLogoIcon } from "@phosphor-
 import { LegalLink } from "@/components/legal/legal-link";
 import { VinhMark } from "@/components/ui";
 
-type FooterLink = { label: string; legalDoc?: "terms" | "privacy" };
+type FooterLink = {
+  label: string;
+  href?: string;
+  legalDoc?: "terms" | "privacy";
+};
 
 const LINK_COLUMNS: { title: string; links: FooterLink[] }[] = [
   {
     title: "Khám phá",
     links: [
-      { label: "Truyện chữ" },
-      { label: "Truyện audio" },
-      { label: "Blog" },
-      { label: "Bảng xếp hạng" },
+      { label: "Truyện chữ", href: "/truyen" },
+      { label: "Truyện audio", href: "/audio" },
+      { label: "Blog", href: "/blog" },
+      { label: "Bảng xếp hạng", href: "/rankings" },
     ],
   },
   {
     title: "Tác giả",
     links: [
-      { label: "Đăng tác phẩm" },
+      { label: "Đăng tác phẩm", href: "/author" },
       { label: "Bản quyền & bảo hộ" },
       { label: "Quyền lợi tác giả" },
       { label: "Hướng dẫn" },
@@ -32,7 +36,7 @@ const LINK_COLUMNS: { title: string; links: FooterLink[] }[] = [
       { label: "Trung tâm trợ giúp" },
       { label: "Điều khoản", legalDoc: "terms" },
       { label: "Bảo mật", legalDoc: "privacy" },
-      { label: "Liên hệ" },
+      { label: "Liên hệ", href: "/ket-noi" },
     ],
   },
 ];
@@ -67,8 +71,21 @@ export function SiteFooter() {
                   <LegalLink key={link.label} doc={link.legalDoc} className="text-left text-[#c9c3bd] hover:text-white">
                     {link.label}
                   </LegalLink>
+                ) : link.href ? (
+                  <Link
+                    key={link.label}
+                    href={link.href}
+                    className="text-[#c9c3bd] no-underline transition-colors hover:text-white"
+                  >
+                    {link.label}
+                  </Link>
                 ) : (
-                  <span key={link.label} className="cursor-default">
+                  <span
+                    key={link.label}
+                    title="Sắp có"
+                    aria-disabled="true"
+                    className="cursor-default text-[#6b635a]"
+                  >
                     {link.label}
                   </span>
                 ),

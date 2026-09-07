@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function AuthorCta() {
   return (
-    <section className="px-11 pb-11">
+    <section className="px-4 pb-11 sm:px-8 lg:px-11">
       <div className="flex flex-col items-start justify-between gap-5 rounded-[20px] bg-[#F7EFD8] px-11 py-9 sm:flex-row sm:items-center">
         <div>
           <div className="text-2xl font-bold text-brand-ink">

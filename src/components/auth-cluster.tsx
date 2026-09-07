@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ShieldCheckIcon,
@@ -20,6 +20,19 @@ export function AuthCluster({
 }) {
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Đóng dropdown khi click ra ngoài vùng avatar+menu
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   const initial = session?.name?.[0] ?? "?";
   const userName = session?.name ?? "";
@@ -75,7 +88,7 @@ export function AuthCluster({
           thông báo). */}
       {isLogged && <NotificationBell />}
       {isLogged && (
-        <div className="relative shrink-0">
+        <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}

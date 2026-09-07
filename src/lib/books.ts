@@ -10,14 +10,14 @@
 // migrations/20260825_update_book_genres.sql và
 // src/lib/covers/genre-styles.ts.
 export const genres = [
-  { label: "Linh dị", active: false },
-  { label: "Cổ tích & Thần thoại", active: false },
-  { label: "Dã sử", active: false },
-  { label: "Trinh thám", active: false },
-  { label: "Tâm lý - tội phạm", active: false },
-  { label: "Tình cảm", active: false },
-  { label: "Đời sống - Xã hội", active: true },
-  { label: "Khoa học viễn tưởng", active: false },
-  { label: "Tiên hiệp/ kiếm hiệp", active: false },
-  { label: "Kỳ ảo", active: false },
+  { label: "Linh dị", slug: "linh-di", active: false },
+  { label: "Cổ tích & Thần thoại", slug: "co-tich-than-thoai", active: false },
+  { label: "Dã sử", slug: "da-su", active: false },
+  { label: "Trinh thám", slug: "trinh-tham", active: false },
+  { label: "Tâm lý - tội phạm", slug: "tam-ly-toi-pham", active: false },
+  { label: "Tình cảm", slug: "tinh-cam", active: false },
+  { label: "Đời sống - Xã hội", slug: "doi-song-xa-hoi", active: true },
+  { label: "Khoa học viễn tưởng", slug: "khoa-hoc-vien-tuong", active: false },
+  { label: "Tiên hiệp/ kiếm hiệp", slug: "tien-hiep-kiem-hiep", active: false },
+  { label: "Kỳ ảo", slug: "ky-ao", active: false },
 ];

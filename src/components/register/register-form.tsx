@@ -298,10 +298,19 @@ export function RegisterForm() {
                 </button>
               }
             />
-            <div className="mt-2 flex gap-1">
+            <div
+              role="meter"
+              aria-label="Độ mạnh mật khẩu"
+              aria-valuenow={score}
+              aria-valuemin={0}
+              aria-valuemax={4}
+              aria-valuetext={PASSWORD_SCORE_LABELS[score] || "Ít nhất 8 ký tự"}
+              className="mt-2 flex gap-1"
+            >
               {[0, 1, 2, 3].map((i) => (
                 <div
                   key={i}
+                  aria-hidden="true"
                   style={{ background: i < score ? PASSWORD_SCORE_COLORS[score] : "#efedea" }}
                   className="h-1 flex-1 rounded-full transition-colors"
                 />
