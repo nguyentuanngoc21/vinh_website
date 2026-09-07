@@ -9,6 +9,7 @@ import {
   SignOutIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 export function AuthCluster({
   ctaLabel = "Viết truyện",
@@ -69,6 +70,10 @@ export function AuthCluster({
           điều khiển
         </Link>
       )}
+      {/* Giữa nút hành động (Viết truyện/...) và avatar, theo đúng vị trí
+          yêu cầu — chỉ hiện khi đã đăng nhập (khách chưa có gì để nhận
+          thông báo). */}
+      {isLogged && <NotificationBell />}
       {isLogged && (
         <div className="relative shrink-0">
           <button

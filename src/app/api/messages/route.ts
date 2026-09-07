@@ -59,7 +59,7 @@ export async function GET() {
 
   const { data: profiles, error: profilesError } = await supabase
     .from("author_public_profiles")
-    .select("id, nickname, username, avatar_url")
+    .select("id, nickname, username, avatar_url, is_system")
     .in("id", counterpartyIds);
   if (profilesError) {
     console.error("[messages] profiles lookup failed:", profilesError);
@@ -81,6 +81,7 @@ export async function GET() {
         nickname: profile.nickname,
         username: profile.username,
         avatarUrl: profile.avatar_url,
+        isSystem: profile.is_system,
         lastMessage: meta.lastMessage,
         unreadCount: meta.unreadCount,
       };

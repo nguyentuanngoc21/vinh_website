@@ -3321,3 +3321,81 @@ create policy "admins view content protection status"
 
 create index content_protection_status_type_idx
   on public.content_protection_status (content_type);
+
+-- --- Admin duyệt/gỡ chương + Thông báo + tài khoản hệ thống — xem
+-- migrations/20260908_add_chapter_moderation_and_notifications.sql. ---
+
+-- Cờ tài khoản hệ thống ("Vịnh", gửi tin nhắn khi gỡ chương) — tối đa 1
+-- hàng true trong toàn bộ profiles (index unique lọc where is_system).
+-- Hàng thật được tạo bằng scripts/create-system-account.mjs (Supabase
+-- Admin API, không phải SQL thô — auth.users do GoTrue quản lý).
+alter table public.profiles add column is_system boolean not null default false;
+create unique index profiles_single_system_idx on public.profiles (is_system) where is_system;
+
+-- Thêm is_system vào view — /api/messages, /api/messages/:userId resolve
+-- counterparty QUA VIEW NÀY, không phải bảng profiles gốc.
+create or replace view public.author_public_profiles as
+  select id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags, is_system
+  from public.profiles;
+
+-- Trạng thái gỡ/khôi phục chương của ADMIN — tách biệt hẳn với `published`
+-- (published=false do admin gỡ phải phân biệt được với published=false vì
+-- tác giả tự để nháp).
+alter table public.chapters
+  add column removed_at timestamptz,
+  add column removed_by uuid references auth.users (id),
+  add column removed_reason_group text,
+  add column removed_reason_detail text;
+
+-- Nhật ký MỌI lần gỡ/khôi phục (audit trail) — giữ lại lịch sử đầy đủ,
+-- không chỉ trạng thái hiện tại ở chapters.removed_*.
+create table public.chapter_moderation_actions (
+  id uuid primary key default gen_random_uuid(),
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  book_id uuid not null references public.books (id) on delete cascade,
+  author_id uuid not null references auth.users (id),
+  admin_id uuid not null references auth.users (id),
+  action text not null check (action in ('removed', 'restored')),
+  reason_group text,
+  reason_detail text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.chapter_moderation_actions enable row level security;
+
+create policy "admins view chapter moderation actions"
+  on public.chapter_moderation_actions for select
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+  ));
+
+create index chapter_moderation_actions_chapter_idx
+  on public.chapter_moderation_actions (chapter_id, created_at);
+
+-- "Mục Thông báo" — lớp (A) ngắn gọn (title + link). Nội dung đầy đủ (lớp
+-- B) nằm ở direct_messages, không lặp lại ở đây. `type` không CHECK cứng
+-- để thêm loại thông báo mới sau này không cần sửa migration.
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  type text not null,
+  title text not null,
+  link text,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.notifications enable row level security;
+
+create policy "users view their own notifications"
+  on public.notifications for select
+  using (auth.uid() = user_id);
+
+create policy "users mark their own notifications read"
+  on public.notifications for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index notifications_user_unread_idx
+  on public.notifications (user_id, created_at) where read_at is null;

@@ -48,6 +48,30 @@ export async function PATCH(
 
   const supabase = await createClient();
 
+  // Chương đang bị ADMIN gỡ (removed_at khác null, xem
+  // migrations/20260908_add_chapter_moderation_and_notifications.sql) —
+  // chặn MỌI sửa đổi, không chỉ published=true. RLS "authors update
+  // chapters on their own books" chỉ kiểm quyền sở hữu, không biết gì về
+  // removed_at, nên nếu không chặn ở đây tác giả có thể tự xuất bản lại
+  // (hoặc sửa nội dung) 1 chương đang bị kiểm duyệt, vô hiệu hoá hoàn
+  // toàn hành động của admin. Chỉ admin (PATCH /api/admin/chapters/:id,
+  // action=restore) mới gỡ được cờ này.
+  const { data: currentChapter } = await supabase
+    .from("chapters")
+    .select("removed_at, removed_reason_detail")
+    .eq("id", chapterId)
+    .maybeSingle();
+  if (currentChapter?.removed_at) {
+    return NextResponse.json(
+      {
+        error: currentChapter.removed_reason_detail
+          ? `Chương này đã bị gỡ bởi quản trị viên (${currentChapter.removed_reason_detail}) — không thể sửa cho tới khi được khôi phục. Xem Hội thoại để biết chi tiết.`
+          : "Chương này đã bị gỡ bởi quản trị viên — không thể sửa cho tới khi được khôi phục. Xem Hội thoại để biết chi tiết.",
+      },
+      { status: 403 }
+    );
+  }
+
   // Defense-in-depth cho chiều true -> false: trigger DB
   // prevent_unset_last_chapter (migrations/20260824_add_chapter_is_last.sql)
   // là chốt chặn thật; kiểm tra sớm ở đây chỉ để trả lỗi tiếng Việt gọn

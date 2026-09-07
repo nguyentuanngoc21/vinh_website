@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwiseIcon, BookOpenTextIcon } from "@phosphor-icons/react/dist/ssr";
 
 export type ContentBookRow = {
   id: string;
@@ -14,7 +14,7 @@ export type ContentBookRow = {
   deletedAt: string | null;
 };
 
-const GRID_COLS = "grid-cols-[1fr_160px_110px_130px_150px_190px]";
+const GRID_COLS = "grid-cols-[1fr_160px_110px_130px_150px_100px_190px]";
 
 /**
  * Bảng quản lý truyện cho src/app/admin/noi-dung/page.tsx. Tìm kiếm lọc
@@ -106,6 +106,7 @@ export function ContentTable({
         <div>Độc quyền</div>
         <div>Đã xoá</div>
         <div />
+        <div />
       </div>
 
       {filtered.map((r) => (
@@ -150,6 +151,14 @@ export function ContentTable({
           </div>
           <div className="text-xs text-stone-alt">
             {r.deletedAt ? new Date(r.deletedAt).toLocaleDateString("vi-VN") : "—"}
+          </div>
+          <div>
+            <Link
+              href={`/admin/noi-dung/${r.id}`}
+              className="flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-ink"
+            >
+              <BookOpenTextIcon size={14} /> Chương
+            </Link>
           </div>
           <div className="flex justify-end">
             {r.deletedAt ? (
