@@ -16,6 +16,13 @@ function mod(i: number, n: number) {
   return ((i % n) + n) % n;
 }
 
+// Độ dịch ngang (px) của 1 bìa cách active `c` bước — dùng chung cho
+// wrapStyle (bìa 3D thật) và lớp bắt click phẳng bên dưới, để 2 bên luôn
+// khớp toạ độ nhau.
+function cardOffsetX(c: number) {
+  return c * 118 - (c > 1 ? (c - 1) * 26 : 0);
+}
+
 function buildSlide(books: HomepageBook[], index: number, active: number, n: number) {
   let d = index - active;
   if (d > n / 2) d -= n;
@@ -34,7 +41,7 @@ function buildSlide(books: HomepageBook[], index: number, active: number, n: num
     height: 330,
     marginLeft: -115,
     marginTop: -165,
-    transform: `translateX(${sgn * (c * 118 - (c > 1 ? (c - 1) * 26 : 0))}px) translateZ(${-c * 78}px) rotateY(${-sgn * c * 20}deg) scale(${1 - c * 0.07})`,
+    transform: `translateX(${sgn * cardOffsetX(c)}px) translateZ(${-c * 78}px) rotateY(${-sgn * c * 20}deg) scale(${1 - c * 0.07})`,
     backfaceVisibility: "hidden",
     transformStyle: "preserve-3d",
     zIndex: 50 - c,
@@ -150,10 +157,19 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
               }}
               className="absolute left-1/2 -translate-x-1/2"
             >
+              {/* Lớp hiển thị 3D — chỉ để vẽ, không nhận click cho bìa bên
+                  nữa. Đã kiểm chứng bằng DevTools inspect trên production:
+                  hover vào bìa bên trả về đúng div.absolute.inset-0 (base
+                  ngoài preserve-3d) chứ không phải bìa — hit-test của trình
+                  duyệt trên phần tử bị rotateY/translateZ trong perspective
+                  + bị scale lại theo bề rộng màn hình (ResizeObserver ở
+                  trên) không khớp vị trí hiển thị. Bìa giữa (transform gần
+                  như identity) không bị ảnh hưởng nên Link vẫn bấm được
+                  bình thường. Click bìa bên được xử lý ở lớp overlay phẳng
+                  (2D) bên dưới thay vì dựa vào hit-test 3D không đáng tin. */}
               <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
                 {books.map((book, i) => {
                   const { wrapStyle, coverStyle, reflStyle } = buildSlide(books, i, active, n);
-                  // Tính khoảng cách đến active để biết đây là bìa giữa hay bên
                   let d = i - active;
                   if (d > n / 2) d -= n;
                   if (d < -n / 2) d += n;
@@ -186,7 +202,8 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
                   return (
                     <div key={book.id} style={wrapStyle}>
                       {isCenter ? (
-                        // Bìa giữa → Link dẫn thẳng tới trang truyện
+                        // Bìa giữa → Link dẫn thẳng tới trang truyện (transform
+                        // gần identity nên hit-test 3D vẫn đúng, đã kiểm chứng)
                         <Link
                           href={`/truyen/${book.slug}`}
                           style={coverStyle}
@@ -196,18 +213,50 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
                           {coverInner}
                         </Link>
                       ) : (
-                        // Bìa bên → bấm để xoay carousel, đẩy bìa này vào giữa
-                        <div
-                          style={coverStyle}
-                          onClick={() => go(i)}
-                          role="button"
-                          aria-label={`Xem ${book.title}`}
-                        >
-                          {coverInner}
-                        </div>
+                        <div style={coverStyle}>{coverInner}</div>
                       )}
                       <div style={reflStyle} />
                     </div>
+                  );
+                })}
+              </div>
+
+              {/* Lớp bắt click phẳng (2D) cho bìa 2 bên — nằm ngoài
+                  preserve-3d, chỉ dùng translateX (giống hệt công thức ở
+                  wrapStyle qua cardOffsetX, bỏ translateZ/rotateY) nên
+                  hit-test luôn đúng vị trí, không phụ thuộc trình duyệt xử
+                  lý 3D thế nào. clipPath giữ lại đúng nửa hướng ra ngoài để
+                  không đè lên vùng bìa giữa (bìa liền kề chờm ~1 nửa vào
+                  giữa theo thiết kế). */}
+              <div className="pointer-events-none absolute inset-0">
+                {books.map((book, i) => {
+                  if (i === active) return null;
+                  let d = i - active;
+                  if (d > n / 2) d -= n;
+                  if (d < -n / 2) d += n;
+                  const abs = Math.abs(d);
+                  if (abs > VISIBLE_DEPTH) return null;
+                  const sgn = Math.sign(d);
+                  const c = Math.min(abs, VISIBLE_DEPTH);
+                  return (
+                    <button
+                      key={book.id}
+                      type="button"
+                      onClick={() => go(i)}
+                      aria-label={`Xem ${book.title}`}
+                      className="pointer-events-auto absolute cursor-pointer border-0 bg-transparent p-0"
+                      style={{
+                        left: "50%",
+                        top: "50%",
+                        width: 230,
+                        height: 330,
+                        marginLeft: -115,
+                        marginTop: -165,
+                        transform: `translateX(${sgn * cardOffsetX(c)}px)`,
+                        clipPath: sgn < 0 ? "inset(0 50% 0 0)" : "inset(0 0 0 50%)",
+                        zIndex: 50 - c,
+                      }}
+                    />
                   );
                 })}
               </div>
