@@ -13,12 +13,14 @@ function resolveContext(value: unknown): MessageContext {
 
 /**
  * GET /api/messages/:userId?context=personal|moderation — toàn bộ tin
- * nhắn giữa mình và :userId TRONG ĐÚNG 1 hòm thư (context) — cùng 1 cặp
- * người dùng giờ có thể có 2 hòm thư tách biệt: "personal" (chat bình
- * thường) và "moderation" (tin gỡ chương từ tài khoản is_system, xem
- * migrations/20260908_add_direct_message_context.sql). Mặc định
- * "personal" nếu không truyền — giữ nguyên hành vi cũ cho mọi nơi gọi
- * route này trước khi có context.
+ * nhắn giữa mình và :userId TRONG ĐÚNG 1 hòm thư (context) — cùng 1 admin
+ * giờ có thể có 2 hòm thư tách biệt với 1 tác giả: "personal" (chat bình
+ * thường) và "moderation" (tin gỡ chương), xem
+ * migrations/20260908_add_direct_message_context.sql. Danh tính người
+ * gửi LUÔN hiển thị thật ở cả 2 context — context chỉ định tuyến tin
+ * nhắn vào đúng hòm thư, không che giấu ai gửi. Mặc định "personal" nếu
+ * không truyền — giữ nguyên hành vi cũ cho mọi nơi gọi route này trước
+ * khi có context.
  */
 export async function GET(
   request: Request,
@@ -34,7 +36,7 @@ export async function GET(
 
   const { data: counterparty, error: counterpartyError } = await supabase
     .from("author_public_profiles")
-    .select("id, nickname, username, avatar_url, is_system")
+    .select("id, nickname, username, avatar_url")
     .eq("id", counterpartyId)
     .maybeSingle();
   if (counterpartyError || !counterparty) {
@@ -69,21 +71,16 @@ export async function GET(
       if (markReadError) console.error("[messages] mark read failed:", markReadError);
     });
 
-  // "Đội ngũ Vịnh" chỉ hiện khi CẢ 2 điều kiện đúng: đang xem hòm thư
-  // moderation VÀ đối phương thực sự là tài khoản is_system=true — không
-  // chỉ dựa vào context (client có thể tự truyền context=moderation tuỳ
-  // ý qua query string, đây chỉ là GET nên không tạo dữ liệu giả được,
-  // nhưng vẫn kiểm cho chắc, khớp cách POST bên dưới chặn ghi sai).
-  const isModerationMailbox = context === "moderation" && counterparty.is_system === true;
-
   return NextResponse.json({
     context,
     counterparty: {
       userId: counterparty.id,
-      nickname: isModerationMailbox ? "Đội ngũ Vịnh" : counterparty.nickname,
+      nickname: counterparty.nickname,
       username: counterparty.username,
-      avatarUrl: isModerationMailbox ? null : counterparty.avatar_url,
-      isModerationMailbox,
+      avatarUrl: counterparty.avatar_url,
+      // Chỉ để UI gắn 1 nhãn nhỏ "Kiểm duyệt" cạnh tên — KHÔNG dùng để
+      // đổi tên/avatar hiển thị (danh tính người gửi luôn thật).
+      isModerationThread: context === "moderation",
     },
     messages: (rows ?? []).map((m) => ({
       id: m.id,
@@ -100,10 +97,14 @@ export async function GET(
 /**
  * POST /api/messages/:userId — gửi 1 tin nhắn tới :userId. Body có thể
  * kèm `context: "moderation"` (khi đang trả lời trong hòm thư kiểm
- * duyệt) — CHỈ được chấp nhận nếu recipientId đúng là tài khoản
- * is_system=true, ngược lại tự hạ về "personal". Chặn ở đây để không ai
- * tự gắn context=moderation gửi cho người khác rồi giả mạo "tin nhắn từ
- * Vịnh" (client không kiểm được, phải chặn phía server).
+ * duyệt) — CHỈ được chấp nhận nếu:
+ *   1. Người nhận có role admin/super_admin, VÀ
+ *   2. Đã có ít nhất 1 tin context='moderation' TỪ CHÍNH người nhận đó
+ *      GỬI cho người đang gửi request (tức đang trả lời 1 thông báo có
+ *      thật, không phải tự bịa ra 1 "cuộc kiểm duyệt" với ai đó).
+ * Ngược lại tự hạ về "personal". Chặn ở server vì client không kiểm
+ * được — nếu không, ai cũng có thể tự gắn context=moderation gửi cho
+ * người khác rồi giả mạo "tin nhắn kiểm duyệt".
  */
 export async function POST(
   request: Request,
@@ -130,7 +131,7 @@ export async function POST(
 
   const { data: recipient } = await supabase
     .from("author_public_profiles")
-    .select("id, is_system")
+    .select("id")
     .eq("id", recipientId)
     .maybeSingle();
   if (!recipient) {
@@ -138,7 +139,22 @@ export async function POST(
   }
 
   const requestedContext = resolveContext(body?.context);
-  const context: MessageContext = requestedContext === "moderation" && recipient.is_system ? "moderation" : "personal";
+  let context: MessageContext = "personal";
+  if (requestedContext === "moderation") {
+    const { data: recipientProfile } = await supabase.from("profiles").select("role").eq("id", recipientId).maybeSingle();
+    const recipientIsAdmin = recipientProfile?.role === "admin" || recipientProfile?.role === "super_admin";
+    if (recipientIsAdmin) {
+      const { data: priorNotice } = await supabase
+        .from("direct_messages")
+        .select("id")
+        .eq("sender_id", recipientId)
+        .eq("recipient_id", userId)
+        .eq("context", "moderation")
+        .limit(1)
+        .maybeSingle();
+      if (priorNotice) context = "moderation";
+    }
+  }
 
   // Mục 8 đặc tả — chỉ gắn nhãn, KHÔNG chặn gửi (xem off-platform-detector.ts).
   const flagged = isLikelyOffPlatform(text);

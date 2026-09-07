@@ -3322,21 +3322,11 @@ create policy "admins view content protection status"
 create index content_protection_status_type_idx
   on public.content_protection_status (content_type);
 
--- --- Admin duyệt/gỡ chương + Thông báo + tài khoản hệ thống — xem
--- migrations/20260908_add_chapter_moderation_and_notifications.sql. ---
-
--- Cờ tài khoản hệ thống ("Vịnh", gửi tin nhắn khi gỡ chương) — tối đa 1
--- hàng true trong toàn bộ profiles (index unique lọc where is_system).
--- Hàng thật được tạo bằng scripts/create-system-account.mjs (Supabase
--- Admin API, không phải SQL thô — auth.users do GoTrue quản lý).
-alter table public.profiles add column is_system boolean not null default false;
-create unique index profiles_single_system_idx on public.profiles (is_system) where is_system;
-
--- Thêm is_system vào view — /api/messages, /api/messages/:userId resolve
--- counterparty QUA VIEW NÀY, không phải bảng profiles gốc.
-create or replace view public.author_public_profiles as
-  select id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags, is_system
-  from public.profiles;
+-- --- Admin duyệt/gỡ chương + Thông báo — xem
+-- migrations/20260908_add_chapter_moderation_and_notifications.sql.
+-- Người gửi tin nhắn khi gỡ chương LÀ chính admin thực hiện thao tác đó
+-- (tài khoản thật, không phải 1 tài khoản "hệ thống" ẩn danh riêng) — xem
+-- api/admin/chapters/[chapterId]/route.ts. ---
 
 -- Trạng thái gỡ/khôi phục chương của ADMIN — tách biệt hẳn với `published`
 -- (published=false do admin gỡ phải phân biệt được với published=false vì
@@ -3400,13 +3390,11 @@ create policy "users mark their own notifications read"
 create index notifications_user_unread_idx
   on public.notifications (user_id, created_at) where read_at is null;
 
--- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context),
--- không phải theo tài khoản gửi — xem
--- migrations/20260908_add_direct_message_context.sql. profiles.is_system
--- ở trên vẫn giữ nguyên vai trò "tài khoản nào đóng vai người gửi kiểm
--- duyệt"; context ở đây tách được tin GỠ CHƯƠNG (context='moderation',
--- hiện như "Đội ngũ Vịnh") khỏi tin CÙNG tài khoản đó tự nhắn bình
--- thường (context='personal', hiện như người dùng thật). ---
+-- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context) —
+-- cho phép 1 admin vừa gửi tin gỡ chương (kiểm duyệt) vừa tự chat bình
+-- thường với CÙNG 1 tác giả mà không bị trộn vào chung 1 hòm thư. Danh
+-- tính người gửi LUÔN hiển thị thật (context không dùng để che giấu) —
+-- xem migrations/20260908_add_direct_message_context.sql. ---
 alter table public.direct_messages
   add column context text not null default 'personal' check (context in ('personal', 'moderation'));
 

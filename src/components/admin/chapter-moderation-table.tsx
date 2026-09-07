@@ -31,7 +31,6 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
   const [rows, setRows] = useState(initialRows);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
   const [removingChapter, setRemovingChapter] = useState<ChapterModerationRow | null>(null);
 
   const restore = async (id: string) => {
@@ -49,7 +48,6 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
         setError((data && typeof data.error === "string" && data.error) || "Không khôi phục được.");
         return;
       }
-      if (data?.warning) setWarning(data.warning);
       setRows((prev) =>
         prev.map((r) =>
           r.id === id
@@ -85,7 +83,6 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
         setError((data && typeof data.error === "string" && data.error) || "Không gỡ được chương.");
         return;
       }
-      if (data?.warning) setWarning(data.warning);
       setRows((prev) =>
         prev.map((r) =>
           r.id === id
@@ -112,11 +109,6 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
       {error && (
         <div className="mb-3.5 rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-[#B02A37]">
           {error}
-        </div>
-      )}
-      {warning && (
-        <div className="mb-3.5 rounded-lg border border-[#f3dfa6] bg-[#fdf8ea] px-3 py-2.5 text-[12.5px] font-medium text-[#894701]">
-          {warning}
         </div>
       )}
 

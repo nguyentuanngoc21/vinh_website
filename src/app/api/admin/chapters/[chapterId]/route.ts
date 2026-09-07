@@ -20,11 +20,15 @@ import {
  * removed_reason_*, rồi:
  *   1. Ghi audit vào chapter_moderation_actions.
  *   2. Tạo 1 dòng notifications (lớp A, ngắn).
- *   3. Gửi 1 direct_messages từ tài khoản hệ thống is_system=true (lớp B,
- *      đầy đủ) — xem scripts/create-system-account.mjs. Nếu tài khoản đó
- *      CHƯA được tạo, vẫn cho gỡ chương thành công (đây là hành động
- *      QUAN TRỌNG hơn) nhưng bỏ qua bước 2-3, trả về `warning` để UI báo
- *      admin biết thông báo chưa gửi được.
+ *   3. Gửi 1 direct_messages từ CHÍNH admin đang thực hiện thao tác này
+ *      (lớp B, đầy đủ) — danh tính thật (tên/avatar thật), không che
+ *      giấu dưới 1 tài khoản "hệ thống" riêng. context='moderation' chỉ
+ *      để tách hòm thư này khỏi chat cá nhân nếu admin đó cũng tự nhắn
+ *      tin bình thường với cùng tác giả — xem
+ *      migrations/20260908_add_direct_message_context.sql. Nhờ vậy, ai
+ *      gỡ chương thì người đó (đúng, không phải "tài khoản dùng chung")
+ *      nhận được phản hồi của tác giả — không cần thêm màn hình admin
+ *      nào khác để "phát" lại cho người khác.
  *
  * `action: "restore"` — ngược lại, published=true + xoá sạch removed_*,
  * cũng gửi 1 thông báo/tin nhắn ngắn báo đã khôi phục (không có trong
@@ -160,36 +164,27 @@ export async function PATCH(
     ].join("\n");
   }
 
-  const { data: systemAccount } = await supabase.from("profiles").select("id").eq("is_system", true).maybeSingle();
-  let warning: string | undefined;
-  if (!systemAccount) {
-    warning =
-      "Đã lưu nhưng CHƯA gửi được thông báo/tin nhắn cho tác giả — chưa có tài khoản nào đánh dấu is_system=true. Chạy: update public.profiles set is_system = true where id = '<id tài khoản Vịnh>'; rồi thử lại thao tác này.";
-    console.error("[admin/chapters] no is_system profile found — skipping notification/message");
-  } else {
-    // context='moderation' — tách khỏi hòm thư "personal" nếu tài khoản
-    // is_system này CŨNG được dùng để tự chat bình thường (xem
-    // migrations/20260908_add_direct_message_context.sql). Link kèm
-    // ?context=moderation để bấm vào mở đúng hòm thư này, không lẫn với
-    // hòm thư cá nhân (nếu có) cùng tài khoản.
-    const link = `/ca-nhan?tab=chat&chat=${systemAccount.id}&context=moderation`;
-    const [{ error: notifError }, { error: messageError }] = await Promise.all([
-      supabase.from("notifications").insert({
-        user_id: book.author_id,
-        type: notificationType,
-        title: notificationTitle,
-        link,
-      }),
-      supabase.from("direct_messages").insert({
-        sender_id: systemAccount.id,
-        recipient_id: book.author_id,
-        body: systemMessageBody,
-        context: "moderation",
-      }),
-    ]);
-    if (notifError) console.error("[admin/chapters] notification insert failed:", notifError);
-    if (messageError) console.error("[admin/chapters] system message insert failed:", messageError);
-  }
+  // Người gửi = chính admin đang đăng nhập (adminId) — không tra tài
+  // khoản "hệ thống" nào khác. Link kèm ?context=moderation để bấm vào
+  // mở đúng hòm thư kiểm duyệt, không lẫn với hòm thư cá nhân (nếu có)
+  // giữa admin này và tác giả.
+  const link = `/ca-nhan?tab=chat&chat=${adminId}&context=moderation`;
+  const [{ error: notifError }, { error: messageError }] = await Promise.all([
+    supabase.from("notifications").insert({
+      user_id: book.author_id,
+      type: notificationType,
+      title: notificationTitle,
+      link,
+    }),
+    supabase.from("direct_messages").insert({
+      sender_id: adminId,
+      recipient_id: book.author_id,
+      body: systemMessageBody,
+      context: "moderation",
+    }),
+  ]);
+  if (notifError) console.error("[admin/chapters] notification insert failed:", notifError);
+  if (messageError) console.error("[admin/chapters] system message insert failed:", messageError);
 
-  return NextResponse.json({ ok: true, warning });
+  return NextResponse.json({ ok: true });
 }

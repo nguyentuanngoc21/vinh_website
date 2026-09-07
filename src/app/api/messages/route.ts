@@ -6,14 +6,14 @@ const RECENT_MESSAGE_LIMIT = 300;
 
 /**
  * GET /api/messages — danh sách hội thoại của người dùng hiện tại. Mỗi
- * hội thoại là 1 cặp (counterparty, context) — cùng 1 người có thể xuất
+ * hội thoại là 1 cặp (counterparty, context) — cùng 1 admin có thể xuất
  * hiện ở 2 dòng riêng biệt nếu vừa có hòm thư "personal" (chat bình
- * thường) vừa có hòm thư "moderation" (tin gỡ chương từ tài khoản
- * is_system) với mình, xem
- * migrations/20260908_add_direct_message_context.sql. Không có bảng
- * "conversations" riêng (xem migrations/20260828_add_direct_messages.sql)
- * nên tự suy ra bằng cách lấy N tin gần nhất rồi group trong JS — cùng
- * tinh thần "join bằng JS" đã dùng ở src/app/author/layout.tsx.
+ * thường) vừa có hòm thư "moderation" (tin gỡ chương) với mình, xem
+ * migrations/20260908_add_direct_message_context.sql. Danh tính người
+ * gửi LUÔN hiển thị thật ở cả 2 hòm thư. Không có bảng "conversations"
+ * riêng (xem migrations/20260828_add_direct_messages.sql) nên tự suy ra
+ * bằng cách lấy N tin gần nhất rồi group trong JS — cùng tinh thần "join
+ * bằng JS" đã dùng ở src/app/author/layout.tsx.
  */
 export async function GET() {
   const supabase = createServiceRoleClient();
@@ -71,7 +71,7 @@ export async function GET() {
   const counterpartyIds = [...new Set(threads.map((t) => t.counterpartyId))];
   const { data: profiles, error: profilesError } = await supabase
     .from("author_public_profiles")
-    .select("id, nickname, username, avatar_url, is_system")
+    .select("id, nickname, username, avatar_url")
     .in("id", counterpartyIds);
   if (profilesError) {
     console.error("[messages] profiles lookup failed:", profilesError);
@@ -87,14 +87,13 @@ export async function GET() {
       // on delete cascade, giữ lại nhánh này chỉ để không crash nếu có
       // lệch dữ liệu.
       if (!profile) return null;
-      const isModerationMailbox = t.context === "moderation" && profile.is_system === true;
       return {
         userId: t.counterpartyId,
         context: t.context,
-        nickname: isModerationMailbox ? "Đội ngũ Vịnh" : profile.nickname,
+        nickname: profile.nickname,
         username: profile.username,
-        avatarUrl: isModerationMailbox ? null : profile.avatar_url,
-        isModerationMailbox,
+        avatarUrl: profile.avatar_url,
+        isModerationThread: t.context === "moderation",
         lastMessage: t.lastMessage,
         unreadCount: t.unreadCount,
       };
