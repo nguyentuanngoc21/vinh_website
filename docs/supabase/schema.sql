@@ -3399,3 +3399,22 @@ create policy "users mark their own notifications read"
 
 create index notifications_user_unread_idx
   on public.notifications (user_id, created_at) where read_at is null;
+
+-- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context),
+-- không phải theo tài khoản gửi — xem
+-- migrations/20260908_add_direct_message_context.sql. profiles.is_system
+-- ở trên vẫn giữ nguyên vai trò "tài khoản nào đóng vai người gửi kiểm
+-- duyệt"; context ở đây tách được tin GỠ CHƯƠNG (context='moderation',
+-- hiện như "Đội ngũ Vịnh") khỏi tin CÙNG tài khoản đó tự nhắn bình
+-- thường (context='personal', hiện như người dùng thật). ---
+alter table public.direct_messages
+  add column context text not null default 'personal' check (context in ('personal', 'moderation'));
+
+drop index if exists direct_messages_thread_idx;
+create index direct_messages_thread_idx
+  on public.direct_messages (
+    least(sender_id, recipient_id),
+    greatest(sender_id, recipient_id),
+    context,
+    created_at
+  );

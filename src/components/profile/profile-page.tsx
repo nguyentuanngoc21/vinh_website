@@ -26,11 +26,17 @@ export function ProfilePage() {
   const searchParams = useSearchParams();
   const chatWithParam = searchParams.get("chat");
   const tabParam = searchParams.get("tab");
+  // "?context=moderation" — chỉ dùng khi deep-link tới từ chuông Thông
+  // báo (gỡ chương), xem link trong api/admin/chapters/[chapterId]/route.ts.
+  // Mọi lối vào khác (Kết nối, Đang theo dõi) không truyền context, mặc
+  // định "personal". Xem migrations/20260908_add_direct_message_context.sql.
+  const contextParam = searchParams.get("context") === "moderation" ? "moderation" : "personal";
 
   const [tab, setTab] = useState<ProfileTab>(
     chatWithParam ? "chat" : isProfileTab(tabParam) ? tabParam : "edit"
   );
   const [activeUserId, setActiveUserId] = useState<string | null>(chatWithParam);
+  const [activeContext, setActiveContext] = useState<"personal" | "moderation">(contextParam);
   const [mobileView, setMobileView] = useState<"list" | "thread">(chatWithParam ? "thread" : "list");
 
   // Header hiển thị trên MỌI tab (không chỉ tab "edit"), nên fetch riêng
@@ -75,6 +81,7 @@ export function ProfilePage() {
   // mock như trước.
   const openChatWith = (userId: string) => {
     setActiveUserId(userId);
+    setActiveContext("personal");
     setMobileView("thread");
     setTab("chat");
   };
@@ -100,8 +107,10 @@ export function ProfilePage() {
       {tab === "chat" && (
         <ChatTab
           activeUserId={activeUserId}
-          onSelectUser={(userId) => {
+          activeContext={activeContext}
+          onSelectUser={(userId, context) => {
             setActiveUserId(userId);
+            setActiveContext(context);
             setMobileView("thread");
           }}
           mobileView={mobileView}

@@ -164,10 +164,15 @@ export async function PATCH(
   let warning: string | undefined;
   if (!systemAccount) {
     warning =
-      "Đã lưu nhưng CHƯA gửi được thông báo/tin nhắn cho tác giả — chưa có tài khoản hệ thống. Chạy `npm run create-system-account` rồi thử lại thao tác này.";
+      "Đã lưu nhưng CHƯA gửi được thông báo/tin nhắn cho tác giả — chưa có tài khoản nào đánh dấu is_system=true. Chạy: update public.profiles set is_system = true where id = '<id tài khoản Vịnh>'; rồi thử lại thao tác này.";
     console.error("[admin/chapters] no is_system profile found — skipping notification/message");
   } else {
-    const link = `/ca-nhan?tab=chat&chat=${systemAccount.id}`;
+    // context='moderation' — tách khỏi hòm thư "personal" nếu tài khoản
+    // is_system này CŨNG được dùng để tự chat bình thường (xem
+    // migrations/20260908_add_direct_message_context.sql). Link kèm
+    // ?context=moderation để bấm vào mở đúng hòm thư này, không lẫn với
+    // hòm thư cá nhân (nếu có) cùng tài khoản.
+    const link = `/ca-nhan?tab=chat&chat=${systemAccount.id}&context=moderation`;
     const [{ error: notifError }, { error: messageError }] = await Promise.all([
       supabase.from("notifications").insert({
         user_id: book.author_id,
@@ -179,6 +184,7 @@ export async function PATCH(
         sender_id: systemAccount.id,
         recipient_id: book.author_id,
         body: systemMessageBody,
+        context: "moderation",
       }),
     ]);
     if (notifError) console.error("[admin/chapters] notification insert failed:", notifError);
