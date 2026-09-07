@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { applyPublicAssetWatermark } from "@/lib/copyright/public-asset-watermark";
 
 const COVER_MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME_EXT: Record<string, string> = {
@@ -72,10 +73,23 @@ export async function POST(
     return NextResponse.json({ error: "Ảnh bìa tối đa 8MB." }, { status: 400 });
   }
 
-  const path = `${user.id}/cover-${bookId}-${Date.now()}.${ext}`;
+  // Ép PNG + nhúng XMP "không cho AI huấn luyện" (ẩn, không che ảnh) —
+  // xem src/lib/copyright/public-asset-watermark.ts. Văn bản luật (Bộ quy
+  // tắc giao dịch Commission) yêu cầu gắn cho "mọi ảnh, link bìa" — bìa
+  // truyện là 1 trong số đó.
+  const originalBuffer = Buffer.from(await file.arrayBuffer());
+  let watermarked: Buffer;
+  try {
+    watermarked = await applyPublicAssetWatermark(originalBuffer, book.title);
+  } catch (err) {
+    console.error("[authoring/books/cover] watermark failed:", err);
+    return NextResponse.json({ error: "Xử lý ảnh bìa thất bại." }, { status: 500 });
+  }
+
+  const path = `${user.id}/cover-${bookId}-${Date.now()}.png`;
   const { error: uploadError } = await supabase.storage
     .from("design-images")
-    .upload(path, file, { contentType: file.type });
+    .upload(path, watermarked, { contentType: "image/png" });
   if (uploadError) {
     console.error("[authoring/books/cover] upload failed:", uploadError);
     return NextResponse.json({ error: `Tải ảnh bìa thất bại: ${uploadError.message}` }, { status: 500 });
@@ -97,6 +111,17 @@ export async function POST(
   if (insertError || !item) {
     console.error("[authoring/books/cover] design_items insert failed:", insertError);
     return NextResponse.json({ error: "Lưu ảnh bìa thất bại." }, { status: 500 });
+  }
+
+  // Ghi nhận đã bảo hộ — chỉ admin đọc được (RLS), phải dùng service-role
+  // (khác `supabase` cookie-bound đang dùng cho phần còn lại của route).
+  // Lỗi ở đây không chặn phản hồi — bìa đã lên thật và đã bảo hộ, chỉ là
+  // admin dashboard đếm thiếu 1 dòng.
+  const { error: protectionError } = await createServiceRoleClient()
+    .from("content_protection_status")
+    .insert({ content_type: "design", content_id: item.id, method: "xmp_png" });
+  if (protectionError) {
+    console.error("[authoring/books/cover] content_protection_status insert failed:", protectionError);
   }
 
   const { error: linkError } = await supabase.rpc("link_cover_to_book", {

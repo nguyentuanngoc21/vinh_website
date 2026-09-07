@@ -13,7 +13,17 @@ export async function generateMetadata({
   const supabase = await createClient();
   const { data: chapter } = await supabase.from("chapters").select("title").eq("id", chapterId).maybeSingle();
 
-  return { title: chapter ? `${chapter.title} — Vịnh` : "Đọc truyện — Vịnh" };
+  return {
+    title: chapter ? `${chapter.title} — Vịnh` : "Đọc truyện — Vịnh",
+    // "noai, noimageai" không nằm trong bộ directive chuẩn Next.js biết
+    // (field `robots` ở trên chỉ hỗ trợ index/follow/...), nên phải phát
+    // qua `other` — vẫn ra đúng thẻ <meta name="robots" content="noai,
+    // noimageai">, chỉ là 1 thẻ robots thứ 2 tách biệt. Xem
+    // src/app/robots.ts (robots.txt) — đây là lớp khai báo thứ 2 cho
+    // cùng mục đích, không phải cơ chế chặn kỹ thuật thật (như đã ghi ở
+    // src/lib/orders/xmp.ts cho ảnh/audio).
+    other: { robots: "noai, noimageai" },
+  };
 }
 
 export default async function ReadChapterPage({

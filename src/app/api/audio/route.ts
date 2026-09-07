@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { AUDIO_GENRES } from "@/lib/audio/get-audio-catalog";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
@@ -86,6 +86,22 @@ export async function POST(request: Request) {
   if (insertError || !item) {
     console.error("[api/audio] insert failed:", insertError);
     return NextResponse.json({ error: "Đăng bản thu thất bại." }, { status: 500 });
+  }
+
+  // KHÔNG sửa file audio — không có thư viện ghi tag ID3/Vorbis/APE nào
+  // trong project và mỗi định dạng (mp3/m4a/wav/ogg) lại khác nhau, không
+  // như PNG (xem migrations/20260907_add_content_protection_status.sql).
+  // Chỉ ghi nhận "đã tuyên bố không cho AI huấn luyện" vào DB — hiển thị
+  // rõ ở UI (xem src/components/audio-hub), không giả vờ đã nhúng vào
+  // file. `content_protection_status` chỉ admin đọc được (RLS) nên phải
+  // dùng service-role, khác `supabase` cookie-bound ở trên. Lỗi ở đây
+  // không chặn phản hồi — bản thu đã lên thật, chỉ admin dashboard đếm
+  // thiếu 1 dòng.
+  const { error: protectionError } = await createServiceRoleClient()
+    .from("content_protection_status")
+    .insert({ content_type: "audio", content_id: item.id, method: "declared_db_only" });
+  if (protectionError) {
+    console.error("[api/audio] content_protection_status insert failed:", protectionError);
   }
 
   return NextResponse.json({ ok: true, id: item.id });

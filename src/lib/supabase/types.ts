@@ -787,6 +787,29 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Xem migrations/20260907_add_content_protection_status.sql — chỉ
+      // admin đọc được (RLS), ghi bằng service-role từ route upload
+      // design/audio, không qua RPC.
+      content_protection_status: {
+        Row: {
+          id: string;
+          content_type: "audio" | "design";
+          content_id: string;
+          protected: boolean;
+          method: string;
+          applied_at: string;
+        };
+        Insert: {
+          id?: string;
+          content_type: "audio" | "design";
+          content_id: string;
+          protected?: boolean;
+          method: string;
+          applied_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["content_protection_status"]["Insert"]>;
+        Relationships: [];
+      };
       transactions: {
         Row: {
           id: string;

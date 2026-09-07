@@ -3295,3 +3295,29 @@ create index disputes_status_idx on public.disputes (status, created_at);
 -- ở đây. confirm_order_received() (phần 12c) và
 -- resolve_order_cancel_request() (phần 12g) được CREATE OR REPLACE trong
 -- migration đó để gọi thêm recalculate_trust_score() tường minh.
+
+-- --- Trạng thái bảo hộ bản quyền/"không cho AI huấn luyện" thật cho nội
+-- dung công khai (ảnh Thiết kế, audio) — xem
+-- migrations/20260907_add_content_protection_status.sql để biết vì sao
+-- "chapter" (truyện chữ) không có dòng riêng ở bảng này. ---
+create table public.content_protection_status (
+  id uuid primary key default gen_random_uuid(),
+  content_type text not null check (content_type in ('audio', 'design')),
+  content_id uuid not null,
+  protected boolean not null default true,
+  method text not null,
+  applied_at timestamptz not null default now(),
+  unique (content_type, content_id)
+);
+
+alter table public.content_protection_status enable row level security;
+
+create policy "admins view content protection status"
+  on public.content_protection_status for select
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+  ));
+
+create index content_protection_status_type_idx
+  on public.content_protection_status (content_type);
