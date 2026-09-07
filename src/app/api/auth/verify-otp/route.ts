@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { setSessionCookie } from "@/lib/session";
 import type { Session } from "@/lib/auth";
 
@@ -54,7 +54,10 @@ export async function POST(request: Request) {
   // Luồng đăng ký: giống nhánh flow=signup của /api/auth/confirm — profiles
   // đã được register/route.ts tạo sẵn bằng service-role client lúc
   // signUp(), nên chỉ cần đọc lại rồi đăng nhập thật (set vinh_session).
-  const { data: profile } = await supabase
+  // Đọc bằng service-role — xem giải thích đầy đủ ở login/route.ts (bug
+  // thật: RLS đôi khi không kịp nhận auth.uid() ngay trong cùng request
+  // vừa xác thực xong).
+  const { data: profile } = await createServiceRoleClient()
     .from("profiles")
     .select("username, nickname, role")
     .eq("id", data.user.id)
