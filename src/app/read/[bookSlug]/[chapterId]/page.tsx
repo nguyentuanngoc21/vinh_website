@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { Reader } from "@/components/reading/reader";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getAuthedUserId, getAuthedAdminId } from "@/lib/wallet/session";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 
 export async function generateMetadata({
@@ -52,7 +52,7 @@ export default async function ReadChapterPage({
   // (src/lib/wallet/session.ts) — nhất quán với các route khác trong repo
   // (penalty, wallet), thay vì chỉ supabase.auth.getUser(). Resolve 1 lần,
   // dùng lại cho cả render (vote/follow đã có chưa) và after() (book_progress).
-  const [{ data: authorProfile }, { data: siblings }, { data: voteCountRow }, viewerId, linkedAudio] =
+  const [{ data: authorProfile }, { data: siblings }, { data: voteCountRow }, viewerId, linkedAudio, adminId] =
     await Promise.all([
       supabase.from("author_public_profiles").select("nickname, avatar_url").eq("id", book.author_id).maybeSingle(),
       // Lấy luôn `title` — dùng chung cho tính prev/next VÀ danh sách chọn
@@ -66,6 +66,9 @@ export default async function ReadChapterPage({
       supabase.from("chapter_vote_counts").select("vote_count").eq("chapter_id", chapter.id).maybeSingle(),
       getAuthedUserId(serviceClient),
       getChapterAudio(supabase, chapter.id),
+      // Cho nút "Xóa" (kiểm duyệt) ở AuthorPanel — null nếu chưa đăng nhập
+      // hoặc không phải admin/super_admin, ẩn nút hoàn toàn khi đó.
+      getAuthedAdminId(serviceClient),
     ]);
 
   const ordered = siblings ?? [];
@@ -128,6 +131,7 @@ export default async function ReadChapterPage({
       initialVoted={!!votedRow}
       initialVoteCount={voteCountRow?.vote_count ?? 0}
       linkedAudio={linkedAudio}
+      viewerIsAdmin={!!adminId}
     />
   );
 }

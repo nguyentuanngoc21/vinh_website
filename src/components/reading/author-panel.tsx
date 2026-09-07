@@ -1,4 +1,4 @@
-import { ShareNetworkIcon, UserCircleIcon } from "@phosphor-icons/react/dist/ssr";
+import { ShareNetworkIcon, TrashIcon, UserCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import type { ThemeColors } from "./reader";
 
 type AuthorPanelProps = {
@@ -13,6 +13,13 @@ type AuthorPanelProps = {
   pending: boolean;
   onToggleFollow: () => void;
   onShareExcerpt: () => void;
+  /** Chỉ true khi viewer là admin/super_admin (xem page.tsx —
+   * getAuthedAdminId()) — hiện thêm nút "Xóa" để gỡ NGAY chương đang đọc,
+   * dùng chung modal chọn lý do + API với bảng chương ở
+   * admin/noi-dung/[bookId] (chapter-moderation-table.tsx), không phải 1
+   * luồng xoá riêng/đơn giản hoá — vẫn bắt buộc chọn lý do như đặc tả gốc. */
+  canModerate?: boolean;
+  onDeleteChapter?: () => void;
   c: ThemeColors;
 };
 
@@ -32,6 +39,8 @@ export function AuthorPanel({
   pending,
   onToggleFollow,
   onShareExcerpt,
+  canModerate = false,
+  onDeleteChapter,
   c,
 }: AuthorPanelProps) {
   const avatarSize = variant === "rail" ? 56 : 40;
@@ -83,6 +92,22 @@ export function AuthorPanel({
     </button>
   );
 
+  // Chỉ hiện với admin/super_admin (canModerate) — không hiện với chính
+  // tác giả (đây là hành động KIỂM DUYỆT, không phải tự quản lý chương của
+  // tác giả — tác giả tự xoá chương qua trang author/[bookId]/[chapterId]
+  // hiện có, không đụng tới nút này).
+  const deleteButton = canModerate && (
+    <button
+      type="button"
+      onClick={onDeleteChapter}
+      title="Gỡ chương này (kiểm duyệt)"
+      aria-label="Gỡ chương này"
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-[#B02A37] transition-colors hover:text-[#8a212b]"
+    >
+      <TrashIcon size={16} /> {variant === "rail" && "Xóa"}
+    </button>
+  );
+
   if (variant === "inline") {
     return (
       <div className="flex items-center gap-3">
@@ -92,6 +117,7 @@ export function AuthorPanel({
         </span>
         {followButton}
         {shareButton}
+        {deleteButton}
       </div>
     );
   }
@@ -104,6 +130,7 @@ export function AuthorPanel({
       </span>
       {followButton}
       {shareButton}
+      {deleteButton}
     </div>
   );
 }

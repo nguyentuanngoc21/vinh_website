@@ -18,6 +18,7 @@ import { ChapterPicker, type ReaderChapterSummary } from "./chapter-picker";
 import { VoteButton } from "./vote-button";
 import { AuthorPanel } from "./author-panel";
 import { ReadingListModal } from "./reading-list-modal";
+import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { shareOrCopy } from "@/lib/share";
 import { VinhMark } from "@/components/ui";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
@@ -300,6 +301,11 @@ export type ReaderProps = {
    * src/lib/audio/get-chapter-audio.ts) — [] thì nút "Nghe" ẩn hẳn, không
    * dẫn tới trình phát rỗng. */
   linkedAudio?: AudioTrack[];
+  /** true khi viewer là admin/super_admin (xem page.tsx —
+   * getAuthedAdminId()) — hiện nút "Xóa" ở AuthorPanel để gỡ NGAY chương
+   * đang đọc, dùng chung modal + API PATCH /api/admin/chapters/[chapterId]
+   * với bảng chương ở admin/noi-dung/[bookId]. */
+  viewerIsAdmin?: boolean;
 };
 
 export function Reader({
@@ -323,6 +329,7 @@ export function Reader({
   initialVoted = false,
   initialVoteCount = 0,
   linkedAudio = [],
+  viewerIsAdmin = false,
 }: ReaderProps) {
   const router = useRouter();
   const { play } = useNowPlaying();
@@ -449,6 +456,38 @@ export function Reader({
       url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
     });
     if (result === "copied") showCopyBubble("Đã sao chép liên kết");
+  };
+
+  // Gỡ chương NGAY từ trang đọc (admin/super_admin only — xem
+  // viewerIsAdmin ở page.tsx) — cùng modal + API với chapter-moderation-table.tsx,
+  // không phải luồng riêng/đơn giản hoá. Sau khi gỡ thành công, chương
+  // không còn published nên rời khỏi trang này ngay (F5 lại sẽ 404).
+  const [removeModalOpen, setRemoveModalOpen] = useState(false);
+  const [removePending, setRemovePending] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  const handleConfirmDeleteChapter = async (payload: RemoveChapterPayload) => {
+    if (!chapterId || removePending) return;
+    setRemovePending(true);
+    setRemoveError(null);
+    try {
+      const res = await fetch(`/api/admin/chapters/${chapterId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove", ...payload }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setRemoveError((data && typeof data.error === "string" && data.error) || "Không gỡ được chương.");
+        setRemovePending(false);
+        return;
+      }
+      setRemoveModalOpen(false);
+      router.push(bookSlug ? `/truyen/${bookSlug}` : "/");
+    } catch {
+      setRemoveError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
+      setRemovePending(false);
+    }
   };
 
   // Vuốt trái/phải trên khung đọc để sang chương — chỉ trên cảm ứng (chuột
@@ -944,6 +983,8 @@ export function Reader({
                 pending={followPending}
                 onToggleFollow={handleToggleFollow}
                 onShareExcerpt={handleShareExcerpt}
+                canModerate={viewerIsAdmin}
+                onDeleteChapter={() => setRemoveModalOpen(true)}
                 c={c}
               />
             </div>
@@ -961,6 +1002,8 @@ export function Reader({
             pending={followPending}
             onToggleFollow={handleToggleFollow}
             onShareExcerpt={handleShareExcerpt}
+            canModerate={viewerIsAdmin}
+            onDeleteChapter={() => setRemoveModalOpen(true)}
             c={c}
           />
         </div>
@@ -1201,6 +1244,24 @@ export function Reader({
           bookId={bookId}
           bookTitle={bookTitle}
         />
+      )}
+
+      {removeModalOpen && (
+        <RemoveChapterModal
+          chapterTitle={chapterTitle}
+          pending={removePending}
+          onCancel={() => {
+            if (removePending) return;
+            setRemoveModalOpen(false);
+            setRemoveError(null);
+          }}
+          onConfirm={handleConfirmDeleteChapter}
+        />
+      )}
+      {removeError && (
+        <div className="fixed inset-x-4 bottom-20 z-[80] mx-auto max-w-[420px] rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-4 py-2.5 text-center text-[13px] font-medium text-[#B02A37] shadow-[0_8px_24px_rgba(0,0,0,.15)] sm:bottom-6">
+          {removeError}
+        </div>
       )}
     </div>
   );
