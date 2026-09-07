@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { applyPublicAssetWatermark } from "@/lib/copyright/public-asset-watermark";
 import type { DesignItemCategory } from "@/lib/supabase/types";
 
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
@@ -54,10 +55,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ảnh tối đa 8MB." }, { status: 400 });
   }
 
-  const path = `${user.id}/gallery-${Date.now()}.${ext}`;
+  // Ép PNG + nhúng XMP "không cho AI huấn luyện" (ẩn, không che ảnh) —
+  // xem src/lib/copyright/public-asset-watermark.ts. Luôn ra .png bất kể
+  // định dạng gốc (jpg/webp) vì sharp không ghi XMP tuỳ ý được cho 2 định
+  // dạng đó. `void ext` — biến ALLOWED_MIME_EXT vẫn dùng để validate MIME
+  // gốc phía trên, chỉ không còn quyết định phần mở rộng file nữa.
+  const rightsHolderLabel = await (async () => {
+    const { data: profile } = await supabase.from("profiles").select("nickname").eq("id", user.id).single();
+    return profile?.nickname || "Hoạ sĩ trên Vịnh";
+  })();
+  const originalBuffer = Buffer.from(await file.arrayBuffer());
+  let watermarked: Buffer;
+  try {
+    watermarked = await applyPublicAssetWatermark(originalBuffer, rightsHolderLabel);
+  } catch (err) {
+    console.error("[api/design] watermark failed:", err);
+    return NextResponse.json({ error: "Xử lý ảnh thất bại." }, { status: 500 });
+  }
+
+  const path = `${user.id}/gallery-${Date.now()}.png`;
   const { error: uploadError } = await supabase.storage
     .from("design-images")
-    .upload(path, file, { contentType: file.type });
+    .upload(path, watermarked, { contentType: "image/png" });
   if (uploadError) {
     console.error("[api/design] upload failed:", uploadError);
     return NextResponse.json({ error: `Tải ảnh thất bại: ${uploadError.message}` }, { status: 500 });
@@ -78,6 +97,19 @@ export async function POST(request: Request) {
   if (insertError || !item) {
     console.error("[api/design] insert failed:", insertError);
     return NextResponse.json({ error: "Đăng tác phẩm thất bại." }, { status: 500 });
+  }
+
+  // Ghi nhận đã bảo hộ — bảng content_protection_status chỉ admin đọc
+  // được qua RLS (xem migrations/20260907_add_content_protection_status.sql),
+  // nên phải dùng service-role ở đây, không phải `supabase` (client theo
+  // cookie của hoạ sĩ) đang dùng cho phần còn lại của route. Lỗi ở bước
+  // này không nên chặn phản hồi thành công cho hoạ sĩ — ảnh đã lên thật
+  // và đã bảo hộ, chỉ là admin dashboard sẽ đếm thiếu 1 dòng.
+  const { error: protectionError } = await createServiceRoleClient()
+    .from("content_protection_status")
+    .insert({ content_type: "design", content_id: item.id, method: "xmp_png" });
+  if (protectionError) {
+    console.error("[api/design] content_protection_status insert failed:", protectionError);
   }
 
   return NextResponse.json({ ok: true, id: item.id });

@@ -64,8 +64,8 @@ export default async function AudioHubPage() {
                   Có giọng đọc hay?
                 </div>
                 <div className="mt-[5px] text-[14.5px] text-[#6b5f3a]">
-                  Ghi âm tác phẩm và chia sẻ trên Vịnh — bản ghi được gắn
-                  watermark âm thanh tự động.
+                  Ghi âm tác phẩm và chia sẻ trên Vịnh — bản ghi được đăng
+                  ký bảo hộ, tuyên bố không cho AI huấn luyện.
                 </div>
               </div>
               <Link

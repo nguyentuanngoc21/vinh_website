@@ -27,6 +27,10 @@ export async function generateMetadata({ params }: PageProps<"/truyen/[slug]">):
   return {
     title: book ? `${book.title} — Vịnh` : "Truyện — Vịnh",
     description: book?.synopsis ?? undefined,
+    // Xem giải thích đầy đủ ở generateMetadata của
+    // src/app/read/[bookSlug]/[chapterId]/page.tsx — cùng lý do áp dụng
+    // cho trang giới thiệu truyện (có tóm tắt là text công khai).
+    other: { robots: "noai, noimageai" },
   };
 }
 

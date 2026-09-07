@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { AUDIO_GENRES } from "@/lib/audio/get-audio-catalog";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
@@ -100,6 +100,16 @@ export async function POST(
   if (insertError || !item) {
     console.error("[chapter audio/record] insert failed:", insertError);
     return NextResponse.json({ error: "Lưu bản thu thất bại." }, { status: 500 });
+  }
+
+  // KHÔNG sửa file audio — xem giải thích đầy đủ ở src/app/api/audio/route.ts.
+  // Chỉ ghi nhận đã tuyên bố "không cho AI huấn luyện" vào DB. Lỗi ở đây
+  // không chặn phản hồi — bản thu đã lên thật.
+  const { error: protectionError } = await createServiceRoleClient()
+    .from("content_protection_status")
+    .insert({ content_type: "audio", content_id: item.id, method: "declared_db_only" });
+  if (protectionError) {
+    console.error("[chapter audio/record] content_protection_status insert failed:", protectionError);
   }
 
   const { error: linkError } = await supabase.rpc("link_audio_to_chapter", {
