@@ -122,33 +122,13 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
         <NavBarContent />
       </nav>
 
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold tracking-[1.2px] text-brand-gold-dark">
-            ĐỀ XUẤT CHO BẠN
-          </div>
-          <h2 className="mt-1.5 text-2xl font-bold tracking-tight text-ink">
-            Tác phẩm nổi bật tuần này
-          </h2>
+      <div className="mb-2">
+        <div className="text-xs font-semibold tracking-[1.2px] text-brand-gold-dark">
+          ĐỀ XUẤT CHO BẠN
         </div>
-        {n > 0 && (
-          <div className="flex gap-2.5">
-            <button
-              onClick={() => go(active - 1)}
-              aria-label="Tác phẩm trước"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e7e5e4] bg-white text-[#57534e] transition-colors hover:border-brand-gold hover:text-brand-gold-dark"
-            >
-              <CaretLeftIcon size={18} />
-            </button>
-            <button
-              onClick={() => go(active + 1)}
-              aria-label="Tác phẩm tiếp theo"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e7e5e4] bg-white text-[#57534e] transition-colors hover:border-brand-gold hover:text-brand-gold-dark"
-            >
-              <CaretRightIcon size={18} />
-            </button>
-          </div>
-        )}
+        <h2 className="mt-1.5 text-2xl font-bold tracking-tight text-ink">
+          Tác phẩm nổi bật tuần này
+        </h2>
       </div>
 
       {n === 0 ? (
@@ -173,29 +153,59 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
               <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
                 {books.map((book, i) => {
                   const { wrapStyle, coverStyle, reflStyle } = buildSlide(books, i, active, n);
-                  return (
-                    <div key={book.id} style={wrapStyle} onClick={() => go(i)}>
-                      <div style={coverStyle}>
-                        <div className="absolute inset-0">
-                          <BookCover
-                            id={book.id}
-                            title={book.title}
-                            author={book.authorNickname}
-                            genre={book.genre}
-                            coverUrl={book.coverUrl}
-                          />
-                        </div>
-                        {book.genre && (
-                          <div className="absolute top-3.5 left-3.5 rounded-full bg-black/[0.32] px-2.5 py-1 text-[10px] font-semibold tracking-[.6px] uppercase backdrop-blur-[2px]">
-                            {book.genre}
-                          </div>
-                        )}
-                        {/* Không overlay tên truyện/tác giả ở đây —
-                            GeneratedBookCover (bên trong BookCover) đã tự vẽ
-                            cả 2 ngay trên bìa (title theo layout riêng, tác
-                            giả căn giữa ở footer) — thêm chữ trắng đè lên chỉ
-                            gây lặp 2 lần cùng nội dung. */}
+                  // Tính khoảng cách đến active để biết đây là bìa giữa hay bên
+                  let d = i - active;
+                  if (d > n / 2) d -= n;
+                  if (d < -n / 2) d += n;
+                  const isCenter = d === 0;
+
+                  const coverInner = (
+                    <>
+                      <div className="absolute inset-0">
+                        <BookCover
+                          id={book.id}
+                          title={book.title}
+                          author={book.authorNickname}
+                          genre={book.genre}
+                          coverUrl={book.coverUrl}
+                        />
                       </div>
+                      {book.genre && (
+                        <div className="absolute top-3.5 left-3.5 rounded-full bg-black/[0.32] px-2.5 py-1 text-[10px] font-semibold tracking-[.6px] uppercase backdrop-blur-[2px]">
+                          {book.genre}
+                        </div>
+                      )}
+                      {/* Không overlay tên truyện/tác giả ở đây —
+                          GeneratedBookCover (bên trong BookCover) đã tự vẽ
+                          cả 2 ngay trên bìa (title theo layout riêng, tác
+                          giả căn giữa ở footer) — thêm chữ trắng đè lên chỉ
+                          gây lặp 2 lần cùng nội dung. */}
+                    </>
+                  );
+
+                  return (
+                    <div key={book.id} style={wrapStyle}>
+                      {isCenter ? (
+                        // Bìa giữa → Link dẫn thẳng tới trang truyện
+                        <Link
+                          href={`/truyen/${book.slug}`}
+                          style={coverStyle}
+                          className="block no-underline"
+                          aria-label={`Đọc ${book.title}`}
+                        >
+                          {coverInner}
+                        </Link>
+                      ) : (
+                        // Bìa bên → bấm để xoay carousel, đẩy bìa này vào giữa
+                        <div
+                          style={coverStyle}
+                          onClick={() => go(i)}
+                          role="button"
+                          aria-label={`Xem ${book.title}`}
+                        >
+                          {coverInner}
+                        </div>
+                      )}
                       <div style={reflStyle} />
                     </div>
                   );
@@ -204,9 +214,15 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-4 pt-2">
+          <div className="flex flex-col items-center gap-3 pt-2">
+            {/* Tên truyện: Link dẫn tới trang truyện */}
             <div className="text-center">
-              <div className="text-2xl font-bold tracking-tight text-ink">{current!.title}</div>
+              <Link
+                href={`/truyen/${current!.slug}`}
+                className="text-2xl font-bold tracking-tight text-ink no-underline transition-colors hover:text-brand-gold-dark"
+              >
+                {current!.title}
+              </Link>
               <div className="mt-1 text-sm text-[#78716c]">
                 {current!.authorNickname ?? "Ẩn danh"}
                 {current!.genre ? ` · ${current!.genre}` : ""}
@@ -227,24 +243,44 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
                 Nghe
               </Link>
             </div>
-            <div className="mt-0.5 flex items-center gap-[7px]">
-              {books.map((book, i) => (
-                <button
-                  key={book.id}
-                  aria-label={`Chuyển đến ${book.title}`}
-                  onClick={() => go(i)}
-                  className="flex cursor-pointer items-center justify-center p-2"
-                >
-                  <span
-                    style={{
-                      width: i === active ? 22 : 7,
-                      height: 7,
-                      background: i === active ? "var(--color-brand-gold)" : "#d6d3d1",
-                    }}
-                    className="block rounded-full transition-all duration-[350ms]"
-                  />
-                </button>
-              ))}
+
+            {/* Nút ←→ nằm hai bên row dots, đã chuyển từ header xuống đây */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => go(active - 1)}
+                aria-label="Tác phẩm trước"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#e7e5e4] bg-white text-[#57534e] transition-colors hover:border-brand-gold hover:text-brand-gold-dark"
+              >
+                <CaretLeftIcon size={16} />
+              </button>
+
+              <div className="flex items-center gap-[3px]">
+                {books.map((book, i) => (
+                  <button
+                    key={book.id}
+                    aria-label={`Chuyển đến ${book.title}`}
+                    onClick={() => go(i)}
+                    className="flex cursor-pointer items-center justify-center p-2"
+                  >
+                    <span
+                      style={{
+                        width: i === active ? 22 : 7,
+                        height: 7,
+                        background: i === active ? "var(--color-brand-gold)" : "#d6d3d1",
+                      }}
+                      className="block rounded-full transition-all duration-[350ms]"
+                    />
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => go(active + 1)}
+                aria-label="Tác phẩm tiếp theo"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#e7e5e4] bg-white text-[#57534e] transition-colors hover:border-brand-gold hover:text-brand-gold-dark"
+              >
+                <CaretRightIcon size={16} />
+              </button>
             </div>
           </div>
         </>
