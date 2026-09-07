@@ -99,7 +99,13 @@ export function ContentTable({
         </div>
       )}
 
-      <div className={`grid ${GRID_COLS} gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
+      {/* overflow-x-auto — admin/layout.tsx bọc <main> bằng overflow-hidden
+          (không cuộn được), nên bảng phải tự lo phần cuộn ngang CỦA CHÍNH
+          NÓ khi đủ cột làm nó rộng hơn màn hình — thiếu dòng này, cột
+          "Chương" (và cả Xoá/Khôi phục) sẽ bị cắt mất hẳn, không cách nào
+          xem/bấm được, đúng như bug đã xảy ra khi thêm cột thứ 7. */}
+      <div className="overflow-x-auto">
+      <div className={`grid ${GRID_COLS} min-w-[900px] gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
         <div>Truyện</div>
         <div>Tác giả</div>
         <div>Trạng thái</div>
@@ -112,7 +118,7 @@ export function ContentTable({
       {filtered.map((r) => (
         <div
           key={r.id}
-          className={`grid ${GRID_COLS} items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
+          className={`grid ${GRID_COLS} min-w-[900px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
         >
           <div className="flex items-center gap-1.5 truncate">
             <span className="truncate">{r.title}</span>
@@ -183,6 +189,7 @@ export function ContentTable({
           </div>
         </div>
       ))}
+      </div>
 
       {filtered.length === 0 && (
         <div className="px-2.5 py-6 text-center text-sm text-stone-light">Không có truyện nào khớp.</div>
