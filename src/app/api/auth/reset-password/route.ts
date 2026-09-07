@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { setSessionCookie } from "@/lib/session";
 import type { Session } from "@/lib/auth";
 
@@ -47,7 +47,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: profile } = await supabase
+  // service-role — xem giải thích đầy đủ ở login/route.ts (bug thật: RLS
+  // đôi khi không kịp nhận auth.uid() ngay trong cùng request vừa xác
+  // thực xong, khiến profile/name/handle/role cùng lúc rơi về rỗng/"user").
+  const { data: profile } = await createServiceRoleClient()
     .from("profiles")
     .select("username, nickname, role")
     .eq("id", userData.user.id)

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { setSessionCookie } from "@/lib/session";
 import type { Session } from "@/lib/auth";
 
@@ -42,8 +42,14 @@ export async function GET(request: Request) {
 
       // Cùng cách login/reset-password/route.ts dựng Session — profiles đã
       // được register/route.ts tạo sẵn bằng service-role client lúc
-      // signUp(), nên chỉ cần đọc lại, không insert gì ở đây.
-      const { data: profile } = await supabase
+      // signUp(), nên chỉ cần đọc lại, không insert gì ở đây. Đọc bằng
+      // service-role, không phải `supabase` — bug thật đã xảy ra ở
+      // login/route.ts (RLS đôi khi không kịp nhận auth.uid() ngay trong
+      // cùng request vừa xác thực xong, .single() lỗi, profile về
+      // undefined, cả name/handle/role CÙNG LÚC rơi về fallback rỗng/"user"
+      // phía dưới — im lặng, không log lỗi nào). id lọc là id auth thật
+      // Supabase vừa xác thực (không phải input client), bỏ qua RLS an toàn.
+      const { data: profile } = await createServiceRoleClient()
         .from("profiles")
         .select("username, nickname, role")
         .eq("id", data.user.id)

@@ -47,7 +47,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
+  // service-role, không phải `supabase` (client vừa signInWithPassword() —
+  // phiên vừa thiết lập ngay trong request này, không đáng tin cậy để RLS
+  // "profiles are readable by their owner" luôn nhận đúng auth.uid() kịp
+  // lúc). Bug thật đã xảy ra: nếu query này thất bại (RLS chặn nhầm),
+  // profile về undefined, cả 3 field (name/handle/role) CÙNG LÚC rơi về
+  // fallback rỗng/"user" phía dưới — im lặng, không có lỗi nào hiện ra,
+  // chỉ thấy sai role sau khi đăng nhập. Cùng lý do route register đã né
+  // (xem comment ở đó) — id dùng để lọc là id auth thật Supabase vừa xác
+  // thực (không phải input từ client), nên bỏ qua RLS ở đây an toàn.
+  const { data: profile } = await createServiceRoleClient()
     .from("profiles")
     .select("username, nickname, role")
     .eq("id", data.user.id)
