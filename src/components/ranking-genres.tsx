@@ -9,7 +9,7 @@ const RANK_COLORS = ["var(--color-brand-gold)", "#C9A86A", "#f0b429", "#9a9a9a"]
 
 export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[] }) {
   return (
-    <section className="grid grid-cols-1 gap-12 px-11 pb-2 pt-6 md:grid-cols-2">
+    <section className="grid grid-cols-1 gap-12 px-4 pb-2 pt-6 sm:px-8 md:grid-cols-2 lg:px-11">
       <div>
         <div className="mb-[18px] flex items-center justify-between">
           <h3 className="text-xl font-bold">Bảng xếp hạng tuần</h3>
@@ -67,17 +67,18 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
         <h3 className="mb-[18px] text-xl font-bold">Khám phá thể loại</h3>
         <div className="flex flex-wrap gap-2.5">
           {genres.map((genre) => (
-            <span
+            <Link
               key={genre.label}
+              href={`/truyen?genre=${genre.slug}`}
               className={
-                "cursor-default rounded-full px-[18px] py-2.5 text-sm font-medium transition-colors hover:text-brand-gold-dark " +
+                "rounded-full px-[18px] py-2.5 text-sm font-medium no-underline transition-colors " +
                 (genre.active
-                  ? "bg-[#F7EFD8] font-semibold text-brand-gold-dark"
-                  : "bg-neutral-bg text-ink")
+                  ? "bg-[#F7EFD8] font-semibold text-brand-gold-dark hover:bg-[#eedfc4]"
+                  : "bg-neutral-bg text-ink hover:bg-[#ebebeb] hover:text-brand-gold-dark")
               }
             >
               {genre.label}
-            </span>
+            </Link>
           ))}
         </div>
         <div className="mt-[26px] flex items-center gap-4 rounded-2xl border border-[#EBDCB4] bg-[#F7EFD8] p-[22px]">

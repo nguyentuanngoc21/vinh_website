@@ -4,11 +4,11 @@ type Variant = "primary" | "dark" | "ghost";
 
 const VARIANT_CLASS: Record<Variant, string> = {
   // Gold CTA — the "submit / continue" action across auth and author flows.
-  primary: "bg-brand-gold text-brand-ink",
+  primary: "bg-brand-gold text-brand-ink hover:brightness-[1.08]",
   // Solid ink — used for secondary confirms (e.g. admin panel actions).
-  dark: "bg-brand-ink text-white",
+  dark: "bg-brand-ink text-white hover:bg-brand-ink-dark",
   // Text-only, for tertiary/cancel actions.
-  ghost: "bg-transparent text-brand-ink border border-border-light",
+  ghost: "bg-transparent text-brand-ink border border-border-light hover:bg-cream-card",
 };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

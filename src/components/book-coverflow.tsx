@@ -114,10 +114,10 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
   const current = n > 0 ? books[active] : null;
 
   return (
-    <section className="bg-gradient-to-b from-[#fafaf9] to-white px-11 pb-2.5">
+    <section className="bg-gradient-to-b from-[#fafaf9] to-white px-4 pb-2.5 sm:px-8 lg:px-11">
       <nav
         data-tour="tour-nav"
-        className="-mx-11 mb-[26px] flex items-center gap-[26px] overflow-x-auto bg-brand-ink px-11 py-3.5 text-[15px] font-medium [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 mb-[26px] flex items-center gap-[26px] overflow-x-auto bg-brand-ink px-4 py-3.5 text-[15px] font-medium [scrollbar-width:none] sm:-mx-8 sm:px-8 lg:-mx-11 lg:px-11 [&::-webkit-scrollbar]:hidden"
       >
         <NavBarContent />
       </nav>
@@ -233,13 +233,17 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
                   key={book.id}
                   aria-label={`Chuyển đến ${book.title}`}
                   onClick={() => go(i)}
-                  style={{
-                    width: i === active ? 22 : 7,
-                    height: 7,
-                    background: i === active ? "var(--color-brand-gold)" : "#d6d3d1",
-                  }}
-                  className="rounded-full transition-all duration-[350ms]"
-                />
+                  className="flex cursor-pointer items-center justify-center p-2"
+                >
+                  <span
+                    style={{
+                      width: i === active ? 22 : 7,
+                      height: 7,
+                      background: i === active ? "var(--color-brand-gold)" : "#d6d3d1",
+                    }}
+                    className="block rounded-full transition-all duration-[350ms]"
+                  />
+                </button>
               ))}
             </div>
           </div>
