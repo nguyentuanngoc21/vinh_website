@@ -49,6 +49,7 @@ export default async function AudioHubPage() {
       <div className="mx-auto max-w-[1280px] bg-white pb-24">
         <SiteHeader
           searchPlaceholder="Tìm truyện audio…"
+          searchType="audio"
           ctaLabel="Đăng tải Audio"
           ctaHref="/audio/new"
         />

@@ -34,6 +34,7 @@ export default async function DesignPage() {
       <div className="mx-auto max-w-[1280px] bg-white">
         <SiteHeader
           searchPlaceholder="Tìm ảnh bìa…"
+          searchType="thiet-ke"
           ctaLabel="Đăng thiết kế"
           ctaHref="/thiet-ke/new"
         />
