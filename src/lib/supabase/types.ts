@@ -452,6 +452,11 @@ export type Database = {
           // ở route, xem migrations/20260901_add_trust_and_disputes.sql).
           // KHÔNG chặn gửi, chỉ gắn nhãn cho chính người gửi thấy.
           flagged_off_platform: boolean;
+          // "personal" | "moderation" — hòm thư riêng cho tin gỡ chương
+          // (hiện như "Đội ngũ Vịnh"), tách khỏi chat bình thường dù cùng
+          // 1 tài khoản gửi (profiles.is_system). Xem
+          // migrations/20260908_add_direct_message_context.sql.
+          context: "personal" | "moderation";
           created_at: string;
         };
         Insert: {
@@ -460,6 +465,7 @@ export type Database = {
           recipient_id: string;
           body: string;
           flagged_off_platform?: boolean;
+          context?: "personal" | "moderation";
         };
         // Update chỉ dùng để set read_at (đánh dấu đã đọc) — route server
         // tự giới hạn field, type ở đây rộng hơn 1 chút cho đơn giản.

@@ -14,17 +14,20 @@ import { Field, Button, Alert } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
 import { VinhMark } from "@/components/ui";
 
+type MessageContext = "personal" | "moderation";
+
 type Conversation = {
   userId: string;
+  context: MessageContext;
   nickname: string;
   username: string;
   avatarUrl: string | null;
-  // Tài khoản hệ thống ("Vịnh", gửi tin gỡ chương — xem
-  // scripts/create-system-account.mjs) — hiện logo thay vì chữ cái đầu
-  // tên, giống yêu cầu "avatar trống, không có profile" trong đặc tả
-  // (không có nghĩa đen "trống" vì Hội thoại bắt buộc counterparty phải
-  // là 1 hàng profiles thật, xem comment ở /api/messages/[userId]).
-  isSystem: boolean;
+  // Hòm thư "moderation" (tin gỡ chương từ tài khoản is_system) — TÁCH
+  // theo TIN NHẮN (context), không phải theo tài khoản: cùng 1 tài
+  // khoản is_system có thể vừa có hòm thư này (hiện "Đội ngũ Vịnh") vừa
+  // có hòm thư "personal" riêng (hiện đúng tên/avatar thật) nếu họ cũng
+  // tự chat bình thường. Xem migrations/20260908_add_direct_message_context.sql.
+  isModerationMailbox: boolean;
   lastMessage: { body: string; createdAt: string; mine: boolean };
   unreadCount: number;
 };
@@ -36,12 +39,13 @@ type Counterparty = {
   nickname: string;
   username: string;
   avatarUrl: string | null;
-  isSystem: boolean;
+  isModerationMailbox: boolean;
 };
 
 type ChatTabProps = {
   activeUserId: string | null;
-  onSelectUser: (userId: string) => void;
+  activeContext: MessageContext;
+  onSelectUser: (userId: string, context: MessageContext) => void;
   mobileView: "list" | "thread";
   onBack: () => void;
 };
@@ -73,15 +77,15 @@ function Avatar({
   nickname,
   avatarUrl,
   size,
-  isSystem,
+  isModerationMailbox,
 }: {
   userId: string;
   nickname: string;
   avatarUrl: string | null;
   size: number;
-  isSystem?: boolean;
+  isModerationMailbox?: boolean;
 }) {
-  if (isSystem) {
+  if (isModerationMailbox) {
     return (
       <div
         style={{ background: "var(--color-brand-ink)", width: size, height: size }}
@@ -112,16 +116,18 @@ function Avatar({
   );
 }
 
-export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: ChatTabProps) {
+export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView, onBack }: ChatTabProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [listQuery, setListQuery] = useState("");
 
-  const [counterparty, setCounterparty] = useState<Counterparty | null>(null);
+  const [counterparty, setCounterparty] = useState<(Counterparty & { context: MessageContext }) | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   // Đơn hàng gắn với cặp (mình, counterparty) — không có bảng conversations
   // riêng, xem ghi chú ở src/app/api/orders/route.ts (GET). Chỉ hiện đơn
   // gần nhất chưa 'cancelled' (đơn cũ đã hủy không còn cần thao tác gì).
+  // Không áp dụng cho hòm thư moderation — tài khoản is_system không có
+  // đơn hàng nào, /api/orders tự trả rỗng, không cần điều kiện riêng.
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -151,7 +157,7 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
     if (activeUserId || autoSelectedRef.current || !conversationsLoaded) return;
     if (conversations.length > 0) {
       autoSelectedRef.current = true;
-      onSelectUser(conversations[0].userId);
+      onSelectUser(conversations[0].userId, conversations[0].context);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationsLoaded, conversations]);
@@ -164,16 +170,19 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
     if (!activeUserId) return;
     let cancelled = false;
     const load = () =>
-      fetch(`/api/messages/${activeUserId}`)
+      fetch(`/api/messages/${activeUserId}?context=${activeContext}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (cancelled || !data) return;
-          setCounterparty(data.counterparty);
+          setCounterparty({ ...data.counterparty, context: data.context });
           setMessages(data.messages ?? []);
           // Đã đọc — cập nhật lại badge chưa đọc ở danh sách hội thoại
-          // ngay, không chờ tới lần poll tiếp theo.
+          // ngay, không chờ tới lần poll tiếp theo. Chỉ đúng dòng (cùng
+          // userId VÀ context) — hòm thư còn lại (nếu có) giữ nguyên.
           setConversations((prev) =>
-            prev.map((c) => (c.userId === activeUserId ? { ...c, unreadCount: 0 } : c))
+            prev.map((c) =>
+              c.userId === activeUserId && c.context === activeContext ? { ...c, unreadCount: 0 } : c
+            )
           );
         });
     load();
@@ -182,7 +191,7 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
       cancelled = true;
       clearInterval(interval);
     };
-  }, [activeUserId]);
+  }, [activeUserId, activeContext]);
 
   useEffect(() => {
     if (!activeUserId) return;
@@ -207,11 +216,9 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
   }, [messages]);
 
   // Suy ra "đã tải xong luồng đang chọn" từ chính counterparty thay vì
-  // giữ 1 state threadLoaded riêng — counterparty chỉ khớp activeUserId
-  // SAU KHI fetch (data.counterparty) đã trả về, nên đủ để phân biệt
-  // "đang chờ" (counterparty vẫn của người trước hoặc null) với "đã có
-  // dữ liệu của đúng người đang chọn".
-  const threadReady = counterparty?.userId === activeUserId;
+  // giữ 1 state threadLoaded riêng — counterparty chỉ khớp
+  // (activeUserId, activeContext) SAU KHI fetch đã trả về.
+  const threadReady = counterparty?.userId === activeUserId && counterparty?.context === activeContext;
 
   const handleSend = async () => {
     const text = draft.trim();
@@ -221,7 +228,10 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
     const res = await fetch(`/api/messages/${activeUserId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: text }),
+      // Gửi kèm context đang mở — để reply trong hòm thư moderation nằm
+      // ĐÚNG hòm thư đó (route server tự hạ về "personal" nếu người nhận
+      // không phải tài khoản is_system, xem api/messages/[userId]/route.ts).
+      body: JSON.stringify({ body: text, context: activeContext }),
     });
     const data = await res.json().catch(() => null);
     setSending(false);
@@ -234,14 +244,15 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
     // Đẩy hội thoại này lên đầu danh sách + cập nhật tin gần nhất, không
     // chờ vòng poll 15s tiếp theo mới thấy tin mình vừa gửi.
     setConversations((prev) => {
-      const withoutThis = prev.filter((c) => c.userId !== activeUserId);
-      const existing = prev.find((c) => c.userId === activeUserId);
+      const withoutThis = prev.filter((c) => !(c.userId === activeUserId && c.context === activeContext));
+      const existing = prev.find((c) => c.userId === activeUserId && c.context === activeContext);
       const entry: Conversation = existing ?? {
         userId: activeUserId,
+        context: activeContext,
         nickname: counterparty?.nickname ?? "",
         username: counterparty?.username ?? "",
         avatarUrl: counterparty?.avatarUrl ?? null,
-        isSystem: counterparty?.isSystem ?? false,
+        isModerationMailbox: counterparty?.isModerationMailbox ?? false,
         lastMessage: data.message,
         unreadCount: 0,
       };
@@ -285,19 +296,25 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
               </div>
             )}
             {filteredConversations.map((c) => {
-              const on = c.userId === activeUserId;
+              const on = c.userId === activeUserId && c.context === activeContext;
               return (
                 <button
-                  key={c.userId}
+                  key={`${c.userId}::${c.context}`}
                   type="button"
-                  onClick={() => onSelectUser(c.userId)}
+                  onClick={() => onSelectUser(c.userId, c.context)}
                   style={{
                     background: on ? "var(--color-cream-card)" : "transparent",
                     borderLeftColor: on ? "var(--color-brand-gold)" : "transparent",
                   }}
                   className="flex w-full cursor-pointer items-center gap-3 border-l-[3px] px-4 py-3 text-left transition-colors hover:bg-cream-card"
                 >
-                  <Avatar userId={c.userId} nickname={c.nickname} avatarUrl={c.avatarUrl} size={44} isSystem={c.isSystem} />
+                  <Avatar
+                    userId={c.userId}
+                    nickname={c.nickname}
+                    avatarUrl={c.avatarUrl}
+                    size={44}
+                    isModerationMailbox={c.isModerationMailbox}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <div
@@ -357,18 +374,18 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
                   nickname={counterparty.nickname}
                   avatarUrl={counterparty.avatarUrl}
                   size={38}
-                  isSystem={counterparty.isSystem}
+                  isModerationMailbox={counterparty.isModerationMailbox}
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <div className="text-[15px] font-semibold text-ink">{counterparty.nickname}</div>
-                    {counterparty.isSystem && (
+                    {counterparty.isModerationMailbox && (
                       <span className="rounded-full bg-brand-ink px-2 py-0.5 text-[10px] font-semibold text-brand-gold-light">
                         Hệ thống
                       </span>
                     )}
                   </div>
-                  {!counterparty.isSystem && (
+                  {!counterparty.isModerationMailbox && (
                     <div className="mt-0.5 text-xs text-stone">@{counterparty.username}</div>
                   )}
                 </div>
@@ -455,12 +472,12 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
                 nickname={counterparty.nickname}
                 avatarUrl={counterparty.avatarUrl}
                 size={68}
-                isSystem={counterparty.isSystem}
+                isModerationMailbox={counterparty.isModerationMailbox}
               />
               <div className="text-[15.5px] font-semibold text-ink">{counterparty.nickname}</div>
-              {/* Tài khoản hệ thống không có trang Kết nối thật để xem —
+              {/* Hòm thư kiểm duyệt không có trang Kết nối thật để xem —
                   ẩn nút này thay vì trỏ tới 1 profile vô nghĩa. */}
-              {!counterparty.isSystem && (
+              {!counterparty.isModerationMailbox && (
                 <Link
                   href={`/ket-noi?p=${counterparty.userId}`}
                   className="flex items-center gap-2 rounded-full bg-brand-ink px-[18px] py-2 text-[13px] font-semibold text-white no-underline"
