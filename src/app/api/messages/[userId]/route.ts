@@ -26,7 +26,7 @@ export async function GET(
 
   const { data: counterparty, error: counterpartyError } = await supabase
     .from("author_public_profiles")
-    .select("id, nickname, username, avatar_url")
+    .select("id, nickname, username, avatar_url, is_system")
     .eq("id", counterpartyId)
     .maybeSingle();
   if (counterpartyError || !counterparty) {
@@ -66,6 +66,7 @@ export async function GET(
       nickname: counterparty.nickname,
       username: counterparty.username,
       avatarUrl: counterparty.avatar_url,
+      isSystem: counterparty.is_system,
     },
     messages: (rows ?? []).map((m) => ({
       id: m.id,

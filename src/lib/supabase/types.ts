@@ -185,6 +185,12 @@ export type Database = {
           // NULL = streak khoẻ mạnh. Có giá trị = vừa lỡ 1 ngày, hết thẻ
           // nghỉ, đang trong 48h ân hạn để trả token cứu.
           streak_at_risk_since: string | null;
+          // Tài khoản hệ thống ("Vịnh", gửi tin nhắn khi admin gỡ chương) —
+          // tối đa 1 hàng true (unique index lọc where is_system, xem
+          // migrations/20260908_add_chapter_moderation_and_notifications.sql).
+          // Hàng thật tạo bằng scripts/create-system-account.mjs, không qua
+          // Insert type này (route/script tự chèn khi tạo).
+          is_system: boolean;
           created_at: string;
         };
         Insert: {
@@ -213,6 +219,7 @@ export type Database = {
           screenshot_penalty_expires_at?: string | null;
           screenshot_penalty_banned?: boolean;
           screenshot_penalty_last_offense_at?: string | null;
+          is_system?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];
@@ -359,6 +366,14 @@ export type Database = {
           // thái "Đã hoàn thành" ở trang giới thiệu truyện. Xem
           // migrations/20260824_add_chapter_is_last.sql.
           is_last_chapter: boolean;
+          // Trạng thái gỡ/khôi phục của ADMIN — tách biệt với `published`
+          // (published=false do admin gỡ phải phân biệt được với tác giả tự
+          // để nháp). Xem migrations/20260908_add_chapter_moderation_and_notifications.sql
+          // + api/admin/chapters/[chapterId]/route.ts.
+          removed_at: string | null;
+          removed_by: string | null;
+          removed_reason_group: string | null;
+          removed_reason_detail: string | null;
           created_at: string;
         };
         Insert: {
@@ -371,6 +386,10 @@ export type Database = {
           price?: number;
           is_exclusive?: boolean;
           is_last_chapter?: boolean;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          removed_reason_group?: string | null;
+          removed_reason_detail?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["chapters"]["Insert"]>;
         Relationships: [];
@@ -808,6 +827,61 @@ export type Database = {
           applied_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["content_protection_status"]["Insert"]>;
+        Relationships: [];
+      };
+      // Xem migrations/20260908_add_chapter_moderation_and_notifications.sql —
+      // chỉ admin đọc được (RLS), ghi bằng service-role từ
+      // api/admin/chapters/[chapterId]/route.ts.
+      chapter_moderation_actions: {
+        Row: {
+          id: string;
+          chapter_id: string;
+          book_id: string;
+          author_id: string;
+          admin_id: string;
+          action: "removed" | "restored";
+          reason_group: string | null;
+          reason_detail: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          chapter_id: string;
+          book_id: string;
+          author_id: string;
+          admin_id: string;
+          action: "removed" | "restored";
+          reason_group?: string | null;
+          reason_detail?: string | null;
+          created_at?: string;
+        };
+        // Chỉ thêm dòng mới (audit trail) — không sửa lại lịch sử đã ghi.
+        Update: never;
+        Relationships: [];
+      };
+      // "Mục Thông báo" — lớp (A) ngắn gọn (title + link), nội dung đầy đủ
+      // (lớp B) nằm ở direct_messages. Đọc/đánh dấu đã đọc qua RLS trực
+      // tiếp (auth.uid() = user_id) — giống direct_messages, không qua RPC.
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          link: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          title: string;
+          link?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
         Relationships: [];
       };
       transactions: {
@@ -1365,6 +1439,9 @@ export type Database = {
           bio: string | null;
           created_at: string;
           creator_tags: CreatorTag[];
+          // Xem migrations/20260908_add_chapter_moderation_and_notifications.sql
+          // — tối đa 1 hàng true trong toàn bộ profiles (tài khoản "Vịnh").
+          is_system: boolean;
         };
         Relationships: [];
       };

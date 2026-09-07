@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "convert-legal-docs": "node scripts/convert-legal-docs.mjs"
+    "convert-legal-docs": "node scripts/convert-legal-docs.mjs",
+    "create-system-account": "node --env-file=.env.local scripts/create-system-account.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

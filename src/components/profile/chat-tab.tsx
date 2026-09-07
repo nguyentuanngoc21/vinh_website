@@ -12,19 +12,32 @@ import {
 import { AVATAR_TONES } from "@/lib/profile";
 import { Field, Button, Alert } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
+import { VinhMark } from "@/components/ui";
 
 type Conversation = {
   userId: string;
   nickname: string;
   username: string;
   avatarUrl: string | null;
+  // Tài khoản hệ thống ("Vịnh", gửi tin gỡ chương — xem
+  // scripts/create-system-account.mjs) — hiện logo thay vì chữ cái đầu
+  // tên, giống yêu cầu "avatar trống, không có profile" trong đặc tả
+  // (không có nghĩa đen "trống" vì Hội thoại bắt buộc counterparty phải
+  // là 1 hàng profiles thật, xem comment ở /api/messages/[userId]).
+  isSystem: boolean;
   lastMessage: { body: string; createdAt: string; mine: boolean };
   unreadCount: number;
 };
 
 type ThreadMessage = { id: string; body: string; createdAt: string; mine: boolean; flagged?: boolean };
 
-type Counterparty = { userId: string; nickname: string; username: string; avatarUrl: string | null };
+type Counterparty = {
+  userId: string;
+  nickname: string;
+  username: string;
+  avatarUrl: string | null;
+  isSystem: boolean;
+};
 
 type ChatTabProps = {
   activeUserId: string | null;
@@ -60,12 +73,24 @@ function Avatar({
   nickname,
   avatarUrl,
   size,
+  isSystem,
 }: {
   userId: string;
   nickname: string;
   avatarUrl: string | null;
   size: number;
+  isSystem?: boolean;
 }) {
+  if (isSystem) {
+    return (
+      <div
+        style={{ background: "var(--color-brand-ink)", width: size, height: size }}
+        className="flex shrink-0 items-center justify-center rounded-full"
+      >
+        <VinhMark size={size * 0.56} tone="cream" />
+      </div>
+    );
+  }
   if (avatarUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -216,6 +241,7 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
         nickname: counterparty?.nickname ?? "",
         username: counterparty?.username ?? "",
         avatarUrl: counterparty?.avatarUrl ?? null,
+        isSystem: counterparty?.isSystem ?? false,
         lastMessage: data.message,
         unreadCount: 0,
       };
@@ -271,7 +297,7 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
                   }}
                   className="flex w-full cursor-pointer items-center gap-3 border-l-[3px] px-4 py-3 text-left transition-colors hover:bg-cream-card"
                 >
-                  <Avatar userId={c.userId} nickname={c.nickname} avatarUrl={c.avatarUrl} size={44} />
+                  <Avatar userId={c.userId} nickname={c.nickname} avatarUrl={c.avatarUrl} size={44} isSystem={c.isSystem} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <div
@@ -331,10 +357,20 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
                   nickname={counterparty.nickname}
                   avatarUrl={counterparty.avatarUrl}
                   size={38}
+                  isSystem={counterparty.isSystem}
                 />
                 <div className="min-w-0">
-                  <div className="text-[15px] font-semibold text-ink">{counterparty.nickname}</div>
-                  <div className="mt-0.5 text-xs text-stone">@{counterparty.username}</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-[15px] font-semibold text-ink">{counterparty.nickname}</div>
+                    {counterparty.isSystem && (
+                      <span className="rounded-full bg-brand-ink px-2 py-0.5 text-[10px] font-semibold text-brand-gold-light">
+                        Hệ thống
+                      </span>
+                    )}
+                  </div>
+                  {!counterparty.isSystem && (
+                    <div className="mt-0.5 text-xs text-stone">@{counterparty.username}</div>
+                  )}
                 </div>
               </div>
               {orders
@@ -419,14 +455,19 @@ export function ChatTab({ activeUserId, onSelectUser, mobileView, onBack }: Chat
                 nickname={counterparty.nickname}
                 avatarUrl={counterparty.avatarUrl}
                 size={68}
+                isSystem={counterparty.isSystem}
               />
               <div className="text-[15.5px] font-semibold text-ink">{counterparty.nickname}</div>
-              <Link
-                href={`/ket-noi?p=${counterparty.userId}`}
-                className="flex items-center gap-2 rounded-full bg-brand-ink px-[18px] py-2 text-[13px] font-semibold text-white no-underline"
-              >
-                <UserCircleIcon size={16} color="var(--color-brand-gold-light)" /> Xem Profile
-              </Link>
+              {/* Tài khoản hệ thống không có trang Kết nối thật để xem —
+                  ẩn nút này thay vì trỏ tới 1 profile vô nghĩa. */}
+              {!counterparty.isSystem && (
+                <Link
+                  href={`/ket-noi?p=${counterparty.userId}`}
+                  className="flex items-center gap-2 rounded-full bg-brand-ink px-[18px] py-2 text-[13px] font-semibold text-white no-underline"
+                >
+                  <UserCircleIcon size={16} color="var(--color-brand-gold-light)" /> Xem Profile
+                </Link>
+              )}
             </div>
           </div>
         )}
