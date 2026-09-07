@@ -96,9 +96,34 @@ const PARAGRAPHS = [
   "Nhưng có những đêm dài hơn một đời người. Và có những cái tên, biển giữ mãi không trả.",
 ];
 
-const WATERMARK_TEXT = "Minh Khôi · @minhkhoi · ID 88245    ".repeat(60);
 const PENALTY_STORAGE_KEY = "vinh_screenshot_penalty";
 const READER_PREFS_KEY = "vinh_reader_prefs";
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+const WATERMARK_TILE_WIDTH = 220;
+const WATERMARK_TILE_HEIGHT = 110;
+
+/** Ô SVG nhỏ chứa tên tác giả, xoay sẵn -22°, dùng làm `background-image`
+ * lặp bằng `background-repeat: repeat` — kỹ thuật giống
+ * `buildTiledWatermarkSvg` ở src/lib/orders/watermark.ts (ảnh giao đơn
+ * Kết nối), chỉ khác là tile nhỏ để trình duyệt tự lặp vô hạn thay vì vẽ
+ * hết mọi ô ra 1 SVG khổ lớn bằng đúng chiều cao nội dung — nhờ vậy phủ
+ * kín được chương dài bao nhiêu cũng được, không cần biết trước chiều
+ * cao thật của nó. */
+function buildAuthorWatermarkTileDataUrl(authorName: string, color: string): string {
+  const label = escapeXml(`${authorName} · Vịnh`);
+  const svg =
+    `<svg width="${WATERMARK_TILE_WIDTH}" height="${WATERMARK_TILE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">` +
+    `<text x="${WATERMARK_TILE_WIDTH / 2}" y="${WATERMARK_TILE_HEIGHT / 2}" ` +
+    `transform="rotate(-22 ${WATERMARK_TILE_WIDTH / 2} ${WATERMARK_TILE_HEIGHT / 2})" ` +
+    `text-anchor="middle" font-size="14" font-weight="600" font-family="sans-serif" ` +
+    `fill="${color}">${label}</text>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
 
 type ReaderPrefs = { fontSize: number; theme: ThemeName; lineHeight: number };
 
@@ -326,6 +351,17 @@ export function Reader({
   // thời gian đọc khớp giữa lúc soạn và lúc đọc thật.
   const wordCount = (content.trim().match(/\S+/g) ?? []).length;
   const readMinutes = Math.max(1, Math.round(wordCount / 200));
+
+  // Watermark mờ chèn tên tác giả thật (trước đây là chuỗi cứng giả lập
+  // tên độc giả demo, không đổi theo truyện/tác giả đang đọc, VÀ chỉ lặp
+  // đủ 1 lượng ký tự cố định — với chương dài, container cha (auto-height,
+  // bằng chiều cao CẢ chương) khiến lớp watermark full-bleed phồng to gấp
+  // bội, đẩy phần chữ đã lặp ra ngoài vùng nhìn thấy, y như không có gì).
+  // Đổi sang tile SVG lặp bằng CSS background-repeat (kỹ thuật giống
+  // buildTiledWatermarkSvg ở src/lib/orders/watermark.ts, dùng cho ảnh
+  // giao đơn Kết nối) — mỗi ô đã tự xoay sẵn trong SVG nên phủ kín vô hạn
+  // theo chiều cao thật của chương, không phụ thuộc số lần lặp/độ dài tên.
+  const watermarkTileUrl = buildAuthorWatermarkTileDataUrl(authorName || "Vịnh", c.wmColor);
 
   // --- State cho chọn chương/vote/danh sách đọc/follow/share — hoàn toàn
   // mới, KHÔNG đụng tới state/effect hệ thống chống chụp màn hình ở trên. ---
@@ -930,21 +966,13 @@ export function Reader({
         </div>
         <div
           aria-hidden="true"
-          style={{ inset: "-30% -20%" }}
-          className="pointer-events-none absolute z-[1] animate-[vn-drift_26s_ease-in-out_infinite]"
-        >
-          <div
-            style={{
-              color: c.wmColor,
-              lineHeight: 5,
-              wordSpacing: "40px",
-              letterSpacing: "1px",
-            }}
-            className="whitespace-pre-wrap text-[15px] font-semibold"
-          >
-            {WATERMARK_TEXT}
-          </div>
-        </div>
+          style={{
+            backgroundImage: `url("${watermarkTileUrl}")`,
+            backgroundRepeat: "repeat",
+            backgroundSize: `${WATERMARK_TILE_WIDTH}px ${WATERMARK_TILE_HEIGHT}px`,
+          }}
+          className="pointer-events-none absolute inset-0 z-[1] animate-[vn-drift_26s_ease-in-out_infinite]"
+        />
 
         <div className="relative z-[2]">
           <div

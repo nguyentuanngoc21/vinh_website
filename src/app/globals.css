@@ -74,14 +74,23 @@ body {
   font-family: var(--font-sans), sans-serif;
 }
 
+/* Trôi nhẹ lớp watermark nền trang đọc (xem reader.tsx) — mỗi ô SVG lặp
+   qua background-repeat đã tự xoay sẵn -22° bên trong, nên ở đây chỉ
+   dịch chuyển (translate), KHÔNG xoay cả khối: xoay cả khối vuông vức
+   đúng khít container (inset-0) sẽ để lộ góc trống sau khi xoay — trước
+   đây bù lại bằng cách "tràn" ra ngoài container 20-30%, nhưng % đó tính
+   theo chiều cao auto của container (bằng đúng chiều cao CẢ chương), nên
+   với chương dài, lớp watermark bị phồng to gấp bội và văng khỏi vùng
+   nhìn thấy — không bao giờ thấy được, dù nội dung watermark có đúng hay
+   không. */
 @keyframes vn-drift {
   0% {
-    transform: rotate(-24deg) translate(0, 0);
+    transform: translate(0, 0);
   }
   50% {
-    transform: rotate(-24deg) translate(26px, -30px);
+    transform: translate(26px, -30px);
   }
   100% {
-    transform: rotate(-24deg) translate(0, 0);
+    transform: translate(0, 0);
   }
 }
