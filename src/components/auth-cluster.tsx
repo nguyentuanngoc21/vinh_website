@@ -6,6 +6,8 @@ import {
   ShieldCheckIcon,
   UserCircleIcon,
   NotebookIcon,
+  TargetIcon,
+  TrophyIcon,
   SignOutIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
@@ -114,6 +116,23 @@ export function AuthCluster({
                 className="flex items-center gap-[11px] px-[18px] py-3 text-sm font-medium text-ink no-underline transition-colors hover:bg-cream-card"
               >
                 <UserCircleIcon size={18} color="var(--color-stone)" /> Thông tin cá nhân
+              </Link>
+              {/* Tách khỏi tab "Nhiệm vụ ngày" cũ trong Thông tin cá nhân —
+                  giờ là 2 điểm đến riêng, cùng cấp với Thông tin cá nhân/
+                  Trang viết truyện (xem src/lib/profile.ts). */}
+              <Link
+                href="/nhiem-vu"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-[11px] px-[18px] py-3 text-sm font-medium text-ink no-underline transition-colors hover:bg-cream-card"
+              >
+                <TargetIcon size={18} color="var(--color-stone)" /> Nhiệm vụ
+              </Link>
+              <Link
+                href="/thanh-tuu"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-[11px] px-[18px] py-3 text-sm font-medium text-ink no-underline transition-colors hover:bg-cream-card"
+              >
+                <TrophyIcon size={18} color="var(--color-stone)" /> Thành tựu
               </Link>
               <Link
                 href="/author"

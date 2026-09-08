@@ -9,7 +9,6 @@ import { ChatTab } from "@/components/profile/chat-tab";
 import { EditProfileTab } from "@/components/profile/edit-profile-tab";
 import { ServicesTab } from "@/components/profile/services-tab";
 import { AgreementsTab } from "@/components/profile/agreements-tab";
-import { DailyTasksTab } from "@/components/profile/daily-tasks-tab";
 import { PROFILE_TABS, type ProfileTab } from "@/lib/profile";
 
 function isProfileTab(value: string | null): value is ProfileTab {
@@ -123,8 +122,6 @@ export function ProfilePage() {
       {tab === "services" && <ServicesTab />}
 
       {tab === "agree" && <AgreementsTab />}
-
-      {tab === "tasks" && <DailyTasksTab />}
     </>
   );
 }

@@ -5,7 +5,6 @@ import {
   ChatTeardropDotsIcon,
   PencilSimpleLineIcon,
   SealCheckIcon,
-  TargetIcon,
   BriefcaseIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { PROFILE_TABS, type ProfileTab } from "@/lib/profile";
@@ -15,7 +14,6 @@ const TAB_ICONS = {
   chat: ChatTeardropDotsIcon,
   pencil: PencilSimpleLineIcon,
   seal: SealCheckIcon,
-  target: TargetIcon,
   briefcase: BriefcaseIcon,
 };
 

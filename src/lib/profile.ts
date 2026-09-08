@@ -1,6 +1,6 @@
 import type { TransactionType } from "@/lib/supabase/types";
 
-export type ProfileTab = "following" | "chat" | "edit" | "services" | "agree" | "tasks";
+export type ProfileTab = "following" | "chat" | "edit" | "services" | "agree";
 
 export const PROFILE_TABS: { id: ProfileTab; label: string; icon: string }[] = [
   { id: "edit", label: "Thông tin cá nhân", icon: "pencil" },
@@ -8,7 +8,9 @@ export const PROFILE_TABS: { id: ProfileTab; label: string; icon: string }[] = [
   { id: "following", label: "Đang theo dõi", icon: "users" },
   { id: "services", label: "Dịch vụ", icon: "briefcase" },
   { id: "agree", label: "Cam kết & Thỏa thuận", icon: "seal" },
-  { id: "tasks", label: "Nhiệm vụ ngày", icon: "target" },
+  // "Nhiệm vụ ngày" tách khỏi đây thành 2 trang riêng /nhiem-vu, /thanh-tuu
+  // (vào từ menu avatar, không còn là tab con của Thông tin cá nhân) —
+  // xem auth-cluster.tsx.
 ];
 
 // Cũng dùng để tô màu avatar fallback (không có avatar_url thật) ở
@@ -37,6 +39,7 @@ const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   order_payment: "Đặt cọc/thanh toán đơn dịch vụ",
   order_earning: "Doanh thu đơn dịch vụ",
   order_refund: "Hoàn tiền đơn dịch vụ",
+  achievement_bonus: "Thưởng thành tựu",
 };
 
 export function transactionTypeLabel(type: TransactionType): string {

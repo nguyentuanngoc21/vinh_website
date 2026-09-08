@@ -79,7 +79,12 @@ export type TransactionType =
   | "order_earning"
   // Hoàn tiền khi hủy Order (Mục 5.1) — cộng ngay, không hold period. Thêm
   // bởi migrations/20260901_add_order_refund_transaction_type.sql.
-  | "order_refund";
+  | "order_refund"
+  // Thưởng thành tựu (author/narrator/designer) — reference_type =
+  // 'achievement', reference_id = achievement_templates.id. Only written
+  // when achievement_templates.reward_tokens > 0. Added by
+  // migrations/20260908_add_achievement_bonus_transaction_type.sql.
+  | "achievement_bonus";
 
 // schema.sql phần 12. Giữ đủ 8 giá trị đúng sơ đồ đặc tả dù
 // 'brief_confirmed'/'deposit_paid' chỉ dừng lại rất ngắn trong thực tế —
@@ -99,6 +104,13 @@ export type ServiceType = "illustration" | "voice" | "ghostwriting";
 // Quest System taxonomy — see migrations/20260827_extend_task_templates_for_quests.sql.
 // Same 6 values used by task_templates.quest_type and quest_examples_pool.quest_type.
 export type QuestType = "discovery" | "engagement" | "lore_hunt" | "cross_compare" | "prediction" | "topup";
+
+// task_templates.for_role — gate theo sản phẩm THẬT đã đăng (books/
+// audio_narrations/design_items), tính bằng EXISTS (src/lib/quests/
+// creator-roles.ts), KHÔNG phải profiles.creator_tags. Không có "reader" —
+// đó là mặc định khi for_role NULL. See
+// migrations/20260908_add_task_template_role_gating.sql.
+export type CreatorRole = "author" | "narrator" | "designer";
 
 // Polymorphic discriminator for quest_id columns (quest_reset_events,
 // anchored_comments) — disambiguates task_templates.id vs hidden_quests.id.
@@ -1083,6 +1095,11 @@ export type Database = {
           quality_flag: string | null;
           similarity_to_pool_score: number | null;
           auto_flag_reason: string | null;
+          // Gate theo role sản phẩm THẬT đã đăng (không phải
+          // profiles.creator_tags) — NULL = áp dụng chung/mặc định đọc
+          // giả. Xem migrations/20260908_add_task_template_role_gating.sql
+          // và src/lib/quests/creator-roles.ts.
+          for_role: CreatorRole | null;
         };
         Insert: {
           id?: string;
@@ -1100,6 +1117,7 @@ export type Database = {
           quality_flag?: string | null;
           similarity_to_pool_score?: number | null;
           auto_flag_reason?: string | null;
+          for_role?: CreatorRole | null;
         };
         Update: Partial<Database["public"]["Tables"]["task_templates"]["Insert"]>;
         Relationships: [];
@@ -1326,8 +1344,10 @@ export type Database = {
           id: string;
           streak_days: number;
           reward_token: number;
-          // No badges table yet — column exists but unenforced (no FK)
-          // until it does. See migrations/20260827_add_streak_milestones.sql.
+          // FK'd to achievement_templates.id since
+          // migrations/20260908_add_achievements.sql — the linked row (if
+          // any) only supplies display metadata (title/icon/color_token),
+          // it does NOT replace claim_streak_milestone()'s unlock logic.
           badge_id: string | null;
           created_at: string;
         };
@@ -1349,6 +1369,61 @@ export type Database = {
           claimed_at: string;
         };
         // Rows are only created via claim_streak_milestone() — not a
+        // direct insert/update.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Achievements (schema.sql section 10) — one framework for every
+      // role, filtered/colored by for_role in the UI. NULL for_role =
+      // shared/reader default, same convention as task_templates.for_role.
+      // See migrations/20260908_add_achievements.sql.
+      achievement_templates: {
+        Row: {
+          id: string;
+          code: string;
+          for_role: CreatorRole | null;
+          title: string;
+          description: string | null;
+          icon: string | null;
+          color_token: string;
+          // NULL/NULL = not auto-computed (e.g. the row a
+          // streak_milestones.badge_id points to — unlock lives in
+          // claim_streak_milestone() instead). Non-null pair = evaluated
+          // by sync_user_achievements().
+          metric: "books_published" | "audio_published" | "design_published" | null;
+          threshold: number | null;
+          reward_tokens: number;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          for_role?: CreatorRole | null;
+          title: string;
+          description?: string | null;
+          icon?: string | null;
+          color_token: string;
+          metric?: "books_published" | "audio_published" | "design_published" | null;
+          threshold?: number | null;
+          reward_tokens?: number;
+          active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["achievement_templates"]["Insert"]>;
+        Relationships: [];
+      };
+      user_achievements: {
+        Row: {
+          id: string;
+          user_id: string;
+          achievement_id: string;
+          // null when the achievement_templates row's reward_tokens was 0
+          // at unlock time — no transaction to attach.
+          transaction_id: string | null;
+          unlocked_at: string;
+        };
+        // Rows are only created via sync_user_achievements() — not a
         // direct insert/update.
         Insert: never;
         Update: never;
@@ -1679,6 +1754,13 @@ export type Database = {
           p_max_resets_per_day: number;
         };
         Returns: Database["public"]["Tables"]["user_quest_pool"]["Row"];
+      };
+      // Lazy-pull: cấp (+ thưởng nếu có) mọi achievement_templates
+      // metric-based mà user vừa đủ điều kiện. Xem
+      // migrations/20260908_add_achievements.sql.
+      sync_user_achievements: {
+        Args: { p_user_id: string };
+        Returns: Database["public"]["Tables"]["user_achievements"]["Row"][];
       };
       // Hệ thống giao dịch commission — xem
       // migrations/20260901_add_order_system_core.sql (nguồn sự thật cho
