@@ -10,6 +10,7 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { AVATAR_TONES } from "@/lib/profile";
+import { timeLabel } from "@/lib/format-time";
 import { Field, Button, Alert } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
 
@@ -56,15 +57,6 @@ type ChatTabProps = {
 // "Hội thoại" đang mở), tự dừng khi rời tab.
 const CONVERSATIONS_POLL_MS = 15_000;
 const THREAD_POLL_MS = 5_000;
-
-function timeLabel(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  return sameDay
-    ? d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-}
 
 function toneFor(userId: string): string {
   let hash = 0;
