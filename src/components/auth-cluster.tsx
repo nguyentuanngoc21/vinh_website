@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ShieldCheckIcon,
@@ -31,6 +32,18 @@ export function AuthCluster({
   // nhau (nhất là bản mobile fixed full-width, đè khít lên nhau hoàn toàn
   // nếu cả 2 cùng mở).
   const [openFlyout, setOpenFlyout] = useState<"messenger" | "notifications" | null>(null);
+
+  // Portal FAB "+" thẳng ra document.body — <header> cha có backdrop-blur
+  // (backdrop-filter), mà theo CSS spec, backdrop-filter khác none trên 1
+  // tổ tiên sẽ tạo containing block MỚI cho position:fixed của con cháu.
+  // Không portal ra ngoài, FAB sẽ bị "nhốt" tính toạ độ theo khung <header>
+  // bé xíu thay vì theo viewport, biến mất khỏi tầm nhìn — CHÍNH lỗi
+  // mobile-nav-drawer.tsx đã gặp và giải quyết bằng portal (xem file đó).
+  // `mounted` tránh portal chạy lúc SSR (document chưa tồn tại) — pattern
+  // giống hệt mobile-nav-drawer.tsx.
+  const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), []);
 
   // Đóng dropdown khi click ra ngoài vùng avatar+menu
   useEffect(() => {
@@ -87,27 +100,21 @@ export function AuthCluster({
           phát (~56-60px, xem mini-player-bar.tsx) trên MỌI trang, thay vì
           dò riêng từng trang đang có gì phía dưới. z-40 — dưới flyout
           Messenger/chuông (z-[60]) nếu chúng cũng đang mở dạng fixed
-          full-width trên mobile, trên MiniPlayerBar (z-30). */}
-      <Link
-        href={ctaHrefResolved}
-        data-tour="tour-cta"
-        aria-label={ctaLabel}
-        title={ctaLabel}
-        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline shadow-[0_8px_24px_rgba(0,0,0,.25)] transition-transform active:scale-95 sm:hidden"
-      >
-        <PlusIcon weight="bold" size={26} />
-      </Link>
-      {isAdmin && (
-        <Link
-          href="/admin"
-          aria-label="Bảng điều khiển"
-          title="Bảng điều khiển"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-ink text-white no-underline sm:h-auto sm:w-auto sm:gap-2 sm:whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm sm:font-semibold"
-        >
-          <ShieldCheckIcon weight="fill" size={17} color="var(--color-brand-gold-light)" />
-          <span className="hidden sm:inline">Bảng điều khiển</span>
-        </Link>
-      )}
+          full-width trên mobile, trên MiniPlayerBar (z-30). Portal ra
+          document.body — xem lý do ở khai báo `mounted` phía trên. */}
+      {mounted &&
+        createPortal(
+          <Link
+            href={ctaHrefResolved}
+            data-tour="tour-cta"
+            aria-label={ctaLabel}
+            title={ctaLabel}
+            className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline shadow-[0_8px_24px_rgba(0,0,0,.25)] transition-transform active:scale-95 sm:hidden"
+          >
+            <PlusIcon weight="bold" size={26} />
+          </Link>,
+          document.body
+        )}
       {isAdmin && (
         <Link
           href="/admin"
