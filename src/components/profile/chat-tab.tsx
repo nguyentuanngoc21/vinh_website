@@ -265,9 +265,24 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
           việc đoán 1 con số cố định trên mobile — để trang cuộn tự
           nhiên, ô nhập tin nhắn tự "dính" đáy màn hình bằng sticky (xem
           composer bên dưới), không phụ thuộc chiều cao phần tử phía
-          trên nữa. */}
+          trên nữa.
+
+          min-[760px]:sticky — bug thật đã xảy ra ở desktop: cột trái
+          (danh sách hội thoại) và cột phải (side panel) có nội dung NGẮN,
+          nằm sát đỉnh khung 604px; cột giữa (tin nhắn) tự cuộn xuống tin
+          mới nhất. Nếu người dùng cuộn TRANG (không phải cuộn trong
+          khung) để thấy hết tin nhắn, cả khung 604px di chuyển theo —
+          phần ĐỈNH của khung (chứa toàn bộ nội dung cột trái/phải) bị đẩy
+          lên trên, khuất khỏi khung nhìn, chỉ còn thấy phần ĐÁY (đúng lúc
+          đó cột trái/phải đã hết nội dung từ lâu) — trông như "bị trắng"
+          dù dữ liệu vẫn đúng, không mất gì. sticky ghim khung lại 1 lần
+          khi cuộn tới, luôn thấy trọn 604px (đủ cả đỉnh lẫn đáy) thay vì
+          dừng lại giữa chừng. top-[124px] ước lượng đúng bằng chiều cao
+          SiteHeader (2 hàng: logo/avatar + danh mục, ~110–125px) để
+          không bị đè lên nhau — cần chỉnh lại nếu SiteHeader đổi chiều
+          cao sau này. */}
       <div
-        className={`grid h-[604px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-auto max-[759px]:overflow-visible max-[759px]:grid-cols-1 sm:rounded-[18px] ${
+        className={`grid h-[604px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-auto max-[759px]:overflow-visible max-[759px]:grid-cols-1 min-[760px]:sticky min-[760px]:top-[124px] sm:rounded-[18px] ${
           counterparty ? "grid-cols-[320px_1fr_272px]" : "grid-cols-[320px_1fr]"
         }`}
       >
