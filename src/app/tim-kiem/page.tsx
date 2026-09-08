@@ -89,11 +89,22 @@ export default async function SearchPage({
               {activeTab === "truyen" && (
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
                   {books.map((b) => (
-                    <Link key={b.id} href={`/truyen/${b.slug}`} className="no-underline">
-                      <div className="aspect-[3/4] overflow-hidden rounded-[10px] bg-neutral-bg">
-                        <BookCover id={b.id} title={b.title} author={b.authorNickname} genre={b.genre} coverUrl={b.coverUrl} />
+                    <Link
+                      key={b.id}
+                      href={`/truyen/${b.slug}`}
+                      className="no-underline transition-transform duration-[250ms] hover:-translate-y-1"
+                    >
+                      <div className="aspect-[2/3] overflow-hidden rounded-[10px] bg-neutral-bg">
+                        <BookCover
+                          id={b.id}
+                          title={b.title}
+                          author={b.authorNickname}
+                          genre={b.genre}
+                          coverUrl={b.coverUrl}
+                          className="h-full w-full"
+                        />
                       </div>
-                      <div className="mt-2 truncate text-sm font-semibold text-brand-ink">{b.title}</div>
+                      <div className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold text-brand-ink">{b.title}</div>
                       <div className="truncate text-xs text-stone-alt">{b.authorNickname ?? "—"}</div>
                     </Link>
                   ))}

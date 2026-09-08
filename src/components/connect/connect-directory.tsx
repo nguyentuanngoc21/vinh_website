@@ -227,7 +227,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
       ) : (
         <div className="grid gap-[30px] px-4 pb-[46px] pt-[26px] sm:px-8 lg:grid-cols-[320px_1fr] lg:px-11">
           {/* People list */}
-          <div className="overflow-hidden rounded-[20px] border border-cream">
+          <div className="overflow-hidden rounded-[20px] border border-cream lg:sticky lg:top-[90px] lg:self-start">
             <div className="border-b border-[#f1efec] px-[18px] pb-3 pt-4">
               <div className="mb-3 rounded-full bg-neutral-bg px-[15px] py-2.5">
                 <Field

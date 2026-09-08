@@ -37,7 +37,7 @@ export function NewWorksGrid({ books }: { books: HomepageBook[] }) {
                 />
               </div>
               <div className="px-1 py-3">
-                <div className="text-[15px] font-semibold text-ink">{book.title}</div>
+                <div className="line-clamp-2 min-h-[2.5rem] text-[15px] font-semibold text-ink">{book.title}</div>
                 <div className="mt-0.5 text-[13px] text-[#9a9a9a]">{book.authorNickname ?? "Ẩn danh"}</div>
               </div>
             </Link>
