@@ -17,6 +17,16 @@ export const metadata: Metadata = {
   title: "Kết nối — Vịnh",
 };
 
+// Trang này cá nhân hoá theo viewer (getAuthedUserId đọc cookie phiên,
+// isFollowingByViewer/isSelf/nút "Nhắn tin" đều phụ thuộc viewerId) — về
+// bản chất không thể prerender tĩnh. Ép dynamic tường minh thay vì trông
+// chờ Next.js tự phát hiện qua cookies() lồng sâu trong
+// getAuthedUserId(): không có export này, Next thử prerender tĩnh lúc
+// build, và nếu bước đó chạy TRƯỚC khi chạm cookies() (chẳng hạn
+// createServiceRoleClient() phía trên ném lỗi vì thiếu env ở build step)
+// thì cả build sập luôn thay vì rơi về dynamic rendering êm như mong đợi.
+export const dynamic = "force-dynamic";
+
 // Trang directory chưa phân trang — 60 người mới tham gia gần nhất là đủ
 // dùng ở quy mô nền tảng hiện tại (thêm phân trang/tìm kiếm server-side
 // sau nếu số user thật vượt xa mốc này).
