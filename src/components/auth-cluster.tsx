@@ -9,6 +9,7 @@ import {
   TargetIcon,
   TrophyIcon,
   SignOutIcon,
+  PlusIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -57,6 +58,13 @@ export function AuthCluster({
           Đăng nhập
         </Link>
       )}
+      {/* Icon-only "+" dưới `sm` (chỉ giữ 1-chạm, không mở menu — vẫn đi
+          thẳng theo ctaHref/ctaLabel context-aware theo trang đang ở, y hệt
+          hành vi cũ), trở lại pill có chữ từ `sm` — bookmark + CTA + (admin:
+          Bảng điều khiển) + Messenger + chuông + avatar dồn hết vào 1 hàng
+          không flex-wrap ở site-header.tsx từng tràn ngang cả trang trên
+          mobile (nhất là admin, có 2 nút pill dài) khi thêm icon Messenger.
+          Không đổi ctaHref/ctaLabel gì — chỉ đổi VỎ hiển thị. */}
       {isGuest ? (
         // Chưa đăng nhập: đưa tới trang đăng nhập trước — bấm mở modal
         // ngay sẽ chỉ nhận lỗi 401 khi submit vì tạo truyện cần
@@ -64,9 +72,12 @@ export function AuthCluster({
         <Link
           href="/dang-nhap"
           data-tour="tour-cta"
-          className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
+          aria-label={ctaLabel}
+          title={ctaLabel}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline sm:h-auto sm:w-auto sm:whitespace-nowrap sm:px-[22px] sm:py-2.5 sm:text-sm sm:font-semibold"
         >
-          {ctaLabel}
+          <PlusIcon weight="bold" size={18} className="sm:hidden" />
+          <span className="hidden sm:inline">{ctaLabel}</span>
         </Link>
       ) : (
         // Trước đây là <Link href="/author"> — luôn mở lại đúng 1 trang
@@ -78,18 +89,23 @@ export function AuthCluster({
         <Link
           href={ctaHref}
           data-tour="tour-cta"
-          className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline"
+          aria-label={ctaLabel}
+          title={ctaLabel}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline sm:h-auto sm:w-auto sm:whitespace-nowrap sm:px-[22px] sm:py-2.5 sm:text-sm sm:font-semibold"
         >
-          {ctaLabel}
+          <PlusIcon weight="bold" size={18} className="sm:hidden" />
+          <span className="hidden sm:inline">{ctaLabel}</span>
         </Link>
       )}
       {isAdmin && (
         <Link
           href="/admin"
-          className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-brand-ink px-5 py-2.5 text-sm font-semibold text-white no-underline"
+          aria-label="Bảng điều khiển"
+          title="Bảng điều khiển"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-ink text-white no-underline sm:h-auto sm:w-auto sm:gap-2 sm:whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm sm:font-semibold"
         >
-          <ShieldCheckIcon weight="fill" size={16} color="var(--color-brand-gold-light)" /> Bảng
-          điều khiển
+          <ShieldCheckIcon weight="fill" size={17} color="var(--color-brand-gold-light)" />
+          <span className="hidden sm:inline">Bảng điều khiển</span>
         </Link>
       )}
       {/* Giữa nút hành động (Viết truyện/...) và avatar, theo đúng vị trí
