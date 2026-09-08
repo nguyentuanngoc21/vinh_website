@@ -34,13 +34,6 @@ export const TOUR_STEPS: TourStep[] = [
     placement: "bottom",
   },
   {
-    id: "bookmark",
-    target: '[data-tour="tour-bookmark"]',
-    title: "Đã lưu",
-    body: "Lưu lại truyện yêu thích để đọc sau.",
-    placement: "left",
-  },
-  {
     id: "cta",
     target: '[data-tour="tour-cta"]',
     title: "Viết truyện",

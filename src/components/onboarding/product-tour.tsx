@@ -40,14 +40,26 @@ const VIEWPORT_MARGIN = 12;
 
 function measureTarget(selector: string | null): Rect | null {
   if (!selector) return null;
-  const el = document.querySelector<HTMLElement>(selector);
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  // width/height both 0 means the element is display:none (e.g. the search
-  // box is lg:flex-only) — treat exactly like "not found" so the step gets
-  // skipped instead of spotlighting an invisible point.
-  if (r.width === 0 && r.height === 0) return null;
-  return { top: r.top, left: r.left, width: r.width, height: r.height };
+  // querySelectorAll, not querySelector — from Phase "bong bóng chat", the
+  // CTA "Viết truyện" has 2 elements sharing data-tour="tour-cta" (pill ở
+  // header từ `sm`, FAB nổi góc dưới-phải dưới `sm`, xem auth-cluster.tsx)
+  // vì luôn có ĐÚNG 1 bản hiển thị tại 1 thời điểm tuỳ kích thước màn hình.
+  // querySelector chỉ lấy phần tử ĐẦU TIÊN khớp theo thứ tự DOM — nếu bản
+  // đó đang display:none (không phải bản đang hiển thị), bước sẽ bị bỏ qua
+  // oan dù bản còn lại vẫn hiển thị. Duyệt hết, lấy bản đầu tiên có rect
+  // khác 0 — hoạt động đúng cho cả trường hợp chỉ có 1 phần tử khớp (mọi
+  // selector khác) lẫn trường hợp nhiều phần tử thay nhau hiển thị theo
+  // breakpoint như trên.
+  const candidates = document.querySelectorAll<HTMLElement>(selector);
+  for (const el of candidates) {
+    const r = el.getBoundingClientRect();
+    // width/height both 0 means the element is display:none (e.g. the
+    // search box is lg:flex-only) — skip to the next candidate instead of
+    // spotlighting an invisible point.
+    if (r.width === 0 && r.height === 0) continue;
+    return { top: r.top, left: r.left, width: r.width, height: r.height };
+  }
+  return null;
 }
 
 // Điện thoại xoay dọc thường hẹp hơn 320px tooltip + lề hai bên, và không

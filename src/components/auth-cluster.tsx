@@ -47,6 +47,15 @@ export function AuthCluster({
   const initial = session?.name?.[0] ?? "?";
   const userName = session?.name ?? "";
   const userHandle = session?.handle ?? "";
+  // Chưa đăng nhập: đưa tới trang đăng nhập trước — bấm mở modal ngay sẽ
+  // chỉ nhận lỗi 401 khi submit vì tạo truyện cần author_id thật (POST
+  // /api/authoring/books). Trước đây là <Link href="/author"> — luôn mở
+  // lại đúng 1 trang tĩnh, không phân biệt được "viết truyện mới" với "sửa
+  // truyện cũ". Sau đó đổi sang tạo sách ngay (POST) rồi điều hướng — giờ
+  // đổi lại lần nữa: chỉ mở /author/new (KHÔNG ghi Supabase), sách chỉ
+  // thật sự được tạo lúc bấm Lưu/Xuất bản lần đầu ở đó (xem
+  // new-work-workspace.tsx + POST /api/authoring/books).
+  const ctaHrefResolved = isGuest ? "/dang-nhap" : ctaHref;
 
   return (
     <>
@@ -58,43 +67,45 @@ export function AuthCluster({
           Đăng nhập
         </Link>
       )}
-      {/* Icon-only "+" dưới `sm` (chỉ giữ 1-chạm, không mở menu — vẫn đi
-          thẳng theo ctaHref/ctaLabel context-aware theo trang đang ở, y hệt
-          hành vi cũ), trở lại pill có chữ từ `sm` — bookmark + CTA + (admin:
-          Bảng điều khiển) + Messenger + chuông + avatar dồn hết vào 1 hàng
-          không flex-wrap ở site-header.tsx từng tràn ngang cả trang trên
-          mobile (nhất là admin, có 2 nút pill dài) khi thêm icon Messenger.
-          Không đổi ctaHref/ctaLabel gì — chỉ đổi VỎ hiển thị. */}
-      {isGuest ? (
-        // Chưa đăng nhập: đưa tới trang đăng nhập trước — bấm mở modal
-        // ngay sẽ chỉ nhận lỗi 401 khi submit vì tạo truyện cần
-        // author_id thật (POST /api/authoring/books).
+      {/* Desktop/tablet (`sm`+): pill có chữ trong header như trước. Dưới
+          `sm`: KHÔNG còn nằm trong hàng icon nữa (từng góp phần tràn ngang
+          cả trang cùng "Bảng điều khiển" khi thêm Messenger) — thay bằng 1
+          nút nổi cố định góc dưới-phải kiểu bong bóng chat Messenger, xem
+          ngay dưới. Cùng data-tour="tour-cta" ở cả 2 — measureTarget() ở
+          product-tour.tsx tự chọn đúng bản đang HIỂN THỊ (bỏ qua bản
+          display:none), không cần 2 id riêng. */}
+      <Link
+        href={ctaHrefResolved}
+        data-tour="tour-cta"
+        className="hidden shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline sm:inline-flex"
+      >
+        {ctaLabel}
+      </Link>
+      {/* FAB nổi góc dưới-phải, chỉ mobile (dưới `sm`). bottom-20 (80px) —
+          ước lượng đủ cao để không đè lên ô soạn tin sticky ở tab Hội thoại
+          (~54-60px, xem chat-tab.tsx) hoặc MiniPlayerBar khi có audio đang
+          phát (~56-60px, xem mini-player-bar.tsx) trên MỌI trang, thay vì
+          dò riêng từng trang đang có gì phía dưới. z-40 — dưới flyout
+          Messenger/chuông (z-[60]) nếu chúng cũng đang mở dạng fixed
+          full-width trên mobile, trên MiniPlayerBar (z-30). */}
+      <Link
+        href={ctaHrefResolved}
+        data-tour="tour-cta"
+        aria-label={ctaLabel}
+        title={ctaLabel}
+        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline shadow-[0_8px_24px_rgba(0,0,0,.25)] transition-transform active:scale-95 sm:hidden"
+      >
+        <PlusIcon weight="bold" size={26} />
+      </Link>
+      {isAdmin && (
         <Link
-          href="/dang-nhap"
-          data-tour="tour-cta"
-          aria-label={ctaLabel}
-          title={ctaLabel}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline sm:h-auto sm:w-auto sm:whitespace-nowrap sm:px-[22px] sm:py-2.5 sm:text-sm sm:font-semibold"
+          href="/admin"
+          aria-label="Bảng điều khiển"
+          title="Bảng điều khiển"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-ink text-white no-underline sm:h-auto sm:w-auto sm:gap-2 sm:whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm sm:font-semibold"
         >
-          <PlusIcon weight="bold" size={18} className="sm:hidden" />
-          <span className="hidden sm:inline">{ctaLabel}</span>
-        </Link>
-      ) : (
-        // Trước đây là <Link href="/author"> — luôn mở lại đúng 1 trang
-        // tĩnh, không phân biệt được "viết truyện mới" với "sửa truyện
-        // cũ". Sau đó đổi sang tạo sách ngay (POST) rồi điều hướng — giờ
-        // đổi lại lần nữa: chỉ mở /author/new (KHÔNG ghi Supabase), sách
-        // chỉ thật sự được tạo lúc bấm Lưu/Xuất bản lần đầu ở đó (xem
-        // new-work-workspace.tsx + POST /api/authoring/books).
-        <Link
-          href={ctaHref}
-          data-tour="tour-cta"
-          aria-label={ctaLabel}
-          title={ctaLabel}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline sm:h-auto sm:w-auto sm:whitespace-nowrap sm:px-[22px] sm:py-2.5 sm:text-sm sm:font-semibold"
-        >
-          <PlusIcon weight="bold" size={18} className="sm:hidden" />
-          <span className="hidden sm:inline">{ctaLabel}</span>
+          <ShieldCheckIcon weight="fill" size={17} color="var(--color-brand-gold-light)" />
+          <span className="hidden sm:inline">Bảng điều khiển</span>
         </Link>
       )}
       {isAdmin && (
