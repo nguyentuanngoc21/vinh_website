@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { MinusIcon, XIcon, PaperPlaneRightIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { UserAvatar } from "@/components/user-avatar";
-import { Field, Button } from "@/components/ui";
 import { useChatBubbles, type BubbleWindow } from "@/lib/chat-bubbles";
 import type { MessageContext } from "@/lib/use-conversations";
 import { chatThreadHref } from "@/lib/chat-thread-href";
+import { autoGrowTextarea, resetTextareaHeight } from "@/lib/autogrow-textarea";
 import { OrderSummaryChip, type OrderSummary } from "@/components/messenger/order-summary-chip";
 
 type ThreadMessage = { id: string; body: string; createdAt: string; mine: boolean; flagged?: boolean };
@@ -21,6 +21,9 @@ type OrderRow = {
 
 // Cùng nhịp THREAD_POLL_MS với luồng đang mở ở chat-tab.tsx.
 const THREAD_POLL_MS = 5_000;
+// Panel chỉ cao 420px tổng cộng — giới hạn thấp hơn chat-tab.tsx (140px)
+// để ô soạn không nuốt hết chỗ của khung tin nhắn phía trên.
+const COMPOSER_MAX_HEIGHT_PX = 96;
 
 /**
  * Panel bong bóng chat đang "expanded" — bản thu gọn của phần Thread ở
@@ -44,6 +47,7 @@ export function ChatBubbleWindow({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   // onThreadRead đổi identity mỗi render ở chat-bubble-dock.tsx (đóng qua
   // markThreadRead của useConversations) — giữ qua ref để effect dưới chỉ
   // phụ thuộc (userId, context), không lập lại vòng poll mỗi lần cha
@@ -131,6 +135,7 @@ export function ChatBubbleWindow({
     }
     setMessages((prev) => [...prev, data.message]);
     setDraft("");
+    resetTextareaHeight(composerRef.current);
   };
 
   return (
@@ -194,11 +199,24 @@ export function ChatBubbleWindow({
         <div ref={messagesEndRef} />
       </div>
       {sendError && <div className="px-3 pb-1.5 text-[11px] text-[#B02A37]">{sendError}</div>}
-      <div className="flex items-center gap-2 border-t border-[#f0f0ef] bg-white px-2.5 py-2">
-        <Field
-          label={null}
+      {/* KHÔNG dùng Field/Button dùng chung — lỗi có sẵn từ trước (không
+          phải mới đổi): Field chỉ áp className lên <input> bên trong,
+          không lên <label> bọc ngoài (chính là flex item thật của hàng
+          này) nên flex-1 vô tác dụng; Button có base class w-full LUÔN
+          thắng mọi class ghi đè width (thứ tự utility trong CSS Tailwind
+          build ra quyết định, không phải thứ tự viết trong className — đã
+          kiểm chứng .w-8{} đứng TRƯỚC .w-full{} trong stylesheet). Chi
+          tiết đầy đủ xem comment tương tự ở chat-tab.tsx (cùng lỗi, cùng
+          cách sửa). textarea cho tự giãn dòng khi soạn tin dài, tối đa
+          COMPOSER_MAX_HEIGHT_PX rồi tự cuộn bên trong. */}
+      <div className="flex items-end gap-2 border-t border-[#f0f0ef] bg-white px-2.5 py-2">
+        <textarea
+          ref={composerRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            autoGrowTextarea(e.target, COMPOSER_MAX_HEIGHT_PX);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -206,16 +224,18 @@ export function ChatBubbleWindow({
             }
           }}
           placeholder="Nhắn tin…"
-          className="min-w-0 flex-1 rounded-full border-none bg-neutral-bg px-3.5 py-2 text-[12.5px] outline-none focus:ring-1 focus:ring-brand-gold"
+          rows={1}
+          className="min-h-8 max-h-[96px] min-w-0 flex-1 resize-none overflow-y-auto rounded-3xl border-none bg-neutral-bg px-3.5 py-2 text-[12.5px] leading-[1.4] outline-none focus:ring-1 focus:ring-brand-gold"
         />
-        <Button
+        <button
           type="button"
           onClick={handleSend}
           disabled={sending || !draft.trim()}
-          className="h-8 w-8 shrink-0 rounded-full p-0 text-brand-ink"
+          aria-label="Gửi"
+          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink transition-transform hover:brightness-[1.08] active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55"
         >
           <PaperPlaneRightIcon weight="fill" size={14} />
-        </Button>
+        </button>
       </div>
     </div>
   );
