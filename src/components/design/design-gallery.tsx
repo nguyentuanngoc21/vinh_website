@@ -256,7 +256,7 @@ export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="grid w-full max-w-[960px] overflow-hidden rounded-[22px] bg-white shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1.15fr_minmax(0,1fr)]"
+            className="grid w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-white shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1.15fr_minmax(0,1fr)]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

@@ -244,10 +244,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       >
                         {b.rank}
                       </div>
-                      <div
-                        style={{ height: i === 0 ? "190px" : "162px" }}
-                        className="overflow-hidden rounded-xl shadow-[0_16px_34px_rgba(0,0,0,.4)]"
-                      >
+                      <div className="mx-auto aspect-[2/3] w-[124px] overflow-hidden rounded-xl shadow-[0_16px_34px_rgba(0,0,0,.4)]">
                         <BookCover
                           id={b.id}
                           title={b.title}
@@ -291,8 +288,8 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                         {b.rank}
                       </div>
                       <div
-                        style={{ background: b.gradient, height: i === 0 ? "190px" : "162px" }}
-                        className="rounded-xl shadow-[0_16px_34px_rgba(0,0,0,.4)]"
+                        style={{ background: b.gradient }}
+                        className="mx-auto aspect-[2/3] w-[124px] rounded-xl shadow-[0_16px_34px_rgba(0,0,0,.4)]"
                       />
                       <div className="mt-4 text-[19px] font-bold leading-[1.3]">{b.title}</div>
                       <div className="mt-[5px] text-[13.5px] text-sidebar-text-dim-2">{f.byline}</div>

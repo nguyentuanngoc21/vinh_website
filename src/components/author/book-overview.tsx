@@ -154,7 +154,7 @@ export function BookOverview({
   };
 
   return (
-    <div className="flex flex-1 flex-col bg-[#FBF8F1] px-4 py-5 lg:overflow-y-auto lg:px-9 lg:py-7">
+    <div className="flex flex-1 flex-col bg-[#FBF8F1] px-4 py-5 lg:col-span-2 lg:overflow-y-auto lg:px-9 lg:py-7">
       <div className="mb-1 flex flex-wrap items-center gap-2.5">
         {bookGenre && (
           <span className="rounded-full bg-neutral-bg px-3 py-1 text-xs font-medium text-ink">{bookGenre}</span>

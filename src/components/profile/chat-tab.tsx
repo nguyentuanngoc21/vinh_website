@@ -266,7 +266,11 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
           nhiên, ô nhập tin nhắn tự "dính" đáy màn hình bằng sticky (xem
           composer bên dưới), không phụ thuộc chiều cao phần tử phía
           trên nữa. */}
-      <div className="grid h-[604px] grid-cols-[320px_1fr_272px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-auto max-[759px]:overflow-visible max-[759px]:grid-cols-1 sm:rounded-[18px]">
+      <div
+        className={`grid h-[604px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-auto max-[759px]:overflow-visible max-[759px]:grid-cols-1 sm:rounded-[18px] ${
+          counterparty ? "grid-cols-[320px_1fr_272px]" : "grid-cols-[320px_1fr]"
+        }`}
+      >
         {/* Conversation list */}
         <div
           className={`flex min-w-0 flex-col border-r border-[#f0f0ef] ${

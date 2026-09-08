@@ -46,7 +46,15 @@ export function MegaMenu({ label, href, triggerClassName, columns }: MegaMenuPro
   const show = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
     const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) setPos({ left: rect.left, top: rect.bottom + 8 });
+    if (rect) {
+      // Menu rộng 420px (2 cột) hoặc 240px (1 cột) — co tọa độ left vào
+      // trong khung nhìn để không tràn ra ngoài mép phải màn hình trên
+      // các laptop 1024px-1200px (viewport hẹp hơn tổng left + minWidth).
+      const menuWidth = columns.length > 1 ? 420 : 240;
+      const margin = 16;
+      const maxLeft = window.innerWidth - menuWidth - margin;
+      setPos({ left: Math.max(margin, Math.min(rect.left, maxLeft)), top: rect.bottom + 8 });
+    }
     setOpen(true);
   };
   const scheduleHide = () => {
