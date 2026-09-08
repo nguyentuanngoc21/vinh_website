@@ -255,7 +255,18 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
 
   return (
     <div className="px-0 pb-6 pt-[22px] sm:px-8 sm:pb-[60px] lg:px-11">
-      <div className="grid h-[604px] grid-cols-[320px_1fr_272px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-[calc(100vh-260px)] max-[759px]:min-h-[420px] max-[759px]:grid-cols-1 sm:rounded-[18px]">
+      {/* max-[759px]:h-auto + overflow-visible — bản cũ dùng
+          h-[calc(100vh-260px)] + overflow-hidden, nhưng 260px không tính
+          SiteHeader (sticky top-0 TOÀN site + 1 hàng danh mục cuộn ngang
+          bên dưới nó, xem site-header.tsx) — trên mobile phần "phía
+          trên" thực tế cao hơn 260px, khiến khung này bị tính THẤP hơn
+          không gian còn lại thật, và overflow-hidden cắt đứt phần dư
+          (đúng vị trí ô nhập tin nhắn) không cách nào cuộn tới. Bỏ hẳn
+          việc đoán 1 con số cố định trên mobile — để trang cuộn tự
+          nhiên, ô nhập tin nhắn tự "dính" đáy màn hình bằng sticky (xem
+          composer bên dưới), không phụ thuộc chiều cao phần tử phía
+          trên nữa. */}
+      <div className="grid h-[604px] grid-cols-[320px_1fr_272px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-auto max-[759px]:overflow-visible max-[759px]:grid-cols-1 sm:rounded-[18px]">
         {/* Conversation list */}
         <div
           className={`flex min-w-0 flex-col border-r border-[#f0f0ef] ${
@@ -275,7 +286,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
               />
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto max-[759px]:overflow-visible">
             {conversationsLoaded && filteredConversations.length === 0 && (
               <div className="px-4 py-6 text-center text-[13px] text-stone-light">
                 {conversations.length === 0
@@ -387,7 +398,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                     onChanged={(updated) => setOrders((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))}
                   />
                 ))}
-              <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-[18px] py-5">
+              <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-[18px] py-5 max-[759px]:overflow-visible">
                 {messages.map((m) => (
                   <div key={m.id} className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
                     <div
@@ -422,7 +433,12 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   <Alert tone="error">{sendError}</Alert>
                 </div>
               )}
-              <div className="flex items-center gap-2.5 border-t border-[#f0f0ef] bg-white px-4 py-3">
+              {/* sticky bottom-0 trên mobile — ô nhập KHÔNG còn phụ thuộc
+                  vào chiều cao chính xác của mọi phần tử phía trên (xem
+                  ghi chú ở container ngoài cùng); tự "dính" đáy màn hình
+                  khi cuộn, đúng hành vi chat mobile chuẩn, bất kể
+                  SiteHeader/ProfileHeader cao bao nhiêu. */}
+              <div className="flex items-center gap-2.5 border-t border-[#f0f0ef] bg-white px-4 py-3 max-[759px]:sticky max-[759px]:bottom-0 max-[759px]:z-10 max-[759px]:shrink-0">
                 <Field
                   label={null}
                   value={draft}
