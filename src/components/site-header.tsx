@@ -43,7 +43,17 @@ export function SiteHeader({
         </span>
       </Link>
 
-      <div className="flex items-center gap-3.5">
+      {/* flex-wrap + justify-end — lưới an toàn: AuthCluster giờ có thêm
+          MessengerBell (bookmark + CTA + [admin: Bảng điều khiển] +
+          Messenger + chuông + avatar dồn vào 1 hàng) đã từng tràn NGANG CẢ
+          TRANG trên mobile (nhất là admin) vì hàng này trước đó không wrap
+          được. AuthCluster tự thu CTA/Bảng điều khiển về icon-only dưới
+          `sm` để vừa 1 hàng trong đa số trường hợp, nhưng flex-wrap vẫn giữ
+          lại phòng khi màn hình quá hẹp hoặc tính toán bề rộng lệch — tối
+          đa chỉ xuống dòng bên trong header, không bao giờ đẩy cả TRANG
+          tràn ngang nữa. sm:flex-nowrap trở lại 1 hàng cố định khi đã đủ
+          chỗ (pill có chữ). */}
+      <div className="flex flex-wrap items-center justify-end gap-3.5 sm:flex-nowrap">
         <Link
           href="/ca-nhan#bookmarks"
           data-tour="tour-bookmark"
