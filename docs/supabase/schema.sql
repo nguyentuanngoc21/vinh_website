@@ -3406,3 +3406,48 @@ create index direct_messages_thread_idx
     context,
     created_at
   );
+
+-- --- Kiểm duyệt CẤP TRUYỆN (book-level) — dùng chung kiến trúc với
+-- kiểm duyệt cấp chương ở trên (bắt buộc lý do, audit trail, thông báo +
+-- tin nhắn hệ thống từ chính admin thực hiện). books.deleted_at đã có sẵn
+-- từ phần soft-delete phía trên — dùng lại, chỉ thêm 3 cột lý do. Xem
+-- migrations/20260908_add_book_moderation.sql. ---
+alter table public.books
+  add column removed_by uuid references auth.users (id),
+  add column removed_reason_group text,
+  add column removed_reason_detail text;
+
+create table public.book_moderation_actions (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  author_id uuid not null references auth.users (id),
+  admin_id uuid not null references auth.users (id),
+  action text not null check (action in ('removed', 'restored')),
+  reason_group text,
+  reason_detail text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.book_moderation_actions enable row level security;
+
+create policy "admins view book moderation actions"
+  on public.book_moderation_actions for select
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+  ));
+
+create index book_moderation_actions_book_idx
+  on public.book_moderation_actions (book_id, created_at);
+
+-- --- Dọn NỘI DUNG NẶNG (không xoá hàng) của truyện/chương đã xoá quá 30
+-- ngày — tối ưu dung lượng, giữ hàng metadata vĩnh viễn cho audit trail.
+-- KHÔNG xoá thật (orders.book_id/author_name_agreements.book_id tham
+-- chiếu books không có ON DELETE CASCADE). Xem
+-- migrations/20260908_add_content_purge_retention.sql +
+-- api/admin/cron/purge-deleted-content/route.ts. ---
+alter table public.chapters
+  add column content_purged_at timestamptz;
+
+alter table public.books
+  add column content_purged_at timestamptz;

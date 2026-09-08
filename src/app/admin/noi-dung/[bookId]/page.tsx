@@ -33,7 +33,7 @@ export default async function AdminBookChaptersPage({
   const { data: chapterRows } = await supabase
     .from("chapters")
     .select(
-      "id, title, order_index, published, removed_at, removed_reason_group, removed_reason_detail, created_at"
+      "id, title, order_index, published, removed_at, removed_reason_group, removed_reason_detail, content_purged_at, created_at"
     )
     .eq("book_id", bookId)
     .order("order_index", { ascending: true });
@@ -46,6 +46,7 @@ export default async function AdminBookChaptersPage({
     removedAt: c.removed_at,
     removedReasonGroup: c.removed_reason_group,
     removedReasonDetail: c.removed_reason_detail,
+    contentPurgedAt: c.content_purged_at,
   }));
 
   return (

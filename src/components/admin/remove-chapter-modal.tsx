@@ -16,20 +16,22 @@ export type RemoveChapterPayload = {
 };
 
 /**
- * Modal chọn lý do gỡ chương (bắt buộc — xem
- * api/admin/chapters/[chapterId]/route.ts) — dùng chung cho cả 2 điểm gọi:
- * bảng chương ở admin/noi-dung/[bookId] (chapter-moderation-table.tsx) VÀ
- * nút "Xóa" ở author-panel.tsx trên chính trang đọc (reader.tsx), để admin
- * gỡ chương ngay tại chỗ đang đọc mà không cần vòng qua trang quản trị.
- * Tách ra file riêng thay vì định nghĩa lặp lại ở 2 nơi.
+ * Modal chọn lý do gỡ (bắt buộc — xem api/admin/chapters/[chapterId]/route.ts
+ * VÀ api/admin/books/[bookId]/route.ts, cùng 4 nhóm lý do) — dùng chung
+ * cho CẢ cấp chương lẫn cấp truyện, ở 3 điểm gọi: bảng chương
+ * admin/noi-dung/[bookId] (chapter-moderation-table.tsx), nút "Xóa" ở
+ * author-panel.tsx trên trang đọc (reader.tsx), và bảng truyện
+ * admin/noi-dung (content-table.tsx). `heading` do caller tự dựng câu
+ * ("Gỡ chương "X""/"Xoá truyện "Y"") — component không giả định đối
+ * tượng là chương hay truyện.
  */
 export function RemoveChapterModal({
-  chapterTitle,
+  heading,
   pending,
   onCancel,
   onConfirm,
 }: {
-  chapterTitle: string;
+  heading: string;
   pending: boolean;
   onCancel: () => void;
   onConfirm: (payload: RemoveChapterPayload) => void;
@@ -55,7 +57,7 @@ export function RemoveChapterModal({
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-[480px] rounded-2xl bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,.25)]">
         <div className="mb-4 flex items-center justify-between">
-          <div className="text-[16px] font-bold text-brand-ink">Gỡ chương &quot;{chapterTitle}&quot;</div>
+          <div className="text-[16px] font-bold text-brand-ink">{heading}</div>
           <button type="button" onClick={onCancel} className="cursor-pointer text-stone-alt hover:text-brand-ink">
             <XIcon size={18} />
           </button>

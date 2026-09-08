@@ -1248,7 +1248,7 @@ export function Reader({
 
       {removeModalOpen && (
         <RemoveChapterModal
-          chapterTitle={chapterTitle}
+          heading={`Gỡ chương "${chapterTitle}"`}
           pending={removePending}
           onCancel={() => {
             if (removePending) return;

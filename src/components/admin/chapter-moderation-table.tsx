@@ -13,6 +13,11 @@ export type ChapterModerationRow = {
   removedAt: string | null;
   removedReasonGroup: string | null;
   removedReasonDetail: string | null;
+  /** not null = content đã bị rỗng hoá do gỡ quá 30 ngày (trực tiếp, HOẶC
+   * gián tiếp vì cả sách đã bị xoá quá hạn) — xem
+   * migrations/20260908_add_content_purge_retention.sql. "Khôi phục" vô
+   * nghĩa với hàng này. */
+  contentPurgedAt: string | null;
 };
 
 const GRID_COLS = "grid-cols-[60px_1fr_150px_220px_160px]";
@@ -28,6 +33,10 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removingChapter, setRemovingChapter] = useState<ChapterModerationRow | null>(null);
+  // Mặc định ẩn — chương đã dọn nội dung (quá 30 ngày) không thể khôi
+  // phục nữa, giữ khỏi làm rối bảng; vẫn bật lên được để đối chiếu.
+  const [showPurged, setShowPurged] = useState(false);
+  const visibleRows = showPurged ? rows : rows.filter((r) => !r.contentPurgedAt);
 
   const restore = async (id: string) => {
     if (pendingId) return;
@@ -97,6 +106,16 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
 
   return (
     <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+      <label className="mb-3.5 flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-stone-alt">
+        <input
+          type="checkbox"
+          checked={showPurged}
+          onChange={(e) => setShowPurged(e.target.checked)}
+          className="cursor-pointer"
+        />
+        Hiện cả chương đã dọn nội dung (&gt;30 ngày)
+      </label>
+
       {error && (
         <div className="mb-3.5 rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-[#B02A37]">
           {error}
@@ -117,7 +136,7 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
         <div />
       </div>
 
-      {rows.map((r) => (
+      {visibleRows.map((r) => (
         <div
           key={r.id}
           className={`grid ${GRID_COLS} min-w-[700px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
@@ -141,11 +160,15 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
             {r.removedAt
               ? `${reasonGroupLabel(r.removedReasonGroup as ReasonGroupId)}${
                   r.removedReasonDetail ? ` — ${r.removedReasonDetail}` : ""
-                }`
+                }${r.contentPurgedAt ? " · Đã dọn nội dung" : ""}`
               : "—"}
           </div>
           <div className="flex justify-end">
-            {r.removedAt ? (
+            {r.contentPurgedAt ? (
+              <span className="text-[12.5px] font-medium text-stone-light" title="Nội dung đã bị rỗng hoá, không thể khôi phục.">
+                Không thể khôi phục
+              </span>
+            ) : r.removedAt ? (
               <button
                 type="button"
                 disabled={pendingId === r.id}
@@ -172,10 +195,15 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
       {rows.length === 0 && (
         <div className="px-2.5 py-6 text-center text-sm text-stone-light">Truyện này chưa có chương nào.</div>
       )}
+      {rows.length > 0 && visibleRows.length === 0 && (
+        <div className="px-2.5 py-6 text-center text-sm text-stone-light">
+          Mọi chương ở đây đều đã dọn nội dung — bật &quot;Hiện cả chương đã dọn nội dung&quot; để xem.
+        </div>
+      )}
 
       {removingChapter && (
         <RemoveChapterModal
-          chapterTitle={removingChapter.title}
+          heading={`Gỡ chương "${removingChapter.title}"`}
           pending={pendingId === removingChapter.id}
           onCancel={() => setRemovingChapter(null)}
           onConfirm={remove}
