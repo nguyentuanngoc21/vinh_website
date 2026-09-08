@@ -81,7 +81,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
             </Link>
           ))}
         </div>
-        <div className="mt-[26px] flex items-center gap-4 rounded-2xl border border-[#EBDCB4] bg-[#F7EFD8] p-[22px]">
+        <div className="mt-[26px] flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-[#EBDCB4] bg-[#F7EFD8] p-5 sm:p-[22px]">
           <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-xl bg-brand-ink text-brand-gold-light">
             <FingerprintIcon weight="fill" size={24} />
           </div>

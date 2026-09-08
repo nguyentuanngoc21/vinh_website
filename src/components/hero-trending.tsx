@@ -54,15 +54,15 @@ export function HeroTrending({ book }: { book: HomepageBook | null }) {
 
   return (
     <section className="px-4 pb-7 pt-10 sm:px-8 lg:px-11">
-      <div className="grid grid-cols-1 items-center gap-12 rounded-[22px] bg-ink p-8 text-white sm:p-12 lg:grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 items-center gap-8 rounded-[22px] bg-ink p-5 text-white sm:gap-12 sm:p-8 lg:grid-cols-[1fr_280px] lg:p-12">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-gold/18 px-3.5 py-1.5 text-xs font-semibold text-brand-gold-light">
             <FireIcon weight="fill" /> THỊNH HÀNH #1 TUẦN NÀY
           </div>
-          <h1 className="mt-5 mb-3.5 text-4xl font-bold leading-[1.08] tracking-[-1.2px] sm:text-[52px]">
+          <h1 className="mt-5 mb-3.5 text-2xl font-bold leading-[1.08] tracking-[-1.2px] sm:text-4xl lg:text-[52px]">
             {book.title}
           </h1>
-          <div className="mt-[22px] flex items-center gap-3.5 text-sm font-medium text-[#c9c3bd]">
+          <div className="mt-[22px] flex flex-wrap items-center gap-3.5 text-sm font-medium text-[#c9c3bd]">
             <div
               style={{ background: hashAvatarColor(book.authorNickname ?? "?") }}
               className="flex h-8 w-8 items-center justify-center rounded-full font-bold text-white"
@@ -71,23 +71,23 @@ export function HeroTrending({ book }: { book: HomepageBook | null }) {
             </div>
             {book.authorNickname ?? "Ẩn danh"} · {book.viewCount.toLocaleString("vi-VN")} đọc · {book.chapterCount} chương
           </div>
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-7 flex flex-col sm:flex-row gap-3">
             <Link
               href={`/truyen/${book.slug}`}
-              className="rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
+              className="w-full sm:w-auto text-center rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
             >
               Đọc ngay
             </Link>
             <Link
               href="/audio/now-playing"
-              className="flex items-center gap-2 rounded-full border border-white/30 px-[26px] py-3.5 text-[15px] font-semibold text-white no-underline"
+              className="w-full sm:w-auto justify-center flex items-center gap-2 rounded-full border border-white/30 px-[26px] py-3.5 text-[15px] font-semibold text-white no-underline"
             >
               <HeadphonesIcon /> Nghe audio
             </Link>
           </div>
         </div>
-        <div className="relative">
-          <div className="h-[220px] overflow-hidden rounded-2xl shadow-[0_24px_48px_rgba(0,0,0,.45)] sm:h-[340px]">
+        <div className="relative mx-auto w-[180px] sm:w-auto">
+          <div className="h-[260px] sm:h-[340px] overflow-hidden rounded-2xl shadow-[0_24px_48px_rgba(0,0,0,.45)]">
             <BookCover
               id={book.id}
               title={book.title}
@@ -97,8 +97,9 @@ export function HeroTrending({ book }: { book: HomepageBook | null }) {
               className="h-full w-full"
             />
           </div>
-          <div className="absolute -right-2.5 -top-2.5 flex h-16 w-16 flex-col items-center justify-center rounded-full bg-brand-ink text-center text-[11px] font-bold leading-tight text-brand-gold-light shadow-[0_6px_16px_rgba(0,0,0,.3)]">
-            <FingerprintIcon weight="fill" size={22} />
+          <div className="absolute -right-2.5 -top-2.5 flex h-14 w-14 sm:h-16 sm:w-16 flex-col items-center justify-center rounded-full bg-brand-ink text-center text-[10px] sm:text-[11px] font-bold leading-tight text-brand-gold-light shadow-[0_6px_16px_rgba(0,0,0,.3)]">
+            <FingerprintIcon weight="fill" size={20} className="sm:hidden" />
+            <FingerprintIcon weight="fill" size={22} className="hidden sm:block" />
             ĐÃ BẢO HỘ
           </div>
         </div>

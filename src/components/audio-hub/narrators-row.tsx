@@ -13,11 +13,11 @@ export function NarratorsRow({ narrators }: { narrators: NarratorStat[] }) {
   if (narrators.length === 0) return null;
 
   return (
-    <section className="px-11 pb-2.5 pt-[38px]">
+    <section className="px-4 pb-2.5 pt-[38px] sm:px-8 lg:px-11">
       <h2 className="mb-[18px] text-[21px] font-bold text-brand-ink">
         Giọng đọc nổi bật
       </h2>
-      <div className="grid grid-cols-2 gap-[18px] sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-[18px] sm:grid-cols-3 lg:grid-cols-5">
         {narrators.map((n, i) => (
           <Link
             key={n.narratorId}

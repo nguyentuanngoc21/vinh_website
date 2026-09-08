@@ -27,12 +27,12 @@ export function ContinueListening({ track, positionSeconds }: ContinueListeningP
   };
 
   return (
-    <section className="px-11 pb-5 pt-9">
-      <div className="grid grid-cols-1 items-center gap-8 rounded-[22px] bg-brand-ink-dark p-8 text-white sm:grid-cols-[220px_1fr] sm:gap-11 sm:p-11">
+    <section className="px-4 pb-5 pt-9 sm:px-8 lg:px-11">
+      <div className="grid grid-cols-1 items-center gap-8 rounded-[22px] bg-brand-ink-dark p-5 text-white sm:grid-cols-[220px_1fr] sm:gap-11 sm:p-8 lg:p-11">
         <button
           type="button"
           onClick={resume}
-          className="relative flex h-[220px] w-full cursor-pointer flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-br from-brand-ink to-[#7a2e1c] p-[22px] text-left font-[family-name:var(--font-lora)] text-2xl font-bold leading-[1.2] shadow-[0_24px_48px_rgba(0,0,0,.45)] sm:h-[260px]"
+          className="relative flex h-[200px] w-full cursor-pointer flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-br from-brand-ink to-[#7a2e1c] p-[22px] text-left font-[family-name:var(--font-lora)] text-xl font-bold leading-[1.2] shadow-[0_24px_48px_rgba(0,0,0,.45)] sm:h-[260px] sm:text-2xl"
         >
           {track.title}
           <span className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/18">
@@ -43,7 +43,7 @@ export function ContinueListening({ track, positionSeconds }: ContinueListeningP
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-gold/18 px-3.5 py-1.5 text-xs font-semibold text-brand-gold-light">
             <WaveformIcon weight="fill" /> AUDIO ĐANG NGHE
           </div>
-          <h1 className="my-2.5 text-[32px] font-bold leading-[1.15] tracking-[-0.5px] sm:text-[44px]">
+          <h1 className="my-2.5 text-2xl font-bold leading-[1.15] tracking-[-0.5px] sm:text-[36px] lg:text-[44px]">
             {track.title}
           </h1>
           <div className="text-[15px] text-sidebar-text-dim-2">
@@ -65,7 +65,7 @@ export function ContinueListening({ track, positionSeconds }: ContinueListeningP
             <button
               type="button"
               onClick={resume}
-              className="flex cursor-pointer items-center gap-[9px] rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink"
+              className="flex w-full sm:w-auto justify-center cursor-pointer items-center gap-[9px] rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink"
             >
               <PlayIcon weight="fill" /> Nghe tiếp
             </button>

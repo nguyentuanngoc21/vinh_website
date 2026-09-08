@@ -68,37 +68,37 @@ export function NowPlaying() {
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="flex flex-col overflow-hidden px-11 py-[30px] text-sidebar-text">
+    <div className="flex flex-col overflow-hidden px-4 py-5 sm:px-8 sm:py-7 lg:px-11 lg:py-[30px] text-sidebar-text">
       <div className="mb-auto flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-4">
           <Link href="/audio">
             <CaretDownIcon
               size={24}
               color="var(--color-sidebar-text)"
-              className="cursor-pointer transition-transform active:scale-90"
+              className="cursor-pointer transition-transform active:scale-90 shrink-0"
             />
           </Link>
           <div className="truncate text-[13px] font-medium text-sidebar-text-dim">
             ĐANG PHÁT · {track.title}
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex shrink-0 items-center gap-2.5">
           <VinhMark size={28} tone="cream" />
           <div className="text-lg font-extrabold text-white">Vịnh</div>
         </div>
       </div>
 
       <div className="my-auto flex flex-col items-center">
-        <div className="relative flex h-[300px] w-[300px] flex-col justify-end rounded-[20px] bg-gradient-to-br from-brand-ink to-[#7a2e1c] p-[26px] text-white shadow-[0_24px_60px_rgba(0,0,0,.5)]">
+        <div className="relative flex h-[min(280px,calc(100vw-3rem))] w-[min(280px,calc(100vw-3rem))] max-h-[300px] max-w-[300px] flex-col justify-end rounded-[20px] bg-gradient-to-br from-brand-ink to-[#7a2e1c] p-5 sm:p-[26px] text-white shadow-[0_24px_60px_rgba(0,0,0,.5)]">
           {track.genre && (
             <div className="text-xs tracking-[2px] text-white/80">{track.genre.toUpperCase()}</div>
           )}
-          <div className="mt-1.5 font-[family-name:var(--font-lora)] text-[26px] font-bold leading-[1.15]">
+          <div className="mt-1.5 font-[family-name:var(--font-lora)] text-xl sm:text-[26px] font-bold leading-[1.15]">
             {track.title}
           </div>
         </div>
 
-        <div className="my-[30px] w-full max-w-[420px]">
+        <div className="my-5 sm:my-[30px] w-full max-w-[420px]">
           <input
             type="range"
             min={0}
@@ -118,13 +118,13 @@ export function NowPlaying() {
         </div>
 
         <div className="mt-4 text-center">
-          <div className="font-[family-name:var(--font-lora)] text-[22px] font-bold text-white">
+          <div className="font-[family-name:var(--font-lora)] text-xl sm:text-[22px] font-bold text-white">
             {track.title}
           </div>
           <div className="mt-1 text-sm text-sidebar-text-dim">Diễn đọc: {track.narratorName}</div>
         </div>
 
-        <div className="mt-6 flex items-center gap-[26px]">
+        <div className="mt-6 flex items-center gap-3 sm:gap-[26px]">
           <button
             type="button"
             onClick={cycleSpeed}
@@ -133,17 +133,17 @@ export function NowPlaying() {
             {SPEEDS[speedIdx]}×
           </button>
           <button type="button" onClick={() => skip(-15)} className="cursor-pointer transition-transform active:scale-90">
-            <SkipBackIcon weight="fill" size={26} color="var(--color-sidebar-text)" />
+            <SkipBackIcon weight="fill" size={24} color="var(--color-sidebar-text)" />
           </button>
           <button
             type="button"
             onClick={toggle}
-            className="flex h-[68px] w-[68px] cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink transition-transform active:scale-90"
+            className="flex h-14 w-14 sm:h-[68px] sm:w-[68px] cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink transition-transform active:scale-90"
           >
-            {isPlaying ? <PauseIcon weight="fill" size={30} /> : <PlayIcon weight="fill" size={30} />}
+            {isPlaying ? <PauseIcon weight="fill" size={26} /> : <PlayIcon weight="fill" size={26} />}
           </button>
           <button type="button" onClick={() => skip(15)} className="cursor-pointer transition-transform active:scale-90">
-            <SkipForwardIcon weight="fill" size={26} color="var(--color-sidebar-text)" />
+            <SkipForwardIcon weight="fill" size={24} color="var(--color-sidebar-text)" />
           </button>
           <button
             type="button"
@@ -151,13 +151,13 @@ export function NowPlaying() {
             style={{ color: sleep ? "var(--color-brand-gold-light)" : "var(--color-sidebar-text)" }}
             className="flex w-[42px] cursor-pointer flex-col items-center transition-transform active:scale-90"
           >
-            <MoonIcon size={22} />
+            <MoonIcon size={20} />
             <span className="mt-0.5 text-[10px] font-semibold">{sleep ? `${sleep}p` : "Hẹn"}</span>
           </button>
         </div>
       </div>
 
-      <div className="mt-auto flex items-center justify-between pt-6">
+      <div className="mt-auto flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 text-center sm:text-left">
         <Link
           href={`/ket-noi?p=${track.narratorId}`}
           className="flex items-center gap-2 rounded-full border border-white/20 px-[18px] py-[9px] text-[13px] font-semibold text-sidebar-text no-underline transition-transform active:scale-90"

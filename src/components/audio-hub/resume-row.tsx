@@ -21,7 +21,7 @@ export function ResumeRow({ items }: { items: ListeningProgressItem[] }) {
   };
 
   return (
-    <section className="px-11 pb-2 pt-3.5">
+    <section className="px-4 pb-2 pt-3.5 sm:px-8 lg:px-11">
       <div className="mb-4 flex items-end justify-between">
         <h2 className="text-[21px] font-bold text-brand-ink">Nghe tiếp</h2>
       </div>

@@ -25,7 +25,7 @@ export function LibraryGrid({ tracks }: { tracks: AudioTrack[] }) {
   };
 
   return (
-    <section className="px-11 pb-2 pt-[34px]">
+    <section className="px-4 pb-2 pt-[34px] sm:px-8 lg:px-11">
       <div className="mb-[18px] flex items-center justify-between">
         <h2 className="text-[21px] font-bold text-brand-ink">Kho truyện audio</h2>
       </div>
@@ -58,7 +58,7 @@ export function LibraryGrid({ tracks }: { tracks: AudioTrack[] }) {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-[22px] sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3.5 sm:gap-[22px] sm:grid-cols-3 lg:grid-cols-4">
           {items.map((t) => (
             <button
               key={t.id}
@@ -66,7 +66,7 @@ export function LibraryGrid({ tracks }: { tracks: AudioTrack[] }) {
               onClick={() => handlePlay(t)}
               className="group block cursor-pointer text-left"
             >
-              <div className="relative h-[210px] overflow-hidden rounded-2xl bg-gradient-to-br from-brand-ink to-brand-ink-dark shadow-[0_10px_22px_rgba(0,0,0,.16)]">
+              <div className="relative h-[160px] sm:h-[210px] overflow-hidden rounded-2xl bg-gradient-to-br from-brand-ink to-brand-ink-dark shadow-[0_10px_22px_rgba(0,0,0,.16)]">
                 {t.genre && (
                   <div className="absolute left-2.5 top-2.5 rounded-full bg-brand-ink-dark/60 px-2.5 py-1 text-[10px] font-semibold tracking-[.5px] text-white">
                     {t.genre}

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { LedgerService } from "@/lib/wallet/ledger-service";
+import { zalopayGatewayAdapter } from "@/lib/wallet/gateways/zalopay";
 
 type Client = SupabaseClient<Database>;
 type DepositRow = Database["public"]["Tables"]["deposit_transactions"]["Row"];
@@ -27,16 +28,16 @@ export interface DepositGatewayAdapter {
 }
 
 /**
- * Placeholder adapter — NOT wired to any real payment gateway. Swap this
- * out (or add alongside it, keyed by name) once VNPay/PayOS/Momo is
- * actually chosen and you have sandbox credentials + their webhook spec:
+ * Placeholder adapter — trusts the body as-is, no signature check. Kept for
+ * local testing of the pipeline itself (idempotency, atomic credit,
+ * reconciliation) without needing real gateway credentials. DO NOT point a
+ * real gateway's webhook at it in production.
+ *
+ * ZaloPay is now wired (see zalopayGatewayAdapter, gateways/zalopay.ts).
+ * If another gateway is added later, same idea applies:
  *   - PayOS: HMAC-SHA256 over sorted query params, checksum key from dashboard.
  *   - VNPay: HMAC-SHA512 over sorted params, vnp_SecureHash field.
  *   - Momo: HMAC-SHA256 over a fixed field order, signature field.
- * None of those are guessable without the real docs/keys in hand, so this
- * adapter trusts the body as-is — DO NOT point a real gateway's webhook at
- * it in production; it exists so the rest of the pipeline (idempotency,
- * atomic credit, reconciliation) can be built and tested now.
  */
 export const stubGatewayAdapter: DepositGatewayAdapter = {
   name: "stub",
@@ -55,6 +56,7 @@ export const stubGatewayAdapter: DepositGatewayAdapter = {
 
 const ADAPTERS: Record<string, DepositGatewayAdapter> = {
   stub: stubGatewayAdapter,
+  zalopay: zalopayGatewayAdapter,
   // vnpay: vnpayGatewayAdapter,
   // payos: payosGatewayAdapter,
   // momo: momoGatewayAdapter,

@@ -27,27 +27,29 @@ export function MiniPlayerBar() {
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-5 bg-brand-ink-dark px-4 py-3 text-white sm:px-11">
+    <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2.5 bg-brand-ink-dark px-3 py-2.5 text-white sm:gap-5 sm:px-8 sm:py-3 lg:px-11">
       <div className="hidden h-[46px] w-[46px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-ink to-[#7a2e1c] text-sm font-bold sm:flex">
         {track.narratorName[0]}
       </div>
-      <div className="hidden min-w-[150px] sm:block">
-        <div className="truncate text-sm font-semibold">{track.title}</div>
-        <div className="truncate text-xs text-sidebar-text-dim">Diễn đọc {track.narratorName}</div>
+      <div className="min-w-0 max-w-[110px] sm:max-w-none sm:min-w-[150px]">
+        <div className="truncate text-xs font-semibold sm:text-sm">{track.title}</div>
+        <div className="truncate text-[10px] text-sidebar-text-dim sm:text-xs">Diễn đọc {track.narratorName}</div>
       </div>
-      <div className="flex items-center gap-4 text-sidebar-text">
+      <div className="flex items-center gap-2 text-sidebar-text sm:gap-4">
         <button type="button" onClick={() => skip(-15)} className="cursor-pointer" aria-label="Lùi 15 giây">
-          <SkipBackIcon size={20} />
+          <SkipBackIcon size={18} className="sm:hidden" />
+          <SkipBackIcon size={20} className="hidden sm:block" />
         </button>
         <button
           type="button"
           onClick={toggle}
-          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink"
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink sm:h-10 sm:w-10"
         >
-          {isPlaying ? <PauseIcon weight="fill" size={17} /> : <PlayIcon weight="fill" size={17} />}
+          {isPlaying ? <PauseIcon weight="fill" size={16} /> : <PlayIcon weight="fill" size={16} />}
         </button>
         <button type="button" onClick={() => skip(15)} className="cursor-pointer" aria-label="Tới 15 giây">
-          <SkipForwardIcon size={20} />
+          <SkipForwardIcon size={18} className="sm:hidden" />
+          <SkipForwardIcon size={20} className="hidden sm:block" />
         </button>
       </div>
       <div className="flex flex-1 items-center gap-3">

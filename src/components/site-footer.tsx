@@ -43,8 +43,8 @@ const LINK_COLUMNS: { title: string; links: FooterLink[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="bg-ink px-11 pb-9 pt-12 text-[#c9c3bd]">
-      <div className="grid grid-cols-1 gap-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+    <footer className="bg-ink px-4 pb-9 pt-12 text-[#c9c3bd] sm:px-8 lg:px-11">
+      <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <Link href="/" className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-brand-gold no-underline">
             <VinhMark size={26} tone="cream" />

@@ -58,20 +58,20 @@ export default async function AudioHubPage() {
           <ResumeRow items={rest} />
           <LibraryGrid tracks={tracks} />
           <NarratorsRow narrators={narrators} />
-          <section className="px-11 pb-10 pt-[34px]">
-            <div className="flex items-center justify-between rounded-[20px] bg-[#F7EFD8] px-10 py-8">
+          <section className="px-4 pb-10 pt-[34px] sm:px-8 lg:px-11">
+            <div className="flex flex-col items-start justify-between gap-6 rounded-[20px] bg-[#F7EFD8] p-6 sm:flex-row sm:items-center sm:px-10 sm:py-8">
               <div>
-                <div className="text-[22px] font-bold text-brand-ink">
+                <div className="text-xl font-bold text-brand-ink sm:text-[22px]">
                   Có giọng đọc hay?
                 </div>
-                <div className="mt-[5px] text-[14.5px] text-[#6b5f3a]">
+                <div className="mt-[5px] text-sm text-[#6b5f3a] sm:text-[14.5px]">
                   Ghi âm tác phẩm và chia sẻ trên Vịnh — bản ghi được đăng
                   ký bảo hộ, tuyên bố không cho AI huấn luyện.
                 </div>
               </div>
               <Link
                 href="/audio/new"
-                className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
+                className="w-full shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-6 py-3 text-center text-sm font-semibold text-brand-ink no-underline sm:w-auto sm:px-[30px] sm:py-3.5 sm:text-[15px]"
               >
                 Gửi bản thu
               </Link>
