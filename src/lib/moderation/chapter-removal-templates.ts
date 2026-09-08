@@ -78,7 +78,10 @@ export const DEFAULT_RESPONSE_DAYS = 7;
 
 type TemplateInput = {
   group: ReasonGroupId;
-  chapterTitle: string;
+  /** null = hành động cấp TRUYỆN (admin xoá cả sách ở content-table.tsx),
+   * không phải 1 chương cụ thể — dùng chung 4 nhóm lý do + template với
+   * kiểm duyệt cấp chương, chỉ khác cách xưng "đối tượng" trong câu. */
+  chapterTitle: string | null;
   bookTitle: string;
   /** {{chi_tiết}} — sub-reason đã chọn, hoặc admin tự nhập, hoặc kết hợp
    * cả 2 ("<sub-reason>: <ghi chú thêm>"). Rỗng cho nhóm "chưa xác định"
@@ -90,7 +93,7 @@ type TemplateInput = {
 /** (A) — luôn 1 câu, không lặp lại {{chi_tiết}} (đặc tả: "giữ ngắn và có
  * tính trigger", toàn bộ chi tiết nằm ở (B)). */
 export function buildRemovalNotificationText({ group, chapterTitle, bookTitle }: TemplateInput): string {
-  const base = `Chương "${chapterTitle}" trong truyện "${bookTitle}"`;
+  const base = chapterTitle ? `Chương "${chapterTitle}" trong truyện "${bookTitle}"` : `Truyện "${bookTitle}"`;
   switch (group) {
     case "vi_pham_noi_dung":
       return `${base} đã bị gỡ do vi phạm chính sách nội dung. Bấm để xem chi tiết.`;
@@ -113,13 +116,16 @@ export function buildRemovalSystemMessage({
 }: TemplateInput): string {
   const greeting = "Chào bạn,";
   const signOff = "Trân trọng,\nĐội ngũ Vịnh";
+  // Không quote — khớp văn phong câu gốc ("Chương X của truyện Y đã bị
+  // gỡ..."). null (cấp truyện) -> "Truyện Y đã bị gỡ...".
+  const target = chapterTitle ? `Chương ${chapterTitle} của truyện ${bookTitle}` : `Truyện ${bookTitle}`;
 
   switch (group) {
     case "vi_pham_noi_dung":
       return [
         greeting,
         "",
-        `Chương ${chapterTitle} của truyện ${bookTitle} đã bị gỡ vì vi phạm Chính sách Nội dung của Vịnh (${detail}).`,
+        `${target} đã bị gỡ vì vi phạm Chính sách Nội dung của Vịnh (${detail}).`,
         "",
         `Nếu bạn cho rằng đây là nhầm lẫn hoặc muốn phản hồi, xin hãy trả lời trực tiếp tại đây trong vòng ${responseDays} ngày kể từ khi nhận được tin nhắn này — đội ngũ Vịnh sẽ xem xét và phản hồi sớm nhất có thể.`,
         "",
@@ -129,9 +135,9 @@ export function buildRemovalSystemMessage({
       return [
         greeting,
         "",
-        `Chương ${chapterTitle} của truyện ${bookTitle} đã bị tạm gỡ do nhận được khiếu nại vi phạm bản quyền (${detail}).`,
+        `${target} đã bị tạm gỡ do nhận được khiếu nại vi phạm bản quyền (${detail}).`,
         "",
-        `Theo quy định về sở hữu trí tuệ, Vịnh tạm gỡ nội dung trong khi xác minh. Nếu bạn tin rằng chương này không vi phạm bản quyền, xin hãy trả lời trực tiếp tại đây kèm bằng chứng quyền sở hữu, trong vòng ${responseDays} ngày.`,
+        `Theo quy định về sở hữu trí tuệ, Vịnh tạm gỡ nội dung trong khi xác minh. Nếu bạn tin rằng nội dung này không vi phạm bản quyền, xin hãy trả lời trực tiếp tại đây kèm bằng chứng quyền sở hữu, trong vòng ${responseDays} ngày.`,
         "",
         signOff,
       ].join("\n");
@@ -139,7 +145,7 @@ export function buildRemovalSystemMessage({
       return [
         greeting,
         "",
-        `Chương ${chapterTitle} của truyện ${bookTitle} đã bị gỡ theo yêu cầu (${detail}).`,
+        `${target} đã bị gỡ theo yêu cầu (${detail}).`,
         "",
         "Nếu bạn có thắc mắc về quyết định này, xin hãy trả lời trực tiếp tại đây hoặc liên hệ đội ngũ Vịnh qua mục Hỗ trợ.",
         "",
@@ -149,7 +155,7 @@ export function buildRemovalSystemMessage({
       return [
         greeting,
         "",
-        `Chương ${chapterTitle} của truyện ${bookTitle} đã bị gỡ. Lý do cụ thể sẽ được cập nhật trong thời gian sớm nhất.`,
+        `${target} đã bị gỡ. Lý do cụ thể sẽ được cập nhật trong thời gian sớm nhất.`,
         "",
         "Nếu bạn muốn phản hồi, xin hãy trả lời trực tiếp tại đây, đội ngũ Vịnh sẽ hỗ trợ bạn sớm nhất có thể.",
         "",

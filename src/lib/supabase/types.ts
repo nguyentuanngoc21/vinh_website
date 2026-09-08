@@ -300,6 +300,18 @@ export type Database = {
           // null = còn sống. Soft-delete — không có DELETE thật. Xem
           // migrations/20260826_add_book_soft_delete.sql.
           deleted_at: string | null;
+          // Ai/vì sao — chỉ có giá trị khi admin gỡ (deleted_at do admin,
+          // không phải tác giả tự xoá bản thảo). Song song
+          // chapters.removed_by/removed_reason_*. Xem
+          // migrations/20260908_add_book_moderation.sql.
+          removed_by: string | null;
+          removed_reason_group: string | null;
+          removed_reason_detail: string | null;
+          // not null = đã dọn nội dung nặng (cover/synopsis + content mọi
+          // chương) do đã xoá quá 30 ngày — xem
+          // migrations/20260908_add_content_purge_retention.sql. Hàng vẫn
+          // giữ nguyên (audit trail), chỉ rỗng nội dung.
+          content_purged_at: string | null;
           // "Hoàn thiện" — Share bản thảo kiểu Drive (một chiều, trigger DB
           // chặn unset — giống is_last_chapter ở chapters). Khi chuyển
           // null -> not null, TỰ ĐỘNG khóa mọi manuscript_access_grants
@@ -332,6 +344,10 @@ export type Database = {
           published?: boolean;
           is_exclusive?: boolean;
           deleted_at?: string | null;
+          removed_by?: string | null;
+          removed_reason_group?: string | null;
+          removed_reason_detail?: string | null;
+          content_purged_at?: string | null;
           finalized_at?: string | null;
           embedding?: number[] | null;
         };
@@ -367,6 +383,9 @@ export type Database = {
           removed_by: string | null;
           removed_reason_group: string | null;
           removed_reason_detail: string | null;
+          // not null = content đã bị rỗng hoá do gỡ/xoá quá 30 ngày — xem
+          // migrations/20260908_add_content_purge_retention.sql.
+          content_purged_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -383,6 +402,7 @@ export type Database = {
           removed_by?: string | null;
           removed_reason_group?: string | null;
           removed_reason_detail?: string | null;
+          content_purged_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["chapters"]["Insert"]>;
         Relationships: [];
@@ -855,6 +875,33 @@ export type Database = {
           created_at?: string;
         };
         // Chỉ thêm dòng mới (audit trail) — không sửa lại lịch sử đã ghi.
+        Update: never;
+        Relationships: [];
+      };
+      // Song song chapter_moderation_actions ở trên, nhưng cấp TRUYỆN —
+      // xem migrations/20260908_add_book_moderation.sql, ghi bằng
+      // service-role từ api/admin/books/[bookId]/route.ts.
+      book_moderation_actions: {
+        Row: {
+          id: string;
+          book_id: string;
+          author_id: string;
+          admin_id: string;
+          action: "removed" | "restored";
+          reason_group: string | null;
+          reason_detail: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          book_id: string;
+          author_id: string;
+          admin_id: string;
+          action: "removed" | "restored";
+          reason_group?: string | null;
+          reason_detail?: string | null;
+          created_at?: string;
+        };
         Update: never;
         Relationships: [];
       };
