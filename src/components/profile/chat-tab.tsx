@@ -287,8 +287,15 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
         }`}
       >
         {/* Conversation list */}
+        {/* min-h-0 — bắt buộc: đây là 1 grid item, mặc định co giãn theo
+            content (min-height: auto) thay vì bám đúng chiều cao 604px của
+            hàng grid, khiến overflow-y-auto ở div con (danh sách hội
+            thoại) không bao giờ thực sự có chỗ để cuộn — nội dung cứ đẩy
+            cả cột cao dần, bị overflow-hidden ở ngoài cắt cụt trong im
+            lặng thay vì cuộn được. Cùng lý do cho "Thread"/"Side panel"
+            bên dưới. */}
         <div
-          className={`flex min-w-0 flex-col border-r border-[#f0f0ef] ${
+          className={`flex min-h-0 min-w-0 flex-col border-r border-[#f0f0ef] ${
             mobileView === "thread" ? "max-[759px]:hidden" : ""
           }`}
         >
@@ -305,7 +312,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
               />
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto max-[759px]:overflow-visible">
+          <div className="min-h-0 flex-1 overflow-y-auto max-[759px]:overflow-visible">
             {conversationsLoaded && filteredConversations.length === 0 && (
               <div className="px-4 py-6 text-center text-[13px] text-stone-light">
                 {conversations.length === 0
@@ -370,7 +377,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
 
         {/* Thread */}
         <div
-          className={`flex min-w-0 flex-col bg-[#fdfdfc] ${
+          className={`flex min-h-0 min-w-0 flex-col bg-[#fdfdfc] ${
             mobileView === "list" ? "max-[759px]:hidden" : ""
           }`}
         >
@@ -417,7 +424,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                     onChanged={(updated) => setOrders((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))}
                   />
                 ))}
-              <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-[18px] py-5 max-[759px]:overflow-visible">
+              <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-[18px] py-5 max-[759px]:overflow-visible">
                 {messages.map((m) => (
                   <div key={m.id} className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
                     <div
@@ -486,7 +493,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
 
         {/* Side panel */}
         {counterparty && (
-          <div className="hidden flex-col gap-4 overflow-y-auto border-l border-[#f0f0ef] px-[18px] py-5 min-[1081px]:flex">
+          <div className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-l border-[#f0f0ef] px-[18px] py-5 min-[1081px]:flex">
             <div className="flex flex-col items-center gap-2.5 text-center">
               <Avatar
                 userId={counterparty.userId}
