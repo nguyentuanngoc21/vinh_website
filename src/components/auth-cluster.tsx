@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { MessengerBell } from "@/components/messenger/messenger-bell";
 
 export function AuthCluster({
   ctaLabel = "Viết truyện",
@@ -23,6 +24,12 @@ export function AuthCluster({
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  // MessengerBell + NotificationBell chia sẻ ĐÚNG 1 state "đang mở cái
+  // nào" thay vì mỗi bên tự giữ open riêng — mở bong bóng chat sẽ tự đóng
+  // chuông thông báo và ngược lại, tránh 2 flyout cùng z-[60] chồng lên
+  // nhau (nhất là bản mobile fixed full-width, đè khít lên nhau hoàn toàn
+  // nếu cả 2 cùng mở).
+  const [openFlyout, setOpenFlyout] = useState<"messenger" | "notifications" | null>(null);
 
   // Đóng dropdown khi click ra ngoài vùng avatar+menu
   useEffect(() => {
@@ -87,8 +94,22 @@ export function AuthCluster({
       )}
       {/* Giữa nút hành động (Viết truyện/...) và avatar, theo đúng vị trí
           yêu cầu — chỉ hiện khi đã đăng nhập (khách chưa có gì để nhận
-          thông báo). */}
-      {isLogged && <NotificationBell />}
+          thông báo/tin nhắn). Messenger đứng TRƯỚC chuông (đúng thứ tự
+          Facebook: apps > messenger > bell > avatar) — xem đặc tả "bong
+          bóng chat" Phase 1 (icon + badge + flyout Tất cả/Chưa đọc/Giao
+          dịch); Phase 2 sẽ thêm bong bóng nổi/minimize. */}
+      {isLogged && (
+        <MessengerBell
+          open={openFlyout === "messenger"}
+          onOpenChange={(next) => setOpenFlyout(next ? "messenger" : null)}
+        />
+      )}
+      {isLogged && (
+        <NotificationBell
+          open={openFlyout === "notifications"}
+          onOpenChange={(next) => setOpenFlyout(next ? "notifications" : null)}
+        />
+      )}
       {isLogged && (
         <div className="relative shrink-0" ref={menuRef}>
           <button

@@ -35,11 +35,14 @@ function timeAgo(iso: string): string {
  * báo" hoàn toàn mới, chưa từng tồn tại trước — lớp (A) trong đặc tả gỡ
  * chương (title ngắn, bấm vào điều hướng qua `link`, thường trỏ tới Hội
  * thoại nơi có nội dung đầy đủ ở lớp B).
+ *
+ * `open`/`onOpenChange` do AuthCluster điều khiển (không tự giữ state) —
+ * để mở chuông thông báo tự đóng bong bóng chat và ngược lại, xem ghi chú
+ * ở messenger-bell.tsx.
  */
-export function NotificationBell() {
+export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const load = () =>
@@ -60,15 +63,16 @@ export function NotificationBell() {
   useEffect(() => {
     if (!open) return;
     const onClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) onOpenChange(false);
     };
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
+  }, [open, onOpenChange]);
 
   const handleOpen = () => {
-    setOpen((v) => !v);
-    if (!open && unreadCount > 0) {
+    const next = !open;
+    onOpenChange(next);
+    if (next && unreadCount > 0) {
       fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -81,7 +85,7 @@ export function NotificationBell() {
   };
 
   const handleClickNotification = (n: Notification) => {
-    setOpen(false);
+    onOpenChange(false);
     if (n.read_at === null) {
       fetch("/api/notifications", {
         method: "PATCH",
@@ -107,11 +111,21 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-[46px] z-[60] w-[320px] overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.16)]">
-          <div className="border-b border-[#f1efec] px-[18px] py-3">
+        // Dưới `sm`: fixed + kẹp lề theo viewport (không theo vị trí icon) —
+        // cùng lý do/ước lượng top-[124px] như messenger-bell.tsx (panel
+        // absolute right-0 neo vào icon này có thể tràn mép trái màn hình
+        // hẹp vì icon không đứng ở rìa phải cùng của header, avatar còn đứng
+        // sau nó). Từ `sm` trở lên giữ NGUYÊN định vị cũ.
+        //
+        // flex flex-col + max-h-[calc(100vh-140px)] — cùng lý do
+        // messenger-bell.tsx: điện thoại xoay ngang có thể thấp hơn tổng
+        // chiều cao panel, giới hạn TOÀN panel theo viewport thay vì để nó
+        // tràn xuống dưới; danh sách (flex-1 min-h-0) tự co lại trước.
+        <div className="fixed inset-x-3 top-[124px] z-[60] flex max-h-[calc(100vh-140px)] w-auto flex-col overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.16)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[46px] sm:w-[320px]">
+          <div className="shrink-0 border-b border-[#f1efec] px-[18px] py-3">
             <div className="text-[14.5px] font-semibold text-ink">Thông báo</div>
           </div>
-          <div className="max-h-[360px] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {notifications.length === 0 && (
               <div className="px-[18px] py-8 text-center text-[13px] text-stone-light">
                 Chưa có thông báo nào.

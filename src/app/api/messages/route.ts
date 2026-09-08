@@ -79,6 +79,25 @@ export async function GET() {
   }
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
+  // Đối tác nào có ít nhất 1 đơn dịch vụ (bất kỳ trạng thái) với mình —
+  // dùng để lọc tab "Giao dịch" ở bong bóng chat header. Không có
+  // conversation_id trên orders (xem ghi chú ở api/orders/route.ts) nên
+  // suy luôn từ 1 lượt query "mọi đơn của mình" rồi rút counterpartyId
+  // trong JS, cùng tinh thần với cách threads được gộp ở trên — tránh
+  // N+1 gọi /api/orders?withUserId= cho từng hội thoại.
+  const { data: orderRows, error: ordersError } = await supabase
+    .from("orders")
+    .select("buyer_id, seller_id")
+    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`);
+  if (ordersError) {
+    // Không chặn cả danh sách hội thoại chỉ vì tab "Giao dịch" lỗi — log
+    // rồi coi như không đối tác nào có đơn (tab đó sẽ rỗng thay vì crash).
+    console.error("[messages] orders lookup for transaction tab failed:", ordersError);
+  }
+  const counterpartyIdsWithOrder = new Set(
+    (orderRows ?? []).map((o) => (o.buyer_id === userId ? o.seller_id : o.buyer_id))
+  );
+
   const conversations = threads
     .map((t) => {
       const profile = profileById.get(t.counterpartyId);
@@ -96,6 +115,7 @@ export async function GET() {
         isModerationThread: t.context === "moderation",
         lastMessage: t.lastMessage,
         unreadCount: t.unreadCount,
+        hasOrder: counterpartyIdsWithOrder.has(t.counterpartyId),
       };
     })
     .filter((c): c is NonNullable<typeof c> => c !== null)

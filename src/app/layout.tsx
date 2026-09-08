@@ -5,6 +5,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RoleProvider } from "@/lib/role";
 import { NowPlayingProvider } from "@/lib/audio/now-playing-context";
 import { MiniPlayerBar } from "@/components/audio-hub/mini-player-bar";
+import { ChatBubbleProvider } from "@/lib/chat-bubbles";
+import { ChatBubbleDock } from "@/components/messenger/chat-bubble-dock";
 import "./globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -25,11 +27,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-white font-sans text-ink">
         <RoleProvider>
           <NowPlayingProvider>
-            {children}
-            {/* Site-wide, not just /audio — chương audio bây giờ phát
-                được từ /read (xem reader.tsx), nên thanh phát phải hiện
-                bất kể đang ở trang nào, không riêng khu vực Audio. */}
-            <MiniPlayerBar />
+            {/* Bao {children} — MessengerBell (auth-cluster.tsx, nằm trong
+                SiteHeader ở từng trang) cần useChatBubbles() để mở bong
+                bóng chat nổi (Phase 2 đặc tả "bong bóng chat"). */}
+            <ChatBubbleProvider>
+              {children}
+              {/* Site-wide, not just /audio — chương audio bây giờ phát
+                  được từ /read (xem reader.tsx), nên thanh phát phải hiện
+                  bất kể đang ở trang nào, không riêng khu vực Audio. */}
+              <MiniPlayerBar />
+              {/* Cùng lý do: bong bóng chat nổi phải theo được người dùng
+                  qua mọi trang, không riêng /ca-nhan — xem
+                  chat-bubble-dock.tsx (tự ẩn dưới breakpoint lg). */}
+              <ChatBubbleDock />
+            </ChatBubbleProvider>
           </NowPlayingProvider>
         </RoleProvider>
         <Analytics />
