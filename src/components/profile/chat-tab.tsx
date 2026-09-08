@@ -11,7 +11,8 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { AVATAR_TONES } from "@/lib/profile";
 import { timeLabel } from "@/lib/format-time";
-import { Field, Button, Alert } from "@/components/ui";
+import { autoGrowTextarea, resetTextareaHeight } from "@/lib/autogrow-textarea";
+import { Field, Alert } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
 
 type MessageContext = "personal" | "moderation";
@@ -57,6 +58,10 @@ type ChatTabProps = {
 // "Hội thoại" đang mở), tự dừng khi rời tab.
 const CONVERSATIONS_POLL_MS = 15_000;
 const THREAD_POLL_MS = 5_000;
+// Ô soạn tin tự giãn tối đa tới đây rồi tự cuộn bên trong (autoGrowTextarea)
+// — không cho giãn vô hạn, tin rất dài sẽ đẩy hết khung tin nhắn phía trên
+// ra khỏi tầm nhìn.
+const COMPOSER_MAX_HEIGHT_PX = 140;
 
 function toneFor(userId: string): string {
   let hash = 0;
@@ -115,6 +120,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
 
   const autoSelectedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const loadConversations = () =>
     fetch("/api/messages")
@@ -221,6 +227,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
     }
     setMessages((prev) => [...prev, data.message]);
     setDraft("");
+    resetTextareaHeight(composerRef.current);
     // Đẩy hội thoại này lên đầu danh sách + cập nhật tin gần nhất, không
     // chờ vòng poll 15s tiếp theo mới thấy tin mình vừa gửi.
     setConversations((prev) => {
@@ -456,11 +463,31 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   ghi chú ở container ngoài cùng); tự "dính" đáy màn hình
                   khi cuộn, đúng hành vi chat mobile chuẩn, bất kể
                   SiteHeader/ProfileHeader cao bao nhiêu. */}
-              <div className="flex items-center gap-2.5 border-t border-[#f0f0ef] bg-white px-4 py-3 max-[759px]:sticky max-[759px]:bottom-0 max-[759px]:z-10 max-[759px]:shrink-0">
-                <Field
-                  label={null}
+              {/* KHÔNG dùng Field/Button dùng chung ở đây — Field chỉ áp
+                  className truyền vào lên <input> BÊN TRONG, không lên
+                  <label> bọc ngoài (chính là flex item thật của hàng này),
+                  nên flex-1 vô tác dụng và ô nhập co lại gần như biến mất.
+                  Button có base class w-full LUÔN thắng bất kỳ class ghi
+                  đè width nào (thứ tự utility trong CSS Tailwind build ra
+                  quyết định thắng-thua, không phải thứ tự viết trong
+                  className — đã kiểm chứng: .w-8{} đứng TRƯỚC .w-full{}
+                  trong stylesheet), nên nút gửi luôn giãn full-width dù
+                  truyền w-[38px]. Cả 2 lỗi có sẵn từ trước (không phải mới
+                  đổi), chỉ lộ ra khi test kỹ luồng chat — sửa cục bộ ở đây
+                  bằng phần tử thuần, không đụng field.tsx/button.tsx dùng
+                  chung (nơi khác đang chạy đúng, sửa chung dễ vỡ chỗ khác).
+                  textarea (thay vì input) + autoGrowTextarea còn cho tự
+                  giãn dòng khi soạn tin dài — input cũ không làm được vì
+                  input luôn 1 dòng bất kể CSS. items-end (thay vì
+                  items-center) để nút gửi ghim đáy khi textarea cao lên. */}
+              <div className="flex shrink-0 items-end gap-2.5 border-t border-[#f0f0ef] bg-white px-4 py-3 max-[759px]:sticky max-[759px]:bottom-0 max-[759px]:z-10">
+                <textarea
+                  ref={composerRef}
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    autoGrowTextarea(e.target, COMPOSER_MAX_HEIGHT_PX);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -468,16 +495,18 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                     }
                   }}
                   placeholder="Nhắn tin…"
-                  className="min-w-0 flex-1 rounded-full border-none bg-neutral-bg px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-brand-gold"
+                  rows={1}
+                  className="min-h-[38px] max-h-[140px] min-w-0 flex-1 resize-none overflow-y-auto rounded-3xl border-none bg-neutral-bg px-4 py-2.5 text-sm leading-[1.4] outline-none focus:ring-1 focus:ring-brand-gold"
                 />
-                <Button
+                <button
                   type="button"
                   onClick={handleSend}
                   disabled={sending || !draft.trim()}
-                  className="h-[38px] w-[38px] rounded-full p-0 text-brand-ink"
+                  aria-label="Gửi"
+                  className="flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink transition-transform hover:brightness-[1.08] active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   <PaperPlaneRightIcon weight="fill" size={17} />
-                </Button>
+                </button>
               </div>
             </>
           )}
