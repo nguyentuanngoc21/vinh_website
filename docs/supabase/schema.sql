@@ -622,7 +622,12 @@ create type public.transaction_type as enum (
   -- Hoàn tiền khi hủy Order (Mục 5.1) — cộng ngay (status='completed'),
   -- không qua hold period. Thêm bởi
   -- migrations/20260901_add_order_refund_transaction_type.sql.
-  'order_refund'
+  'order_refund',
+  -- Thưởng thành tựu (author/narrator/designer) — reference_type =
+  -- 'achievement', reference_id = achievement_templates.id. Chỉ ghi khi
+  -- achievement_templates.reward_tokens > 0. Thêm bởi
+  -- migrations/20260908_add_achievement_bonus_transaction_type.sql.
+  'achievement_bonus'
 );
 
 create type public.transaction_status as enum (
@@ -3451,3 +3456,136 @@ alter table public.chapters
 
 alter table public.books
   add column content_purged_at timestamptz;
+
+-- --- Gate nhiệm vụ ngày theo "for_role" (tác giả/người thu âm/thiết kế) —
+-- NULL = áp dụng chung (mặc định đọc giả), cùng convention với quest_type
+-- NULL. Unlock role tính bằng EXISTS trên books/audio_narrations/
+-- design_items (src/lib/quests/creator-roles.ts), KHÔNG cache trên
+-- profiles — hệ thống không xoá hàng thật nên EXISTS đã tự vĩnh viễn.
+-- KHÔNG dùng profiles.creator_tags (tự khai, chưa có UI set, không mang
+-- quyền hạn theo thiết kế gốc — xem phần 1). Xem
+-- migrations/20260908_add_task_template_role_gating.sql. ---
+alter table public.task_templates add column for_role text;
+
+alter table public.task_templates
+  add constraint task_templates_for_role_check
+  check (for_role is null or for_role in ('author', 'narrator', 'designer'));
+
+-- --- Hệ thống Thành tựu (Achievements) — 1 khung chung cho mọi role, lọc +
+-- tô màu theo for_role ở UI (NULL = chung/đọc giả, cùng convention
+-- task_templates.for_role). Ghép nối với streak_milestones.badge_id
+-- (placeholder từ migrations/20260827_add_streak_milestones.sql) — mốc
+-- streak dùng 1 hàng ở đây (metric NULL) chỉ để cấp metadata hiển thị,
+-- unlock/claim streak vẫn qua claim_streak_milestone(), KHÔNG đổi. Chỉ 3
+-- role sản phẩm dùng metric+threshold+sync_user_achievements(). Xem
+-- migrations/20260908_add_achievement_bonus_transaction_type.sql +
+-- migrations/20260908_add_achievements.sql. ---
+alter type public.transaction_type add value if not exists 'achievement_bonus';
+
+create table public.achievement_templates (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  for_role text,
+  title text not null,
+  description text,
+  icon text,
+  color_token text not null,
+  metric text,
+  threshold integer,
+  reward_tokens integer not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint achievement_templates_for_role_check
+    check (for_role is null or for_role in ('author', 'narrator', 'designer')),
+  constraint achievement_templates_metric_check
+    check (metric is null or metric in ('books_published', 'audio_published', 'design_published')),
+  constraint achievement_templates_metric_threshold_check
+    check ((metric is null) = (threshold is null)),
+  constraint achievement_templates_threshold_check check (threshold is null or threshold > 0),
+  constraint achievement_templates_reward_tokens_check check (reward_tokens >= 0)
+);
+
+alter table public.achievement_templates enable row level security;
+
+create policy "authenticated users can view active achievement templates"
+  on public.achievement_templates for select
+  to authenticated
+  using (active);
+
+create policy "admins manage achievement templates"
+  on public.achievement_templates for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create table public.user_achievements (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  achievement_id uuid not null references public.achievement_templates (id) on delete cascade,
+  transaction_id uuid references public.transactions (id),
+  unlocked_at timestamptz not null default now(),
+  unique (user_id, achievement_id)
+);
+
+alter table public.user_achievements enable row level security;
+
+create policy "users view their own achievements"
+  on public.user_achievements for select
+  using (auth.uid() = user_id);
+
+create policy "admins view all user achievements"
+  on public.user_achievements for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create index user_achievements_user_idx on public.user_achievements (user_id);
+
+alter table public.streak_milestones
+  add constraint streak_milestones_badge_id_fkey
+  foreign key (badge_id) references public.achievement_templates (id);
+
+create function public.sync_user_achievements(p_user_id uuid)
+returns setof public.user_achievements as $$
+declare
+  v_template public.achievement_templates;
+  v_count integer;
+  v_txn public.transactions;
+  v_row public.user_achievements;
+begin
+  for v_template in
+    select * from public.achievement_templates
+    where active and metric is not null
+      and id not in (
+        select achievement_id from public.user_achievements where user_id = p_user_id
+      )
+  loop
+    v_count := case v_template.metric
+      when 'books_published' then
+        (select count(*) from public.books where author_id = p_user_id and published)
+      when 'audio_published' then
+        (select count(*) from public.audio_narrations where narrator_id = p_user_id)
+      when 'design_published' then
+        (select count(*) from public.design_items where illustrator_id = p_user_id)
+      else 0
+    end;
+
+    if v_count >= v_template.threshold then
+      v_txn := null;
+      if v_template.reward_tokens > 0 then
+        v_txn := public.apply_transaction(
+          p_user_id, 'achievement_bonus', v_template.reward_tokens,
+          'achievement', v_template.id
+        );
+      end if;
+
+      insert into public.user_achievements (user_id, achievement_id, transaction_id)
+      values (p_user_id, v_template.id, v_txn.id)
+      returning * into v_row;
+
+      return next v_row;
+    end if;
+  end loop;
+
+  return;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.sync_user_achievements from public, anon, authenticated;
+grant execute on function public.sync_user_achievements to service_role;

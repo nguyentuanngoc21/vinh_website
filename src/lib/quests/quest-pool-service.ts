@@ -7,6 +7,7 @@ import {
   QUEST_RESET_COOLDOWN_DAYS,
   QUEST_TYPE_WEIGHTS,
 } from "@/lib/quests/config";
+import { getUnlockedRoles, isTemplateUnlockedForRoles } from "@/lib/quests/creator-roles";
 import type { QuestResult } from "@/lib/quests/reward-engine";
 
 type Client = SupabaseClient<Database>;
@@ -141,7 +142,10 @@ export const QuestPoolService = {
     }
 
     const cooldownIds = await getCooldownTemplateIds(supabase, params.userId, poolDate);
-    const eligible = templates.filter((t) => !cooldownIds.has(t.id));
+    const unlockedRoles = await getUnlockedRoles(supabase, params.userId);
+    const eligible = templates.filter(
+      (t) => !cooldownIds.has(t.id) && isTemplateUnlockedForRoles(t.for_role, unlockedRoles)
+    );
 
     const byType = (type: QuestType) => eligible.filter((t) => t.quest_type === type);
 
@@ -204,6 +208,7 @@ export const QuestPoolService = {
     }
 
     const cooldownIds = await getCooldownTemplateIds(supabase, params.userId, poolDate);
+    const unlockedRoles = await getUnlockedRoles(supabase, params.userId);
     const currentPoolIds = new Set(currentPool.map((p) => p.task_template_id));
 
     const { data: sameTypeCandidates, error: candidatesError } = await supabase
@@ -214,7 +219,11 @@ export const QuestPoolService = {
     if (candidatesError) return { ok: false, error: candidatesError.message };
 
     const eligible = (sameTypeCandidates ?? []).filter(
-      (t) => t.id !== params.taskTemplateId && !cooldownIds.has(t.id) && !currentPoolIds.has(t.id)
+      (t) =>
+        t.id !== params.taskTemplateId &&
+        !cooldownIds.has(t.id) &&
+        !currentPoolIds.has(t.id) &&
+        isTemplateUnlockedForRoles(t.for_role, unlockedRoles)
     );
     const replacement = weightedPick(eligible, weightOf);
     if (!replacement) {

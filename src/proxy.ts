@@ -26,7 +26,9 @@ import { decodeSession, SESSION_COOKIE } from "@/lib/session";
 
 const ADMIN_PREFIX = "/admin";
 const AUTHOR_PREFIX = "/author";
-const READER_ONLY_PREFIXES = ["/ca-nhan"]; // any logged-in role may enter
+// Nhiệm vụ/Thành tựu tách khỏi /ca-nhan thành 2 trang riêng (không còn là
+// tab con) — cùng mức bảo vệ: bất kỳ ai đã đăng nhập đều vào được.
+const READER_ONLY_PREFIXES = ["/ca-nhan", "/nhiem-vu", "/thanh-tuu"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -60,5 +62,5 @@ function redirectToLogin(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/author/:path*", "/ca-nhan/:path*"],
+  matcher: ["/admin/:path*", "/author/:path*", "/ca-nhan/:path*", "/nhiem-vu/:path*", "/thanh-tuu/:path*"],
 };
