@@ -24,12 +24,12 @@ const WATERMARK_TEXT =
 export function CopyrightBand() {
   return (
     <section className="px-4 py-11 sm:px-8 lg:px-11">
-      <div className="grid grid-cols-1 items-center gap-12 rounded-[22px] bg-ink p-11 text-white lg:grid-cols-[1fr_460px]">
+      <div className="grid grid-cols-1 items-center gap-12 rounded-[22px] bg-ink p-5 text-white sm:p-8 lg:grid-cols-[1fr_460px] lg:p-11">
         <div>
           <div className="text-xs font-semibold tracking-[1px] text-brand-gold-light">
             BẢO VỆ BẢN QUYỀN
           </div>
-          <h2 className="my-3 text-[34px] font-bold leading-[1.2] tracking-[-.5px]">
+          <h2 className="my-3 text-2xl font-bold leading-[1.2] tracking-[-.5px] sm:text-[34px]">
             Tác phẩm của bạn, được bảo vệ ba lớp
           </h2>
           <div className="flex max-w-[480px] flex-col gap-4">
@@ -47,7 +47,7 @@ export function CopyrightBand() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl bg-[#fbf8f0] p-9">
+        <div className="relative overflow-hidden rounded-2xl bg-[#fbf8f0] p-5 sm:p-9">
           <div
             aria-hidden="true"
             style={{ inset: "-40% -10%" }}

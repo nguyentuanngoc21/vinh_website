@@ -105,17 +105,44 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
   const [active, setActive] = useState(0);
   const [scale, setScale] = useState(1);
   const stageWrapRef = useRef<HTMLDivElement>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = stageWrapRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? STAGE_WIDTH;
-      setScale(Math.min(1, width / STAGE_WIDTH));
+      const computedScale =
+        width < 640
+          ? Math.max(0.42, Math.min(0.65, width / 780))
+          : Math.min(1, width / STAGE_WIDTH);
+      setScale(computedScale);
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+      if (deltaX > 0) {
+        go(active - 1);
+      } else {
+        go(active + 1);
+      }
+    }
+  };
 
   const go = (i: number) => setActive(mod(i, n));
   const current = n > 0 ? books[active] : null;
@@ -145,7 +172,13 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
         </div>
       ) : (
         <>
-          <div ref={stageWrapRef} style={{ height: STAGE_HEIGHT * scale }} className="relative">
+          <div
+            ref={stageWrapRef}
+            style={{ height: STAGE_HEIGHT * scale }}
+            className="relative overflow-hidden touch-pan-y select-none"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             <div
               style={{
                 width: STAGE_WIDTH,

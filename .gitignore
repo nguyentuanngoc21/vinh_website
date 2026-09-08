@@ -48,3 +48,8 @@ next-env.d.ts
 python-service/.venv
 python-service/**/__pycache__
 *.pyc
+
+# Vercel plugin content manually copied for Claude Code (third-party, not project code)
+.claude/skills/
+.claude/agents/
+.claude/commands/

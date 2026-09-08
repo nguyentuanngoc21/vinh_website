@@ -112,9 +112,9 @@ export default async function StoryPage({ params }: PageProps<"/truyen/[slug]">)
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
         <SiteHeader />
-        <main className="px-11 py-9">
+        <main className="px-4 py-6 sm:px-8 sm:py-9 lg:px-11">
           <div className="flex flex-col gap-8 sm:flex-row">
-            <div className="w-[200px] shrink-0">
+            <div className="mx-auto w-[180px] shrink-0 sm:mx-0 sm:w-[200px]">
               <div className="aspect-[2/3] overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]">
                 <BookCover
                   id={book.id}
@@ -128,12 +128,12 @@ export default async function StoryPage({ params }: PageProps<"/truyen/[slug]">)
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col">
-              <h1 className="font-[family-name:var(--font-lora)] text-[28px] font-bold leading-tight text-brand-ink">
+              <h1 className="font-[family-name:var(--font-lora)] text-2xl font-bold leading-tight text-brand-ink sm:text-[28px]">
                 {book.title}
               </h1>
               {authorProfile?.nickname && <p className="mt-1 text-sm text-stone-alt">bởi {authorProfile.nickname}</p>}
 
-              <div className="mt-3.5 flex items-center gap-5 text-sm text-stone-alt">
+              <div className="mt-3.5 flex flex-wrap items-center gap-3.5 text-sm text-stone-alt sm:gap-5">
                 <span className="flex items-center gap-1.5">
                   <EyeIcon size={17} /> {book.view_count.toLocaleString("vi-VN")}
                 </span>

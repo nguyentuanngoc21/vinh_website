@@ -3,7 +3,7 @@ import Link from "next/link";
 export function AuthorCta() {
   return (
     <section className="px-4 pb-11 sm:px-8 lg:px-11">
-      <div className="flex flex-col items-start justify-between gap-5 rounded-[20px] bg-[#F7EFD8] px-11 py-9 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-start justify-between gap-5 rounded-[20px] bg-[#F7EFD8] p-6 sm:flex-row sm:items-center sm:px-11 sm:py-9">
         <div>
           <div className="text-2xl font-bold text-brand-ink">
             Bạn là tác giả?
@@ -15,7 +15,7 @@ export function AuthorCta() {
         </div>
         <Link
           href="/author"
-          className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-8 py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
+          className="w-full shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-8 py-3.5 text-center text-[15px] font-semibold text-brand-ink no-underline sm:w-auto"
         >
           Bắt đầu viết
         </Link>
