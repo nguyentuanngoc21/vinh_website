@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { BookmarkSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { NavBarContent, type SearchType } from "@/components/nav-bar-content";
 import { AuthCluster } from "@/components/auth-cluster";
 import { VinhMark } from "@/components/ui";
@@ -33,9 +32,12 @@ export function SiteHeader({
 }: SiteHeaderProps = {}) {
   return (
     <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11">
-      {/* Logo + bookmark + AuthCluster — giữ nguyên ở mọi kích thước màn
-          hình, không ẩn/thu gọn gì thêm (ô tìm kiếm đã chuyển xuống thanh
-          nav màu brand-ink bên dưới — xem NavBarContent). */}
+      {/* Logo + AuthCluster — giữ nguyên ở mọi kích thước màn hình, không
+          ẩn/thu gọn gì thêm (ô tìm kiếm đã chuyển xuống thanh nav màu
+          brand-ink bên dưới — xem NavBarContent). Bookmark ("Tác phẩm đã
+          lưu") đã bỏ khỏi đây — avatar → "Thông tin cá nhân" (đã có sẵn
+          trong menu, xem auth-cluster.tsx) là đủ để tới cùng khu vực đó,
+          không cần lối tắt riêng ở header nữa. */}
       <Link href="/" className="flex shrink-0 items-center gap-[9px] no-underline">
         <VinhMark size={34} tone="ink" className="shrink-0" />
         <span className="text-[27px] font-extrabold tracking-[-0.5px] text-brand-ink">
@@ -43,25 +45,15 @@ export function SiteHeader({
         </span>
       </Link>
 
-      {/* flex-wrap + justify-end — lưới an toàn: AuthCluster giờ có thêm
-          MessengerBell (bookmark + CTA + [admin: Bảng điều khiển] +
-          Messenger + chuông + avatar dồn vào 1 hàng) đã từng tràn NGANG CẢ
-          TRANG trên mobile (nhất là admin) vì hàng này trước đó không wrap
-          được. AuthCluster tự thu CTA/Bảng điều khiển về icon-only dưới
-          `sm` để vừa 1 hàng trong đa số trường hợp, nhưng flex-wrap vẫn giữ
-          lại phòng khi màn hình quá hẹp hoặc tính toán bề rộng lệch — tối
-          đa chỉ xuống dòng bên trong header, không bao giờ đẩy cả TRANG
-          tràn ngang nữa. sm:flex-nowrap trở lại 1 hàng cố định khi đã đủ
-          chỗ (pill có chữ). */}
-      <div className="flex flex-wrap items-center justify-end gap-3.5 sm:flex-nowrap">
-        <Link
-          href="/ca-nhan#bookmarks"
-          data-tour="tour-bookmark"
-          aria-label="Tác phẩm đã lưu"
-          className="inline-flex text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
-        >
-          <BookmarkSimpleIcon size={21} />
-        </Link>
+      {/* ml-auto — ép cụm này về SÁT MÉP PHẢI, không dựa hoàn toàn vào
+          justify-between của <header>: cụm đã co lại chỉ còn icon (CTA/Bảng
+          điều khiển icon-only dưới `sm`, xem auth-cluster.tsx) nên dư nhiều
+          chỗ trống, cần chắc chắn phần dư đó nằm bên TRÁI cụm chứ không phải
+          để cụm trôi tự do theo nội dung. flex-wrap + justify-end vẫn giữ
+          làm lưới an toàn — dù màn hình hẹp tới đâu cũng chỉ xuống dòng bên
+          trong header, không bao giờ đẩy cả TRANG tràn ngang. sm:flex-nowrap
+          trở lại 1 hàng cố định khi đã đủ chỗ (pill có chữ). */}
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-3.5 sm:flex-nowrap">
         <AuthCluster ctaLabel={ctaLabel} ctaHref={ctaHref} />
       </div>
 
