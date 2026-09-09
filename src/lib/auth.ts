@@ -23,6 +23,13 @@ export type RegisterPayload = {
   cccd?: string;
   cccdFront?: File;
   cccdBack?: File;
+  /** Trang cần quay lại sau khi xác nhận đăng ký xong (đọc ?next= ở
+   * register-form.tsx) — chuyển tới register/route.ts để nhúng vào
+   * `emailRedirectTo` của link trong mail xác nhận. Luồng nhập mã OTP thủ
+   * công (không qua email link) dùng lại đúng giá trị này ở
+   * router.push(resolveRedirectTarget(next)) tại register-form.tsx, không
+   * đi qua đây. */
+  next?: string;
 };
 
 // Khác AuthResult: đăng ký xong KHÔNG có session ngay — tài khoản Supabase
@@ -83,6 +90,7 @@ export async function register(payload: RegisterPayload): Promise<RegisterResult
   body.set("password", payload.password);
   if (payload.realname) body.set("realname", payload.realname);
   if (payload.phone) body.set("phone", payload.phone);
+  if (payload.next) body.set("next", payload.next);
   if (payload.cccd && payload.cccdFront && payload.cccdBack) {
     body.set("cccd", payload.cccd);
     body.set("cccdFront", payload.cccdFront);
@@ -235,14 +243,15 @@ export async function verifyRecoveryOtp(email: string, token: string): Promise<{
  */
 export async function resendOtp(
   email: string,
-  type: "signup" | "recovery"
+  type: "signup" | "recovery",
+  next?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   let res: Response;
   try {
     res = await fetch("/api/auth/resend-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, type }),
+      body: JSON.stringify({ email, type, next }),
     });
   } catch {
     return { ok: false, error: "Không thể kết nối máy chủ. Vui lòng thử lại sau." };

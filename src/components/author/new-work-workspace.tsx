@@ -28,6 +28,8 @@ export function NewWorkWorkspace() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [price, setPrice] = useState(0);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [audioPrice, setAudioPrice] = useState(0);
   const [isExclusive, setIsExclusive] = useState(true);
   const [genre, setGenre] = useState<BookGenre | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -63,6 +65,8 @@ export function NewWorkWorkspace() {
           chapterContent: content,
           published,
           price,
+          audioUrl: audioUrl.trim(),
+          audioPrice,
           isLastChapter,
         }),
       });
@@ -117,6 +121,10 @@ export function NewWorkWorkspace() {
         exclusiveError={null}
         price={price}
         onPriceChange={setPrice}
+        audioUrl={audioUrl}
+        onAudioUrlChange={setAudioUrl}
+        audioPrice={audioPrice}
+        onAudioPriceChange={setAudioPrice}
         bookTitle={bookTitle}
         onBookTitleChange={setBookTitle}
         onBookTitleCommit={() => {}}

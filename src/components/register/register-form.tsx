@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { resendOtp } from "@/lib/auth";
+import { resolveRedirectTarget } from "@/lib/redirect-target";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
 import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/lib/password-strength";
 import { LegalLink } from "@/components/legal/legal-link";
@@ -26,6 +27,12 @@ export function RegisterForm() {
   // thiếu/hết hạn/dùng rồi — mirror đúng cách forgot-password-form.tsx xử
   // lý error=link-het-han.
   const linkExpired = searchParams.get("error") === "link-het-han";
+  // Trang cần quay lại sau khi xác nhận đăng ký xong (rào đọc/nghe cho
+  // khách vãng lai — xem src/components/access-gate/login-gate-modal.tsx)
+  // — đi kèm cả 2 nhánh xác nhận: link trong email (qua register() ->
+  // register/route.ts -> emailRedirectTo) VÀ nhập mã OTP thủ công (dùng
+  // trực tiếp ở handleVerifyOtp bên dưới, không qua server).
+  const nextParam = searchParams.get("next");
 
   const router = useRouter();
   const { register, verifySignupCode } = useRole();
@@ -108,6 +115,7 @@ export function RegisterForm() {
       ...(cccdComplete && files.front && files.back
         ? { cccd: cccdDigits, cccdFront: files.front, cccdBack: files.back }
         : {}),
+      ...(nextParam ? { next: nextParam } : {}),
     });
     setPending(false);
     if (!result.ok) {
@@ -128,14 +136,14 @@ export function RegisterForm() {
       setOtpError(result.error);
       return;
     }
-    router.push("/");
+    router.push(resolveRedirectTarget(nextParam));
   };
 
   const handleResend = async () => {
     if (!submittedEmail || resending) return;
     setResending(true);
     setResendMsg(null);
-    const result = await resendOtp(submittedEmail, "signup");
+    const result = await resendOtp(submittedEmail, "signup", nextParam ?? undefined);
     setResending(false);
     setResendMsg(result.ok ? "Đã gửi lại email xác nhận." : result.error);
   };

@@ -346,6 +346,22 @@ alter table public.chapters
 alter table public.chapters
   add column is_exclusive boolean not null default true;
 
+-- --- Link audio + giá audio riêng — panel xuất bản, hàng "Truyện audio"
+-- chỉ hiện khi audio_url có giá trị (src/components/author/publish-panel.tsx).
+-- Link đơn giản do tác giả tự dán, KHÔNG qua cơ chế "share link nội bộ
+-- id&token" của chapter_audio_links/audio_narrations (ChapterAudioPanel) —
+-- 2 cơ chế song song, không đụng nhau. audio_price CHƯA enforce chặn nghe,
+-- chỉ lưu giá niêm yết — xem
+-- migrations/20260909_add_chapter_audio_url_and_price.sql. ---
+alter table public.chapters
+  add column audio_url text;
+
+alter table public.chapters
+  add column audio_price integer not null default 0;
+
+alter table public.chapters
+  add constraint chapters_audio_price_check check (audio_price >= 0);
+
 -- --- Chương cuối — checkbox 1 chiều ở chapter-editor.tsx, dùng để tính
 -- trạng thái "Đã hoàn thành" ở trang giới thiệu truyện (/truyen/[slug]).
 -- Tối đa 1 chương/sách được true, và KHÔNG được đổi lại false (trigger

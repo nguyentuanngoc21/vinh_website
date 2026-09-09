@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveRedirectTarget } from "@/lib/redirect-target";
 
 /**
  * "Gửi lại mã" cho màn xác nhận OTP (/api/auth/verify-otp) — dùng khi mã 6
@@ -37,11 +38,15 @@ export async function POST(request: Request) {
   // đăng ký ngay trước đó (đã biết tài khoản này tồn tại), nên không cần
   // che giấu lỗi — trả thẳng message của Supabase để họ biết vì sao gửi
   // lại thất bại (ví dụ rate limit).
+  // `next` giữ nguyên giá trị từ lần signUp() ban đầu (register-form.tsx
+  // gửi lại đúng searchParams.get("next") của chính nó) — gửi lại mail
+  // không được làm rơi mất trang cần quay lại đã chọn từ đầu.
+  const next = resolveRedirectTarget(typeof body?.next === "string" ? body.next : null);
   const { error } = await supabase.auth.resend({
     type: "signup",
     email,
     options: {
-      emailRedirectTo: `${origin}/api/auth/confirm?next=${encodeURIComponent("/")}&flow=signup`,
+      emailRedirectTo: `${origin}/api/auth/confirm?next=${encodeURIComponent(next)}&flow=signup`,
     },
   });
   if (error) {

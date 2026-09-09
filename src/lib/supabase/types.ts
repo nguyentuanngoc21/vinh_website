@@ -377,6 +377,13 @@ export type Database = {
           // Số token đọc chương, 0 = miễn phí. Giá niêm yết — chưa tự
           // động nối vào create_purchase()/purchase_transactions.
           price: number;
+          // Link audio do tác giả tự dán (khác chapter_audio_links/
+          // audio_narrations — cơ chế "Tự thu & gắn"/"Dán link chia sẻ" ở
+          // ChapterAudioPanel) + giá niêm yết riêng cho bản audio đó, 0 =
+          // miễn phí. CHƯA enforce chặn nghe theo giá này — chỉ lưu. Xem
+          // migrations/20260909_add_chapter_audio_url_and_price.sql.
+          audio_url: string | null;
+          audio_price: number;
           // DEPRECATED — độc quyền giờ đọc/viết ở books.is_exclusive (cấp
           // truyện, không phải từng chương). Cột này vẫn còn trong DB
           // (không drop) nhưng app không đọc/viết nữa. Xem
@@ -408,6 +415,8 @@ export type Database = {
           order_index: number;
           published?: boolean;
           price?: number;
+          audio_url?: string | null;
+          audio_price?: number;
           is_exclusive?: boolean;
           is_last_chapter?: boolean;
           removed_at?: string | null;

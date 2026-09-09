@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { verifyCccdAgainstImages } from "@/lib/ocr";
+import { resolveRedirectTarget } from "@/lib/redirect-target";
 
 export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
@@ -72,6 +73,12 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const origin = new URL(request.url).origin;
+  // Trang cần quay lại sau khi xác nhận xong (rào đọc/nghe cho khách vãng
+  // lai đưa người dùng qua đây kèm ?next=, xem register-form.tsx +
+  // src/lib/auth.ts RegisterPayload.next) — validate qua
+  // resolveRedirectTarget() (chỉ nhận đường dẫn nội bộ, tránh open
+  // redirect), rơi về "/" như cũ nếu thiếu/không hợp lệ.
+  const next = resolveRedirectTarget(String(form.get("next") ?? ""));
 
   // emailRedirectTo giống cách forgot-password/route.ts làm cho luồng quên
   // mật khẩu: không set thì Supabase rơi về Site URL mặc định, link "Xác
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/api/auth/confirm?next=${encodeURIComponent("/")}&flow=signup`,
+      emailRedirectTo: `${origin}/api/auth/confirm?next=${encodeURIComponent(next)}&flow=signup`,
     },
   });
   if (authError || !authData.user) {

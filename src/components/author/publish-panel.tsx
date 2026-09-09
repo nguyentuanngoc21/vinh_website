@@ -27,6 +27,12 @@ type PublishPanelProps = {
   exclusiveError: string | null;
   price: number;
   onPriceChange: (value: number) => void;
+  /** Link audio đơn giản tác giả tự dán (khác ChapterAudioPanel bên dưới —
+   * xem comment tại chỗ dùng) — "" = chưa gắn, ẩn hàng giá "Truyện audio". */
+  audioUrl: string;
+  onAudioUrlChange: (value: string) => void;
+  audioPrice: number;
+  onAudioPriceChange: (value: number) => void;
   bookTitle: string;
   onBookTitleChange: (title: string) => void;
   /** Lưu tên truyện — gọi lúc blur, không phải mỗi lần gõ (khác genre/tags,
@@ -64,6 +70,10 @@ export function PublishPanel({
   exclusiveError,
   price,
   onPriceChange,
+  audioUrl,
+  onAudioUrlChange,
+  audioPrice,
+  onAudioPriceChange,
   bookTitle,
   onBookTitleChange,
   onBookTitleCommit,
@@ -130,6 +140,22 @@ export function PublishPanel({
           </div>
 
           <div>
+            <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">
+              Link audio <span className="font-normal text-stone-alt">(không bắt buộc)</span>
+            </div>
+            <Field
+              label={null}
+              value={audioUrl}
+              onChange={(e) => onAudioUrlChange(e.target.value)}
+              placeholder="Dán link file audio (mp3, wav…) hoặc link chia sẻ"
+            />
+            {/* Khác ChapterAudioPanel (cuối trang, "Tự thu & gắn"/"Dán link
+                chia sẻ" — cơ chế nội bộ id&token trỏ tới audio_narrations) —
+                đây chỉ là 1 link đơn giản tác giả tự dán, có giá riêng ở
+                khối "Giá" bên dưới. 2 cơ chế song song, không đụng nhau. */}
+          </div>
+
+          <div>
             <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Thể loại</div>
             <GenreSelect value={genre} onChange={onGenreChange} />
           </div>
@@ -182,18 +208,38 @@ export function PublishPanel({
           </div>
 
           <div>
-            <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Giá chương</div>
-            <div className="flex items-center rounded-lg border border-cream-border px-3 py-2.5">
-              <CoinsIcon color="var(--color-brand-gold)" />
-              <input
-                type="number"
-                min="0"
-                step="1000"
-                value={price}
-                onChange={(event) => onPriceChange(Math.max(0, Number(event.target.value) || 0))}
-                className="ml-2 w-full bg-transparent text-sm font-semibold outline-none"
-              />
-              <span className="ml-2 text-sm text-stone-alt">token</span>
+            <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Giá</div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2.5 rounded-lg border border-cream-border px-3 py-2.5">
+                <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện chữ:</span>
+                <CoinsIcon color="var(--color-brand-gold)" />
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={price}
+                  onChange={(event) => onPriceChange(Math.max(0, Number(event.target.value) || 0))}
+                  className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                />
+                <span className="shrink-0 text-sm text-stone-alt">token</span>
+              </div>
+              {/* Chỉ hiện khi đã dán link audio ở trên — chưa gắn thì
+                  chưa có gì để đặt giá riêng. */}
+              {audioUrl.trim().length > 0 && (
+                <div className="flex items-center gap-2.5 rounded-lg border border-cream-border px-3 py-2.5">
+                  <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện audio</span>
+                  <CoinsIcon color="var(--color-brand-gold)" />
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={audioPrice}
+                    onChange={(event) => onAudioPriceChange(Math.max(0, Number(event.target.value) || 0))}
+                    className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                  />
+                  <span className="shrink-0 text-sm text-stone-alt">token</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
