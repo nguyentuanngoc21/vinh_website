@@ -5,6 +5,7 @@ import { Reader } from "@/components/reading/reader";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId, getAuthedAdminId } from "@/lib/wallet/session";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
+import { buildContentPreview } from "@/lib/reading/access-gate";
 
 export async function generateMetadata({
   params,
@@ -42,7 +43,7 @@ export default async function ReadChapterPage({
 
   const { data: chapter } = await supabase
     .from("chapters")
-    .select("id, title, content, order_index, published")
+    .select("id, title, content, order_index, published, price")
     .eq("id", chapterId)
     .eq("book_id", book.id)
     .maybeSingle();
@@ -81,13 +82,44 @@ export default async function ReadChapterPage({
 
   const isOwnBook = viewerId !== null && viewerId === book.author_id;
 
-  // Chỉ query khi đã đăng nhập — 2 bảng này chỉ có ý nghĩa với 1 viewer cụ thể.
-  const [{ data: votedRow }, { data: followRow }] = viewerId
+  // Chỉ query khi đã đăng nhập — 3 bảng này chỉ có ý nghĩa với 1 viewer cụ
+  // thể. purchase_transactions chỉ cần tra khi chương thật sự có giá — hầu
+  // hết chương free, tra thêm 1 query vô ích cho mọi lượt đọc là phí.
+  const needsPurchaseLookup = viewerId !== null && chapter.price > 0 && !isOwnBook;
+  const [{ data: votedRow }, { data: followRow }, { data: purchaseRow }] = viewerId
     ? await Promise.all([
         serviceClient.from("chapter_votes").select("chapter_id").eq("chapter_id", chapter.id).eq("user_id", viewerId).maybeSingle(),
         serviceClient.from("author_follows").select("author_id").eq("author_id", book.author_id).eq("follower_id", viewerId).maybeSingle(),
+        needsPurchaseLookup
+          ? serviceClient.from("purchase_transactions").select("id").eq("chapter_id", chapter.id).eq("buyer_id", viewerId).maybeSingle()
+          : Promise.resolve({ data: null }),
       ])
-    : [{ data: null }, { data: null }];
+    : [{ data: null }, { data: null }, { data: null }];
+
+  // Rào truy nghiệm — vá lỗ hổng cũ (chapters.price tồn tại nhưng chưa hề
+  // được đọc ở trang này, ai cũng đọc được full mọi chương kể cả VIP chưa
+  // mua) + thêm giới hạn cho khách vãng lai (xem src/lib/reading/access-gate.ts):
+  // - Tác giả xem chương của chính mình: luôn full, bỏ qua mọi rào.
+  // - Chương giá > 0 (VIP) mà viewer chưa mua (hoặc chưa đăng nhập nên
+  //   chắc chắn chưa mua): chặn HOÀN TOÀN, không có preview % — khác chương
+  //   thường, xem quyết định ở PR/thảo luận tính năng này.
+  // - Chương thường (price = 0) mà khách CHƯA đăng nhập: chỉ thấy
+  //   GUEST_PREVIEW_RATIO đầu, phần còn lại yêu cầu đăng nhập (miễn phí).
+  // - Mọi trường hợp khác (đã đăng nhập, hoặc đã mua): full, accessGate="none".
+  const isPurchased = !!purchaseRow;
+  const needsPurchase = !isOwnBook && chapter.price > 0 && !isPurchased;
+  let content = chapter.content;
+  let accessGate: "none" | "login" | "purchase" = "none";
+  if (needsPurchase) {
+    content = "";
+    accessGate = "purchase";
+  } else if (viewerId === null && !isOwnBook) {
+    const preview = buildContentPreview(chapter.content);
+    if (preview.truncated) {
+      content = preview.visible;
+      accessGate = "login";
+    }
+  }
 
   // Side effect: tăng view + ghi "chương đọc gần nhất" — chạy SAU khi
   // response đã trả về (không cộng latency vào lần tải trang), nhưng vẫn
@@ -124,7 +156,7 @@ export default async function ReadChapterPage({
       chapterId={chapter.id}
       chapterTitle={chapter.title}
       chapterPosition={chapterPosition}
-      content={chapter.content}
+      content={content}
       prevChapterId={prevChapterId}
       nextChapterId={nextChapterId}
       chapters={ordered.map((c, i) => ({ id: c.id, title: c.title, position: i + 1 }))}
@@ -132,6 +164,9 @@ export default async function ReadChapterPage({
       initialVoteCount={voteCountRow?.vote_count ?? 0}
       linkedAudio={linkedAudio}
       viewerIsAdmin={!!adminId}
+      accessGate={accessGate}
+      chapterPrice={chapter.price}
+      isLoggedIn={viewerId !== null}
     />
   );
 }

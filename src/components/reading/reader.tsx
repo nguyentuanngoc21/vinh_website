@@ -19,6 +19,7 @@ import { VoteButton } from "./vote-button";
 import { AuthorPanel } from "./author-panel";
 import { ReadingListModal } from "./reading-list-modal";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
+import { ReadingGate } from "./reading-gate";
 import { shareOrCopy } from "@/lib/share";
 import { VinhMark } from "@/components/ui";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
@@ -306,6 +307,17 @@ export type ReaderProps = {
    * đang đọc, dùng chung modal + API PATCH /api/admin/chapters/[chapterId]
    * với bảng chương ở admin/noi-dung/[bookId]. */
   viewerIsAdmin?: boolean;
+  /** Rào truy nghiệm cho khách vãng lai/chương VIP chưa mua — tính sẵn ở
+   * server (page.tsx), vì `content` truyền vào đây CŨNG đã bị cắt tương ứng
+   * (xem src/lib/reading/access-gate.ts) — Reader chỉ render, không tự
+   * quyết định cắt ở đâu. "none" = đọc được toàn bộ, không hiện rào. */
+  accessGate?: "none" | "login" | "purchase";
+  /** Giá chương (token) — chỉ có ý nghĩa khi accessGate === "purchase". */
+  chapterPrice?: number;
+  /** true nếu viewer đã đăng nhập (kể cả khi accessGate === "purchase" và
+   * chưa mua) — quyết định ReadingGate hiện nút "Mua ngay" hay "Đăng nhập
+   * để mua". */
+  isLoggedIn?: boolean;
 };
 
 export function Reader({
@@ -330,6 +342,9 @@ export function Reader({
   initialVoteCount = 0,
   linkedAudio = [],
   viewerIsAdmin = false,
+  accessGate = "none",
+  chapterPrice = 0,
+  isLoggedIn = false,
 }: ReaderProps) {
   const router = useRouter();
   const { play } = useNowPlaying();
@@ -353,7 +368,10 @@ export function Reader({
   const c = THEMES[theme];
   const isPenaltyActive = penalty.banned || (!!penalty.expiresAt && now !== null && penalty.expiresAt > now);
 
-  const paragraphs = content.split("\n\n");
+  // content="" khi accessGate="purchase" (chương VIP chưa mua — page.tsx
+  // cắt về rỗng, không có gì để hiện) — "".split("\n\n") vẫn ra [""], sẽ vẽ
+  // 1 đoạn <p> trống vô nghĩa phía trên ReadingGate nếu không chặn ở đây.
+  const paragraphs = content ? content.split("\n\n") : [];
   // Cùng công thức với src/components/author/chapter-editor.tsx, để số chữ/
   // thời gian đọc khớp giữa lúc soạn và lúc đọc thật.
   const wordCount = (content.trim().match(/\S+/g) ?? []).length;
@@ -1100,6 +1118,34 @@ export function Reader({
               </div>
             )}
           </div>
+
+          {/* accessGate !== "none": `content` (paragraphs ở trên) đã bị cắt
+              THẬT ở server (page.tsx + src/lib/reading/access-gate.ts) —
+              đây chỉ là phần UI mời đăng nhập/mua, không tự ý ẩn thêm gì
+              thêm phía client. Không hiện khi đang bị khoá vì chụp màn hình
+              (2 overlay chồng nhau sẽ rối, phạt đang ưu tiên hơn). */}
+          {accessGate !== "none" && !isPenaltyActive && (
+            <div className="mb-6">
+              {accessGate === "purchase" ? (
+                <ReadingGate
+                  variant="purchase"
+                  price={chapterPrice}
+                  c={c}
+                  bookSlug={bookSlug}
+                  chapterId={chapterId}
+                  isLoggedIn={isLoggedIn}
+                />
+              ) : (
+                <ReadingGate
+                  variant="login"
+                  c={c}
+                  bookSlug={bookSlug}
+                  chapterId={chapterId}
+                  isLoggedIn={isLoggedIn}
+                />
+              )}
+            </div>
+          )}
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <button

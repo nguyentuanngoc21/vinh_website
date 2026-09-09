@@ -1001,6 +1001,13 @@ create table public.purchase_transactions (
   check (author_share + platform_share = amount)
 );
 
+-- Chặn mua trùng 1 chương (2 request gần như đồng thời cùng qua được check
+-- "đã mua chưa" ở tầng app) — xem
+-- migrations/20260909_add_purchase_transactions_unique_buyer_chapter.sql +
+-- POST /api/chapters/[chapterId]/purchase (bắt lỗi 23505, coi như đã sở hữu).
+create unique index if not exists purchase_transactions_buyer_chapter_key
+  on public.purchase_transactions (buyer_id, chapter_id);
+
 alter table public.purchase_transactions enable row level security;
 
 create policy "buyers view their own purchases"
