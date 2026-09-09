@@ -102,6 +102,24 @@ export async function POST(request: Request) {
     );
   }
 
+  // Project này bật cả "Confirm email" và "Confirm phone" (bắt buộc xác nhận
+  // qua OTP/link — xem comment emailRedirectTo phía trên) — theo tài liệu
+  // GoTrueClient.signUp(), khi gọi signUp() với 1 email ĐÃ tồn tại VÀ ĐÃ xác
+  // nhận từ trước, Supabase KHÔNG báo lỗi mà trả về "obfuscated/fake user
+  // object" để tránh lộ thông tin email đã có tài khoản. authError vẫn null
+  // và authData.user vẫn có id, NHƯNG id đó không tồn tại thật trong
+  // auth.users — insert bên dưới vào profiles (có FK tới auth.users) sẽ vỡ
+  // ràng buộc khoá ngoại (profiles_id_fkey), lộ ra như lỗi 500 khó hiểu thay
+  // vì cho biết email đã được dùng. Nhận diện case này qua identities rỗng
+  // (fake user luôn có identities: []) và chặn sớm, KHÔNG chạm tới bước
+  // insert profiles/upload ảnh nữa.
+  if (authData.user.identities && authData.user.identities.length === 0) {
+    return NextResponse.json(
+      { error: "Email này đã được đăng ký. Vui lòng đăng nhập hoặc dùng chức năng quên mật khẩu." },
+      { status: 400 }
+    );
+  }
+
   // Dùng service role từ đây trở xuống: nếu project bật "Confirm email"
   // (mặc định của Supabase), tài khoản vừa signUp() CHƯA có session thật
   // — các lệnh ghi dùng client thường (createClient()) sẽ bị RLS chặn vì
