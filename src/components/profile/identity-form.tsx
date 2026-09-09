@@ -47,8 +47,9 @@ export function IdentityForm({ onVerified }: { onVerified?: (verified: boolean) 
   const cccdDigits = cccd.replace(/\D/g, "");
   const ready = cccdDigits.length === 12 && !!files.front && !!files.back && !pending;
 
-  const onFile = (slot: CccdSlotKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
+  // Nhận File đã nén sẵn từ CccdUploadTiles (xem compress-image.ts) — không
+  // còn nhận ChangeEvent thô ở đây nữa.
+  const onFile = (slot: CccdSlotKey) => (file: File | null) => {
     setFiles((prev) => ({ ...prev, [slot]: file }));
   };
 

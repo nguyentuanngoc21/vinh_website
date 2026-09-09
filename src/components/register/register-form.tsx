@@ -92,8 +92,9 @@ export function RegisterForm() {
     return list;
   }, [filled, pw2, match, cccdStarted, cccdOk, files, agree]);
 
-  const onFile = (slot: SlotKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
+  // Nhận File đã nén sẵn từ CccdUploadTiles (xem compress-image.ts) — không
+  // còn nhận ChangeEvent thô ở đây nữa.
+  const onFile = (slot: SlotKey) => (file: File | null) => {
     setFiles((prev) => ({ ...prev, [slot]: file }));
   };
 
