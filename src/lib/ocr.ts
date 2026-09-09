@@ -1,5 +1,4 @@
 import { createWorker } from "tesseract.js";
-import sharp from "sharp";
 
 const CCCD_DIGIT_LENGTH = 12;
 
@@ -51,55 +50,6 @@ function extractDigitCandidates(text: string): string[] {
 // ở trạng thái pending vô hạn. Bọc timeout để luôn trả lỗi rõ ràng.
 const OCR_TIMEOUT_MS = 20_000;
 
-/**
- * Ảnh CCCD do người dùng tự chụp/upload có thể bị xoay: EXIF orientation sai
- * hoặc bị strip mất (rất phổ biến khi ảnh đi qua app chat/mạng xã hội trước
- * khi tải lên), hoặc người dùng chụp ngang rồi upload thẳng không xoay lại.
- * Tesseract đọc chữ bị xoay 90/270 độ gần như luôn thất bại (không tìm ra
- * candidate nào), và ở 180 độ thì đọc RA được nhưng SAI (số bị đảo/lẫn) —
- * nguy hiểm hơn vì verifyCccdAgainstImages() không có cách phân biệt "sai vì
- * xoay ngược" với "sai vì ảnh không phải thẻ này".
- *
- * Xử lý theo 2 bước:
- *  1) Chuẩn hoá theo EXIF orientation (sharp().rotate() không tham số) trước
- *     khi OCR — sửa được phần lớn case ảnh có EXIF hợp lệ mà chỉ hiển thị
- *     xoay do trình duyệt tự render theo EXIF (giống hiện tượng ảnh xem
- *     ngoài thì đúng chiều nhưng buffer gốc lại xoay).
- *  2) Luôn thử thêm cả 90/180/270 độ THỦ CÔNG trên ảnh đã chuẩn hoá — bù cho
- *     trường hợp ảnh không có EXIF orientation (hoặc bị strip) nên bước 1
- *     không sửa được.
- *
- * QUAN TRỌNG: không được dừng ngay khi một góc cho ra candidate đầu tiên.
- * Test thực tế cho thấy ở góc SAI (đặc biệt lệch ~180 độ so với chiều đúng),
- * Tesseract không im lặng thất bại mà đọc RA một dãy 12 số — chỉ là sai. Nếu
- * dừng sớm ở góc sai này, candidate đúng (nằm ở góc thử sau đó) không bao giờ
- * được thêm vào danh sách, khiến verifyCccdAgainstImages() reject oan ảnh
- * hợp lệ. Vì vậy phải thử đủ cả 4 góc và GỘP candidate của tất cả các góc lại
- * — đúng tinh thần "trả về toàn bộ candidate thay vì chỉ 1 cái" đã áp dụng ở
- * extractDigitCandidates() phía trên, chỉ là áp dụng thêm ở cấp độ góc xoay.
- * Đánh đổi: luôn chạy OCR đủ 4 lần (thay vì 1) — chấp nhận được vì đây là
- * bước xác minh giấy tờ tuỳ thân, ưu tiên độ chính xác hơn tốc độ.
- */
-const ROTATION_FALLBACK_ANGLES = [0, 90, 180, 270] as const;
-// Các lượt xoay thử thêm (sau lượt đầu) ít khả năng đúng hơn — dùng timeout
-// ngắn hơn để worst-case tổng thời gian không quá tệ.
-const ROTATION_FALLBACK_TIMEOUT_MS = 10_000;
-
-async function normalizeOrientation(buffer: Buffer): Promise<Buffer> {
-  try {
-    return await sharp(buffer).rotate().toBuffer();
-  } catch (err) {
-    // Ảnh không decode được qua sharp (định dạng lạ/hỏng) — để nguyên buffer
-    // gốc, cứ thử OCR thẳng, tesseract tự báo lỗi nếu thật sự không đọc được.
-    console.error("[ocr] normalizeOrientation failed, using raw buffer:", err);
-    return buffer;
-  }
-}
-
-async function rotateBuffer(buffer: Buffer, angle: 90 | 180 | 270): Promise<Buffer> {
-  return sharp(buffer).rotate(angle).toBuffer();
-}
-
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
@@ -128,25 +78,9 @@ export async function extractIdentityNumber(file: File): Promise<string[]> {
       "createWorker"
     );
 
-    const rawBuffer = Buffer.from(await file.arrayBuffer());
-    const normalized = await normalizeOrientation(rawBuffer);
-
-    // Gộp candidate của TẤT CẢ các góc — xem comment ở ROTATION_FALLBACK_ANGLES
-    // để biết vì sao không được dừng sớm ở góc đầu tiên có candidate.
-    const allCandidates = new Set<string>();
-    for (const angle of ROTATION_FALLBACK_ANGLES) {
-      const attemptBuffer = angle === 0 ? normalized : await rotateBuffer(normalized, angle);
-      const timeoutMs = angle === 0 ? OCR_TIMEOUT_MS : ROTATION_FALLBACK_TIMEOUT_MS;
-      const { data } = await withTimeout(
-        worker.recognize(attemptBuffer),
-        timeoutMs,
-        `worker.recognize (${angle}deg)`
-      );
-      for (const candidate of extractDigitCandidates(data?.text ?? "")) {
-        allCandidates.add(candidate);
-      }
-    }
-    return [...allCandidates];
+    const imageBuffer = Buffer.from(await file.arrayBuffer());
+    const { data } = await withTimeout(worker.recognize(imageBuffer), OCR_TIMEOUT_MS, "worker.recognize");
+    return extractDigitCandidates(data?.text ?? "");
   } catch (err) {
     console.error("[ocr] extractIdentityNumber failed:", err);
     return [];
