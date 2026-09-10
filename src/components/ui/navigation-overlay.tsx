@@ -29,6 +29,16 @@ import { LoadingScreen } from "./loading-screen";
  * trình duyệt (popstate) không đi qua đây. Phạm vi vừa đủ cho phần lớn
  * điều hướng thật trong app (bấm vào nav/menu/link), không cố bắt mọi
  * đường có thể đổi route.
+ *
+ * Bug thật đã xảy ra: listener gắn ở BUBBLE phase (mặc định) trên
+ * `document` không bao giờ chạy TRƯỚC handler onClick của chính Next
+ * <Link> — React gắn listener của nó ở gốc React (nằm DƯỚI document
+ * trong cây DOM), nên trong bubble phase (đi từ target lên TRÊN, qua gốc
+ * React rồi mới tới document) nó luôn nổ trước, gọi preventDefault()
+ * xong thì tới lượt listener ở đây mới chạy, thấy `e.defaultPrevented`
+ * đã true nên return sớm ngay dòng đầu — overlay không bao giờ bật được
+ * với link thật. Sửa bằng CAPTURE phase (đi từ document XUỐNG target,
+ * document luôn nổ đầu tiên) — không còn dựa vào defaultPrevented nữa.
  */
 export function NavigationOverlay() {
   const pathname = usePathname();
@@ -45,7 +55,7 @@ export function NavigationOverlay() {
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.button !== 0) return;
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const anchor = (e.target as HTMLElement).closest("a");
       if (!anchor) return;
@@ -68,8 +78,10 @@ export function NavigationOverlay() {
       if (url.pathname === window.location.pathname) return;
       setPending(true);
     };
-    document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    // capture: true — bắt buộc, xem giải thích "Bug thật" ở doc-comment
+    // trên đầu file.
+    document.addEventListener("click", onClick, { capture: true });
+    return () => document.removeEventListener("click", onClick, { capture: true });
   }, []);
 
   if (!pending) return null;
