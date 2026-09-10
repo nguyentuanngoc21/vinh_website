@@ -86,15 +86,28 @@ export default async function ReadChapterPage({
   // thể. purchase_transactions chỉ cần tra khi chương thật sự có giá — hầu
   // hết chương free, tra thêm 1 query vô ích cho mọi lượt đọc là phí.
   const needsPurchaseLookup = viewerId !== null && chapter.price > 0 && !isOwnBook;
-  const [{ data: votedRow }, { data: followRow }, { data: purchaseRow }] = viewerId
+  const [{ data: votedRow }, { data: followRow }, { data: purchaseRow }, { data: progressRow }] = viewerId
     ? await Promise.all([
         serviceClient.from("chapter_votes").select("chapter_id").eq("chapter_id", chapter.id).eq("user_id", viewerId).maybeSingle(),
         serviceClient.from("author_follows").select("author_id").eq("author_id", book.author_id).eq("follower_id", viewerId).maybeSingle(),
         needsPurchaseLookup
           ? serviceClient.from("purchase_transactions").select("id").eq("chapter_id", chapter.id).eq("buyer_id", viewerId).maybeSingle()
           : Promise.resolve({ data: null }),
+        // Tự cuộn tới đúng đoạn đã đọc dở — CHỈ áp dụng nếu chapter_id đã
+        // lưu khớp đúng chương đang mở (mở chương khác, kể cả cùng sách,
+        // thì bắt đầu từ đầu). Xem
+        // migrations/20260910_add_book_progress_paragraph.sql.
+        serviceClient
+          .from("book_progress")
+          .select("chapter_id, last_paragraph_index")
+          .eq("user_id", viewerId)
+          .eq("book_id", book.id)
+          .maybeSingle(),
       ])
-    : [{ data: null }, { data: null }, { data: null }];
+    : [{ data: null }, { data: null }, { data: null }, { data: null }];
+
+  const initialParagraphIndex =
+    progressRow && progressRow.chapter_id === chapter.id ? progressRow.last_paragraph_index : null;
 
   // Rào truy nghiệm — vá lỗ hổng cũ (chapters.price tồn tại nhưng chưa hề
   // được đọc ở trang này, ai cũng đọc được full mọi chương kể cả VIP chưa
@@ -167,6 +180,7 @@ export default async function ReadChapterPage({
       accessGate={accessGate}
       chapterPrice={chapter.price}
       isLoggedIn={viewerId !== null}
+      initialParagraphIndex={initialParagraphIndex}
     />
   );
 }

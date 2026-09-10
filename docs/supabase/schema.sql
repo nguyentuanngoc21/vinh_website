@@ -1388,6 +1388,14 @@ create table public.book_progress (
   primary key (user_id, book_id)
 );
 
+-- Nhớ ĐOẠN VĂN cụ thể trong chapter_id ở trên — null = chưa có/chưa cuộn
+-- qua đoạn nào, reader.tsx coi như "bắt đầu từ đầu chương". Chỉ áp dụng
+-- khi mở LẠI đúng chapter_id này — route reading-progress luôn ghi đè cả
+-- 2 cột cùng lúc để không lệch nhau. Xem
+-- migrations/20260910_add_book_progress_paragraph.sql.
+alter table public.book_progress
+  add column last_paragraph_index integer check (last_paragraph_index is null or last_paragraph_index >= 0);
+
 alter table public.book_progress enable row level security;
 
 create policy "users manage their own book progress"
