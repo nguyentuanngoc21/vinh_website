@@ -346,6 +346,22 @@ alter table public.chapters
 alter table public.chapters
   add column is_exclusive boolean not null default true;
 
+-- --- Link audio + giá audio riêng — panel xuất bản, hàng "Truyện audio"
+-- chỉ hiện khi audio_url có giá trị (src/components/author/publish-panel.tsx).
+-- Link đơn giản do tác giả tự dán, KHÔNG qua cơ chế "share link nội bộ
+-- id&token" của chapter_audio_links/audio_narrations (ChapterAudioPanel) —
+-- 2 cơ chế song song, không đụng nhau. audio_price CHƯA enforce chặn nghe,
+-- chỉ lưu giá niêm yết — xem
+-- migrations/20260909_add_chapter_audio_url_and_price.sql. ---
+alter table public.chapters
+  add column audio_url text;
+
+alter table public.chapters
+  add column audio_price integer not null default 0;
+
+alter table public.chapters
+  add constraint chapters_audio_price_check check (audio_price >= 0);
+
 -- --- Chương cuối — checkbox 1 chiều ở chapter-editor.tsx, dùng để tính
 -- trạng thái "Đã hoàn thành" ở trang giới thiệu truyện (/truyen/[slug]).
 -- Tối đa 1 chương/sách được true, và KHÔNG được đổi lại false (trigger
@@ -1000,6 +1016,13 @@ create table public.purchase_transactions (
   created_at timestamptz not null default now(),
   check (author_share + platform_share = amount)
 );
+
+-- Chặn mua trùng 1 chương (2 request gần như đồng thời cùng qua được check
+-- "đã mua chưa" ở tầng app) — xem
+-- migrations/20260909_add_purchase_transactions_unique_buyer_chapter.sql +
+-- POST /api/chapters/[chapterId]/purchase (bắt lỗi 23505, coi như đã sở hữu).
+create unique index if not exists purchase_transactions_buyer_chapter_key
+  on public.purchase_transactions (buyer_id, chapter_id);
 
 alter table public.purchase_transactions enable row level security;
 

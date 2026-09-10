@@ -14,6 +14,11 @@ export type WorkspaceChapter = {
   content: string;
   published: boolean;
   price: number;
+  // Link audio đơn giản do tác giả tự dán + giá riêng — tách biệt cơ chế
+  // chapter_audio_links/audio_narrations (ChapterAudioPanel/linkedAudio bên
+  // dưới). Xem migrations/20260909_add_chapter_audio_url_and_price.sql.
+  audio_url: string | null;
+  audio_price: number;
   is_last_chapter: boolean;
 };
 
@@ -64,6 +69,8 @@ export function AuthorWorkspace({
   const [content, setContent] = useState(chapter.content);
   const [published, setPublished] = useState(chapter.published);
   const [price, setPrice] = useState(chapter.price);
+  const [audioUrl, setAudioUrl] = useState(chapter.audio_url ?? "");
+  const [audioPrice, setAudioPrice] = useState(chapter.audio_price);
   const [isExclusive, setIsExclusive] = useState(bookIsExclusive);
   const [exclusiveError, setExclusiveError] = useState<string | null>(null);
   const [genre, setGenre] = useState<BookGenre | null>(bookGenre);
@@ -98,6 +105,8 @@ export function AuthorWorkspace({
           content,
           published: nextPublished,
           price,
+          audio_url: audioUrl.trim(),
+          audio_price: audioPrice,
           is_last_chapter: isLastChapter,
         }),
       });
@@ -258,6 +267,10 @@ export function AuthorWorkspace({
         exclusiveError={exclusiveError}
         price={price}
         onPriceChange={setPrice}
+        audioUrl={audioUrl}
+        onAudioUrlChange={setAudioUrl}
+        audioPrice={audioPrice}
+        onAudioPriceChange={setAudioPrice}
         bookTitle={bookTitle}
         onBookTitleChange={setBookTitle}
         onBookTitleCommit={handleBookTitleCommit}

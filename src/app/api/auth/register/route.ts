@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { verifyCccdAgainstImages } from "@/lib/ocr";
+import { resolveRedirectTarget } from "@/lib/redirect-target";
 
 export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
@@ -72,6 +73,12 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const origin = new URL(request.url).origin;
+  // Trang cần quay lại sau khi xác nhận xong (rào đọc/nghe cho khách vãng
+  // lai đưa người dùng qua đây kèm ?next=, xem register-form.tsx +
+  // src/lib/auth.ts RegisterPayload.next) — validate qua
+  // resolveRedirectTarget() (chỉ nhận đường dẫn nội bộ, tránh open
+  // redirect), rơi về "/" như cũ nếu thiếu/không hợp lệ.
+  const next = resolveRedirectTarget(String(form.get("next") ?? ""));
 
   // emailRedirectTo giống cách forgot-password/route.ts làm cho luồng quên
   // mật khẩu: không set thì Supabase rơi về Site URL mặc định, link "Xác
@@ -85,12 +92,30 @@ export async function POST(request: Request) {
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/api/auth/confirm?next=${encodeURIComponent("/")}&flow=signup`,
+      emailRedirectTo: `${origin}/api/auth/confirm?next=${encodeURIComponent(next)}&flow=signup`,
     },
   });
   if (authError || !authData.user) {
     return NextResponse.json(
       { error: authError?.message ?? "Đăng ký thất bại." },
+      { status: 400 }
+    );
+  }
+
+  // Project này bật cả "Confirm email" và "Confirm phone" (bắt buộc xác nhận
+  // qua OTP/link — xem comment emailRedirectTo phía trên) — theo tài liệu
+  // GoTrueClient.signUp(), khi gọi signUp() với 1 email ĐÃ tồn tại VÀ ĐÃ xác
+  // nhận từ trước, Supabase KHÔNG báo lỗi mà trả về "obfuscated/fake user
+  // object" để tránh lộ thông tin email đã có tài khoản. authError vẫn null
+  // và authData.user vẫn có id, NHƯNG id đó không tồn tại thật trong
+  // auth.users — insert bên dưới vào profiles (có FK tới auth.users) sẽ vỡ
+  // ràng buộc khoá ngoại (profiles_id_fkey), lộ ra như lỗi 500 khó hiểu thay
+  // vì cho biết email đã được dùng. Nhận diện case này qua identities rỗng
+  // (fake user luôn có identities: []) và chặn sớm, KHÔNG chạm tới bước
+  // insert profiles/upload ảnh nữa.
+  if (authData.user.identities && authData.user.identities.length === 0) {
+    return NextResponse.json(
+      { error: "Email này đã được đăng ký. Vui lòng đăng nhập hoặc dùng chức năng quên mật khẩu." },
       { status: 400 }
     );
   }

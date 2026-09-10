@@ -86,6 +86,15 @@ export async function POST(request: Request) {
   if (typeof body?.price === "number" && Number.isFinite(body.price) && body.price >= 0) {
     chapterPrice = Math.round(body.price);
   }
+  // audio_url/audio_price — link audio đơn giản do tác giả tự dán + giá
+  // niêm yết riêng, tách biệt hoàn toàn cơ chế chapter_audio_links/
+  // audio_narrations (ChapterAudioPanel), CHƯA enforce chặn nghe. Xem
+  // migrations/20260909_add_chapter_audio_url_and_price.sql.
+  const audioUrl = (typeof body?.audioUrl === "string" ? body.audioUrl.trim() : "") || null;
+  let audioPrice = 0;
+  if (typeof body?.audioPrice === "number" && Number.isFinite(body.audioPrice) && body.audioPrice >= 0) {
+    audioPrice = Math.round(body.audioPrice);
+  }
   const isLastChapter = body?.isLastChapter === true;
 
   const supabase = await createClient();
@@ -129,6 +138,8 @@ export async function POST(request: Request) {
       order_index: 1,
       published: chapterPublished,
       price: chapterPrice,
+      audio_url: audioUrl,
+      audio_price: audioPrice,
       is_last_chapter: isLastChapter,
     })
     .select("id")

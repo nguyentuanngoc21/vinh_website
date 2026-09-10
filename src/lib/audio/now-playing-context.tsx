@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
+import { useRole } from "@/lib/role";
+import { GUEST_PREVIEW_RATIO } from "@/lib/reading/access-gate";
 
 /**
  * Site-wide real playback state — 1 <audio> element created once, kept
@@ -28,6 +30,12 @@ type NowPlayingContextValue = {
   currentTime: number;
   duration: number;
   playbackRate: number;
+  /** true khi khách vãng lai (chưa đăng nhập) đã nghe hết
+   * GUEST_PREVIEW_RATIO của track đang phát — audio đã tự pause, UI (
+   * now-playing.tsx, mini-player-bar.tsx) tự hiện rào làm mờ + modal đăng
+   * nhập khi cờ này bật, KHÔNG resume tới khi đổi track khác hoặc đăng
+   * nhập. Luôn false nếu đã đăng nhập. */
+  audioGated: boolean;
   play: (track: AudioTrack, resumeAtSeconds?: number) => void;
   pause: () => void;
   toggle: () => void;
@@ -41,6 +49,20 @@ const NowPlayingContext = createContext<NowPlayingContextValue | null>(null);
 const PROGRESS_SAVE_INTERVAL_MS = 8000;
 
 export function NowPlayingProvider({ children }: { children: ReactNode }) {
+  // NowPlayingProvider nằm TRONG RoleProvider ở root layout (xem
+  // src/app/layout.tsx) nên gọi được useRole() ở đây. `isLogged` chỉ đọc
+  // từ localStorage/sessionStorage phía client (role.tsx: "chỉ là cờ hiện/
+  // ẩn UI, không phải lớp bảo mật") — dùng để gate audio là hợp lý vì audio
+  // vốn đã là public URL từ Supabase Storage (không stream/signed URL, xem
+  // toAudioTrack ở get-audio-catalog.ts), NÊN không có lớp bảo mật thật nào
+  // để "vá" ở tầng server — chặn ở đây chỉ là rào trải nghiệm, cùng mức độ
+  // với chính useRole() đã tự nhận.
+  const { isLogged } = useRole();
+  const isLoggedRef = useRef(isLogged);
+  useEffect(() => {
+    isLoggedRef.current = isLogged;
+  }, [isLogged]);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackRef = useRef<AudioTrack | null>(null);
   const lastSavedAtRef = useRef(0);
@@ -52,6 +74,13 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRateState] = useState(1);
+  // "Raw" — chỉ ghi true bên trong các callback phát/tua (onTimeUpdate,
+  // clampForGuest), KHÔNG tự đọc lại `isLogged` để gỡ rào (tránh 1 effect
+  // chỉ để đồng bộ state phái sinh — đăng nhập trong lúc đang bị gate, ví
+  // dụ mở /dang-nhap ở tab khác rồi quay lại, thì AND với `!isLogged` ngay
+  // dưới đây đã tự gỡ rào ngay lần render kế tiếp, không cần effect).
+  const [audioGatedRaw, setAudioGated] = useState(false);
+  const audioGated = audioGatedRaw && !isLogged;
 
   const saveProgress = useCallback((immediate: boolean) => {
     const audio = audioRef.current;
@@ -75,6 +104,18 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     audioRef.current = audio;
 
     const onTimeUpdate = () => {
+      // Khách vãng lai nghe hết % preview cho phép — pause + kẹp lại đúng
+      // mốc giới hạn (không kẹp về 0, để UI vẫn hiện đúng chỗ vừa dừng) rồi
+      // bật cờ audioGated cho UI tự hiện rào. Bỏ qua nếu đã đăng nhập hoặc
+      // chưa rõ duration (đang tải).
+      if (!isLoggedRef.current && audio.duration > 0) {
+        const limit = audio.duration * GUEST_PREVIEW_RATIO;
+        if (audio.currentTime >= limit) {
+          audio.currentTime = limit;
+          audio.pause();
+          setAudioGated(true);
+        }
+      }
       setCurrentTime(audio.currentTime);
       saveProgress(false);
     };
@@ -123,6 +164,9 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
       setTrack(next);
       setCurrentTime(resumeAtSeconds ?? 0);
       setDuration(0);
+      // Track mới — mỗi track có preview riêng cho khách, không cộng dồn
+      // rào của track vừa nghe trước đó.
+      setAudioGated(false);
 
       if (!playedThisSessionRef.current.has(next.id)) {
         playedThisSessionRef.current.add(next.id);
@@ -146,19 +190,34 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     else audio.pause();
   }, []);
 
+  // Kẹp về đúng mốc giới hạn (không cho tua vượt qua) nếu khách vãng lai —
+  // dùng chung cho seek() (kéo thanh trượt) và skip() (nút lùi/tới 15s),
+  // tránh việc kéo thẳng thanh trượt qua mặt cơ chế chặn ở onTimeUpdate.
+  // Tự pause ngay (không chờ tick timeupdate kế tiếp) nếu bị kẹp.
+  const clampForGuest = useCallback((audio: HTMLAudioElement, target: number): number => {
+    if (isLoggedRef.current || audio.duration <= 0) return target;
+    const limit = audio.duration * GUEST_PREVIEW_RATIO;
+    if (target >= limit) {
+      setAudioGated(true);
+      audio.pause();
+      return limit;
+    }
+    return target;
+  }, []);
+
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
     if (!audio || !trackRef.current) return;
-    audio.currentTime = Math.max(0, Math.min(seconds, audio.duration || seconds));
+    audio.currentTime = clampForGuest(audio, Math.max(0, Math.min(seconds, audio.duration || seconds)));
     setCurrentTime(audio.currentTime);
-  }, []);
+  }, [clampForGuest]);
 
   const skip = useCallback((deltaSeconds: number) => {
     const audio = audioRef.current;
     if (!audio || !trackRef.current) return;
-    audio.currentTime = Math.max(0, Math.min(audio.currentTime + deltaSeconds, audio.duration || 0));
+    audio.currentTime = clampForGuest(audio, Math.max(0, Math.min(audio.currentTime + deltaSeconds, audio.duration || 0)));
     setCurrentTime(audio.currentTime);
-  }, []);
+  }, [clampForGuest]);
 
   const setPlaybackRate = useCallback((rate: number) => {
     playbackRateRef.current = rate;
@@ -168,7 +227,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
 
   return (
     <NowPlayingContext.Provider
-      value={{ track, isPlaying, currentTime, duration, playbackRate, play, pause, toggle, seek, skip, setPlaybackRate }}
+      value={{ track, isPlaying, currentTime, duration, playbackRate, audioGated, play, pause, toggle, seek, skip, setPlaybackRate }}
     >
       {children}
     </NowPlayingContext.Provider>

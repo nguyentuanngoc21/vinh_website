@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,17 +9,20 @@ import {
   PlayIcon,
   PauseIcon,
   ArrowsOutSimpleIcon,
+  LockKeyIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { formatClock } from "@/lib/audio/get-audio-catalog";
 import { useNowPlaying } from "@/lib/audio/now-playing-context";
+import { LoginGateModal } from "@/components/access-gate/login-gate-modal";
 
 /** Mounted at the bottom of every /audio page (audio/layout.tsx) — reads
  * live state from NowPlayingProvider (root layout), so it keeps playing/
  * showing the current track even after navigating between /audio pages.
  * Renders nothing until something has actually been played. */
 export function MiniPlayerBar() {
-  const { track, isPlaying, currentTime, duration, toggle, seek, skip } = useNowPlaying();
+  const { track, isPlaying, currentTime, duration, audioGated, toggle, seek, skip } = useNowPlaying();
   const pathname = usePathname();
+  const [gateModalOpen, setGateModalOpen] = useState(false);
 
   // /audio/now-playing has its own full transport controls — showing the
   // mini bar there too would just duplicate them.
@@ -42,10 +46,21 @@ export function MiniPlayerBar() {
         </button>
         <button
           type="button"
-          onClick={toggle}
+          // Khách vãng lai vừa hết % preview (audioGated) — bấm Play ở đây
+          // sẽ gọi audio.play() rồi lập tức bị onTimeUpdate/clampForGuest
+          // (now-playing-context.tsx) pause lại ngay tick kế tiếp, giật hình
+          // vô nghĩa. Mở thẳng modal đăng nhập thay vì toggle().
+          onClick={audioGated ? () => setGateModalOpen(true) : toggle}
+          aria-label={audioGated ? "Đăng nhập để nghe tiếp" : undefined}
           className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink sm:h-10 sm:w-10"
         >
-          {isPlaying ? <PauseIcon weight="fill" size={16} /> : <PlayIcon weight="fill" size={16} />}
+          {audioGated ? (
+            <LockKeyIcon weight="fill" size={16} />
+          ) : isPlaying ? (
+            <PauseIcon weight="fill" size={16} />
+          ) : (
+            <PlayIcon weight="fill" size={16} />
+          )}
         </button>
         <button type="button" onClick={() => skip(15)} className="cursor-pointer" aria-label="Tới 15 giây">
           <SkipForwardIcon size={18} className="sm:hidden" />
@@ -70,6 +85,14 @@ export function MiniPlayerBar() {
       <Link href="/audio/now-playing" className="flex shrink-0 text-sidebar-text">
         <ArrowsOutSimpleIcon size={19} />
       </Link>
+
+      <LoginGateModal
+        open={gateModalOpen}
+        onClose={() => setGateModalOpen(false)}
+        title="Đăng nhập để nghe tiếp"
+        description="Bạn vừa nghe hết phần xem trước dành cho khách. Đăng nhập miễn phí để nghe toàn bộ bản thu này."
+        returnTo={pathname}
+      />
     </div>
   );
 }

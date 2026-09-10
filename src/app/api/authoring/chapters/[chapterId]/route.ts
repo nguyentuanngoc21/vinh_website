@@ -31,6 +31,8 @@ export async function PATCH(
     content?: string;
     published?: boolean;
     price?: number;
+    audio_url?: string | null;
+    audio_price?: number;
     is_last_chapter?: boolean;
   } = {};
 
@@ -39,6 +41,16 @@ export async function PATCH(
   if (typeof body.published === "boolean") update.published = body.published;
   if (typeof body.price === "number" && Number.isFinite(body.price) && body.price >= 0) {
     update.price = Math.round(body.price);
+  }
+  // audio_url/audio_price — xem POST /api/authoring/books (cùng công thức).
+  // audio_url cho phép ghi đè về null (bỏ link đã gắn) — khác `title`
+  // (không cho lưu rỗng), field body.audio_url === "" cũng hợp lệ để xoá.
+  if (typeof body.audio_url === "string" || body.audio_url === null) {
+    const trimmed = typeof body.audio_url === "string" ? body.audio_url.trim() : "";
+    update.audio_url = trimmed || null;
+  }
+  if (typeof body.audio_price === "number" && Number.isFinite(body.audio_price) && body.audio_price >= 0) {
+    update.audio_price = Math.round(body.audio_price);
   }
   if (typeof body.is_last_chapter === "boolean") update.is_last_chapter = body.is_last_chapter;
 
@@ -126,7 +138,7 @@ export async function PATCH(
     .from("chapters")
     .update(update)
     .eq("id", chapterId)
-    .select("id, book_id, title, content, published, price, is_last_chapter")
+    .select("id, book_id, title, content, published, price, audio_url, audio_price, is_last_chapter")
     .maybeSingle();
 
   if (error) {

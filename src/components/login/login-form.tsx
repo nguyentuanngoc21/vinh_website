@@ -7,8 +7,17 @@ import { EyeIcon, EyeSlashIcon, ArrowRightIcon, UserPlusIcon } from "@phosphor-i
 import { useRole } from "@/lib/role";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
 import { LegalLink } from "@/components/legal/legal-link";
+import { resolveRedirectTarget } from "@/lib/redirect-target";
 
-export function LoginForm() {
+type LoginFormProps = {
+  /** Trang cần quay lại sau khi đăng nhập xong (đọc ?next= ở page.tsx, đã
+   * là Server Component nên không cần useSearchParams() ở đây). Validate
+   * qua resolveRedirectTarget() (src/lib/redirect-target.ts) — sai định
+   * dạng thì rơi về "/" như trước. */
+  nextPath?: string;
+};
+
+export function LoginForm({ nextPath }: LoginFormProps = {}) {
   const router = useRouter();
   const { login } = useRole();
 
@@ -32,7 +41,7 @@ export function LoginForm() {
       setError(result.error);
       return;
     }
-    router.push("/");
+    router.push(resolveRedirectTarget(nextPath));
   };
 
   return (

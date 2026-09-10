@@ -16,7 +16,16 @@ export const metadata: Metadata = {
   title: "Đăng nhập — Vịnh",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps<"/dang-nhap">) {
+  // `next` = trang cần quay lại sau khi đăng nhập (rào đọc/nghe cho khách
+  // vãng lai — xem src/components/access-gate/login-gate-modal.tsx). Đọc ở
+  // Server Component qua prop `searchParams`, không phải useSearchParams()
+  // phía client, để khỏi cần bọc <Suspense> chỉ vì 1 query param (trang này
+  // vẫn prerender tĩnh được — xem node_modules/next/dist/docs/01-app/03-api-reference/04-functions/use-search-params.md).
+  const sp = await searchParams;
+  const rawNext = sp.next;
+  const next = typeof rawNext === "string" ? rawNext : undefined;
+
   return (
     <div className={`${lora.variable} grid flex-1 grid-cols-1 bg-white lg:grid-cols-2`}>
       <div className="relative flex flex-col justify-between gap-10 overflow-hidden bg-brand-ink-dark p-9 text-white sm:p-14 lg:gap-0 lg:p-[56px_60px]">
@@ -63,7 +72,7 @@ export default function LoginPage() {
       </div>
 
       <div className="flex flex-col justify-center p-9 sm:p-14 lg:p-[56px_72px]">
-        <LoginForm />
+        <LoginForm nextPath={next} />
       </div>
     </div>
   );

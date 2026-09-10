@@ -53,7 +53,7 @@ export default async function AuthorChapterPage({
 
   const { data: chapter } = await supabase
     .from("chapters")
-    .select("id, title, content, published, price, is_last_chapter")
+    .select("id, title, content, published, price, audio_url, audio_price, is_last_chapter")
     .eq("id", chapterId)
     .eq("book_id", bookId)
     .maybeSingle();
