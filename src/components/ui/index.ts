@@ -7,3 +7,4 @@ export { GenreSelect } from "./genre-select";
 export { BankSelect } from "./bank-select";
 export { Pill } from "./pill";
 export { VinhMark } from "./vinh-mark";
+export { LoadingScreen } from "./loading-screen";
