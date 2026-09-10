@@ -28,6 +28,11 @@ const EDITABLE_KEYS = [
   "accepted_content",
   "rejected_content",
   "is_private",
+  // Mục 12 — ĐỘC LẬP với 11 trường trên/is_accepting_orders, không tham
+  // gia computeMissingFields(). Chỉ dùng riêng cho is_accepting_commissions
+  // (xử lý bên dưới, giống is_accepting_orders). Xem
+  // migrations/20260910_add_service_commission_status.sql.
+  "monthly_commission_limit",
 ] as const;
 
 /**
@@ -97,9 +102,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ li
     }
   }
 
+  // Toggle "nhận comm" — ĐỘC LẬP với is_accepting_orders/11 trường trên
+  // (đã chốt với admin). Chỉ chặn bật khi CHƯA có hạn mức — tắt luôn cho
+  // phép, không cần điều kiện gì.
+  const requestedAcceptingCommissions =
+    typeof body?.isAcceptingCommissions === "boolean" ? body.isAcceptingCommissions : undefined;
+  let finalAcceptingCommissions = current.is_accepting_commissions;
+  if (requestedAcceptingCommissions === true) {
+    const mergedLimit = merged.monthly_commission_limit;
+    if (mergedLimit == null) {
+      return NextResponse.json(
+        { error: "Vui lòng đặt hạn mức comm/tháng trước khi bật." },
+        { status: 400 }
+      );
+    }
+    finalAcceptingCommissions = true;
+  } else if (requestedAcceptingCommissions === false) {
+    finalAcceptingCommissions = false;
+  }
+
   const { data: updated, error } = await supabase
     .from("service_listings")
-    .update({ ...patch, is_accepting_orders: finalAccepting, updated_at: new Date().toISOString() })
+    .update({
+      ...patch,
+      is_accepting_orders: finalAccepting,
+      is_accepting_commissions: finalAcceptingCommissions,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", listingId)
     .select("*")
     .single();

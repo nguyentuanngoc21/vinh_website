@@ -2243,8 +2243,16 @@ create table public.anchored_comments (
   check ((quest_id is null) = (quest_source is null))
 );
 
+-- Reply lồng 1 CẤP DUY NHẤT (không cho reply-vào-reply) — enforce ở API
+-- route (api/chapters/[chapterId]/comments), không phải CHECK DB. Reply
+-- copy chapter_id/paragraph_index/char_start/char_end từ hàng cha khi
+-- ghi. Xem migrations/20260910_add_anchored_comment_replies.sql.
+alter table public.anchored_comments
+  add column parent_comment_id uuid references public.anchored_comments (id) on delete cascade;
+
 create index anchored_comments_chapter_id_idx on public.anchored_comments (chapter_id);
 create index anchored_comments_quest_idx on public.anchored_comments (quest_id, quest_source) where quest_id is not null;
+create index anchored_comments_parent_idx on public.anchored_comments (parent_comment_id) where parent_comment_id is not null;
 
 alter table public.anchored_comments enable row level security;
 
@@ -2827,6 +2835,19 @@ create table public.service_listings (
   updated_at timestamptz not null default now(),
   check (deposit_pct is null or deposit_pct between 0 and 100)
 );
+
+-- Trạng thái "nhận comm" — ĐỘC LẬP với is_accepting_orders (không nằm
+-- trong 11 mục bắt buộc để publish). monthly_commission_limit null = seller
+-- chưa đặt hạn mức (khi đó is_accepting_commissions không có ý nghĩa gì,
+-- route chặn bật). Đếm "đang nhận bao nhiêu comm" theo TỪNG gói riêng —
+-- count(*) orders where listing_id=this and status='in_progress', tính
+-- trực tiếp lúc đọc, không cache cột riêng. Xem
+-- migrations/20260910_add_service_commission_status.sql.
+alter table public.service_listings
+  add column monthly_commission_limit integer,
+  add column is_accepting_commissions boolean not null default false,
+  add constraint service_listings_monthly_commission_limit_check
+    check (monthly_commission_limit is null or monthly_commission_limit > 0);
 
 alter table public.service_listings enable row level security;
 

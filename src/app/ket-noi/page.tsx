@@ -6,6 +6,7 @@ import { ConnectDirectory, type ConnectPerson } from "@/components/connect/conne
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { computeCommissionStatus } from "@/lib/orders/service-listing-service";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -127,7 +128,9 @@ export default async function ConnectPage() {
           // điều kiện không lộ ra ở Kết nối dù không riêng tư.
           supabase
             .from("service_listings")
-            .select("id, seller_id, service_type, name, price_tiers, delivery_days")
+            .select(
+              "id, seller_id, service_type, name, price_tiers, delivery_days, monthly_commission_limit, is_accepting_commissions"
+            )
             .in("seller_id", peopleIds)
             .eq("is_accepting_orders", true)
             .eq("is_private", false),
@@ -213,17 +216,36 @@ export default async function ConnectPage() {
     designByAuthor.set(d.illustrator_id, list);
   }
 
+  // Đếm "đang nhận bao nhiêu comm" theo TỪNG gói riêng (không cộng dồn
+  // theo người bán) — 1 query cho CẢ TRANG (group-by phía JS), không phải
+  // 1 query/listing. Chỉ status='in_progress' được tính (đã chốt với
+  // admin — xem src/lib/orders/service-listing-service.ts).
+  const listingIds = (serviceRows ?? []).map((s) => s.id);
+  const { data: activeOrderRows, error: activeOrderError } =
+    listingIds.length === 0
+      ? { data: [] as { listing_id: string }[], error: null }
+      : await supabase.from("orders").select("listing_id").in("listing_id", listingIds).eq("status", "in_progress");
+  if (activeOrderError) console.error("[ket-noi] active orders count query failed:", activeOrderError);
+  const activeCountByListing = new Map<string, number>();
+  for (const row of activeOrderRows ?? []) {
+    activeCountByListing.set(row.listing_id, (activeCountByListing.get(row.listing_id) ?? 0) + 1);
+  }
+
   const servicesBySeller = new Map<string, ConnectPerson["services"]>();
   for (const s of serviceRows ?? []) {
     const list = servicesBySeller.get(s.seller_id) ?? [];
     const tiers = Array.isArray(s.price_tiers) ? s.price_tiers : [];
     const prices = tiers.map((t) => Number((t as { price?: unknown })?.price)).filter((n) => Number.isFinite(n) && n > 0);
+    const activeCount = activeCountByListing.get(s.id) ?? 0;
     list.push({
       id: s.id,
       serviceType: s.service_type,
       name: s.name,
       minPrice: prices.length ? Math.min(...prices) : null,
       deliveryDays: s.delivery_days,
+      commissionStatus: computeCommissionStatus(s.is_accepting_commissions, s.monthly_commission_limit, activeCount),
+      activeCommissionCount: activeCount,
+      monthlyCommissionLimit: s.monthly_commission_limit,
     });
     servicesBySeller.set(s.seller_id, list);
   }

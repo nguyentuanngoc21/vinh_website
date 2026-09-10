@@ -129,3 +129,34 @@ export async function fetchAutoSamples(
     .limit(5);
   return (data ?? []).map((o) => ({ title: o.code, ref: o.id }));
 }
+
+export type CommissionStatus = "available" | "busy" | "off";
+
+/** Số đơn "đang nhận" của 1 gói dịch vụ — chỉ tính `in_progress` (đã
+ * chốt với admin: brief_confirmed/deposit_paid là bước thoáng qua,
+ * delivered coi như đã xong phần khó, completed/cancelled/disputed
+ * không tính). Đếm theo TỪNG gói riêng (listing_id), không cộng dồn theo
+ * người bán — khớp field 12 (monthly_commission_limit) cũng đặt theo
+ * từng gói. Xem migrations/20260910_add_service_commission_status.sql. */
+export async function getActiveCommissionCount(supabase: Client, listingId: string): Promise<number> {
+  const { count } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("listing_id", listingId)
+    .eq("status", "in_progress");
+  return count ?? 0;
+}
+
+/** "off" nếu chưa bật toggle HOẶC chưa đặt hạn mức (bật mà không có hạn
+ * mức thì "đang bận"/"có thể nhận" không có ý nghĩa gì — route PATCH
+ * cũng chặn bật is_accepting_commissions khi limit null, xem
+ * api/profile/services/[listingId]/route.ts). Dùng chung cho cả
+ * services-tab.tsx (seller tự xem) và connect-directory.tsx (khách xem). */
+export function computeCommissionStatus(
+  isAccepting: boolean,
+  monthlyLimit: number | null,
+  activeCount: number
+): CommissionStatus {
+  if (!isAccepting || monthlyLimit == null) return "off";
+  return activeCount < monthlyLimit ? "available" : "busy";
+}

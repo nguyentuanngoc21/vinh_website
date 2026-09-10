@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   BookmarkSimpleIcon,
+  ChatCircleTextIcon,
   HeadphonesIcon,
   ListBulletsIcon,
+  PlusCircleIcon,
   ShareNetworkIcon,
   TextAaIcon,
   ShieldCheckIcon,
@@ -19,6 +21,8 @@ import { VoteButton } from "./vote-button";
 import { AuthorPanel } from "./author-panel";
 import { ReadingListModal } from "./reading-list-modal";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
+import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
+import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
 import { shareOrCopy } from "@/lib/share";
 import { VinhMark } from "@/components/ui";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
@@ -390,6 +394,31 @@ export function Reader({
   const [visibleParagraph, setVisibleParagraph] = useState(paragraphs[0] ?? "");
   const paragraphRefs = useRef<Array<HTMLParagraphElement | null>>([]);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Bình luận theo đoạn (tham khảo Wattpad) — 1 lần fetch TOÀN BỘ bình
+  // luận của chương này khi mount (không phải 1 API/đoạn), client tự
+  // nhóm theo paragraph_index. Xem src/lib/reading/paragraph-comments.ts
+  // + api/chapters/[chapterId]/comments/route.ts.
+  const [paragraphComments, setParagraphComments] = useState<ParagraphComment[]>([]);
+  const [openCommentsParagraph, setOpenCommentsParagraph] = useState<number | null>(null);
+  const { countByParagraph, threadsByParagraph } = useMemo(
+    () => groupParagraphComments(paragraphComments),
+    [paragraphComments]
+  );
+
+  useEffect(() => {
+    if (!chapterId) return;
+    let cancelled = false;
+    fetch(`/api/chapters/${chapterId}/comments`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setParagraphComments(data.comments ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chapterId]);
 
   const showCopyBubble = (label: string) => {
     setCopyBubble(label);
@@ -1081,18 +1110,44 @@ export function Reader({
               style={{ fontSize: `${fontSize}px`, color: c.body, lineHeight }}
               className="font-[family-name:var(--font-lora)]"
             >
-              {paragraphs.map((p, i) => (
-                <p
-                  key={i}
-                  ref={(el) => {
-                    paragraphRefs.current[i] = el;
-                  }}
-                  data-paragraph-index={i}
-                  className="mb-[1.5em]"
-                >
-                  {p}
-                </p>
-              ))}
+              {paragraphs.map((p, i) => {
+                const count = countByParagraph.get(i) ?? 0;
+                return (
+                  <div key={i} className="group relative mb-[1.5em]">
+                    <p
+                      ref={(el) => {
+                        paragraphRefs.current[i] = el;
+                      }}
+                      data-paragraph-index={i}
+                    >
+                      {p}
+                    </p>
+                    {/* Icon bình luận theo đoạn (tham khảo Wattpad) — luôn
+                        hiện nếu đã có bình luận (count>0), chỉ hiện khi
+                        hover ở desktop nếu chưa có (tránh rợp icon "+" dày
+                        đặc khi chưa cần) — group-hover không có tác dụng
+                        trên cảm ứng nên luôn hiện trên mobile qua
+                        sm:opacity-0. */}
+                    <button
+                      type="button"
+                      onClick={() => setOpenCommentsParagraph(i)}
+                      aria-label={count > 0 ? `${count} bình luận cho đoạn này` : "Bình luận đoạn này"}
+                      style={{ color: c.inkSoft }}
+                      className={`mt-1 flex items-center gap-1 text-xs transition-opacity hover:text-brand-gold-dark ${
+                        count > 0 ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                      }`}
+                    >
+                      {count > 0 ? (
+                        <>
+                          <ChatCircleTextIcon size={15} /> {count}
+                        </>
+                      ) : (
+                        <PlusCircleIcon size={15} />
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
             {isPenaltyActive && (
               <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-white/90 p-6 text-center text-sm font-semibold text-[#7f1d1d] shadow-[0_10px_30px_rgba(0,0,0,.12)]">
@@ -1262,6 +1317,19 @@ export function Reader({
         <div className="fixed inset-x-4 bottom-20 z-[80] mx-auto max-w-[420px] rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-4 py-2.5 text-center text-[13px] font-medium text-[#B02A37] shadow-[0_8px_24px_rgba(0,0,0,.15)] sm:bottom-6">
           {removeError}
         </div>
+      )}
+
+      {openCommentsParagraph !== null && (
+        <ParagraphCommentsPanel
+          chapterId={chapterId}
+          paragraphIndex={openCommentsParagraph}
+          threads={threadsByParagraph.get(openCommentsParagraph) ?? []}
+          onClose={() => setOpenCommentsParagraph(null)}
+          onCommentCreated={(c) => setParagraphComments((prev) => [...prev, c])}
+          onCommentDeleted={(id) =>
+            setParagraphComments((prev) => prev.filter((c) => c.id !== id && c.parentCommentId !== id))
+          }
+        />
       )}
     </div>
   );

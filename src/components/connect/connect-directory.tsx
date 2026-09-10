@@ -32,6 +32,12 @@ export type ConnectService = {
   name: string;
   minPrice: number | null;
   deliveryDays: number | null;
+  /** "available" (xanh) / "busy" (đỏ) / "off" (xám, không tooltip) — xem
+   * src/lib/orders/service-listing-service.ts computeCommissionStatus().
+   * Đếm theo TỪNG gói riêng, không cộng dồn theo người bán. */
+  commissionStatus: "available" | "busy" | "off";
+  activeCommissionCount: number;
+  monthlyCommissionLimit: number | null;
 };
 
 export type ConnectPerson = {
@@ -373,7 +379,34 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                         className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cream px-3.5 py-2.5"
                       >
                         <div className="min-w-0">
-                          <div className="truncate text-[13.5px] font-semibold text-ink">{s.name}</div>
+                          <div
+                            className="flex min-w-0 items-center gap-1.5 truncate text-[13.5px] font-semibold text-ink"
+                            title={
+                              s.commissionStatus === "off"
+                                ? undefined
+                                : `${s.commissionStatus === "available" ? "Có thể nhận comm" : "Đang bận"} — đang xử lý ${s.activeCommissionCount}/${s.monthlyCommissionLimit} comm`
+                            }
+                          >
+                            {/* Chấm trạng thái "nhận comm" — ĐỘC LẬP với
+                                pill/status của dịch vụ, chỉ phản ánh
+                                is_accepting_commissions + hạn mức mục 12.
+                                Xem services-tab.tsx (nơi bật/tắt) +
+                                service-listing-service.ts
+                                computeCommissionStatus(). */}
+                            <span
+                              aria-hidden
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{
+                                background:
+                                  s.commissionStatus === "available"
+                                    ? "#2C7453"
+                                    : s.commissionStatus === "busy"
+                                      ? "#B02A37"
+                                      : "#dcdcdc",
+                              }}
+                            />
+                            <span className="truncate">{s.name}</span>
+                          </div>
                           <div className="mt-0.5 text-xs text-stone">
                             {s.minPrice ? `Từ ${s.minPrice.toLocaleString("vi-VN")}₫` : "Liên hệ giá"}
                             {s.deliveryDays ? ` · ${s.deliveryDays} ngày` : ""}

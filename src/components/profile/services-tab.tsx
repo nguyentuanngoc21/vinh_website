@@ -39,6 +39,11 @@ type Listing = {
   rejected_content: string | null;
   is_private: boolean;
   is_accepting_orders: boolean;
+  // Mục 12 — ĐỘC LẬP với is_accepting_orders/11 trường trên. null = chưa
+  // đặt hạn mức, khi đó is_accepting_commissions không bật được (route
+  // chặn). Xem migrations/20260910_add_service_commission_status.sql.
+  monthly_commission_limit: number | null;
+  is_accepting_commissions: boolean;
 };
 
 // computeMissingFields() (service-listing-service.ts) chỉ đọc đúng các
@@ -240,6 +245,14 @@ export function ServicesTab() {
     void patchListing(l.id, { isAcceptingOrders: !l.is_accepting_orders });
   };
 
+  // Toggle "nhận comm" — ĐỘC LẬP với is_accepting_orders. Chỉ chặn BẬT
+  // khi chưa đặt hạn mức (mục 12); tắt luôn cho phép. Server (route
+  // PATCH) validate lại, đây chỉ tránh 1 request thừa/UX rõ ràng hơn.
+  const toggleCommissionsFor = (l: Listing) => {
+    if (!l.is_accepting_commissions && l.monthly_commission_limit == null) return;
+    void patchListing(l.id, { isAcceptingCommissions: !l.is_accepting_commissions });
+  };
+
   const duplicateListing = async (l: Listing) => {
     setPending(true);
     const res = await fetch("/api/profile/services", {
@@ -363,7 +376,7 @@ export function ServicesTab() {
                 key={l.id}
                 className="grid items-start gap-3 bg-white px-4 py-3.5"
                 style={{
-                  gridTemplateColumns: "minmax(0,1fr) 140px 150px 40px",
+                  gridTemplateColumns: "minmax(0,1fr) 140px 150px 76px 40px",
                   borderTop: i === 0 ? "none" : "1px solid #f4f2ef",
                 }}
               >
@@ -396,6 +409,31 @@ export function ServicesTab() {
                   <div className="mt-1.5 text-[11px] text-stone-light">
                     {filledCount}/{total} mục
                   </div>
+                </div>
+                {/* Toggle "nhận comm" — ĐỘC LẬP với pill "Đang nhận đơn"
+                    bên trái. Xám mờ + không bấm được nếu chưa đặt hạn
+                    mức (mục 12), title giải thích lý do. */}
+                <div className="flex flex-col items-center gap-1 pt-0.5">
+                  <button
+                    type="button"
+                    title={
+                      l.monthly_commission_limit == null
+                        ? "Đặt \"Số lượng comm nhận/tháng\" ở mục 12 trước khi bật"
+                        : l.is_accepting_commissions
+                          ? "Tắt nhận comm"
+                          : "Bật nhận comm"
+                    }
+                    disabled={l.monthly_commission_limit == null && !l.is_accepting_commissions}
+                    onClick={() => toggleCommissionsFor(l)}
+                    style={{ background: l.is_accepting_commissions ? "var(--color-brand-ink)" : "#dcdcdc" }}
+                    className="h-5 w-9 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <div
+                      className="h-4 w-4 rounded-full bg-white transition-transform"
+                      style={{ transform: l.is_accepting_commissions ? "translateX(16px)" : "translateX(0)" }}
+                    />
+                  </button>
+                  <span className="text-[10px] text-stone-light">Nhận comm</span>
                 </div>
                 <div className="relative">
                   <button
@@ -806,6 +844,24 @@ export function ServicesTab() {
             </div>
           </NumberedField>
         )}
+
+        {/* Mục 12 — ĐỘC LẬP với is_accepting_orders/11 mục trên (không
+            tham gia computeMissingFields/validate publish). Chỉ phục vụ
+            toggle "nhận comm" ở list view — bật toggle đó bị chặn nếu
+            còn để trống. Xem
+            migrations/20260910_add_service_commission_status.sql. */}
+        <NumberedField num={12} label="Số lượng comm nhận/tháng" filled={selected.monthly_commission_limit != null}>
+          <Field
+            label={null}
+            type="number"
+            min={1}
+            defaultValue={selected.monthly_commission_limit ?? ""}
+            placeholder="Để trống nếu chưa muốn bật nhận comm"
+            onBlur={(e) =>
+              patch({ monthly_commission_limit: e.target.value === "" ? null : Number(e.target.value) })
+            }
+          />
+        </NumberedField>
       </div>
     </div>
   );

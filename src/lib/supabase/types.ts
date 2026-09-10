@@ -558,6 +558,13 @@ export type Database = {
           // Chỉ được set true bởi src/lib/orders/service-listing-service.ts
           // sau khi validate đủ 11/11 trường — không phải validate ở đây.
           is_accepting_orders: boolean;
+          // Mục 12, ĐỘC LẬP với is_accepting_orders/11 trường trên — null =
+          // seller chưa đặt hạn mức nhận comm/tháng. Xem
+          // migrations/20260910_add_service_commission_status.sql.
+          monthly_commission_limit: number | null;
+          // Chỉ được set true bởi route PATCH sau khi xác nhận
+          // monthly_commission_limit khác null — không phải validate ở đây.
+          is_accepting_commissions: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -578,12 +585,14 @@ export type Database = {
           accepted_content?: string | null;
           rejected_content?: string | null;
           is_private?: boolean;
+          monthly_commission_limit?: number | null;
         };
-        // is_accepting_orders CỐ Ý không có ở Update — chỉ set qua
-        // service-layer sau khi validate 11 trường, xem ghi chú Row ở trên.
+        // is_accepting_orders/is_accepting_commissions CỐ Ý không có ở
+        // Insert — chỉ set qua route sau khi validate điều kiện tương
+        // ứng, xem ghi chú Row ở trên.
         Update: Partial<
           Omit<Database["public"]["Tables"]["service_listings"]["Insert"], "seller_id">
-        > & { is_accepting_orders?: boolean; updated_at?: string };
+        > & { is_accepting_orders?: boolean; is_accepting_commissions?: boolean; updated_at?: string };
         Relationships: [];
       };
       service_samples: {
@@ -1323,6 +1332,10 @@ export type Database = {
           content: string;
           quest_id: string | null;
           quest_source: QuestSource | null;
+          // not null = reply (1 cấp duy nhất — cha của 1 reply luôn có
+          // parent_comment_id null, enforce ở route, không phải DB). Xem
+          // migrations/20260910_add_anchored_comment_replies.sql.
+          parent_comment_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -1335,6 +1348,7 @@ export type Database = {
           content: string;
           quest_id?: string | null;
           quest_source?: QuestSource | null;
+          parent_comment_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["anchored_comments"]["Insert"]>;
         Relationships: [];
