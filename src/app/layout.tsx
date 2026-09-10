@@ -7,6 +7,7 @@ import { NowPlayingProvider } from "@/lib/audio/now-playing-context";
 import { MiniPlayerBar } from "@/components/audio-hub/mini-player-bar";
 import { ChatBubbleProvider } from "@/lib/chat-bubbles";
 import { ChatBubbleDock } from "@/components/messenger/chat-bubble-dock";
+import { NavigationOverlay } from "@/components/ui/navigation-overlay";
 import "./globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -43,6 +44,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </ChatBubbleProvider>
           </NowPlayingProvider>
         </RoleProvider>
+        {/* Đè lên trang HIỆN TẠI trong lúc chờ trang mới render — không
+            thay thế nội dung như app/loading.tsx (đã bỏ, xem
+            navigation-overlay.tsx). Đặt ngoài mọi provider — không phụ
+            thuộc gì, chỉ cần usePathname(). */}
+        <NavigationOverlay />
         <Analytics />
         <SpeedInsights />
       </body>
