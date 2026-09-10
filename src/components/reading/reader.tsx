@@ -9,6 +9,7 @@ import {
   BookmarkSimpleIcon,
   ChatCircleTextIcon,
   HeadphonesIcon,
+  HighlighterIcon,
   ListBulletsIcon,
   PlusCircleIcon,
   ShareNetworkIcon,
@@ -24,6 +25,7 @@ import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admi
 import { ReadingGate } from "./reading-gate";
 import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
 import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
+import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { shareOrCopy } from "@/lib/share";
 import { VinhMark } from "@/components/ui";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
@@ -322,6 +324,11 @@ export type ReaderProps = {
    * chưa mua) — quyết định ReadingGate hiện nút "Mua ngay" hay "Đăng nhập
    * để mua". */
   isLoggedIn?: boolean;
+  /** Đoạn văn đã đọc dở lần trước, CHỈ khi đúng chương này (page.tsx đã
+   * tự đối chiếu chapter_id) — null = bắt đầu từ đầu chương (chưa từng
+   * đọc, hoặc lần trước dừng ở chương khác). Tự cuộn tới 1 lần lúc mount.
+   * Xem migrations/20260910_add_book_progress_paragraph.sql. */
+  initialParagraphIndex?: number | null;
 };
 
 export function Reader({
@@ -349,6 +356,7 @@ export function Reader({
   accessGate = "none",
   chapterPrice = 0,
   isLoggedIn = false,
+  initialParagraphIndex = null,
 }: ReaderProps) {
   const router = useRouter();
   const { play } = useNowPlaying();
@@ -437,6 +445,106 @@ export function Reader({
       cancelled = true;
     };
   }, [chapterId]);
+
+  // Highlight (bôi đen đoạn văn) — RIÊNG TƯ, chỉ của chính viewer (khác
+  // paragraphComments công khai) — xem src/lib/reading/highlights.ts +
+  // api/chapters/[chapterId]/highlights/route.ts. 1 lần fetch toàn bộ
+  // highlight của chương khi mount, giống paragraphComments.
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const highlightsByParagraph = useMemo(() => {
+    const map = new Map<number, Highlight[]>();
+    for (const h of highlights) {
+      const list = map.get(h.paragraphIndex) ?? [];
+      list.push(h);
+      map.set(h.paragraphIndex, list);
+    }
+    return map;
+  }, [highlights]);
+
+  useEffect(() => {
+    if (!chapterId) return;
+    let cancelled = false;
+    fetch(`/api/chapters/${chapterId}/highlights`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setHighlights(data.highlights ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chapterId]);
+
+  // Nút "Đánh dấu" nổi lên gần vùng vừa bôi đen — toạ độ fixed tính từ
+  // getBoundingClientRect() của Range, không phụ thuộc layout cha. null =
+  // không có lựa chọn hợp lệ nào (chưa bôi đen, hoặc bôi đen tràn ra
+  // ngoài 1 đoạn văn — không hỗ trợ highlight nhiều đoạn cùng lúc).
+  const [pendingHighlight, setPendingHighlight] = useState<{
+    paragraphIndex: number;
+    charStart: number;
+    charEnd: number;
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const handleParagraphSelect = (paragraphIndex: number, el: HTMLParagraphElement) => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      setPendingHighlight(null);
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    // Chỉ nhận selection nằm GỌN trong đúng đoạn văn này — bôi đen tràn
+    // sang đoạn khác (hoặc UI khác trên trang) bị bỏ qua, không hỗ trợ
+    // highlight nhiều đoạn cùng lúc (đơn giản hoá, khớp shape 1
+    // paragraph_index/highlight của DB).
+    if (!el.contains(range.commonAncestorContainer)) {
+      setPendingHighlight(null);
+      return;
+    }
+    const charStart = textOffsetWithin(el, range.startContainer, range.startOffset);
+    const charEnd = textOffsetWithin(el, range.endContainer, range.endOffset);
+    if (charEnd <= charStart) {
+      setPendingHighlight(null);
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    setPendingHighlight({ paragraphIndex, charStart, charEnd, top: rect.top, left: rect.left + rect.width / 2 });
+  };
+
+  const [highlightPending, setHighlightPending] = useState(false);
+  const confirmHighlight = async () => {
+    if (!pendingHighlight || !chapterId || highlightPending) return;
+    setHighlightPending(true);
+    try {
+      const res = await fetch(`/api/chapters/${chapterId}/highlights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paragraphIndex: pendingHighlight.paragraphIndex,
+          charStart: pendingHighlight.charStart,
+          charEnd: pendingHighlight.charEnd,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.highlight) {
+        setHighlights((prev) => [...prev, data.highlight]);
+      }
+    } finally {
+      setHighlightPending(false);
+      setPendingHighlight(null);
+      window.getSelection()?.removeAllRanges();
+    }
+  };
+
+  const removeHighlight = async (id: string) => {
+    if (!chapterId) return;
+    setHighlights((prev) => prev.filter((h) => h.id !== id));
+    await fetch(`/api/chapters/${chapterId}/highlights/${id}`, { method: "DELETE" }).catch(() => {
+      // best-effort — không rollback UI vì đây là thao tác xoá, giữ đã
+      // ẩn là hành vi hợp lý hơn kể cả khi request lỗi
+    });
+  };
 
   const showCopyBubble = (label: string) => {
     setCopyBubble(label);
@@ -728,9 +836,50 @@ export function Reader({
     };
   }, []);
 
+  // Tự cuộn tới đoạn đã đọc dở lần trước (initialParagraphIndex, page.tsx
+  // đã đối chiếu đúng chapter_id) — CHỈ 1 LẦN lúc mount, không lặp lại
+  // mỗi khi paragraphRefs đổi. setTimeout(0) để chắc chắn layout đã xong
+  // (ảnh bìa/watermark có thể còn đang load, dịch chiều cao trang) trước
+  // khi tính vị trí cuộn — cùng kiểu xử lý với effect nạp reader prefs ở
+  // trên.
+  const scrollRestoredRef = useRef(false);
+  useEffect(() => {
+    if (scrollRestoredRef.current) return;
+    if (initialParagraphIndex === null || initialParagraphIndex === 0) return;
+    scrollRestoredRef.current = true;
+    const timeout = setTimeout(() => {
+      paragraphRefs.current[initialParagraphIndex]?.scrollIntoView({ block: "start" });
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [initialParagraphIndex]);
+
+  // Ghi lại tiến độ đọc (đoạn đang xem) — debounce 3s sau khi NGỪNG cuộn
+  // (không ghi mỗi lần đổi đoạn, tránh spam API lúc cuộn nhanh), qua
+  // src/app/api/books/[bookId]/reading-progress/route.ts. Best-effort —
+  // lỗi bỏ qua im lặng (mất 1 lần ghi tiến độ không phải sự cố nghiêm
+  // trọng), không cần đăng nhập cũng gọi được, route tự trả 401 và bị
+  // nuốt ở catch. Xem migrations/20260910_add_book_progress_paragraph.sql.
+  const progressSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedParagraphRef = useRef<number | null>(null);
+  const scheduleProgressSave = (idx: number) => {
+    if (!bookId || !chapterId || lastSavedParagraphRef.current === idx) return;
+    if (progressSaveTimeoutRef.current) clearTimeout(progressSaveTimeoutRef.current);
+    progressSaveTimeoutRef.current = setTimeout(() => {
+      lastSavedParagraphRef.current = idx;
+      fetch(`/api/books/${bookId}/reading-progress`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chapterId, paragraphIndex: idx }),
+      }).catch(() => {
+        // best-effort — bỏ qua lỗi mạng/401 (chưa đăng nhập)
+      });
+    }, 3000);
+  };
+
   // Theo dõi đoạn văn đang hiện giữa khung nhìn lúc cuộn — dùng cho nút
-  // chia sẻ ở AuthorPanel ("chia sẻ đoạn đang đọc"). Effect RIÊNG, không
-  // chung với 3 effect chống chụp màn hình ở trên.
+  // chia sẻ ở AuthorPanel ("chia sẻ đoạn đang đọc") VÀ ghi tiến độ đọc ở
+  // trên. Effect RIÊNG, không chung với 3 effect chống chụp màn hình ở
+  // trên.
   useEffect(() => {
     if (paragraphs.length === 0) return;
     const observer = new IntersectionObserver(
@@ -749,7 +898,10 @@ export function Reader({
           }
         }
         const idx = Number((best.target as HTMLElement).dataset.paragraphIndex);
-        if (!Number.isNaN(idx) && paragraphs[idx]) setVisibleParagraph(paragraphs[idx]);
+        if (!Number.isNaN(idx) && paragraphs[idx]) {
+          setVisibleParagraph(paragraphs[idx]);
+          scheduleProgressSave(idx);
+        }
       },
       { threshold: [0, 0.25, 0.5, 0.75, 1], rootMargin: "-40% 0px -40% 0px" }
     );
@@ -1099,7 +1251,7 @@ export function Reader({
             style={{ background: c.tintBg, borderColor: c.tintBorder, color: c.tintInk }}
             className="mb-[30px] inline-flex items-center gap-2 rounded-lg border px-[13px] py-2 text-xs font-medium"
           >
-            <ShieldCheckIcon /> Nội dung được bảo hộ · render dạng ảnh ·
+            <ShieldCheckIcon /> Nội dung được bảo hộ · phần mềm phát hiện sao chép, chụp màn hình ·
             watermark theo phiên đọc của bạn
           </div>
 
@@ -1123,13 +1275,17 @@ export function Reader({
             </div>
           )}
 
-          <div className="relative">
+          <div
+            className="relative"
+            onMouseDown={() => setPendingHighlight(null)}
+          >
             <div
               style={{ fontSize: `${fontSize}px`, color: c.body, lineHeight }}
               className="font-[family-name:var(--font-lora)]"
             >
               {paragraphs.map((p, i) => {
                 const count = countByParagraph.get(i) ?? 0;
+                const segments = buildHighlightSegments(p, highlightsByParagraph.get(i) ?? []);
                 return (
                   <div key={i} className="group relative mb-[1.5em]">
                     <p
@@ -1137,8 +1293,38 @@ export function Reader({
                         paragraphRefs.current[i] = el;
                       }}
                       data-paragraph-index={i}
+                      onMouseUp={(e) => handleParagraphSelect(i, e.currentTarget)}
+                      onTouchEnd={(e) => {
+                        const el = e.currentTarget;
+                        // setTimeout(0) — 1 số trình duyệt mobile chốt
+                        // xong Selection SAU touchend 1 nhịp, đọc ngay lúc
+                        // này có thể vẫn thấy selection cũ/rỗng.
+                        setTimeout(() => handleParagraphSelect(i, el), 0);
+                      }}
                     >
-                      {p}
+                      {/* Bôi đen (highlight) riêng tư — segment nào thuộc
+                          highlightId khác null thì bọc <mark>, bấm vào
+                          xoá luôn (đơn giản, không cần menu xác nhận cho
+                          1 ghi chú cá nhân). Xem
+                          src/lib/reading/highlights.ts. */}
+                      {segments.map((seg, si) =>
+                        seg.highlightId ? (
+                          <mark
+                            key={si}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeHighlight(seg.highlightId!);
+                            }}
+                            title="Bấm để bỏ đánh dấu"
+                            style={{ background: "rgba(233,192,116,.45)", color: "inherit" }}
+                            className="cursor-pointer rounded-[2px]"
+                          >
+                            {seg.text}
+                          </mark>
+                        ) : (
+                          <span key={si}>{seg.text}</span>
+                        )
+                      )}
                     </p>
                     {/* Icon bình luận theo đoạn (tham khảo Wattpad) — luôn
                         hiện nếu đã có bình luận (count>0), chỉ hiện khi
@@ -1376,6 +1562,28 @@ export function Reader({
             setParagraphComments((prev) => prev.filter((c) => c.id !== id && c.parentCommentId !== id))
           }
         />
+      )}
+
+      {/* Nút "Đánh dấu" nổi — render NGOÀI khung đoạn văn (position:fixed
+          không cần lồng DOM để định vị) để tránh onMouseDown ở khung đó
+          (dùng để tự ẩn nút khi bắt đầu 1 lượt bôi đen mới) vô tình bắt
+          luôn sự kiện mousedown của chính nút này trước khi onClick kịp
+          chạy. */}
+      {pendingHighlight && (
+        <button
+          type="button"
+          disabled={highlightPending}
+          onClick={confirmHighlight}
+          style={{
+            position: "fixed",
+            top: Math.max(8, pendingHighlight.top - 42),
+            left: pendingHighlight.left,
+            transform: "translateX(-50%)",
+          }}
+          className="z-[70] flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-ink px-3.5 py-2 text-xs font-semibold text-brand-gold-light shadow-[0_8px_20px_rgba(0,0,0,.25)] disabled:opacity-60"
+        >
+          <HighlighterIcon size={14} weight="fill" /> {highlightPending ? "Đang lưu…" : "Đánh dấu"}
+        </button>
       )}
     </div>
   );

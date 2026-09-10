@@ -10,7 +10,7 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { AVATAR_TONES } from "@/lib/profile";
-import { timeLabel } from "@/lib/format-time";
+import { timeLabel, messageTimeLabel, isNewSession, sessionDividerLabel } from "@/lib/format-time";
 import { autoGrowTextarea, resetTextareaHeight } from "@/lib/autogrow-textarea";
 import { Field, Alert } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
@@ -424,26 +424,42 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   />
                 ))}
               <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-[18px] py-5 max-[759px]:overflow-visible">
-                {messages.map((m) => (
-                  <div key={m.id} className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
-                    <div
-                      style={{
-                        background: m.mine ? "var(--color-brand-ink)" : "#f2f1ee",
-                        color: m.mine ? "#fff" : "var(--color-ink)",
-                        borderRadius: m.mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                      }}
-                      className="max-w-[74%] whitespace-pre-wrap break-words px-[15px] py-2.5 text-sm leading-[1.55]"
-                    >
-                      {m.body}
-                    </div>
-                    {m.mine && m.flagged && (
-                      <div
-                        title="Tin nhắn có thể chứa thông tin liên hệ/giao dịch ngoài nền tảng — chỉ mình bạn thấy cảnh báo này."
-                        className="mt-1 flex items-center gap-1 text-[10.5px] text-[#A9781A]"
-                      >
-                        <WarningCircleIcon weight="fill" size={11} /> Có thể chứa thông tin ngoài nền tảng
+                {messages.map((m, i) => (
+                  <div key={m.id} className="flex flex-col">
+                    {/* Dòng chia phiên (tham khảo Zalo) — cách tin liền
+                        trước quá 15 phút hoặc khác ngày thì chèn 1 mốc
+                        giờ căn giữa phía trên tin đầu tiên của phiên mới.
+                        Xem src/lib/format-time.ts isNewSession()/
+                        sessionDividerLabel(). */}
+                    {isNewSession(i > 0 ? messages[i - 1].createdAt : null, m.createdAt) && (
+                      <div className="my-2 text-center text-[11px] font-medium text-stone-light">
+                        {sessionDividerLabel(m.createdAt)}
                       </div>
                     )}
+                    <div className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
+                      <div
+                        style={{
+                          background: m.mine ? "var(--color-brand-ink)" : "#f2f1ee",
+                          color: m.mine ? "#fff" : "var(--color-ink)",
+                          borderRadius: m.mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                        }}
+                        className="max-w-[74%] whitespace-pre-wrap break-words px-[15px] py-2.5 text-sm leading-[1.55]"
+                      >
+                        {m.body}
+                      </div>
+                      {/* Giờ:phút dưới MỖI bong bóng — luôn hiện, không
+                          chỉ tin cuối 1 chuỗi (đã chốt theo yêu cầu, khác
+                          hành vi mặc định của Zalo nhưng rõ ràng hơn). */}
+                      <div className="mt-0.5 px-1 text-[10.5px] text-stone-light">{messageTimeLabel(m.createdAt)}</div>
+                      {m.mine && m.flagged && (
+                        <div
+                          title="Tin nhắn có thể chứa thông tin liên hệ/giao dịch ngoài nền tảng — chỉ mình bạn thấy cảnh báo này."
+                          className="mt-1 flex items-center gap-1 text-[10.5px] text-[#A9781A]"
+                        >
+                          <WarningCircleIcon weight="fill" size={11} /> Có thể chứa thông tin ngoài nền tảng
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {messages.length === 0 && (

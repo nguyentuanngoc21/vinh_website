@@ -449,12 +449,18 @@ export type Database = {
           user_id: string;
           book_id: string;
           chapter_id: string;
+          // null = chưa có/chưa cuộn qua đoạn nào — chỉ có ý nghĩa khi
+          // khớp ĐÚNG chapter_id ở trên. Xem
+          // migrations/20260910_add_book_progress_paragraph.sql.
+          last_paragraph_index: number | null;
           updated_at: string;
         };
         Insert: {
           user_id: string;
           book_id: string;
           chapter_id: string;
+          last_paragraph_index?: number | null;
+          updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["book_progress"]["Insert"]>;
         Relationships: [];
