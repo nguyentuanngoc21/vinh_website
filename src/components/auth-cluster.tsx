@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ImageSquareIcon,
+  MicrophoneStageIcon,
+  PencilSimpleLineIcon,
   ShieldCheckIcon,
   UserCircleIcon,
   NotebookIcon,
@@ -12,6 +15,7 @@ import {
   TrophyIcon,
   SignOutIcon,
   PlusIcon,
+  XIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -27,6 +31,8 @@ export function AuthCluster({
   const pathname = usePathname();
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [prevPathname, setPrevPathname] = useState(pathname);
   const menuRef = useRef<HTMLDivElement>(null);
   // MessengerBell + NotificationBell chia sẻ ĐÚNG 1 state "đang mở cái
   // nào" thay vì mỗi bên tự giữ open riêng — mở bong bóng chat sẽ tự đóng
@@ -71,13 +77,29 @@ export function AuthCluster({
   // thật sự được tạo lúc bấm Lưu/Xuất bản lần đầu ở đó (xem
   // new-work-workspace.tsx + POST /api/authoring/books).
   const ctaHrefResolved = isGuest ? "/dang-nhap" : ctaHref;
-  const showMobileFab =
-    pathname !== "/" &&
-    !pathname.startsWith("/truyen") &&
-    !pathname.startsWith("/read") &&
-    !pathname.startsWith("/blog") &&
-    !pathname.startsWith("/rankings") &&
-    !pathname.startsWith("/tim-kiem");
+  const quickActionOffsetClass = pathname.startsWith("/read") ? "bottom-20" : "bottom-5";
+  const quickActions = [
+    {
+      label: "Viết truyện",
+      href: ctaHrefResolved,
+      icon: PencilSimpleLineIcon,
+    },
+    {
+      label: "Đăng audio",
+      href: isGuest ? "/dang-nhap" : "/audio/new",
+      icon: MicrophoneStageIcon,
+    },
+    {
+      label: "Đăng ảnh minh họa",
+      href: isGuest ? "/dang-nhap" : "/thiet-ke/new",
+      icon: ImageSquareIcon,
+    },
+  ];
+
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    if (quickActionsOpen) setQuickActionsOpen(false);
+  }
 
   return (
     <>
@@ -112,17 +134,47 @@ export function AuthCluster({
           full-width trên mobile, trên MiniPlayerBar (z-30). Portal ra
           document.body — xem lý do ở khai báo `mounted` phía trên. */}
       {mounted &&
-        showMobileFab &&
         createPortal(
-          <Link
-            href={ctaHrefResolved}
-            data-tour="tour-cta"
-            aria-label={ctaLabel}
-            title={ctaLabel}
-            className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-brand-ink no-underline shadow-[0_8px_24px_rgba(0,0,0,.25)] transition-transform active:scale-95 sm:hidden"
-          >
-            <PlusIcon weight="bold" size={26} />
-          </Link>,
+          <div className={`fixed right-4 ${quickActionOffsetClass} z-40 sm:hidden`}>
+            {quickActionsOpen && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Đóng tác vụ nhanh"
+                  onClick={() => setQuickActionsOpen(false)}
+                  className="fixed inset-0 z-[-1] cursor-default bg-transparent"
+                />
+                <div className="mb-3 w-[218px] overflow-hidden rounded-2xl border border-cream-border bg-white shadow-[0_14px_36px_rgba(0,0,0,.2)]">
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return (
+                      <Link
+                        key={action.label}
+                        href={action.href}
+                        onClick={() => setQuickActionsOpen(false)}
+                        className="flex items-center gap-3 border-b border-[#f1efec] px-4 py-3 text-sm font-semibold text-brand-ink no-underline transition-colors last:border-b-0 hover:bg-cream-card"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-ink text-brand-gold-light">
+                          <Icon size={17} weight="bold" />
+                        </span>
+                        {action.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <button
+              type="button"
+              data-tour="tour-cta"
+              aria-label={quickActionsOpen ? "Đóng tác vụ nhanh" : "Mở tác vụ nhanh"}
+              title="Tác vụ nhanh"
+              onClick={() => setQuickActionsOpen((value) => !value)}
+              className="ml-auto flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink shadow-[0_8px_24px_rgba(0,0,0,.25)] transition-transform active:scale-95"
+            >
+              {quickActionsOpen ? <XIcon weight="bold" size={24} /> : <PlusIcon weight="bold" size={26} />}
+            </button>
+          </div>,
           document.body
         )}
       {isAdmin && (
