@@ -8,6 +8,7 @@ import {
   BriefcaseIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { PROFILE_TABS, type ProfileTab } from "@/lib/profile";
+import { Tabs } from "@/components/ui";
 
 const TAB_ICONS = {
   users: UsersThreeIcon,
@@ -21,14 +22,17 @@ type ProfileTabsProps = { active: ProfileTab; onChange: (tab: ProfileTab) => voi
 
 export function ProfileTabs({ active, onChange }: ProfileTabsProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto border-b border-[#f0f0ef] px-4 pt-[22px] [scrollbar-width:none] sm:px-8 lg:px-11 [&::-webkit-scrollbar]:hidden">
+    <Tabs.List
+      aria-label="Mục hồ sơ"
+      className="flex gap-2 overflow-x-auto border-b border-[#f0f0ef] px-4 pt-[22px] [scrollbar-width:none] sm:px-8 lg:px-11 [&::-webkit-scrollbar]:hidden"
+    >
       {PROFILE_TABS.map((tab) => {
         const Icon = TAB_ICONS[tab.icon as keyof typeof TAB_ICONS];
         const isActive = tab.id === active;
         return (
-          <button
+          <Tabs.Tab
             key={tab.id}
-            type="button"
+            active={isActive}
             onClick={() => onChange(tab.id)}
             style={{
               color: isActive ? "var(--color-brand-ink)" : "var(--color-stone-dark)",
@@ -40,9 +44,9 @@ export function ProfileTabs({ active, onChange }: ProfileTabsProps) {
             }`}
           >
             <Icon size={17} /> {tab.label}
-          </button>
+          </Tabs.Tab>
         );
       })}
-    </div>
+    </Tabs.List>
   );
 }

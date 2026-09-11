@@ -16,7 +16,7 @@ import {
   PauseIcon,
   CopyIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Field, Alert, Checkbox } from "@/components/ui";
+import { Field, Alert, Checkbox, Skeleton } from "@/components/ui";
 import { computeMissingFields } from "@/lib/orders/service-listing-service";
 import type { Database } from "@/lib/supabase/types";
 
@@ -332,7 +332,19 @@ export function ServicesTab() {
     setSamples((prev) => [data.sample, ...prev]);
   };
 
-  if (!loaded) return <div className="px-4 py-10 text-center text-sm text-stone-light sm:px-8 lg:px-11">Đang tải…</div>;
+  if (!loaded) {
+    return (
+      <div className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
+        <Skeleton className="mb-1.5 h-6 w-52 rounded-[var(--radius-sm)]" />
+        <Skeleton className="mb-5 h-4 w-full max-w-[560px] rounded-[var(--radius-sm)]" />
+        <div className="overflow-hidden rounded-2xl border border-cream">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-none border-b border-cream last:border-b-0" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // ===== Danh sách =====
   if (!selected) {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { LoadingScreen } from "./loading-screen";
+import { useNavigationPending, useSetNavigationPending } from "@/lib/navigation/pending-navigation";
 
 /**
  * Lớp phủ loading TOÀN TRANG khi đang chuyển route — KHÁC hẳn
@@ -39,19 +39,18 @@ import { LoadingScreen } from "./loading-screen";
  * đã true nên return sớm ngay dòng đầu — overlay không bao giờ bật được
  * với link thật. Sửa bằng CAPTURE phase (đi từ document XUỐNG target,
  * document luôn nổ đầu tiên) — không còn dựa vào defaultPrevented nữa.
+ *
+ * `pending` không còn là state riêng của component này — chuyển lên
+ * NavigationPendingProvider (src/lib/navigation/pending-navigation.tsx) để
+ * usePendingNavigate() (submit-rồi-router.push từ code, ví dụ đăng
+ * nhập/đăng ký) cũng bật được CÙNG overlay này, việc mà click-listener bên
+ * dưới không thể tự bắt (router.push() gọi thẳng từ code không đi qua
+ * click). Logic tắt khi pathname đổi thật vẫn y hệt trước, chỉ chuyển vị
+ * trí lên Provider.
  */
 export function NavigationOverlay() {
-  const pathname = usePathname();
-  const [pending, setPending] = useState(false);
-  const prevPathnameRef = useRef(pathname);
-
-  // pathname đổi thật (RSC payload trang mới đã áp dụng xong) -> tắt overlay.
-  useEffect(() => {
-    if (prevPathnameRef.current !== pathname) {
-      prevPathnameRef.current = pathname;
-      setPending(false);
-    }
-  }, [pathname]);
+  const pending = useNavigationPending();
+  const setPending = useSetNavigationPending();
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -82,7 +81,10 @@ export function NavigationOverlay() {
     // trên đầu file.
     document.addEventListener("click", onClick, { capture: true });
     return () => document.removeEventListener("click", onClick, { capture: true });
-  }, []);
+    // setPending: định danh ổn định qua mọi lần render (chính là setState
+    // gốc từ useState trong NavigationPendingProvider, chỉ đi qua 1 hook
+    // trung gian) — thêm vào deps để thoả eslint mà không đổi hành vi.
+  }, [setPending]);
 
   if (!pending) return null;
   return <LoadingScreen />;

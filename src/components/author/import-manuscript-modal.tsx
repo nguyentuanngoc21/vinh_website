@@ -9,7 +9,7 @@ import {
   TextAlignLeftIcon,
   XIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Alert, Button, Field } from "@/components/ui";
+import { Alert, Button, Field, Modal } from "@/components/ui";
 import { countWords, splitChapters, type DetectedChapter, type SplitMode } from "@/lib/authoring/split-chapters";
 
 type ImportManuscriptModalProps = {
@@ -116,8 +116,6 @@ export function ImportManuscriptModal({
     }
     return splitChapters(rawText, splitMode);
   }, [rawText, splitMode, headingChapters]);
-
-  if (!open) return null;
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -255,11 +253,7 @@ export function ImportManuscriptModal({
   };
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[86vh] w-full max-w-[640px] overflow-y-auto rounded-[20px] bg-white p-7 shadow-[0_24px_60px_rgba(0,0,0,.28)]"
-      >
+    <Modal open={open} onClose={onClose} panelClassName="max-h-[86vh] max-w-[640px] overflow-y-auto p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-[family-name:var(--font-lora)] text-xl font-bold text-brand-ink">
@@ -337,7 +331,8 @@ export function ImportManuscriptModal({
                     type="button"
                     onClick={handlePasteContinue}
                     disabled={!pastedText.trim()}
-                    className="w-auto px-5"
+                    fullWidth={false}
+                    className="px-5"
                   >
                     Tiếp tục
                   </Button>
@@ -495,14 +490,14 @@ export function ImportManuscriptModal({
                 type="button"
                 onClick={handleConfirm}
                 disabled={!detected.length || submitting}
-                className="w-auto px-5"
+                fullWidth={false}
+                className="px-5"
               >
                 {submitting ? "Đang nhập…" : `Nhập ${detected.length} chương`}
               </Button>
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

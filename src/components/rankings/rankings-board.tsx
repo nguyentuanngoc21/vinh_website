@@ -15,6 +15,7 @@ import { genres as REAL_GENRES } from "@/lib/books";
 import { BookCover } from "@/components/covers/book-cover";
 import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import { DevelopmentOverlay } from "@/components/development-overlay";
+import { Tabs } from "@/components/ui";
 import { REAL_PERIODS, type BookRankingsData, type RealPeriodId } from "@/lib/rankings/get-book-rankings";
 import {
   KINDS,
@@ -75,6 +76,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
     .filter((b) => genre === "Tất cả" || b.genre === genre)
     .map((b, i) => ({ ...b, rank: i + 1 }));
   const listLength = isReal ? realRows.length : mockRows.length;
+  const podiumCols = Math.max(Math.min(listLength, 3), 1);
 
   const rowCount = Math.max(0, Math.min(limit, listLength - 3));
   const hasRows = rowCount > 0;
@@ -127,7 +129,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
 
   return (
     <>
-      <div className="px-11 pt-[34px]">
+      <div className="px-4 pt-[34px] sm:px-6 lg:px-11">
         <div className="flex flex-wrap items-end justify-between gap-[18px]">
           <div>
             <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">
@@ -138,11 +140,11 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
             </div>
             <div className="mt-2 text-sm text-stone">{subheading}</div>
           </div>
-          <div className="flex gap-2 rounded-full bg-neutral-bg p-[5px]">
+          <Tabs.List aria-label="Loại bảng xếp hạng" className="flex gap-2 rounded-full bg-neutral-bg p-[5px]">
             {KINDS.map((label) => (
-              <button
+              <Tabs.Tab
                 key={label}
-                type="button"
+                active={label === kind}
                 onClick={() => {
                   setKind(label);
                   setGenre("Tất cả");
@@ -157,18 +159,18 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                 className="cursor-pointer rounded-full px-5 py-2.5 text-[13.5px] font-semibold transition-all"
               >
                 {label}
-              </button>
+              </Tabs.Tab>
             ))}
-          </div>
+          </Tabs.List>
         </div>
       </div>
 
-      <div className="mt-[26px] flex flex-wrap items-center justify-between gap-4 border-b border-[#f1efec] px-11">
-        <div className="flex gap-[30px]">
+      <div className="mt-[26px] flex flex-wrap items-center justify-between gap-4 border-b border-[#f1efec] px-4 sm:px-6 lg:px-11">
+        <Tabs.List aria-label="Khoảng thời gian" className="flex gap-[30px]">
           {(isReal ? REAL_PERIODS : PERIODS).map((p) => (
-            <button
+            <Tabs.Tab
               key={p.id}
-              type="button"
+              active={p.id === periodId}
               onClick={() => {
                 setPeriodId(p.id as RealPeriodId);
                 setLimit(7);
@@ -186,15 +188,15 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
               >
                 {isReal ? bookRankings[p.id as RealPeriodId].range : (p as { range: string }).range}
               </div>
-            </button>
+            </Tabs.Tab>
           ))}
-        </div>
+        </Tabs.List>
         <div className="pb-3 text-[13px] font-medium text-stone-light">
           {isReal ? updateNote : "Cập nhật 06:00 hôm nay · theo lượt đọc & thời gian đọc thực"}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2.5 px-11 pb-1.5 pt-[22px]">
+      <div className="flex flex-wrap gap-2.5 px-4 pb-1.5 pt-[22px] sm:px-6 lg:px-11">
         {cats.map((label) => (
           <button
             key={label}
@@ -213,7 +215,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
       </div>
 
       {isReal && listLength === 0 ? (
-        <div className="mx-11 mt-[22px] flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#e7e5e4] bg-[#fafaf9] py-14 text-center">
+        <div className="mx-4 mt-[22px] flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#e7e5e4] bg-[#fafaf9] py-14 text-center sm:mx-6 lg:mx-11">
           <div className="text-sm font-semibold text-ink">Chưa có dữ liệu xếp hạng</div>
           <div className="text-[13px] text-[#9a9a9a]">
             Cần ít nhất 1 truyện được xuất bản để tính bảng xếp hạng.
@@ -222,8 +224,14 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
       ) : (
         <MaybeBlurred blurred={!isReal}>
           <div
-            style={{ gridTemplateColumns: `repeat(${Math.max(Math.min(listLength, 3), 1)}, 1fr)` }}
-            className="grid items-end gap-[22px] px-11 pt-[22px]"
+            // 1 cột cố định trên mobile (mỗi thẻ đủ rộng để đọc — minHeight
+            // 330-360px bên dưới thì 3 thẻ chia đều trên màn hình hẹp sẽ quá
+            // bóp) — số cột tính động (podiumCols) chỉ áp dụng từ sm trở
+            // lên, qua class tĩnh thay vì CSS custom property (để Tailwind
+            // generate class bình thường, không cần inline style).
+            className={`grid grid-cols-1 items-end gap-[22px] px-4 pt-[22px] sm:px-6 lg:px-11 ${
+              podiumCols === 3 ? "sm:grid-cols-3" : podiumCols === 2 ? "sm:grid-cols-2" : "sm:grid-cols-1"
+            }`}
           >
             {isReal
               ? realRows.slice(0, 3).map((b, i) => {
@@ -325,15 +333,15 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                 })}
           </div>
 
-          <div className="grid grid-cols-1 gap-11 px-11 pb-2.5 pt-[30px] lg:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-1 gap-11 px-4 pb-2.5 pt-[30px] sm:px-6 lg:grid-cols-[1fr_320px] lg:px-11">
             <div>
               {hasRows && (
-                <div className="grid grid-cols-[56px_1fr_130px_110px_90px] gap-3.5 border-b border-[#f1efec] px-4 pb-2.5 text-[11.5px] font-semibold tracking-[.7px] text-stone-light">
+                <div className="grid grid-cols-[40px_1fr_90px] gap-3.5 border-b border-[#f1efec] px-4 pb-2.5 text-[11.5px] font-semibold tracking-[.7px] text-stone-light sm:grid-cols-[56px_1fr_130px_110px_90px]">
                   <div>HẠNG</div>
                   <div>{colItem}</div>
-                  <div>{colGenre}</div>
+                  <div className="hidden sm:block">{colGenre}</div>
                   <div className="text-right">{colReads}</div>
-                  <div className="text-right">BIẾN ĐỘNG</div>
+                  <div className="hidden text-right sm:block">BIẾN ĐỘNG</div>
                 </div>
               )}
               {isReal
@@ -343,7 +351,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       <Link
                         key={b.id}
                         href={`/truyen/${b.slug}`}
-                        className="grid grid-cols-[56px_1fr_130px_110px_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] px-4 py-3.5 no-underline transition-colors hover:bg-cream-card"
+                        className="grid grid-cols-[40px_1fr_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] px-4 py-3.5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[56px_1fr_130px_110px_90px]"
                       >
                         <div className="text-xl font-extrabold text-[#c1b9ae]">{b.rank}</div>
                         <div className="flex min-w-0 items-center gap-3.5">
@@ -366,13 +374,13 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                             </div>
                           </div>
                         </div>
-                        <div className="text-[13px] font-medium text-stone-dark">{b.genre ?? "—"}</div>
+                        <div className="hidden text-[13px] font-medium text-stone-dark sm:block">{b.genre ?? "—"}</div>
                         <div className="text-right text-sm font-semibold text-brand-ink">
                           {b.reads.toLocaleString("vi-VN") + " đọc"}
                         </div>
                         <div
                           style={{ color: dl.color, fontWeight: dl.weight }}
-                          className="text-right text-[13px]"
+                          className="hidden text-right text-[13px] sm:block"
                         >
                           {dl.txt}
                         </div>
@@ -386,7 +394,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       <Link
                         key={b.title}
                         href="/read"
-                        className="grid grid-cols-[56px_1fr_130px_110px_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] px-4 py-3.5 no-underline transition-colors hover:bg-cream-card"
+                        className="grid grid-cols-[40px_1fr_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] px-4 py-3.5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[56px_1fr_130px_110px_90px]"
                       >
                         <div className="text-xl font-extrabold text-[#c1b9ae]">{b.rank}</div>
                         <div className="flex min-w-0 items-center gap-3.5">
@@ -401,13 +409,13 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                             <div className="mt-[3px] text-[13px] text-stone">{f.byline}</div>
                           </div>
                         </div>
-                        <div className="text-[13px] font-medium text-stone-dark">{b.genre}</div>
+                        <div className="hidden text-[13px] font-medium text-stone-dark sm:block">{b.genre}</div>
                         <div className="text-right text-sm font-semibold text-brand-ink">
                           {f.reads}
                         </div>
                         <div
                           style={{ color: dl.color, fontWeight: dl.weight }}
-                          className="text-right text-[13px]"
+                          className="hidden text-right text-[13px] sm:block"
                         >
                           {dl.txt}
                         </div>

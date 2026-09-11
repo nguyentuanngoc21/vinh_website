@@ -5,7 +5,24 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr";
 
-export type MegaMenuColumn = { title: string; items: string[] };
+// Item thường là 1 chuỗi (dùng chung href của tiêu đề, đúng hành vi trước
+// đây cho MỌI cột — xem comment ở nav-strip-links.tsx: Audio/Thiết kế chưa
+// có route lọc theo loại nên bấm mục con vẫn ra "tất cả"). Cột "Thể loại"
+// của Truyện chữ giờ có route lọc thật (/truyen?the-loai=...) nên truyền
+// item dạng object có href RIÊNG cho từng thể loại — 2 dạng cùng tồn tại
+// trong 1 mảng `items` vì các cột khác không cần đổi.
+export type MegaMenuItem = string | { label: string; href: string };
+export type MegaMenuColumn = { title: string; items: MegaMenuItem[] };
+
+// Export để mobile-nav-drawer.tsx dùng lại đúng logic này (nó tự vẽ lại
+// mega-menu bên trong drawer mobile, cùng nguồn dữ liệu MEGA_MENUS) thay vì
+// chép lại cách đọc string | {label, href}.
+export function itemLabel(item: MegaMenuItem): string {
+  return typeof item === "string" ? item : item.label;
+}
+export function itemHref(item: MegaMenuItem, fallbackHref: string): string {
+  return typeof item === "string" ? fallbackHref : item.href;
+}
 
 type MegaMenuProps = {
   label: string;
@@ -69,6 +86,10 @@ export function MegaMenu({ label, href, triggerClassName, columns }: MegaMenuPro
         className={`${triggerClassName} inline-flex items-center gap-1.5`}
         onMouseEnter={show}
         onMouseLeave={scheduleHide}
+        onFocus={show}
+        onBlur={scheduleHide}
+        aria-haspopup="true"
+        aria-expanded={open}
       >
         {label}
         <CaretDownIcon size={11} weight="bold" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -90,12 +111,12 @@ export function MegaMenu({ label, href, triggerClassName, columns }: MegaMenuPro
                   <div className="flex flex-col gap-2">
                     {col.items.map((item) => (
                       <Link
-                        key={item}
-                        href={href}
+                        key={itemLabel(item)}
+                        href={itemHref(item, href)}
                         className="text-[13.5px] text-[#3a3a3a] no-underline transition-colors hover:text-brand-gold-dark"
                         onClick={() => setOpen(false)}
                       >
-                        {item}
+                        {itemLabel(item)}
                       </Link>
                     ))}
                   </div>

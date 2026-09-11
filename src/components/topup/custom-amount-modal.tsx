@@ -1,7 +1,7 @@
 "use client";
 
 import { MinusIcon, PlusIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
-import { Field } from "@/components/ui";
+import { Field, Modal } from "@/components/ui";
 import { formatTokens, formatVnd, type TokenPack } from "@/lib/topup";
 
 type CustomAmountModalProps = {
@@ -33,17 +33,8 @@ export function CustomAmountModal({
   onClose,
   onConfirm,
 }: CustomAmountModalProps) {
-  if (!open) return null;
-
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] rounded-[20px] bg-white p-7 shadow-[0_24px_60px_rgba(0,0,0,.28)]"
-      >
+    <Modal open={open} onClose={onClose} panelClassName="max-w-[440px] p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-[family-name:var(--font-lora)] text-xl font-bold text-brand-ink">
@@ -132,7 +123,6 @@ export function CustomAmountModal({
             Xác nhận
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

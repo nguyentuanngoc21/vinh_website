@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChatCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { AVATAR_TONES } from "@/lib/profile";
-import { Field, Alert } from "@/components/ui";
+import { Field, Alert, Skeleton } from "@/components/ui";
 
 type FollowedPerson = {
   userId: string;
@@ -88,7 +88,17 @@ export function FollowingTab({ onMessage }: FollowingTabProps) {
       </div>
 
       {people === null ? (
-        <div className="py-10 text-center text-[13.5px] text-stone-light">Đang tải…</div>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3.5 rounded-2xl border border-cream px-[18px] py-4">
+              <Skeleton className="h-[46px] w-[46px] shrink-0 rounded-full" />
+              <div className="min-w-0 flex-1">
+                <Skeleton className="h-4 w-3/4 rounded-[var(--radius-sm)]" />
+                <Skeleton className="mt-2 h-3 w-1/2 rounded-[var(--radius-sm)]" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">

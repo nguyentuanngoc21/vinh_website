@@ -2,17 +2,18 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { EyeIcon, EyeSlashIcon, ArrowRightIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { createClient } from "@/lib/supabase/client";
 import { Field, Button, Alert } from "@/components/ui";
 import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/lib/password-strength";
+import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
+import { useAsyncSubmit } from "@/lib/hooks/use-async-submit";
 
 type SessionCheck = "checking" | "valid" | "invalid";
 
 export function ResetPasswordForm() {
-  const router = useRouter();
+  const navigate = usePendingNavigate();
   const { resetPassword } = useRole();
 
   // /api/auth/confirm already exchanged the emailed code for a recovery
@@ -39,8 +40,7 @@ export function ResetPasswordForm() {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = useAsyncSubmit(resetPassword);
 
   const score = passwordScore(pw);
   const match = pw2.length > 0 && pw === pw2;
@@ -56,15 +56,8 @@ export function ResetPasswordForm() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready) return;
-    setPending(true);
-    setError(null);
-    const result = await resetPassword(pw);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    router.push("/");
+    const result = await run(pw);
+    if (result.ok) navigate("/");
   };
 
   if (sessionCheck === "checking") {

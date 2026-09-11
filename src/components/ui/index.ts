@@ -1,6 +1,11 @@
 export { Field } from "./field";
+export { Textarea } from "./textarea";
 export { Button } from "./button";
 export { Alert } from "./alert";
+export { Modal } from "./modal";
+export { Skeleton } from "./skeleton";
+export { Tabs } from "./tabs";
+export { ToastProvider, useToast } from "./toast";
 export { Checkbox } from "./checkbox";
 export { Breadcrumbs, type BreadcrumbItem } from "./breadcrumbs";
 export { GenreSelect } from "./genre-select";

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr";
-import { Alert } from "@/components/ui";
+import { Alert, Skeleton } from "@/components/ui";
 import { AGREEMENTS } from "@/lib/legal/registry";
 import { AgreementDocumentViewer, formatVi, type AgreementRow } from "@/components/legal/agreement-document-viewer";
 import { acceptAgreement, missingInfoUrl } from "@/lib/legal/accept-agreement";
@@ -94,7 +94,12 @@ export function AgreementsTab() {
   if (state === "loading") {
     return (
       <div className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
-        <div className="text-[13.5px] text-stone-light">Đang tải…</div>
+        <Skeleton className="mb-4 h-10 w-full max-w-[360px] rounded-[10px]" />
+        <div className="flex flex-col gap-2.5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-[var(--radius-md)]" />
+          ))}
+        </div>
       </div>
     );
   }

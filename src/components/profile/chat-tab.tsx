@@ -12,7 +12,7 @@ import {
 import { AVATAR_TONES } from "@/lib/profile";
 import { timeLabel, messageTimeLabel, isNewSession, sessionDividerLabel } from "@/lib/format-time";
 import { autoGrowTextarea, resetTextareaHeight } from "@/lib/autogrow-textarea";
-import { Field, Alert } from "@/components/ui";
+import { Field, Alert, Skeleton } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
 
 type MessageContext = "personal" | "moderation";
@@ -380,9 +380,21 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
             mobileView === "list" ? "max-[759px]:hidden" : ""
           }`}
         >
-          {!activeUserId || !threadReady || !counterparty ? (
+          {!activeUserId ? (
             <div className="flex flex-1 items-center justify-center px-6 text-center text-[13.5px] text-stone-light">
-              {activeUserId ? "Đang tải…" : "Chọn một hội thoại để bắt đầu nhắn tin."}
+              Chọn một hội thoại để bắt đầu nhắn tin.
+            </div>
+          ) : !threadReady || !counterparty ? (
+            <div className="flex flex-1 flex-col">
+              <div className="flex items-center gap-3 border-b border-[#f0f0ef] bg-white px-[18px] py-3.5">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <Skeleton className="h-4 w-32 rounded-[var(--radius-sm)]" />
+              </div>
+              <div className="flex flex-1 flex-col justify-end gap-2.5 px-[18px] py-4">
+                <Skeleton className="h-9 w-2/3 self-start rounded-2xl" />
+                <Skeleton className="h-9 w-1/2 self-end rounded-2xl" />
+                <Skeleton className="h-9 w-3/5 self-start rounded-2xl" />
+              </div>
             </div>
           ) : (
             <>
@@ -479,22 +491,24 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   ghi chú ở container ngoài cùng); tự "dính" đáy màn hình
                   khi cuộn, đúng hành vi chat mobile chuẩn, bất kể
                   SiteHeader/ProfileHeader cao bao nhiêu. */}
-              {/* KHÔNG dùng Field/Button dùng chung ở đây — Field chỉ áp
-                  className truyền vào lên <input> BÊN TRONG, không lên
-                  <label> bọc ngoài (chính là flex item thật của hàng này),
-                  nên flex-1 vô tác dụng và ô nhập co lại gần như biến mất.
-                  Button có base class w-full LUÔN thắng bất kỳ class ghi
-                  đè width nào (thứ tự utility trong CSS Tailwind build ra
-                  quyết định thắng-thua, không phải thứ tự viết trong
-                  className — đã kiểm chứng: .w-8{} đứng TRƯỚC .w-full{}
-                  trong stylesheet), nên nút gửi luôn giãn full-width dù
-                  truyền w-[38px]. Cả 2 lỗi có sẵn từ trước (không phải mới
-                  đổi), chỉ lộ ra khi test kỹ luồng chat — sửa cục bộ ở đây
-                  bằng phần tử thuần, không đụng field.tsx/button.tsx dùng
-                  chung (nơi khác đang chạy đúng, sửa chung dễ vỡ chỗ khác).
-                  textarea (thay vì input) + autoGrowTextarea còn cho tự
-                  giãn dòng khi soạn tin dài — input cũ không làm được vì
-                  input luôn 1 dòng bất kể CSS. items-end (thay vì
+              {/* KHÔNG dùng Field/Button dùng chung ở đây. 2 lỗi API từng
+                  chặn việc này (Field không forward className lên <label>
+                  bọc ngoài; Button có base class w-full luôn thắng class
+                  ghi đè width) ĐÃ ĐƯỢC SỬA — xem `wrapperClassName` trong
+                  field.tsx/textarea.tsx và prop `fullWidth` trong
+                  button.tsx. Vẫn giữ phần tử thuần ở đây vì lý do khác: ô
+                  nhập là pill bo tròn hết cỡ, không viền, nền
+                  neutral-bg + auto-grow theo nội dung (autoGrowTextarea) —
+                  khác hẳn hình dạng chuẩn của Field/Textarea (bo góc nhỏ,
+                  có viền, nền trắng); nút gửi là nút tròn chỉ-icon 38×38 —
+                  Button chưa có biến thể icon-only (chỉ có 3 biến thể
+                  primary/dark/ghost dạng chữ). Ép cả hai vào Field/Button
+                  sẽ phải ghi đè gần hết class nền tảng, rủi ro hơn lợi ích
+                  thống nhất — giữ nguyên phần tử thuần, chỉ 2 lỗi trên
+                  (đã sửa ở chỗ dùng chung) là lý do gốc bị chặn, không phải
+                  hình dạng. textarea (thay vì input) + autoGrowTextarea còn
+                  cho tự giãn dòng khi soạn tin dài — input cũ không làm
+                  được vì input luôn 1 dòng bất kể CSS. items-end (thay vì
                   items-center) để nút gửi ghim đáy khi textarea cao lên. */}
               <div className="flex shrink-0 items-end gap-2.5 border-t border-[#f0f0ef] bg-white px-4 py-3 max-[759px]:sticky max-[759px]:bottom-0 max-[759px]:z-10">
                 <textarea

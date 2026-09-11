@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr";
-import { BankSelect, Field, Button, Alert } from "@/components/ui";
+import { BankSelect, Field, Button, Alert, Skeleton } from "@/components/ui";
 import { findBankByCode, type VietnamBank } from "@/lib/banks";
 
 type LoadState = "loading" | "ready";
@@ -79,7 +79,14 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
   };
 
   if (state === "loading") {
-    return <div className="text-[13.5px] text-stone-light">Đang tải…</div>;
+    return (
+      <div className="flex flex-col gap-3.5">
+        <Skeleton className="h-11 w-full rounded-[10px]" />
+        <Skeleton className="h-11 w-full rounded-[10px]" />
+        <Skeleton className="h-11 w-full rounded-[10px]" />
+        <Skeleton className="h-11 w-40 rounded-[10px]" />
+      </div>
+    );
   }
 
   return (
@@ -125,7 +132,8 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
         type="button"
         onClick={handleSave}
         disabled={!ready}
-        className="w-auto self-start px-6 py-[11px] text-sm font-semibold"
+        fullWidth={false}
+        className="self-start px-6 py-[11px] text-sm font-semibold"
       >
         {pending ? "Đang lưu…" : "Lưu thông tin ngân hàng"}
       </Button>

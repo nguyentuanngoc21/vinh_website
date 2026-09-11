@@ -12,7 +12,7 @@ import {
   TargetIcon,
   ArrowsCounterClockwiseIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Alert } from "@/components/ui";
+import { Alert, Skeleton } from "@/components/ui";
 
 type QuestSlot = {
   slotIndex: number;
@@ -150,7 +150,12 @@ export function DailyTasksTab() {
   if (state === "loading") {
     return (
       <div className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
-        <div className="text-[13.5px] text-stone-light">Đang tải…</div>
+        <Skeleton className="mb-4 h-16 w-full rounded-2xl" />
+        <div className="flex flex-col gap-2.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-[72px] w-full rounded-2xl" />
+          ))}
+        </div>
       </div>
     );
   }

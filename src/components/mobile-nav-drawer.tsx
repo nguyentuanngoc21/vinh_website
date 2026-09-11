@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ListIcon, XIcon, CaretDownIcon } from "@phosphor-icons/react/dist/ssr";
 import { NAV_ITEMS, MEGA_MENUS, deriveActive, type NavKey } from "@/components/nav-strip-links";
+import { itemLabel, itemHref } from "@/components/mega-menu";
 
 /**
  * Hamburger + drawer trượt vào từ bên phải, chỉ hiện dưới `lg` — nằm ở đầu
@@ -136,12 +137,12 @@ export function MobileNavDrawer() {
                               <div className="flex flex-col gap-2">
                                 {col.items.map((subItem) => (
                                   <Link
-                                    key={subItem}
-                                    href={item.href}
+                                    key={itemLabel(subItem)}
+                                    href={itemHref(subItem, item.href)}
                                     onClick={closeDrawer}
                                     className="text-[13.5px] text-[#3a3a3a] no-underline transition-colors hover:text-brand-gold-dark"
                                   >
-                                    {subItem}
+                                    {itemLabel(subItem)}
                                   </Link>
                                 ))}
                               </div>

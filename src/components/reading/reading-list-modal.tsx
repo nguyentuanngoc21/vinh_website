@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckIcon, PlusIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
+import { Modal, Skeleton } from "@/components/ui";
 
 type ReadingList = { id: string; name: string; createdAt: string; containsBook: boolean };
 
@@ -48,8 +49,6 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
 
     load();
   }, [open, bookId]);
-
-  if (!open) return null;
 
   const setPending = (id: string, on: boolean) => {
     setPendingIds((prev) => {
@@ -121,11 +120,7 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
   };
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[420px] rounded-[20px] bg-white p-7 shadow-[0_24px_60px_rgba(0,0,0,.28)]"
-      >
+    <Modal open={open} onClose={onClose} panelClassName="max-w-[420px] p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-[family-name:var(--font-lora)] text-xl font-bold text-brand-ink">Thêm vào danh sách đọc</div>
@@ -137,7 +132,8 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
         </div>
 
         <div className="mt-5 flex max-h-[240px] flex-col gap-1 overflow-y-auto">
-          {loading && <div className="py-3 text-center text-sm text-stone">Đang tải…</div>}
+          {loading &&
+            [0, 1, 2].map((i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
           {!loading && lists.length === 0 && (
             <div className="py-3 text-center text-sm text-stone">Chưa có danh sách nào — tạo mới bên dưới.</div>
           )}
@@ -181,7 +177,6 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
             <PlusIcon weight="bold" /> Tạo
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

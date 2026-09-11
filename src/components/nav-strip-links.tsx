@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MegaMenu, type MegaMenuColumn } from "@/components/mega-menu";
-import { BOOK_GENRES } from "@/lib/covers/genre-styles";
+import { BOOK_GENRES, GENRE_SLUGS } from "@/lib/covers/genre-styles";
 
 export type NavKey = "home" | "audio" | "blog" | "design" | "connect" | "rankings";
 
@@ -22,16 +22,19 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 // Audio/Thiết kế: đúng nội dung mega-menu trong Vịnh Trang chủ.dc.html
-// (.vn-mega/.vn-pop). "Truyện chữ": KHÔNG lấy nội dung design mock — dùng
-// BOOK_GENRES (src/lib/covers/genre-styles.ts, nguồn thể loại DUY NHẤT
-// của hệ thống) để giữ đúng yêu cầu ban đầu "giữ thể loại truyện chữ như
-// hiện tại", chỉ thêm hiển thị hover đang thiếu chứ không đổi danh sách
-// thể loại. Mọi mục (kể cả từng thể loại) đều trỏ về `href` KHÔNG lọc —
-// giống hệt cách Audio/Thiết kế đang làm (chưa có route lọc theo thể
-// loại/loại hình thật), nên bấm vào tiêu đề hay bấm vào 1 mục con đều ra
-// cùng 1 trang "tất cả", không có mục nào lọc ra kết quả khác nhau.
+// (.vn-mega/.vn-pop) — mọi mục con vẫn trỏ về `href` KHÔNG lọc (chưa có
+// route lọc theo loại hình thật). "Truyện chữ": KHÔNG lấy nội dung design
+// mock — dùng BOOK_GENRES (src/lib/covers/genre-styles.ts, nguồn thể loại
+// DUY NHẤT của hệ thống); mỗi thể loại giờ trỏ tới `/truyen?the-loai=<slug>`
+// RIÊNG (route lọc thật — xem src/app/truyen/page.tsx), khác với Audio/
+// Thiết kế ở trên.
 export const MEGA_MENUS: Partial<Record<NavKey, MegaMenuColumn[]>> = {
-  home: [{ title: "Thể loại", items: [...BOOK_GENRES] }],
+  home: [
+    {
+      title: "Thể loại",
+      items: BOOK_GENRES.map((genre) => ({ label: genre, href: `/truyen?the-loai=${GENRE_SLUGS[genre]}` })),
+    },
+  ],
   audio: [
     { title: "Lồng tiếng", items: ["Người kể chuyện", "Thoại nhân vật một giọng", "Thoại nhân vật nhiều giọng"] },
     { title: "Nhạc cụ", items: ["Sáo", "Piano", "Trống"] },
