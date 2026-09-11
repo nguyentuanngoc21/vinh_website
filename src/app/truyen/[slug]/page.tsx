@@ -111,10 +111,10 @@ export default async function StoryPage({ params }: PageProps<"/truyen/[slug]">)
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
-        <SiteHeader />
+        <SiteHeader sticky={false} />
         <main className="px-4 py-6 sm:px-8 sm:py-9 lg:px-11">
-          <div className="flex flex-col gap-8 sm:flex-row">
-            <div className="mx-auto w-[180px] shrink-0 sm:mx-0 sm:w-[200px]">
+          <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
+            <div className="mx-auto w-[156px] shrink-0 sm:mx-0 sm:w-[200px]">
               <div className="aspect-[2/3] overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]">
                 <BookCover
                   id={book.id}
@@ -163,14 +163,14 @@ export default async function StoryPage({ params }: PageProps<"/truyen/[slug]">)
               )}
 
               {book.synopsis ? (
-                <p className="mt-4 whitespace-pre-line text-[14.5px] leading-[1.7] text-ink">{book.synopsis}</p>
+                <p className="mt-4 max-w-[900px] whitespace-pre-line text-[14.5px] leading-[1.7] text-ink">{book.synopsis}</p>
               ) : (
                 <p className="mt-4 text-[14.5px] italic text-stone-light">Truyện này chưa có mô tả</p>
               )}
             </div>
           </div>
 
-          <div className="mt-10 max-w-[720px]">
+          <div className="mt-8 max-w-[900px] sm:mt-10">
             <StoryTabs
               bookSlug={book.slug}
               status={status}
