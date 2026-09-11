@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { genres as REAL_GENRES } from "@/lib/books";
 import { BookCover } from "@/components/covers/book-cover";
+import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import { DevelopmentOverlay } from "@/components/development-overlay";
 import { REAL_PERIODS, type BookRankingsData, type RealPeriodId } from "@/lib/rankings/get-book-rankings";
 import {
@@ -227,17 +228,37 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
             {isReal
               ? realRows.slice(0, 3).map((b, i) => {
                   const dl = formatRealDelta(b.delta, b.isNew);
+                  const cardBackground = i === 0 ? "var(--color-brand-ink-dark)" : "var(--color-brand-ink)";
+                  const palette = !b.coverUrl
+                    ? buildCoverSpec({ id: b.id, title: b.title, author: b.authorNickname, genre: b.genre }).palette
+                    : null;
                   return (
                     <Link
                       key={b.id}
                       href={`/truyen/${b.slug}`}
                       style={{
-                        background: i === 0 ? "var(--color-brand-ink-dark)" : "var(--color-brand-ink)",
+                        background: cardBackground,
                         minHeight: i === 0 ? "360px" : "330px",
                         border: i === 0 ? "1px solid rgba(217,164,65,.5)" : "1px solid transparent",
                       }}
-                      className="relative block rounded-[20px] p-[26px] text-white no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.16)]"
+                      className="relative isolate block overflow-hidden rounded-[20px] p-[26px] text-white no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.16)]"
                     >
+                      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                        <div
+                          className="absolute inset-0 scale-[1.2] bg-cover bg-center opacity-65 blur-[28px]"
+                          style={{
+                            backgroundImage: b.coverUrl
+                              ? `url(${JSON.stringify(b.coverUrl)})`
+                              : `linear-gradient(135deg, ${palette?.from}, ${palette?.to})`,
+                          }}
+                        />
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: `linear-gradient(to bottom, color-mix(in srgb, ${cardBackground} 28%, transparent) 0%, color-mix(in srgb, ${cardBackground} 50%, transparent) 42%, ${cardBackground} 76%)`,
+                          }}
+                        />
+                      </div>
                       <div
                         style={{ background: MEDAL_BG[i] }}
                         className="absolute right-[18px] top-[18px] flex h-[34px] w-[34px] items-center justify-center rounded-full text-base font-extrabold text-brand-ink"
