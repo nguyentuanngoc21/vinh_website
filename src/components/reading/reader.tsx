@@ -58,7 +58,7 @@ const THEMES: Record<ThemeName, ThemeColors> = {
     ink: "var(--color-brand-ink)",
     inkSoft: "var(--color-stone-alt)",
     hair: "var(--color-cream-border)",
-    wmColor: "rgba(20,59,77,.07)",
+    wmColor: "rgba(20,59,77,.035)",
     tintBg: "var(--color-info-bg)",
     tintBorder: "var(--color-sidebar-text)",
     tintInk: "#2C5870",
@@ -72,7 +72,7 @@ const THEMES: Record<ThemeName, ThemeColors> = {
     ink: "#5c4524",
     inkSoft: "#9a8a72",
     hair: "#D6C3A4",
-    wmColor: "rgba(92,69,36,.08)",
+    wmColor: "rgba(92,69,36,.04)",
     tintBg: "#E3D2B4",
     tintBorder: "#cdb893",
     tintInk: "#7a5a2a",
@@ -86,7 +86,7 @@ const THEMES: Record<ThemeName, ThemeColors> = {
     ink: "#ece4d6",
     inkSoft: "var(--color-stone-alt)",
     hair: "#2e2823",
-    wmColor: "rgba(233,192,116,.07)",
+    wmColor: "rgba(233,192,116,.04)",
     tintBg: "#231d18",
     tintBorder: "#3a322a",
     tintInk: "var(--color-brand-gold-light)",
@@ -1249,13 +1249,12 @@ export function Reader({
 
           <div
             style={{ background: c.tintBg, borderColor: c.tintBorder, color: c.tintInk }}
-            className="mb-[30px] inline-flex items-center gap-2 rounded-lg border px-[13px] py-2 text-xs font-medium"
+            className="mb-[26px] inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold"
           >
-            <ShieldCheckIcon /> Nội dung được bảo hộ · phần mềm phát hiện sao chép, chụp màn hình ·
-            watermark theo phiên đọc của bạn
+            <ShieldCheckIcon className="shrink-0" /> Nội dung được bảo hộ
           </div>
 
-{warningMessage ? (
+          {warningMessage ? (
               <div className="mb-6 rounded-[14px] border border-[#F3C6C6] bg-[#FBEDEC] px-4 py-3 text-sm text-[#B02A37]">
                 {warningMessage}
               </div>

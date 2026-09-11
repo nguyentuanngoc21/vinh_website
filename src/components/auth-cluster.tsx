@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   ShieldCheckIcon,
   UserCircleIcon,
@@ -23,6 +24,7 @@ export function AuthCluster({
   ctaLabel?: string;
   ctaHref?: string;
 }) {
+  const pathname = usePathname();
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -69,6 +71,13 @@ export function AuthCluster({
   // thật sự được tạo lúc bấm Lưu/Xuất bản lần đầu ở đó (xem
   // new-work-workspace.tsx + POST /api/authoring/books).
   const ctaHrefResolved = isGuest ? "/dang-nhap" : ctaHref;
+  const showMobileFab =
+    pathname !== "/" &&
+    !pathname.startsWith("/truyen") &&
+    !pathname.startsWith("/read") &&
+    !pathname.startsWith("/blog") &&
+    !pathname.startsWith("/rankings") &&
+    !pathname.startsWith("/tim-kiem");
 
   return (
     <>
@@ -103,6 +112,7 @@ export function AuthCluster({
           full-width trên mobile, trên MiniPlayerBar (z-30). Portal ra
           document.body — xem lý do ở khai báo `mounted` phía trên. */}
       {mounted &&
+        showMobileFab &&
         createPortal(
           <Link
             href={ctaHrefResolved}

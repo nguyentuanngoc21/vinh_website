@@ -37,20 +37,20 @@ const CACHE_HEADERS = {
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ bookId: string }> }
 ) {
-  const { id } = await params;
+  const { bookId } = await params;
 
   const supabase = await createClient();
 
   const { data: book, error: bookError } = await supabase
     .from("books")
     .select("id, title, author_id, genre, cover_design_item_id")
-    .eq("id", id)
+    .eq("id", bookId)
     .maybeSingle();
 
   if (bookError) {
-    console.error("[covers] /api/books/[id]/cover: query books failed:", bookError);
+    console.error("[covers] /api/books/[bookId]/cover: query books failed:", bookError);
   }
   if (!book) {
     // RLS đã lo phần "sách chưa published và không phải chủ sở hữu" —

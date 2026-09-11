@@ -10,7 +10,7 @@ import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
 const VISIBLE_DEPTH = 3;
 const STAGE_WIDTH = 1160;
-const STAGE_HEIGHT = 470;
+const STAGE_HEIGHT = 430;
 
 function mod(i: number, n: number) {
   return ((i % n) + n) % n;

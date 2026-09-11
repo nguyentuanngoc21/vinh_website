@@ -4,6 +4,7 @@ import { AuthCluster } from "@/components/auth-cluster";
 import { VinhMark } from "@/components/ui";
 
 type SiteHeaderProps = {
+  sticky?: boolean;
   /** Home renders the nav bar itself, further down the page (không sticky
    * cùng header — xem book-coverflow.tsx). */
   showNav?: boolean;
@@ -22,6 +23,7 @@ type SiteHeaderProps = {
 };
 
 export function SiteHeader({
+  sticky = true,
   showNav = true,
   showSearch = true,
   searchPlaceholder = "Tìm truyện, tác giả…",
@@ -31,7 +33,7 @@ export function SiteHeader({
   ctaHref = "/author/new",
 }: SiteHeaderProps = {}) {
   return (
-    <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11">
+    <header className={`${sticky ? "sticky top-0 z-20" : "relative z-10"} flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11`}>
       {/* Logo + AuthCluster — giữ nguyên ở mọi kích thước màn hình, không
           ẩn/thu gọn gì thêm (ô tìm kiếm đã chuyển xuống thanh nav màu
           brand-ink bên dưới — xem NavBarContent). Bookmark ("Tác phẩm đã
