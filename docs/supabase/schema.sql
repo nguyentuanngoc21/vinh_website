@@ -166,6 +166,19 @@ create index direct_messages_thread_idx
 create index direct_messages_unread_idx
   on public.direct_messages (recipient_id, sender_id) where read_at is null;
 
+-- Phục vụ GET /api/messages (danh sách hội thoại — "sender_id = :me OR
+-- recipient_id = :me", không lọc theo 1 đối tác cụ thể nên
+-- direct_messages_thread_idx ở trên không dùng được). Xem
+-- migrations/20260912_add_direct_messages_participant_indexes.sql —
+-- migration đó dùng CREATE INDEX CONCURRENTLY (production đã có
+-- traffic), ở đây dùng cú pháp thường vì schema.sql chỉ dùng để dựng
+-- project mới từ đầu (chưa có traffic, không cần CONCURRENTLY).
+create index direct_messages_sender_created_idx
+  on public.direct_messages (sender_id, created_at desc);
+
+create index direct_messages_recipient_created_idx
+  on public.direct_messages (recipient_id, created_at desc);
+
 alter table public.direct_messages enable row level security;
 
 create policy "participants read their own messages"
