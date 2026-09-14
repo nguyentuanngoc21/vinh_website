@@ -1,0 +1,58 @@
+-- Migration: index cho truy vấn "danh sách thông báo" (GET /api/notifications)
+-- — sửa lỗi 504 Gateway Timeout thật đã xảy ra trên production lúc 2026-09-14
+-- 19:50 (giờ VN) cùng lúc với timeout ở /api/messages ("[notifications] list
+-- failed: { message: 'Gateway Timeout' }", src/app/api/notifications/route.ts).
+--
+-- Nguyên nhân: CÙNG một dạng bug đã gặp ở direct_messages (xem
+-- migrations/20260912_add_direct_messages_participant_indexes.sql). Route
+-- chạy
+--   WHERE user_id = :me ORDER BY created_at DESC LIMIT 30
+-- trên TOÀN BỘ thông báo của user (cả đã đọc lẫn chưa đọc — route không lọc
+-- read_at). Index hiện có, notifications_user_unread_idx (xem
+-- docs/supabase/schema.sql), là PARTIAL INDEX — "(user_id, created_at) WHERE
+-- read_at IS NULL" — chỉ phục vụ được nhánh "chưa đọc". Một user tích luỹ
+-- càng nhiều thông báo ĐÃ đọc, Postgres càng phải seq scan + sort toàn bảng
+-- notifications để trả lời đúng truy vấn "tất cả, mới nhất trước" — giống hệt
+-- cơ chế đã gây 504 ở direct_messages, và nhiều khả năng chính seq scan này
+-- (chạy song song với seq scan direct_messages) là nguyên nhân khiến cả
+-- truy vấn PK đơn giản khác ("[messages] profiles lookup failed") cũng bị
+-- kéo theo timeout trong cùng khung giờ — DB bão hoà CPU/connection, không
+-- phải bản thân truy vấn profiles có vấn đề.
+--
+-- Fix: thêm 1 index thường (không partial) trên (user_id, created_at) —
+-- phục vụ đúng truy vấn "mọi thông báo của tôi, mới nhất trước" mà không cần
+-- filter read_at. Giữ nguyên notifications_user_unread_idx (route PATCH
+-- markAllRead vẫn lọc theo read_at IS NULL, được lợi từ partial index đó).
+--
+-- Dùng CONCURRENTLY — bảng đang có traffic ghi thật (thông báo mới liên tục
+-- được tạo). KHÔNG được chạy trong transaction block: dán và Run ĐÚNG 1 câu
+-- CREATE INDEX bên dưới trong Supabase SQL Editor, đợi xong hẳn — không dán
+-- kèm câu SQL nào khác trong cùng 1 lần Run (xem giải thích chi tiết ở
+-- migrations/20260912_add_direct_messages_participant_indexes.sql, mục
+-- "QUAN TRỌNG").
+--
+-- Run in the Supabase SQL editor (or via psql). Test in staging first.
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS notifications_user_created_idx
+  ON public.notifications (user_id, created_at DESC);
+
+-- Notes:
+-- 1. Idempotent: CÓ — IF NOT EXISTS. Nếu CONCURRENTLY bị ngắt giữa chừng và
+--    để lại index INVALID, DROP INDEX CONCURRENTLY IF EXISTS
+--    notifications_user_created_idx rồi chạy lại câu CREATE ở trên.
+-- 2. Cập nhật docs/supabase/schema.sql — thêm CREATE INDEX này ngay sau
+--    notifications_user_unread_idx (không CONCURRENTLY ở đó, cùng lý do đã
+--    ghi ở migration 20260912: schema.sql dựng project MỚI, chưa có traffic).
+-- 3. Không đổi src/lib/supabase/types.ts — chỉ thêm index, không thêm
+--    cột/bảng.
+-- 4. Không đổi code route — index này chỉ tăng tốc truy vấn hiện có ở
+--    src/app/api/notifications/route.ts, không đổi hành vi/kết quả trả về.
+-- 5. Đã xác nhận trên production (2026-09-14, sau sự cố) — 2 index của
+--    migration 20260912 (direct_messages_sender_created_idx,
+--    direct_messages_recipient_created_idx) ĐÃ tồn tại, không phải nguyên
+--    nhân lần 504 này. Suy ra: seq scan của chính notifications (bảng này
+--    gần như chắc chắn được GET /api/notifications gọi ở MỌI trang có
+--    header — chuông thông báo — tần suất cao hơn hẳn /api/messages) nhiều
+--    khả năng là nguồn tải chính khiến DB bão hoà rồi kéo theo timeout ở cả
+--    direct_messages (dù đã có index) lẫn profiles lookup (PK lookup đơn
+--    giản) trong cùng khung giờ — không phải 3 lỗi độc lập.
