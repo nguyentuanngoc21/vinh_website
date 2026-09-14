@@ -3,7 +3,15 @@
 import { useRef, useState } from "react";
 import { CameraIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert } from "@/components/ui";
+import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { createClient } from "@/lib/supabase/client";
+
+// Tỉ lệ khung crop ảnh bìa — banner ở đây co giãn theo viewport (h-[120px]
+// -> h-[210px], w-full) nên không có 1 tỉ lệ "đúng" duy nhất; 2.7:1 là mức
+// trung bình hợp lý (gần khung ảnh bìa Facebook), đủ rộng để không quá mỏng
+// trong modal crop, chấp nhận lệch nhẹ so với tỉ lệ hiển thị thật ở 2 đầu
+// breakpoint — mọi tính năng "ảnh bìa" đều đánh đổi tương tự.
+const COVER_CROP_ASPECT = 2.7;
 
 type ProfileHeaderProps = {
   nickname: string;
@@ -44,15 +52,21 @@ export function ProfileHeader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Object URL của ảnh bìa vừa chọn, chờ crop — null = modal đóng.
+  const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarPending, setAvatarPending] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [avatarCropSrc, setAvatarCropSrc] = useState<string | null>(null);
 
   const handlePick = () => fileInputRef.current?.click();
   const handlePickAvatar = () => avatarInputRef.current?.click();
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Chỉ chọn + validate file ở đây — việc crop (kéo/zoom/cắt kiểu Facebook,
+  // xem image-crop-modal.tsx) và upload tách ra 2 hàm riêng bên dưới, chạy
+  // SAU khi người dùng bấm "Xong" trong modal crop.
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     // Cho phép chọn lại đúng file đó ở lần sau (onChange không bắn lại
     // nếu value không đổi).
@@ -68,6 +82,42 @@ export function ProfileHeader({
       return;
     }
 
+    setError(null);
+    setCoverCropSrc(URL.createObjectURL(file));
+  };
+
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Cho phép chọn lại đúng file đó ở lần sau (onChange không bắn lại
+    // nếu value không đổi).
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Chỉ nhận file ảnh.");
+      return;
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarError("Ảnh đại diện tối đa 15MB.");
+      return;
+    }
+
+    setAvatarError(null);
+    setAvatarCropSrc(URL.createObjectURL(file));
+  };
+
+  const closeCoverCrop = () => {
+    if (coverCropSrc) URL.revokeObjectURL(coverCropSrc);
+    setCoverCropSrc(null);
+  };
+
+  const closeAvatarCrop = () => {
+    if (avatarCropSrc) URL.revokeObjectURL(avatarCropSrc);
+    setAvatarCropSrc(null);
+  };
+
+  const uploadCover = async (file: File) => {
+    closeCoverCrop();
     setPending(true);
     setError(null);
 
@@ -111,26 +161,12 @@ export function ProfileHeader({
     onCoverSaved?.(confirmData.coverImageUrl ?? null);
   };
 
-  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    // Cho phép chọn lại đúng file đó ở lần sau (onChange không bắn lại
-    // nếu value không đổi).
-    e.target.value = "";
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setAvatarError("Chỉ nhận file ảnh.");
-      return;
-    }
-    if (file.size > AVATAR_MAX_BYTES) {
-      setAvatarError("Ảnh đại diện tối đa 15MB.");
-      return;
-    }
-
+  const uploadAvatar = async (file: File) => {
+    closeAvatarCrop();
     setAvatarPending(true);
     setAvatarError(null);
 
-    // Cùng flow 3 bước với handleFile (ảnh bìa) — xem comment ở đó.
+    // Cùng flow 3 bước với uploadCover — xem comment ở đó.
     const createRes = await fetch("/api/profile/avatar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -255,6 +291,32 @@ export function ProfileHeader({
           </div>
         </div>
       </section>
+
+      {/* key={coverCropSrc}: mỗi ảnh mới chọn ứng với 1 key khác nhau, buộc
+          React unmount/remount component — cách reset crop/zoom nội bộ về
+          mặc định mà không cần effect (xem comment trong image-crop-modal.tsx). */}
+      <ImageCropModal
+        key={coverCropSrc}
+        open={!!coverCropSrc}
+        imageSrc={coverCropSrc}
+        aspect={COVER_CROP_ASPECT}
+        cropShape="rect"
+        title="Cắt ảnh bìa"
+        outputFileName="cover"
+        onCancel={closeCoverCrop}
+        onConfirm={uploadCover}
+      />
+      <ImageCropModal
+        key={avatarCropSrc}
+        open={!!avatarCropSrc}
+        imageSrc={avatarCropSrc}
+        aspect={1}
+        cropShape="round"
+        title="Cắt ảnh đại diện"
+        outputFileName="avatar"
+        onCancel={closeAvatarCrop}
+        onConfirm={uploadAvatar}
+      />
     </>
   );
 }
