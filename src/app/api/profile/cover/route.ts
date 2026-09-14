@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 
-const COVER_MAX_BYTES = 5 * 1024 * 1024;
+// Xem giải thích đầy đủ trong api/profile/avatar/route.ts — cùng lý do,
+// cùng cơ chế signed upload URL, cùng chốt chặn 15MB ở bucket "avatars".
 const ALLOWED_MIME_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -13,8 +14,12 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
  * Ảnh bìa trang cá nhân/tác giả — cùng bucket "avatars" đã có (public,
  * RLS folder-per-user), khác filename prefix ("cover-" thay vì
  * "avatar-"). Không cần bucket/migration storage riêng — xem
- * migrations/20260828_add_profile_cover_image.sql. Pattern multipart
- * upload mirror api/profile/identity/route.ts.
+ * migrations/20260828_add_profile_cover_image.sql.
+ *
+ * Upload đi qua signed upload URL (POST tạo URL -> client PUT thẳng lên
+ * Storage -> PATCH xác nhận), KHÔNG còn multipart qua route này — mirror
+ * api/profile/avatar/route.ts (đọc comment ở đó để biết lý do bỏ qua
+ * giới hạn body ~4.5MB của Vercel Serverless Functions).
  */
 export async function GET() {
   const supabase = createServiceRoleClient();
@@ -35,6 +40,7 @@ export async function GET() {
   return NextResponse.json({ coverImageUrl: data.cover_image_url });
 }
 
+/** Bước 1: sinh signed upload URL cho client PUT thẳng file lên Storage. */
 export async function POST(request: Request) {
   const supabase = createServiceRoleClient();
   const userId = await getAuthedUserId(supabase);
@@ -42,34 +48,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const form = await request.formData().catch(() => null);
-  if (!form) {
-    return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
-  }
-
-  const file = form.get("cover");
-  if (!(file instanceof File) || file.size === 0) {
-    return NextResponse.json({ error: "Thiếu ảnh bìa." }, { status: 400 });
-  }
-
-  const ext = ALLOWED_MIME_EXT[file.type];
+  const body = await request.json().catch(() => null);
+  const contentType = typeof body?.contentType === "string" ? body.contentType : null;
+  const ext = contentType ? ALLOWED_MIME_EXT[contentType] : null;
   if (!ext) {
     return NextResponse.json(
       { error: "Chỉ nhận ảnh định dạng JPG, PNG hoặc WEBP." },
       { status: 400 }
     );
   }
-  if (file.size > COVER_MAX_BYTES) {
-    return NextResponse.json({ error: "Ảnh bìa tối đa 5MB." }, { status: 400 });
-  }
 
   const path = `${userId}/cover-${Date.now()}.${ext}`;
-  const { error: uploadError } = await supabase.storage
-    .from("avatars")
-    .upload(path, file, { contentType: file.type });
-  if (uploadError) {
-    console.error("[profile/cover] upload failed:", uploadError);
-    return NextResponse.json({ error: `Tải ảnh bìa thất bại: ${uploadError.message}` }, { status: 500 });
+  const { data, error } = await supabase.storage.from("avatars").createSignedUploadUrl(path);
+  if (error || !data) {
+    console.error("[profile/cover] createSignedUploadUrl failed:", error);
+    return NextResponse.json({ error: "Không tạo được link tải ảnh." }, { status: 500 });
+  }
+
+  return NextResponse.json({ path: data.path, token: data.token, signedUrl: data.signedUrl });
+}
+
+/** Bước 2: client đã upload xong lên `path` — xác nhận và lưu vào hồ sơ. */
+export async function PATCH(request: Request) {
+  const supabase = createServiceRoleClient();
+  const userId = await getAuthedUserId(supabase);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const path = typeof body?.path === "string" ? body.path : null;
+  if (!path || !path.startsWith(`${userId}/cover-`)) {
+    return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
   const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);

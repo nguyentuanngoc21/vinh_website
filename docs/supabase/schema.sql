@@ -472,6 +472,14 @@ insert into storage.buckets (id, name, public) values ('identity-documents', 'id
   on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true)
   on conflict (id) do nothing;
+-- Avatar/ảnh bìa upload thẳng lên đây qua signed upload URL (bỏ qua giới
+-- hạn ~4.5MB body của Vercel Serverless Functions) — xem
+-- migrations/20260914_raise_avatar_cover_size_limit.sql.
+update storage.buckets
+set
+  file_size_limit = 15728640, -- 15MB
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+where id = 'avatars';
 -- Không còn bucket 'book-covers' riêng — ảnh bìa giờ đi qua kho thiết kế
 -- dùng chung (bucket 'design-images', tạo ở phần 9), vì bìa sách cũng chỉ
 -- là 1 "design_item" như minh hoạ khác, được books.cover_design_item_id

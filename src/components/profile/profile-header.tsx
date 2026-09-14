@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { CameraIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
 
 type ProfileHeaderProps = {
   nickname: string;
@@ -21,8 +22,12 @@ type ProfileHeaderProps = {
   onAvatarSaved?: (url: string | null) => void;
 };
 
-const COVER_MAX_BYTES = 5 * 1024 * 1024;
-const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+// 15MB — file đi thẳng lên Storage qua signed upload URL (xem
+// api/profile/avatar|cover/route.ts), không qua Next.js Function nữa nên
+// không còn bị giới hạn cứng ~4.5MB của Vercel. Chốt chặn thật ở
+// storage.buckets.file_size_limit (migrations/20260914_raise_avatar_cover_size_limit.sql).
+const COVER_MAX_BYTES = 15 * 1024 * 1024;
+const AVATAR_MAX_BYTES = 15 * 1024 * 1024;
 
 export function ProfileHeader({
   nickname,
@@ -59,22 +64,51 @@ export function ProfileHeader({
       return;
     }
     if (file.size > COVER_MAX_BYTES) {
-      setError("Ảnh bìa tối đa 5MB.");
+      setError("Ảnh bìa tối đa 15MB.");
       return;
     }
 
     setPending(true);
     setError(null);
-    const body = new FormData();
-    body.set("cover", file);
-    const res = await fetch("/api/profile/cover", { method: "POST", body });
-    const data = await res.json().catch(() => null);
-    setPending(false);
-    if (!res.ok) {
-      setError((data && data.error) || "Tải ảnh bìa thất bại.");
+
+    // Upload thẳng lên Supabase Storage qua signed upload URL — bỏ qua
+    // giới hạn body ~4.5MB của Vercel Serverless Functions (xem comment
+    // trong api/profile/cover/route.ts). 3 bước: (1) xin URL, (2) PUT file
+    // thẳng lên Storage bằng URL đó, (3) xác nhận để lưu vào hồ sơ.
+    const createRes = await fetch("/api/profile/cover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contentType: file.type }),
+    });
+    const createData = await createRes.json().catch(() => null);
+    if (!createRes.ok) {
+      setPending(false);
+      setError((createData && createData.error) || "Tải ảnh bìa thất bại.");
       return;
     }
-    onCoverSaved?.(data.coverImageUrl ?? null);
+
+    const supabase = createClient();
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .uploadToSignedUrl(createData.path, createData.token, file, { contentType: file.type });
+    if (uploadError) {
+      setPending(false);
+      setError("Tải ảnh bìa thất bại.");
+      return;
+    }
+
+    const confirmRes = await fetch("/api/profile/cover", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: createData.path }),
+    });
+    const confirmData = await confirmRes.json().catch(() => null);
+    setPending(false);
+    if (!confirmRes.ok) {
+      setError((confirmData && confirmData.error) || "Tải ảnh bìa thất bại.");
+      return;
+    }
+    onCoverSaved?.(confirmData.coverImageUrl ?? null);
   };
 
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,22 +123,48 @@ export function ProfileHeader({
       return;
     }
     if (file.size > AVATAR_MAX_BYTES) {
-      setAvatarError("Ảnh đại diện tối đa 5MB.");
+      setAvatarError("Ảnh đại diện tối đa 15MB.");
       return;
     }
 
     setAvatarPending(true);
     setAvatarError(null);
-    const body = new FormData();
-    body.set("avatar", file);
-    const res = await fetch("/api/profile/avatar", { method: "POST", body });
-    const data = await res.json().catch(() => null);
-    setAvatarPending(false);
-    if (!res.ok) {
-      setAvatarError((data && data.error) || "Tải ảnh đại diện thất bại.");
+
+    // Cùng flow 3 bước với handleFile (ảnh bìa) — xem comment ở đó.
+    const createRes = await fetch("/api/profile/avatar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contentType: file.type }),
+    });
+    const createData = await createRes.json().catch(() => null);
+    if (!createRes.ok) {
+      setAvatarPending(false);
+      setAvatarError((createData && createData.error) || "Tải ảnh đại diện thất bại.");
       return;
     }
-    onAvatarSaved?.(data.avatarUrl ?? null);
+
+    const supabase = createClient();
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .uploadToSignedUrl(createData.path, createData.token, file, { contentType: file.type });
+    if (uploadError) {
+      setAvatarPending(false);
+      setAvatarError("Tải ảnh đại diện thất bại.");
+      return;
+    }
+
+    const confirmRes = await fetch("/api/profile/avatar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: createData.path }),
+    });
+    const confirmData = await confirmRes.json().catch(() => null);
+    setAvatarPending(false);
+    if (!confirmRes.ok) {
+      setAvatarError((confirmData && confirmData.error) || "Tải ảnh đại diện thất bại.");
+      return;
+    }
+    onAvatarSaved?.(confirmData.avatarUrl ?? null);
   };
 
   return (
