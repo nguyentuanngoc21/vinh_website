@@ -3468,6 +3468,11 @@ create policy "users mark their own notifications read"
 create index notifications_user_unread_idx
   on public.notifications (user_id, created_at) where read_at is null;
 
+-- Phục vụ GET /api/notifications (mọi thông báo, không chỉ chưa đọc) — xem
+-- migrations/20260914_add_notifications_user_created_idx.sql.
+create index notifications_user_created_idx
+  on public.notifications (user_id, created_at desc);
+
 -- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context) —
 -- cho phép 1 admin vừa gửi tin gỡ chương (kiểm duyệt) vừa tự chat bình
 -- thường với CÙNG 1 tác giả mà không bị trộn vào chung 1 hòm thư. Danh
