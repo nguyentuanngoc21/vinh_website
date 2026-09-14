@@ -4,7 +4,7 @@ import { createClient as createSupabaseClient, createServiceRoleClient } from "@
 import { decodeSession, SESSION_COOKIE } from "@/lib/session";
 
 type PenaltyRule = { percent: number; durationDays: number };
-type NextPenalty = PenaltyRule | { ban: true; durationDays: number };
+type NextPenalty = PenaltyRule | { ban: true; durationDays: number } | { warning: true };
 
 const PENALTY_RULES: ReadonlyArray<PenaltyRule> = [
   { percent: 10, durationDays: 3 },
@@ -15,11 +15,18 @@ const PENALTY_RULES: ReadonlyArray<PenaltyRule> = [
 
 const PENALTY_BASE_TOKEN = 1000;
 
+// count=0 (vi phạm lần đầu tiên) -> CẢNH BÁO, không trừ token/không khoá —
+// xem hội thoại review UI/UX: reader chưa có bước "cảnh báo trước khi
+// phạt", lần đầu bị phát hiện đã trừ token ngay. Từ lần vi phạm THỨ 2 trở
+// đi (count>=1) mới áp PENALTY_RULES thật, lệch 1 chỉ số so với trước đây
+// (PENALTY_RULES[count-1] thay vì PENALTY_RULES[count]) để nhường chỗ cho
+// bước cảnh báo — cấm vĩnh viễn dời từ count>=4 sang count>=5 theo đúng độ
+// lệch đó (tổng 4 mốc phạt thật không đổi, chỉ thêm 1 mốc cảnh báo trước
+// mốc đầu).
 function getNextPenalty(count: number): NextPenalty {
-  if (count >= 4) {
-    return { ban: true, durationDays: 30 };
-  }
-  return PENALTY_RULES[count];
+  if (count === 0) return { warning: true };
+  if (count >= 5) return { ban: true, durationDays: 30 };
+  return PENALTY_RULES[count - 1];
 }
 
 async function getPenaltyProfile(supabase: ReturnType<typeof createServiceRoleClient>, identifier: { username?: string; userId?: string }) {
@@ -105,7 +112,14 @@ export async function POST(request: Request) {
   let lastDeductedAmount: number | null = null;
 
   const nextPenalty = getNextPenalty(currentCount);
-  if ("ban" in nextPenalty && nextPenalty.ban) {
+  const warningOnly = "warning" in nextPenalty;
+  if ("warning" in nextPenalty) {
+    // Lần vi phạm đầu tiên — chỉ cảnh báo, KHÔNG trừ token/không set
+    // expiresAt/banned (giữ nguyên giá trị mặc định false/null khai báo ở
+    // trên). Nhánh dưới (cập nhật profiles) vẫn chạy để tăng
+    // screenshot_penalty_count lên 1, cho lần vi phạm SAU biết đây không
+    // còn là lần đầu.
+  } else if ("ban" in nextPenalty && nextPenalty.ban) {
     banned = true;
   } else {
     const expires = new Date(now.getTime() + nextPenalty.durationDays * 24 * 60 * 60 * 1000);
@@ -173,5 +187,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Không thể cập nhật trạng thái phạt." }, { status: 500 });
   }
 
-  return NextResponse.json({ ...updated, last_deducted_amount: lastDeductedAmount });
+  return NextResponse.json({ ...updated, last_deducted_amount: lastDeductedAmount, warning_only: warningOnly });
 }

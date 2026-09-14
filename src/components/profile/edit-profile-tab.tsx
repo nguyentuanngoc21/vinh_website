@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CoinsIcon, CheckCircleIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { transactionTypeLabel } from "@/lib/profile";
-import { Field, Button, Alert } from "@/components/ui";
+import { Field, Button, Alert, Textarea, Skeleton } from "@/components/ui";
 import { BankInfoForm } from "@/components/profile/bank-info-form";
 import { IdentityForm } from "@/components/profile/identity-form";
 import { useRole } from "@/lib/role";
@@ -223,21 +223,20 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
         )}
 
         {eligibility !== null && (
-          <div
-            className={
-              "flex items-center gap-2.5 rounded-[14px] border px-[18px] py-3.5 text-[13.5px] font-medium " +
-              (eligibility
-                ? "border-[#cfe8d9] bg-[#F4FAF6] text-[#2F7A4F]"
-                : "border-[#F0E3C4] bg-cream-card text-stone-dark")
+          <Alert
+            tone={eligibility ? "success" : "info"}
+            icon={
+              eligibility ? (
+                <CheckCircleIcon weight="fill" size={18} />
+              ) : (
+                <WarningCircleIcon weight="fill" size={18} color="var(--color-brand-gold-dark)" />
+              )
             }
           >
             {eligibility ? (
-              <>
-                <CheckCircleIcon weight="fill" size={18} /> Đủ điều kiện rút token
-              </>
+              "Đủ điều kiện rút token"
             ) : (
               <>
-                <WarningCircleIcon weight="fill" size={18} color="var(--color-brand-gold-dark)" />
                 {/* Nêu ĐÚNG mục nào còn thiếu — trước đây luôn ghi "CCCD và ngân
                     hàng" dù chỉ 1 trong 2 chưa xong, khiến người đã điền xong 1
                     mục tưởng nhầm cả 2 đều chưa lưu. */}
@@ -246,7 +245,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
                 để rút token
               </>
             )}
-          </div>
+          </Alert>
         )}
 
         <div className="rounded-[18px] border border-cream p-[26px]">
@@ -255,7 +254,14 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
             Tên hiển thị và mô tả sẽ xuất hiện trên trang tác giả cùng mọi bình luận của bạn.
           </div>
           {state === "loading" ? (
-            <div className="mt-[22px] text-[13.5px] text-stone-light">Đang tải…</div>
+            <div className="mt-[22px] flex flex-col gap-[18px]">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i}>
+                  <Skeleton className="mb-[7px] h-3.5 w-24 rounded-[var(--radius-sm)]" />
+                  <Skeleton className="h-11 w-full rounded-[10px]" />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="mt-[22px] flex flex-col gap-[18px]">
               <Field
@@ -267,16 +273,13 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
                 hint="Có thể đổi 1 lần mỗi 30 ngày."
                 status={isMissing("penName") ? { tone: "error", message: missingHint } : undefined}
               />
-              <label className="block">
-                <div className="mb-2 text-[13px] font-semibold text-ink">Mô tả về bản thân</div>
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value.slice(0, 280))}
-                  rows={5}
-                  className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.65] outline-none focus:border-brand-gold"
-                />
-                <div className="mt-1.5 text-xs text-stone">{bio.length}/280 ký tự</div>
-              </label>
+              <Textarea
+                label="Mô tả về bản thân"
+                value={bio}
+                onChange={(e) => setBio(e.target.value.slice(0, 280))}
+                rows={5}
+                hint={`${bio.length}/280 ký tự`}
+              />
 
               {/* Không hiển thị công khai — hệ thống tự chọn field phù
                   hợp trong số này để điền vào các hợp đồng cần đến (vd
@@ -322,7 +325,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
               />
 
               {saved && !dirty && (
-                <div className="text-[13px] font-medium text-[#2F7A4F]">Đã lưu thay đổi.</div>
+                <div className="text-[13px] font-medium text-success-form">Đã lưu thay đổi.</div>
               )}
               {error && <Alert tone="error">{error}</Alert>}
               <div className="flex gap-2.5">
@@ -330,7 +333,8 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
                   type="button"
                   onClick={handleSave}
                   disabled={!ready}
-                  className="w-auto px-6 py-[11px] text-sm font-semibold"
+                  fullWidth={false}
+                  className="px-6 py-[11px] text-sm font-semibold"
                 >
                   {pending ? "Đang lưu…" : "Lưu thay đổi"}
                 </Button>
@@ -339,7 +343,8 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
                   variant="ghost"
                   onClick={handleCancel}
                   disabled={!dirty || pending}
-                  className="w-auto px-[22px] py-[11px] text-sm font-medium"
+                  fullWidth={false}
+                  className="px-[22px] py-[11px] text-sm font-medium"
                 >
                   Hủy
                 </Button>

@@ -166,6 +166,19 @@ create index direct_messages_thread_idx
 create index direct_messages_unread_idx
   on public.direct_messages (recipient_id, sender_id) where read_at is null;
 
+-- Phục vụ GET /api/messages (danh sách hội thoại — "sender_id = :me OR
+-- recipient_id = :me", không lọc theo 1 đối tác cụ thể nên
+-- direct_messages_thread_idx ở trên không dùng được). Xem
+-- migrations/20260912_add_direct_messages_participant_indexes.sql —
+-- migration đó dùng CREATE INDEX CONCURRENTLY (production đã có
+-- traffic), ở đây dùng cú pháp thường vì schema.sql chỉ dùng để dựng
+-- project mới từ đầu (chưa có traffic, không cần CONCURRENTLY).
+create index direct_messages_sender_created_idx
+  on public.direct_messages (sender_id, created_at desc);
+
+create index direct_messages_recipient_created_idx
+  on public.direct_messages (recipient_id, created_at desc);
+
 alter table public.direct_messages enable row level security;
 
 create policy "participants read their own messages"
@@ -459,6 +472,14 @@ insert into storage.buckets (id, name, public) values ('identity-documents', 'id
   on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true)
   on conflict (id) do nothing;
+-- Avatar/ảnh bìa upload thẳng lên đây qua signed upload URL (bỏ qua giới
+-- hạn ~4.5MB body của Vercel Serverless Functions) — xem
+-- migrations/20260914_raise_avatar_cover_size_limit.sql.
+update storage.buckets
+set
+  file_size_limit = 15728640, -- 15MB
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+where id = 'avatars';
 -- Không còn bucket 'book-covers' riêng — ảnh bìa giờ đi qua kho thiết kế
 -- dùng chung (bucket 'design-images', tạo ở phần 9), vì bìa sách cũng chỉ
 -- là 1 "design_item" như minh hoạ khác, được books.cover_design_item_id

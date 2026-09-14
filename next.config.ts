@@ -28,7 +28,45 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/auth/register": [
       "./node_modules/tesseract.js/**/*",
-      "./node_modules/tesseract.js-core/**/*",
+      // tesseract.js-core (44MB cả gói) đóng gói 6 biến thể wasm core
+      // (thường/simd/relaxedsimd × full/lstm-only) cho CẢ trình duyệt lẫn
+      // Node, nhưng src/lib/ocr.ts gọi createWorker("vie", 1, ...) — OEM=1
+      // = LSTM_ONLY cố định — nên getCoreNode.js (xem
+      // node_modules/tesseract.js/src/worker/node/getCoreNode.js) chỉ bao
+      // giờ require() 1 trong 3 biến thể "*-lstm" (simd/relaxedsimd chọn
+      // lúc runtime qua wasm-feature-detect), không đụng tới 3 biến thể
+      // không-lstm. Mỗi biến thể *-lstm.js (Emscripten glue) tự
+      // fs.readFileSync(__dirname + "/*-lstm.wasm") lúc runtime — nft không
+      // theo dõi được (cùng lý do phải ép include thủ công như comment
+      // trên) nên phải liệt kê rõ .js lẫn .wasm; KHÔNG cần *-lstm.wasm.js
+      // (bản wasm nhúng base64 chỉ dùng cho nhánh browser/blob-worker, xem
+      // getCore.js, không được getCoreNode.js đụng tới — xem
+      // worker-script/node/getCore.js, file getCore thật sự được
+      // worker-script/node/index.js require(), khác file worker/node/getCore.js
+      // cùng tên ở thư mục khác dùng global.importScripts()). Giữ nguyên
+      // hành vi, chỉ bớt 3 biến thể không-lstm (.js+.wasm, ~14MB) khỏi
+      // bundle route này — xoá glob "**/*" cũ nếu bump version
+      // tesseract.js-core và logic getCore.js đổi cách chọn file.
+      //
+      // Còn 3 file "*-lstm.wasm.js" (~13.5MB, bản wasm nhúng base64 cho
+      // nhánh browser — KHÔNG được getCore.js phía Node đụng tới) vẫn lọt
+      // vào bundle dù không khai báo ở đây: đã thử outputFileTracingExcludes
+      // (xem next.config.ts git history) nhưng build bằng Turbopack không
+      // áp dụng exclude cho các file này — có vẻ bước
+      // collect-build-traces.js áp include/exclude dựa trên
+      // buildTraceContext.chunksTrace (đường Webpack), Turbopack không đi
+      // qua cùng đường nên exclude bị bỏ qua trong thực tế (đã build sạch,
+      // xoá .next, kiểm tra .next/server/app/api/auth/register/route.js.nft.json
+      // để xác nhận). Còn lại ~19MB cho tesseract.js-core/route này (từ 44MB
+      // gốc) — không cố ép giảm tiếp để tránh xoá nhầm file thật sự cần.
+      "./node_modules/tesseract.js-core/package.json",
+      "./node_modules/tesseract.js-core/index.js",
+      "./node_modules/tesseract.js-core/tesseract-core-lstm.js",
+      "./node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
+      "./node_modules/tesseract.js-core/tesseract-core-simd-lstm.js",
+      "./node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
+      "./node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.js",
+      "./node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm",
       "./node_modules/wasm-feature-detect/**/*",
       "./node_modules/bmp-js/**/*",
       "./node_modules/is-url/**/*",

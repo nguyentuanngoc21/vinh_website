@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   MagnifyingGlassIcon,
   CaretRightIcon,
@@ -13,6 +13,7 @@ import {
   PaletteIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Field, Alert } from "@/components/ui";
+import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
 import { AVATAR_TONES } from "@/lib/profile";
 import type { CreatorTag } from "@/lib/supabase/types";
 
@@ -148,7 +149,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({ truyen: true, audio: false, design: false });
   const [orderingId, setOrderingId] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
-  const router = useRouter();
+  const navigate = usePendingNavigate();
 
   const filteredPeople = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -195,7 +196,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
   // luồng chọn phạm vi quyền sử dụng/brief/đặt cọc.
   const placeOrder = async (listingId: string, sellerId: string) => {
     if (!viewerId) {
-      router.push("/dang-nhap");
+      navigate("/dang-nhap");
       return;
     }
     setOrderingId(listingId);
@@ -211,7 +212,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
       setOrderError((data && data.error) || "Không tạo được đơn hàng.");
       return;
     }
-    router.push(`/ca-nhan?chat=${sellerId}`);
+    navigate(`/ca-nhan?chat=${sellerId}`);
   };
 
   return (

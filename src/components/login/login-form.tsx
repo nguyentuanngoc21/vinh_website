@@ -2,12 +2,13 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { EyeIcon, EyeSlashIcon, ArrowRightIcon, UserPlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
 import { LegalLink } from "@/components/legal/legal-link";
 import { resolveRedirectTarget } from "@/lib/redirect-target";
+import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
+import { useAsyncSubmit } from "@/lib/hooks/use-async-submit";
 
 type LoginFormProps = {
   /** Trang cần quay lại sau khi đăng nhập xong (đọc ?next= ở page.tsx, đã
@@ -18,30 +19,22 @@ type LoginFormProps = {
 };
 
 export function LoginForm({ nextPath }: LoginFormProps = {}) {
-  const router = useRouter();
+  const navigate = usePendingNavigate();
   const { login } = useRole();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = useAsyncSubmit(login);
 
   const ready = identifier.trim().length > 0 && password.length > 0;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready || pending) return;
-    setPending(true);
-    setError(null);
-    const result = await login(identifier.trim(), password, remember);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    router.push(resolveRedirectTarget(nextPath));
+    const result = await run(identifier.trim(), password, remember);
+    if (result.ok) navigate(resolveRedirectTarget(nextPath));
   };
 
   return (

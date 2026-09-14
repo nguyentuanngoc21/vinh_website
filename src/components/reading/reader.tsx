@@ -27,7 +27,8 @@ import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
 import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { shareOrCopy } from "@/lib/share";
-import { VinhMark } from "@/components/ui";
+import { VinhMark, useToast } from "@/components/ui";
+import { supportMailto } from "@/lib/support";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { useNowPlaying } from "@/lib/audio/now-playing-context";
 
@@ -166,8 +167,14 @@ function saveReaderPrefs(prefs: ReaderPrefs) {
 }
 
 type PenaltyRule = { percent: number; durationDays: number };
-type NextPenalty = PenaltyRule | { ban: true; durationDays: number };
+type NextPenalty = PenaltyRule | { ban: true; durationDays: number } | { warning: true };
 
+// Đồng bộ TAY với src/app/api/penalty/route.ts (không import chung được —
+// route.ts chạy server-only, PENALTY_RULES ở đây chỉ dùng cho nhánh
+// fallback offline khi gọi server thất bại, xem applyPenalty bên dưới).
+// Lần vi phạm đầu tiên (count=0) = CẢNH BÁO, không nằm trong bảng này —
+// PENALTY_RULES[0] giờ ứng với lần vi phạm THỨ 2 (count=1), lệch 1 so với
+// trước đây.
 const PENALTY_RULES: ReadonlyArray<PenaltyRule> = [
   { percent: 10, durationDays: 3 },
   { percent: 10, durationDays: 7 },
@@ -211,7 +218,11 @@ function formatPenaltyMessage(penalty: PenaltyState) {
     return "Tài khoản này đã bị cấm vĩnh viễn vì vi phạm quy tắc chụp màn hình.";
   }
 
-  const rule = PENALTY_RULES[penalty.count - 1];
+  // count=1 = lần cảnh báo đầu tiên (không có rule/expiresAt thật — xem
+  // getNextPenalty) -> rule ở đây luôn undefined cho count=1, trả về null
+  // là đúng (banner cảnh báo tức thời warningMessage đã lo phần hiển thị
+  // lúc đó, không cần banner thường trực này lặp lại).
+  const rule = PENALTY_RULES[penalty.count - 2];
   if (!rule || !penalty.expiresAt) return null;
   const expiry = new Date(penalty.expiresAt).toLocaleDateString("vi-VN");
   const baseMessage = `Lần ${penalty.count}: tính thêm ${rule.percent}% token để mở khóa truyện đến ${expiry}.`;
@@ -221,9 +232,12 @@ function formatPenaltyMessage(penalty: PenaltyState) {
   return baseMessage;
 }
 
+// Phải khớp CHÍNH XÁC logic trong src/app/api/penalty/route.ts (đồng bộ
+// tay, xem comment PENALTY_RULES ở trên).
 function getNextPenalty(count: number): NextPenalty {
-  if (count >= 4) return { ban: true, durationDays: 30 };
-  return PENALTY_RULES[count];
+  if (count === 0) return { warning: true };
+  if (count >= 5) return { ban: true, durationDays: 30 };
+  return PENALTY_RULES[count - 1];
 }
 
 function normalizePenaltyState(payload: {
@@ -259,7 +273,7 @@ async function fetchPenaltyStateFromServer(): Promise<PenaltyState | null> {
   }
 }
 
-async function postScreenshotPenaltyToServer(): Promise<PenaltyState | null> {
+async function postScreenshotPenaltyToServer(): Promise<{ state: PenaltyState; warningOnly: boolean } | null> {
   try {
     const res = await fetch("/api/penalty", {
       method: "POST",
@@ -269,7 +283,7 @@ async function postScreenshotPenaltyToServer(): Promise<PenaltyState | null> {
     if (!res.ok) return null;
     const payload = await res.json();
     if (typeof payload?.screenshot_penalty_count !== "number") return null;
-    return normalizePenaltyState(payload);
+    return { state: normalizePenaltyState(payload), warningOnly: Boolean(payload?.warning_only) };
   } catch {
     return null;
   }
@@ -359,12 +373,22 @@ export function Reader({
   initialParagraphIndex = null,
 }: ReaderProps) {
   const router = useRouter();
+  const toast = useToast();
   const { play } = useNowPlaying();
   const [fontSize, setFontSize] = useState(19);
   const [theme, setTheme] = useState<ThemeName>("cream");
   const [lineHeight, setLineHeight] = useState(DEFAULT_LINE_HEIGHT);
   const [panelOpen, setPanelOpen] = useState(false);
   const [penalty, setPenalty] = useState<PenaltyState>({ count: 0, expiresAt: null, banned: false, lastOffenseAt: null, deductedAmount: null });
+  // penalty ban đầu luôn count:0 (giá trị thật chỉ tới sau 1 lượt tải từ
+  // localStorage/server) — onKeyDown/onCopy bên dưới đăng ký 1 lần lúc
+  // mount (deps []), đọc qua ref này thay vì đóng closure lên `penalty`
+  // trực tiếp để đoán "lần đầu hay không" luôn dùng giá trị MỚI NHẤT tại
+  // thời điểm người dùng thật sự bấm, không phải giá trị lúc effect chạy.
+  const penaltyRef = useRef(penalty);
+  useEffect(() => {
+    penaltyRef.current = penalty;
+  }, [penalty]);
   const [screenshotDetected, setScreenshotDetected] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const penaltyAppliedRef = useRef(false);
@@ -416,7 +440,6 @@ export function Reader({
   const [following, setFollowing] = useState(isFollowingAuthor);
   const [followPending, setFollowPending] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
-  const [copyBubble, setCopyBubble] = useState<string | null>(null);
   const [visibleParagraph, setVisibleParagraph] = useState(paragraphs[0] ?? "");
   const paragraphRefs = useRef<Array<HTMLParagraphElement | null>>([]);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -546,11 +569,6 @@ export function Reader({
     });
   };
 
-  const showCopyBubble = (label: string) => {
-    setCopyBubble(label);
-    setTimeout(() => setCopyBubble(null), 2200);
-  };
-
   const handleToggleVote = async () => {
     if (voting || !chapterId) return;
     setVoting(true);
@@ -600,7 +618,7 @@ export function Reader({
       text: bookSynopsis ?? "",
       url: `${window.location.origin}/truyen/${bookSlug}`,
     });
-    if (result === "copied") showCopyBubble("Đã sao chép liên kết");
+    if (result === "copied") toast.show("Đã sao chép liên kết", "success");
   };
 
   const handleShareExcerpt = async () => {
@@ -610,7 +628,7 @@ export function Reader({
       text: visibleParagraph,
       url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
     });
-    if (result === "copied") showCopyBubble("Đã sao chép liên kết");
+    if (result === "copied") toast.show("Đã sao chép liên kết", "success");
   };
 
   // Gỡ chương NGAY từ trang đọc (admin/super_admin only — xem
@@ -759,14 +777,16 @@ export function Reader({
     penaltyAppliedRef.current = true;
 
     const applyPenalty = async () => {
-      const serverState = await postScreenshotPenaltyToServer();
-      if (serverState) {
-        savePenaltyState(serverState);
-        setPenalty(serverState);
+      const result = await postScreenshotPenaltyToServer();
+      if (result) {
+        savePenaltyState(result.state);
+        setPenalty(result.state);
         setWarningMessage(
-          serverState.banned
-            ? "Bạn đã bị cấm vì chụp màn hình."
-            : `Đã áp dụng phạt. Số token trừ: ${serverState.deductedAmount ?? 0}`
+          result.warningOnly
+            ? "Đây là lần đầu hệ thống phát hiện — chưa trừ token lần này. Lần tới sẽ bị trừ token và khoá nội dung tạm thời."
+            : result.state.banned
+              ? "Bạn đã bị cấm vì chụp màn hình."
+              : `Đã áp dụng phạt. Số token trừ: ${result.state.deductedAmount ?? 0}`
         );
         return;
       }
@@ -778,6 +798,26 @@ export function Reader({
       const now = Date.now();
       const nextCount = penalty.count + 1;
       const next = getNextPenalty(penalty.count);
+
+      if ("warning" in next) {
+        // Server không phản hồi được — vẫn cho qua với cảnh báo cục bộ,
+        // KHÔNG tự trừ token/khoá nội dung phía client (nguồn sự thật là
+        // server; chỉ ghi nhận count để lần sau không lặp lại cảnh báo).
+        const warnedState: PenaltyState = {
+          count: nextCount,
+          expiresAt: null,
+          banned: false,
+          lastOffenseAt: now,
+          deductedAmount: null,
+        };
+        savePenaltyState(warnedState);
+        setPenalty(warnedState);
+        setWarningMessage(
+          "Đây là lần đầu hệ thống phát hiện — chưa trừ token lần này. Lần tới sẽ bị trừ token và khoá nội dung tạm thời."
+        );
+        return;
+      }
+
       setWarningMessage("Không thể cập nhật phạt đến server. Phạt vẫn được ghi cục bộ.");
 
       if ("ban" in next && next.ban) {
@@ -809,6 +849,13 @@ export function Reader({
   }, [screenshotDetected, penalty]);
 
   useEffect(() => {
+    // Thông điệp cảnh báo TỨC THỜI (trước khi biết chắc server trả lời gì)
+    // — đoán trước dựa trên penaltyRef.current.count (giá trị MỚI NHẤT tại
+    // thời điểm bấm, xem khai báo penaltyRef ở trên): count===0 nghĩa là
+    // lần vi phạm SẮP TỚI sẽ chỉ là cảnh báo (xem getNextPenalty), count>=1
+    // nghĩa là lần này sẽ bị trừ token/khoá thật. applyPenalty ở trên sẽ
+    // ghi đè thông điệp này bằng phản hồi thật từ server ngay sau đó — đây
+    // chỉ là phản hồi tức thời trong lúc chờ.
     const onKeyDown = (event: KeyboardEvent) => {
       if (
         event.key === "PrintScreen" ||
@@ -818,13 +865,21 @@ export function Reader({
         (event.key === "s" && event.metaKey && event.shiftKey)
       ) {
         setScreenshotDetected(true);
-        setWarningMessage("Hệ thống đã phát hiện hành vi chụp màn hình và đang áp dụng phạt.");
+        setWarningMessage(
+          penaltyRef.current.count === 0
+            ? "Hệ thống đã phát hiện hành vi chụp màn hình — đây là lần đầu nên chỉ cảnh báo."
+            : "Hệ thống đã phát hiện hành vi chụp màn hình và đang áp dụng phạt."
+        );
       }
     };
 
     const onCopy = () => {
       setScreenshotDetected(true);
-      setWarningMessage("Hệ thống đã phát hiện hành vi sao chép/chụp màn hình và đang áp dụng phạt.");
+      setWarningMessage(
+        penaltyRef.current.count === 0
+          ? "Hệ thống đã phát hiện hành vi sao chép/chụp màn hình — đây là lần đầu nên chỉ cảnh báo."
+          : "Hệ thống đã phát hiện hành vi sao chép/chụp màn hình và đang áp dụng phạt."
+      );
     };
 
     document.addEventListener("keydown", onKeyDown);
@@ -1254,19 +1309,30 @@ export function Reader({
             <ShieldCheckIcon className="shrink-0" /> Nội dung được bảo hộ
           </div>
 
-          {warningMessage ? (
-              <div className="mb-6 rounded-[14px] border border-[#F3C6C6] bg-[#FBEDEC] px-4 py-3 text-sm text-[#B02A37]">
-                {warningMessage}
+          {(warningMessage || penalty.banned || isPenaltyActive) && (
+            <div className="mb-6 rounded-[14px] border border-[#F3C6C6] bg-[#FBEDEC] px-4 py-3 text-sm text-[#B02A37]">
+              <div>
+                {warningMessage
+                  ? warningMessage
+                  : penalty.banned
+                    ? "Tài khoản này đã bị cấm vĩnh viễn vì vi phạm chụp màn hình."
+                    : formatPenaltyMessage(penalty)}
               </div>
-            ) : penalty.banned ? (
-            <div className="mb-6 rounded-[14px] border border-[#F3C6C6] bg-[#FBEDEC] px-4 py-3 text-sm text-[#B02A37]">
-              Tài khoản này đã bị cấm vĩnh viễn vì vi phạm chụp màn hình.
+              {/* Chỉ hiện CTA khi ĐANG có phạt/cấm thật sự đang áp dụng —
+                  không hiện cho thông điệp cảnh báo lần đầu (warningMessage
+                  có thể đang hiện "chỉ cảnh báo", lúc đó penalty.banned và
+                  isPenaltyActive đều false, không cần "liên hệ hỗ trợ" cho
+                  1 lời nhắc chưa có hậu quả thật). */}
+              {(penalty.banned || isPenaltyActive) && (
+                <a
+                  href={supportMailto("Hỗ trợ phạt chụp màn hình")}
+                  className="mt-2 inline-block font-semibold underline hover:text-brand-ink"
+                >
+                  Liên hệ hỗ trợ →
+                </a>
+              )}
             </div>
-          ) : isPenaltyActive ? (
-            <div className="mb-6 rounded-[14px] border border-[#F3C6C6] bg-[#FBEDEC] px-4 py-3 text-sm text-[#B02A37]">
-              {formatPenaltyMessage(penalty)}
-            </div>
-          ) : null}
+          )}
 
           {isPenaltyActive && (
             <div className="mb-6 rounded-[14px] border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-sm text-[#475569]">
@@ -1353,8 +1419,11 @@ export function Reader({
               })}
             </div>
             {isPenaltyActive && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-white/90 p-6 text-center text-sm font-semibold text-[#7f1d1d] shadow-[0_10px_30px_rgba(0,0,0,.12)]">
-                Nội dung đang bị khóa do vi phạm chụp màn hình. Vui lòng chờ hết hạn phạt hoặc liên hệ hỗ trợ.
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-[14px] bg-white/90 p-6 text-center text-sm font-semibold text-[#7f1d1d] shadow-[0_10px_30px_rgba(0,0,0,.12)]">
+                <div>Nội dung đang bị khóa do vi phạm chụp màn hình. Vui lòng chờ hết hạn phạt hoặc</div>
+                <a href={supportMailto("Hỗ trợ phạt chụp màn hình")} className="underline hover:text-brand-ink">
+                  liên hệ hỗ trợ
+                </a>
               </div>
             )}
           </div>
@@ -1406,7 +1475,6 @@ export function Reader({
             >
               <ShareNetworkIcon /> Chia sẻ
             </button>
-            {copyBubble && <span className="text-xs font-medium text-brand-gold-dark">{copyBubble}</span>}
           </div>
 
           {/* Ẩn trên mobile — bottom bar cố định (xem <nav> cuối trang) đã

@@ -12,7 +12,7 @@ import {
   CheckIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
-import { Alert } from "@/components/ui";
+import { Alert, Skeleton } from "@/components/ui";
 
 // Hình dạng khớp JSON trả về bởi GET /api/achievements (AchievementView ở
 // achievement-service.ts) — định nghĩa lại ở đây thay vì import thẳng vì
@@ -208,7 +208,12 @@ export function AchievementsPage() {
   if (state === "loading") {
     return (
       <div className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
-        <div className="text-[13.5px] text-stone-light">Đang tải…</div>
+        <Skeleton className="mb-6 h-6 w-48 rounded-[var(--radius-sm)]" />
+        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-2xl" />
+          ))}
+        </div>
       </div>
     );
   }

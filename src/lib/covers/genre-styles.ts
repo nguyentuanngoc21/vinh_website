@@ -212,6 +212,37 @@ export const GENRE_STYLES: Record<BookGenre, GenreStyle> = {
 // báo theo đặc tả ECMAScript, không cần sort/tự liệt kê lại).
 export const BOOK_GENRES: BookGenre[] = Object.keys(GENRE_STYLES) as BookGenre[];
 
+// Slug URL cho từng thể loại (dùng ở /truyen?the-loai=<slug> — xem
+// src/app/truyen/page.tsx) — SINH TỰ ĐỘNG từ BOOK_GENRES, không hardcode
+// tay từng cặp genre↔slug: bỏ dấu, hạ chữ thường, thay khoảng trắng/"/"/
+// "&"/"-" bằng 1 dấu gạch ngang. Tự sinh vì BOOK_GENRES đã từng đổi
+// taxonomy 1 lần (8→10 giá trị, xem comment đầu file) — hardcode tay ở đây
+// sẽ là nơi thứ 4 phải sửa nếu đổi lần nữa.
+function slugifyGenre(genre: string): string {
+  return genre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // bỏ dấu (combining diacritical marks sau NFD)
+    .replace(/đ/gi, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export const GENRE_SLUGS: Record<BookGenre, string> = Object.fromEntries(
+  BOOK_GENRES.map((genre) => [genre, slugifyGenre(genre)])
+) as Record<BookGenre, string>;
+
+const SLUG_TO_GENRE: Record<string, BookGenre> = Object.fromEntries(
+  BOOK_GENRES.map((genre) => [GENRE_SLUGS[genre], genre])
+);
+
+/** Ngược lại GENRE_SLUGS — slug từ URL không khớp thể loại nào (đổi tên,
+ * gõ sai, link cũ) trả về undefined, KHÔNG throw — nơi gọi tự quyết định
+ * fallback (xem truyen/page.tsx: rơi về danh sách không lọc). */
+export function slugToGenre(slug: string): BookGenre | undefined {
+  return SLUG_TO_GENRE[slug];
+}
+
 // Sách chưa gán genre (genre = null trên books), HOẶC mang 1 giá trị cũ
 // không còn hợp lệ (dữ liệu tồn dư từ trước lần đổi taxonomy) — style
 // trung tính, không alias ngầm sang 1 genre có sẵn vì đó sẽ ngầm gán ý

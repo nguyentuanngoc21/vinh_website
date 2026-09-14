@@ -70,10 +70,17 @@ export default async function SearchPage({
 
           {query && (
             <>
-              <div className="mb-6 mt-4 flex gap-2 border-b border-cream-border">
+              {/* role="tablist"/"tab" cho đúng ngữ nghĩa — đây là <Link> điều
+                  hướng cả trang (server component, không có client state để
+                  gắn Tabs.List/Tabs.Tab dùng chung, xem tabs.tsx), nên không
+                  cần thêm JS roving-tabindex: phím Tab của trình duyệt vốn
+                  đã đi qua được từng link tuần tự. */}
+              <div role="tablist" aria-label="Loại kết quả" className="mb-6 mt-4 flex gap-2 border-b border-cream-border">
                 {TABS.map((tab) => (
                   <Link
                     key={tab.type}
+                    role="tab"
+                    aria-selected={activeTab === tab.type}
                     href={`/tim-kiem?q=${encodeURIComponent(query)}${tab.type === "truyen" ? "" : `&type=${tab.type}`}`}
                     className={`border-b-2 px-4 py-2.5 text-sm font-semibold no-underline ${
                       activeTab === tab.type

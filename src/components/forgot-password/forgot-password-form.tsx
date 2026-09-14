@@ -2,10 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowRightIcon, ArrowLeftIcon, CheckCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { requestPasswordReset, verifyRecoveryOtp } from "@/lib/auth";
 import { Field, Button, Alert } from "@/components/ui";
+import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
+import { useAsyncSubmit } from "@/lib/hooks/use-async-submit";
 
 export function ForgotPasswordForm() {
   const searchParams = useSearchParams();
@@ -14,10 +16,9 @@ export function ForgotPasswordForm() {
   // short-lived, so this is the expected path once a link goes stale.
   const linkExpired = searchParams.get("error") === "link-het-han";
 
-  const router = useRouter();
+  const navigate = usePendingNavigate();
   const [email, setEmail] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = useAsyncSubmit(requestPasswordReset);
   const [sent, setSent] = useState(false);
 
   // Mã OTP trong email đặt lại mật khẩu (độ dài do setting "OTP Length"
@@ -25,8 +26,7 @@ export function ForgotPasswordForm() {
   // link khi link mở sai browser (xem /api/auth/verify-otp cho lý do đầy
   // đủ).
   const [otp, setOtp] = useState("");
-  const [otpPending, setOtpPending] = useState(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
+  const { pending: otpPending, error: otpError, run: runVerifyOtp } = useAsyncSubmit(verifyRecoveryOtp);
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
 
@@ -35,15 +35,8 @@ export function ForgotPasswordForm() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready || pending) return;
-    setPending(true);
-    setError(null);
-    const result = await requestPasswordReset(email.trim());
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setSent(true);
+    const result = await run(email.trim());
+    if (result.ok) setSent(true);
   };
 
   // Thành công ở đây chỉ dựng session phục hồi (cookie) — /dat-lai-mat-khau
@@ -51,15 +44,8 @@ export function ForgotPasswordForm() {
   const handleVerifyOtp = async (e: FormEvent) => {
     e.preventDefault();
     if (otp.trim().length === 0 || otpPending) return;
-    setOtpPending(true);
-    setOtpError(null);
-    const result = await verifyRecoveryOtp(email.trim(), otp.trim());
-    setOtpPending(false);
-    if (!result.ok) {
-      setOtpError(result.error);
-      return;
-    }
-    router.push("/dat-lai-mat-khau");
+    const result = await runVerifyOtp(email.trim(), otp.trim());
+    if (result.ok) navigate("/dat-lai-mat-khau");
   };
 
   const handleResend = async () => {

@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -14,6 +15,7 @@ import {
 import { useRole } from "@/lib/role";
 import { resendOtp } from "@/lib/auth";
 import { resolveRedirectTarget } from "@/lib/redirect-target";
+import { useAsyncSubmit } from "@/lib/hooks/use-async-submit";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
 import { passwordScore, PASSWORD_SCORE_COLORS, PASSWORD_SCORE_LABELS } from "@/lib/password-strength";
 import { LegalLink } from "@/components/legal/legal-link";
@@ -34,7 +36,7 @@ export function RegisterForm() {
   // trực tiếp ở handleVerifyOtp bên dưới, không qua server).
   const nextParam = searchParams.get("next");
 
-  const router = useRouter();
+  const navigate = usePendingNavigate();
   const { register, verifySignupCode } = useRole();
   // Đăng ký xong KHÔNG có session ngay (xem RegisterResult ở lib/auth.ts) —
   // giữ lại email vừa đăng ký để hiện trong màn "cần xác thực" bên dưới.
@@ -45,8 +47,7 @@ export function RegisterForm() {
   // link (link mở sai browser trên mobile sẽ luôn báo hết hạn dù mail vừa
   // gửi).
   const [otp, setOtp] = useState("");
-  const [otpPending, setOtpPending] = useState(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
+  const { pending: otpPending, error: otpError, run: runVerifyOtp } = useAsyncSubmit(verifySignupCode);
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
 
@@ -61,8 +62,7 @@ export function RegisterForm() {
   const [cccd, setCccd] = useState("");
   const [files, setFiles] = useState<Record<SlotKey, File | null>>({ front: null, back: null });
   const [agree, setAgree] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run } = useAsyncSubmit(register);
 
   const uname = username.trim();
   const score = passwordScore(pw);
@@ -101,9 +101,7 @@ export function RegisterForm() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready) return;
-    setPending(true);
-    setError(null);
-    const result = await register({
+    const result = await run({
       email: email.trim(),
       username: uname,
       nickname: nickname.trim(),
@@ -118,26 +116,14 @@ export function RegisterForm() {
         : {}),
       ...(nextParam ? { next: nextParam } : {}),
     });
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setSubmittedEmail(email.trim());
+    if (result.ok) setSubmittedEmail(email.trim());
   };
 
   const handleVerifyOtp = async (e: FormEvent) => {
     e.preventDefault();
     if (!submittedEmail || otp.trim().length === 0 || otpPending) return;
-    setOtpPending(true);
-    setOtpError(null);
-    const result = await verifySignupCode(submittedEmail, otp.trim());
-    setOtpPending(false);
-    if (!result.ok) {
-      setOtpError(result.error);
-      return;
-    }
-    router.push(resolveRedirectTarget(nextParam));
+    const result = await runVerifyOtp(submittedEmail, otp.trim());
+    if (result.ok) navigate(resolveRedirectTarget(nextParam));
   };
 
   const handleResend = async () => {

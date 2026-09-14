@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr";
-import { Field, Button, Alert } from "@/components/ui";
+import { Field, Button, Alert, Skeleton } from "@/components/ui";
 import { CccdUploadTiles, type CccdSlotKey } from "@/components/register/cccd-upload-tiles";
 
 type LoadState = "loading" | "ready";
@@ -75,7 +75,14 @@ export function IdentityForm({ onVerified }: { onVerified?: (verified: boolean) 
   };
 
   if (state === "loading") {
-    return <div className="text-[13.5px] text-stone-light">Đang tải…</div>;
+    return (
+      <div className="flex flex-col gap-3.5">
+        <Skeleton className="h-11 w-full rounded-[10px]" />
+        <Skeleton className="h-11 w-full rounded-[10px]" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-11 w-40 rounded-[10px]" />
+      </div>
+    );
   }
 
   if (verified) {
@@ -111,7 +118,8 @@ export function IdentityForm({ onVerified }: { onVerified?: (verified: boolean) 
         type="button"
         onClick={handleSubmit}
         disabled={!ready}
-        className="w-auto self-start px-6 py-[11px] text-sm font-semibold"
+        fullWidth={false}
+        className="self-start px-6 py-[11px] text-sm font-semibold"
       >
         {pending ? "Đang xác minh…" : "Xác minh CCCD"}
       </Button>

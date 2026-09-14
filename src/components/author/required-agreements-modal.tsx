@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WarningCircleIcon, ArrowSquareOutIcon } from "@phosphor-icons/react/dist/ssr";
 import { AGREEMENTS } from "@/lib/legal/registry";
 import { AgreementDocumentViewer, type AgreementRow } from "@/components/legal/agreement-document-viewer";
 import { acceptAgreement, missingInfoUrl } from "@/lib/legal/accept-agreement";
+import { Modal, Skeleton } from "@/components/ui";
 
 /**
  * Chặn "Xuất bản" khi truyện đang ở chế độ độc quyền nhưng tác giả chưa
@@ -86,66 +86,62 @@ export function RequiredAgreementsModal({
 
   return (
     <>
-      {createPortal(
-        <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[480px] rounded-[18px] bg-white p-7 shadow-[0_24px_60px_rgba(0,0,0,.3)]"
-          >
-            <div className="flex items-start gap-3">
-              <WarningCircleIcon weight="fill" size={24} color="var(--color-brand-gold-dark)" className="mt-0.5 shrink-0" />
-              <div>
-                <div className="text-lg font-bold text-brand-ink">
-                  Bạn chưa đồng ý các chính sách để đăng tác phẩm
-                </div>
-                <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
-                  Truyện này đang ở chế độ độc quyền — cần xác nhận văn bản dưới đây trước khi xuất bản.
-                </div>
-              </div>
+      <Modal open onClose={onClose} panelClassName="max-w-[480px] p-7">
+        <div className="flex items-start gap-3">
+          <WarningCircleIcon weight="fill" size={24} color="var(--color-brand-gold-dark)" className="mt-0.5 shrink-0" />
+          <div>
+            <div className="text-lg font-bold text-brand-ink">
+              Bạn chưa đồng ý các chính sách để đăng tác phẩm
             </div>
-
-            {rows === null ? (
-              <div className="mt-5 text-[13.5px] text-stone-light">Đang tải…</div>
-            ) : (
-              <div className="mt-5 flex flex-col gap-2.5">
-                {rows.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-cream-border bg-cream-card px-4 py-3"
-                  >
-                    <div className="min-w-0 text-[13.5px] font-semibold text-ink">{r.name}</div>
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(r.id)}
-                      disabled={acceptingId === r.id}
-                      className="shrink-0 cursor-pointer whitespace-nowrap rounded-lg border border-brand-ink bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
-                    >
-                      Xem &amp; đồng ý
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-6 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="cursor-pointer rounded-full border border-cream-border px-5 py-2.5 text-[13.5px] font-medium text-stone-dark"
-              >
-                Đóng
-              </button>
-              <Link
-                href="/ca-nhan?tab=agree"
-                className="flex items-center gap-1.5 text-[13px] font-semibold text-brand-gold-dark no-underline"
-              >
-                Đi tới Cam kết &amp; Thỏa thuận <ArrowSquareOutIcon size={14} />
-              </Link>
+            <div className="mt-1.5 text-[13.5px] leading-[1.6] text-stone-dark">
+              Truyện này đang ở chế độ độc quyền — cần xác nhận văn bản dưới đây trước khi xuất bản.
             </div>
           </div>
-        </div>,
-        document.body
-      )}
+        </div>
+
+        {rows === null ? (
+          <div className="mt-5 flex flex-col gap-2.5">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-[52px] rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5 flex flex-col gap-2.5">
+            {rows.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-cream-border bg-cream-card px-4 py-3"
+              >
+                <div className="min-w-0 text-[13.5px] font-semibold text-ink">{r.name}</div>
+                <button
+                  type="button"
+                  onClick={() => setOpenId(r.id)}
+                  disabled={acceptingId === r.id}
+                  className="shrink-0 cursor-pointer whitespace-nowrap rounded-lg border border-brand-ink bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                >
+                  Xem &amp; đồng ý
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-full border border-cream-border px-5 py-2.5 text-[13.5px] font-medium text-stone-dark"
+          >
+            Đóng
+          </button>
+          <Link
+            href="/ca-nhan?tab=agree"
+            className="flex items-center gap-1.5 text-[13px] font-semibold text-brand-gold-dark no-underline"
+          >
+            Đi tới Cam kết &amp; Thỏa thuận <ArrowSquareOutIcon size={14} />
+          </Link>
+        </div>
+      </Modal>
 
       {openRow && openDoc && (
         <AgreementDocumentViewer

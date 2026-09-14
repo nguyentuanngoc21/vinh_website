@@ -7,6 +7,7 @@ import {
   DEFAULT_RESPONSE_DAYS,
   type ReasonGroupId,
 } from "@/lib/moderation/chapter-removal-templates";
+import { Alert, Field, Modal, Textarea } from "@/components/ui";
 
 export type RemoveChapterPayload = {
   reasonGroup: ReasonGroupId;
@@ -54,8 +55,10 @@ export function RemoveChapterModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-[480px] rounded-2xl bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,.25)]">
+    // closeOnBackdrop=false — hành vi cũ (bấm nền không đóng), giữ nguyên:
+    // đây là modal xác nhận GỠ chương/truyện, không muốn mất dữ liệu vừa
+    // điền vì lỡ tay click ra ngoài.
+    <Modal open onClose={onCancel} closeOnBackdrop={false} panelClassName="max-w-[480px] p-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[16px] font-bold text-brand-ink">{heading}</div>
           <button type="button" onClick={onCancel} className="cursor-pointer text-stone-alt hover:text-brand-ink">
@@ -101,36 +104,40 @@ export function RemoveChapterModal({
           </>
         )}
 
-        <label className="mb-1 block text-[12.5px] font-semibold text-stone-dark">
-          Ghi chú thêm {groupInfo.subReasons.length === 0 && group !== "chua_xac_dinh" ? "(bắt buộc)" : "(tuỳ chọn)"}
-        </label>
-        <textarea
-          value={detail}
-          onChange={(e) => {
-            setDetail(e.target.value);
-            setFormError(null);
-          }}
-          rows={3}
-          placeholder="Ví dụ: chương 12, đoạn 3 sao chép nguyên văn từ..."
-          className="mb-3 w-full resize-none rounded-lg border border-cream-border px-3 py-2 text-sm"
-        />
+        <div className="mb-3">
+          <Textarea
+            label={
+              "Ghi chú thêm " +
+              (groupInfo.subReasons.length === 0 && group !== "chua_xac_dinh" ? "(bắt buộc)" : "(tuỳ chọn)")
+            }
+            value={detail}
+            onChange={(e) => {
+              setDetail(e.target.value);
+              setFormError(null);
+            }}
+            rows={3}
+            placeholder="Ví dụ: chương 12, đoạn 3 sao chép nguyên văn từ..."
+            className="resize-none"
+          />
+        </div>
 
         {groupInfo.invitesComplaint && (
-          <>
-            <label className="mb-1 block text-[12.5px] font-semibold text-stone-dark">
-              Số ngày tác giả có thể phản hồi
-            </label>
-            <input
+          <div className="mb-3 w-24">
+            <Field
+              label="Số ngày tác giả có thể phản hồi"
               type="number"
               min={1}
               value={responseDays}
               onChange={(e) => setResponseDays(Math.max(1, Number(e.target.value) || DEFAULT_RESPONSE_DAYS))}
-              className="mb-3 w-24 rounded-lg border border-cream-border px-3 py-2 text-sm"
             />
-          </>
+          </div>
         )}
 
-        {formError && <div className="mb-3 text-[12.5px] font-medium text-[#B02A37]">{formError}</div>}
+        {formError && (
+          <div className="mb-3">
+            <Alert tone="error">{formError}</Alert>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2.5">
           <button
@@ -144,12 +151,11 @@ export function RemoveChapterModal({
             type="button"
             disabled={pending}
             onClick={handleSubmit}
-            className="rounded-lg bg-[#B02A37] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-error px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
           >
             {pending ? "Đang gỡ…" : "Xác nhận gỡ"}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

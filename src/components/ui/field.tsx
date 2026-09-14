@@ -24,21 +24,26 @@ type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
   status?: FieldStatus;
   /** Render something (e.g. a show/hide-password button) inside the input's right edge. */
   suffix?: ReactNode;
+  /** className applies to the <input> itself; use this for the wrapping
+   * <label> (e.g. `flex-1` in a flex row) — the two are NOT interchangeable,
+   * see chat-tab.tsx's composer for the bug this caused before this prop
+   * existed. */
+  wrapperClassName?: string;
 };
 
 export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { label, hint, status, suffix, className = "", ...inputProps },
+  { label, hint, status, suffix, className = "", wrapperClassName = "", ...inputProps },
   ref
 ) {
   const toneClass =
     status?.tone === "error"
-      ? "border-[#B02A37]"
+      ? "border-error"
       : status?.tone === "success"
-        ? "border-[#2F7A4F]"
+        ? "border-success-form"
         : "border-border-light";
 
   return (
-    <label className="block">
+    <label className={`block ${wrapperClassName}`}>
       {label !== null && (
         <div className="mb-[7px] text-[13px] font-semibold text-slate">{label}</div>
       )}
@@ -58,9 +63,9 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
         <div
           className={`mt-1.5 text-xs ${
             status?.tone === "error"
-              ? "text-[#B02A37]"
+              ? "text-error"
               : status?.tone === "success"
-                ? "text-[#2F7A4F]"
+                ? "text-success-form"
                 : "text-stone-light"
           }`}
         >

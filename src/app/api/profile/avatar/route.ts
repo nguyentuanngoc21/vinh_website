@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 
-const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+// Kích thước tối đa (15MB) không còn kiểm ở route này — file giờ đi thẳng
+// từ trình duyệt lên Storage qua signed upload URL, route chỉ cấp URL.
+// Chốt chặn thật sự là storage.buckets.file_size_limit trên bucket
+// "avatars" (xem migrations/20260914_raise_avatar_cover_size_limit.sql);
+// phía client (profile-header.tsx) cũng tự chặn sớm cho UX.
 const ALLOWED_MIME_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -13,6 +17,13 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
  * Ảnh đại diện trang cá nhân/tác giả — cùng bucket "avatars" đã có (public,
  * RLS folder-per-user), khác filename prefix ("avatar-" thay vì "cover-").
  * Không cần bucket/migration storage riêng. Mirror api/profile/cover/route.ts.
+ *
+ * Upload đi qua signed upload URL (POST tạo URL -> client PUT thẳng lên
+ * Storage -> PATCH xác nhận), KHÔNG còn multipart qua route này — Vercel
+ * Serverless Functions giới hạn cứng body request ở ~4.5MB (giới hạn
+ * platform, không sửa được bằng code), nên trước đây avatar/cover không
+ * thể lớn hơn ~4.5MB dù route có tự khai "tối đa 5MB". Đi thẳng lên Storage
+ * bỏ qua giới hạn đó hoàn toàn.
  */
 export async function GET() {
   const supabase = createServiceRoleClient();
@@ -33,6 +44,7 @@ export async function GET() {
   return NextResponse.json({ avatarUrl: data.avatar_url });
 }
 
+/** Bước 1: sinh signed upload URL cho client PUT thẳng file lên Storage. */
 export async function POST(request: Request) {
   const supabase = createServiceRoleClient();
   const userId = await getAuthedUserId(supabase);
@@ -40,34 +52,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const form = await request.formData().catch(() => null);
-  if (!form) {
-    return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
-  }
-
-  const file = form.get("avatar");
-  if (!(file instanceof File) || file.size === 0) {
-    return NextResponse.json({ error: "Thiếu ảnh đại diện." }, { status: 400 });
-  }
-
-  const ext = ALLOWED_MIME_EXT[file.type];
+  const body = await request.json().catch(() => null);
+  const contentType = typeof body?.contentType === "string" ? body.contentType : null;
+  const ext = contentType ? ALLOWED_MIME_EXT[contentType] : null;
   if (!ext) {
     return NextResponse.json(
       { error: "Chỉ nhận ảnh định dạng JPG, PNG hoặc WEBP." },
       { status: 400 }
     );
   }
-  if (file.size > AVATAR_MAX_BYTES) {
-    return NextResponse.json({ error: "Ảnh đại diện tối đa 5MB." }, { status: 400 });
-  }
 
   const path = `${userId}/avatar-${Date.now()}.${ext}`;
-  const { error: uploadError } = await supabase.storage
-    .from("avatars")
-    .upload(path, file, { contentType: file.type });
-  if (uploadError) {
-    console.error("[profile/avatar] upload failed:", uploadError);
-    return NextResponse.json({ error: `Tải ảnh đại diện thất bại: ${uploadError.message}` }, { status: 500 });
+  const { data, error } = await supabase.storage.from("avatars").createSignedUploadUrl(path);
+  if (error || !data) {
+    console.error("[profile/avatar] createSignedUploadUrl failed:", error);
+    return NextResponse.json({ error: "Không tạo được link tải ảnh." }, { status: 500 });
+  }
+
+  return NextResponse.json({ path: data.path, token: data.token, signedUrl: data.signedUrl });
+}
+
+/** Bước 2: client đã upload xong lên `path` — xác nhận và lưu vào hồ sơ. */
+export async function PATCH(request: Request) {
+  const supabase = createServiceRoleClient();
+  const userId = await getAuthedUserId(supabase);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const path = typeof body?.path === "string" ? body.path : null;
+  // Chặn xác nhận path không thuộc thư mục của chính user này (mỗi user 1
+  // folder theo userId, khớp policy "users upload and replace their own
+  // avatar" trong docs/supabase/schema.sql).
+  if (!path || !path.startsWith(`${userId}/avatar-`)) {
+    return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
   const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
