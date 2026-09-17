@@ -1419,8 +1419,17 @@ export type Database = {
           // NULL/NULL = not auto-computed (e.g. the row a
           // streak_milestones.badge_id points to — unlock lives in
           // claim_streak_milestone() instead). Non-null pair = evaluated
-          // by sync_user_achievements().
-          metric: "books_published" | "audio_published" | "design_published" | null;
+          // by sync_user_achievements(). chapters_read/genres_read_count/
+          // night_reads_count added by
+          // migrations/20260917_add_reading_event_log.sql.
+          metric:
+            | "books_published"
+            | "audio_published"
+            | "design_published"
+            | "chapters_read"
+            | "genres_read_count"
+            | "night_reads_count"
+            | null;
           threshold: number | null;
           reward_tokens: number;
           active: boolean;
@@ -1434,7 +1443,14 @@ export type Database = {
           description?: string | null;
           icon?: string | null;
           color_token: string;
-          metric?: "books_published" | "audio_published" | "design_published" | null;
+          metric?:
+            | "books_published"
+            | "audio_published"
+            | "design_published"
+            | "chapters_read"
+            | "genres_read_count"
+            | "night_reads_count"
+            | null;
           threshold?: number | null;
           reward_tokens?: number;
           active?: boolean;
@@ -1775,6 +1791,12 @@ export type Database = {
       sync_reading_streak: {
         Args: { p_user_id: string; p_activity_date?: string };
         Returns: Database["public"]["Tables"]["profiles"]["Row"];
+      };
+      // Dedupe theo (user_id, chapter_id, ngày server) — trả null nếu đã
+      // ghi hôm nay. Xem migrations/20260917_add_reading_event_log.sql.
+      record_chapter_read: {
+        Args: { p_user_id: string; p_book_id: string; p_chapter_id: string };
+        Returns: Database["public"]["Tables"]["reading_history"]["Row"] | null;
       };
       rescue_streak_with_tokens: {
         Args: { p_user_id: string; p_token_cost: number };

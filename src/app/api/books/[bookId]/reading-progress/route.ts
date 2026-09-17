@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { ReadingEventService } from "@/lib/quests/reading-event-service";
 
 /**
  * POST /api/books/:bookId/reading-progress — ghi lại ĐOẠN VĂN cụ thể
@@ -14,6 +15,14 @@ import { getAuthedUserId } from "@/lib/wallet/session";
  * trong lúc chapter_id đã trỏ sang chương B). Cùng onConflict với
  * book_progress upsert ở page.tsx (after() — chỉ ghi chapter_id, không
  * biết đoạn nào; route này tinh chỉnh thêm sau khi trang đã render).
+ *
+ * isLastParagraph (tuỳ chọn, reader.tsx gửi khi đoạn đang xem là đoạn cuối
+ * chương) — kích hoạt ReadingEventService.recordChapterCompletion(), nguồn
+ * duy nhất ghi reading_history/streak/tiến trình nhiệm vụ "hoàn thành
+ * chương". Chờ xong (không phải fire-and-forget) vì có ý nghĩa phần
+ * thưởng, nhưng lỗi ở đây KHÔNG làm hỏng việc lưu tiến độ đọc phía trên —
+ * xem comment trong reading-event-service.ts. Xem
+ * migrations/20260917_add_reading_event_log.sql.
  */
 export async function POST(
   request: Request,
@@ -29,6 +38,7 @@ export async function POST(
   const body = await request.json().catch(() => null);
   const chapterId = typeof body?.chapterId === "string" ? body.chapterId : "";
   const paragraphIndex = Number(body?.paragraphIndex);
+  const isLastParagraph = body?.isLastParagraph === true;
   if (!chapterId || !Number.isInteger(paragraphIndex) || paragraphIndex < 0) {
     return NextResponse.json({ error: "Thiếu chapterId/paragraphIndex hợp lệ." }, { status: 400 });
   }
@@ -46,6 +56,10 @@ export async function POST(
   if (error) {
     console.error("[reading-progress] upsert failed:", error);
     return NextResponse.json({ error: "Không lưu được tiến độ đọc." }, { status: 500 });
+  }
+
+  if (isLastParagraph) {
+    await ReadingEventService.recordChapterCompletion(supabase, { userId, bookId, chapterId });
   }
 
   return NextResponse.json({ ok: true });

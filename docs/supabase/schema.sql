@@ -1405,10 +1405,45 @@ create table public.reading_history (
 
 alter table public.reading_history enable row level security;
 
-create policy "users manage their own reading history"
-  on public.reading_history for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+-- SELECT-only cho chủ hàng — bảng này nuôi streak + achievement metric
+-- (tiền thưởng thật) từ migrations/20260917_add_reading_event_log.sql, nên
+-- không còn cho phép user tự INSERT/UPDATE/DELETE thẳng qua Supabase
+-- client nữa. Ghi DUY NHẤT qua record_chapter_read() (SECURITY DEFINER,
+-- service_role) ở dưới.
+create policy "users view their own reading history"
+  on public.reading_history for select
+  using (auth.uid() = user_id);
+
+-- Gọi khi user thật sự đọc hết 1 chương (cuộn tới đoạn cuối cùng — xem
+-- src/components/reading/reader.tsx +
+-- src/app/api/books/[bookId]/reading-progress/route.ts). Dedupe theo
+-- (user_id, chapter_id, NGÀY server/UTC) — trả NULL nếu đã ghi hôm nay, để
+-- caller (TS) biết KHÔNG lặp lại side-effect (tăng tiến trình nhiệm vụ,
+-- gọi streak) cho cùng 1 lần hoàn thành do client gửi lại. Xem
+-- migrations/20260917_add_reading_event_log.sql.
+create function public.record_chapter_read(p_user_id uuid, p_book_id uuid, p_chapter_id uuid)
+returns public.reading_history as $$
+declare
+  v_row public.reading_history;
+begin
+  if exists (
+    select 1 from public.reading_history
+    where user_id = p_user_id and chapter_id = p_chapter_id and read_at::date = current_date
+  ) then
+    return null;
+  end if;
+
+  insert into public.reading_history (user_id, book_id, chapter_id)
+  values (p_user_id, p_book_id, p_chapter_id)
+  returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+-- p_user_id trần — chỉ service_role gọi được, cùng lý do increment_task_progress.
+revoke execute on function public.record_chapter_read from public, anon, authenticated;
+grant execute on function public.record_chapter_read to service_role;
 
 -- View công khai, đã ẩn danh (không có user_id) — số lượt đọc mỗi SÁCH
 -- theo TỪNG NGÀY, dùng để tính bảng xếp hạng tuần/tháng/quý thật ở
@@ -3632,7 +3667,10 @@ create table public.achievement_templates (
   constraint achievement_templates_for_role_check
     check (for_role is null or for_role in ('author', 'narrator', 'designer')),
   constraint achievement_templates_metric_check
-    check (metric is null or metric in ('books_published', 'audio_published', 'design_published')),
+    check (metric is null or metric in (
+      'books_published', 'audio_published', 'design_published',
+      'chapters_read', 'genres_read_count', 'night_reads_count'
+    )),
   constraint achievement_templates_metric_threshold_check
     check ((metric is null) = (threshold is null)),
   constraint achievement_templates_threshold_check check (threshold is null or threshold > 0),
@@ -3697,6 +3735,20 @@ begin
         (select count(*) from public.audio_narrations where narrator_id = p_user_id)
       when 'design_published' then
         (select count(*) from public.design_items where illustrator_id = p_user_id)
+      when 'chapters_read' then
+        (select count(distinct chapter_id) from public.reading_history
+           where user_id = p_user_id and chapter_id is not null)
+      when 'genres_read_count' then
+        (select count(distinct b.genre) from public.reading_history rh
+           join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and b.genre is not null)
+      when 'night_reads_count' then
+        -- Giờ server/UTC thống nhất, không theo timezone từng user — cùng
+        -- quyết định đã có cho ranh giới "1 ngày" của quest pool.
+        (select count(*) from public.reading_history
+           where user_id = p_user_id
+             and (extract(hour from timezone('utc', read_at)) >= 22
+                  or extract(hour from timezone('utc', read_at)) < 2))
       else 0
     end;
 

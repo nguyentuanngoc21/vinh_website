@@ -89,20 +89,55 @@ export const AchievementService = {
 /** COUNT thật cho từng metric — dùng để hiện progress bar của thành tựu
  * CHƯA unlock. Cùng bảng/cột với getUnlockedRoles() (creator-roles.ts)
  * nhưng cần số đếm thật (so ngưỡng), không chỉ có/không, nên tách riêng
- * thay vì tái dùng thẳng hàm đó. */
+ * thay vì tái dùng thẳng hàm đó.
+ *
+ * chapters_read/genres_read_count/night_reads_count PHẢI khớp đúng logic
+ * trong sync_user_achievements() (docs/supabase/schema.sql, phần 10) — 2
+ * nơi tính cùng 1 công thức, đổi 1 bên nhớ đổi bên kia. Giờ-trong-ngày dùng
+ * server/UTC thống nhất, không theo timezone từng user (xem
+ * migrations/20260917_add_reading_event_log.sql). */
 async function getMetricCounts(
   supabase: Client,
   userId: string
-): Promise<Record<"books_published" | "audio_published" | "design_published", number>> {
-  const [booksRes, audioRes, designRes] = await Promise.all([
+): Promise<
+  Record<
+    | "books_published"
+    | "audio_published"
+    | "design_published"
+    | "chapters_read"
+    | "genres_read_count"
+    | "night_reads_count",
+    number
+  >
+> {
+  const [booksRes, audioRes, designRes, readingHistoryRes] = await Promise.all([
     supabase.from("books").select("id", { count: "exact", head: true }).eq("author_id", userId).eq("published", true),
     supabase.from("audio_narrations").select("id", { count: "exact", head: true }).eq("narrator_id", userId),
     supabase.from("design_items").select("id", { count: "exact", head: true }).eq("illustrator_id", userId),
+    supabase.from("reading_history").select("book_id, chapter_id, read_at").eq("user_id", userId),
   ]);
+
+  const rows = readingHistoryRes.data ?? [];
+  const distinctChapters = new Set(rows.map((r) => r.chapter_id).filter((id): id is string => id !== null));
+  const nightReads = rows.filter((r) => {
+    const hour = new Date(r.read_at).getUTCHours();
+    return hour >= 22 || hour < 2;
+  }).length;
+
+  const distinctBookIds = [...new Set(rows.map((r) => r.book_id))];
+  const genresRes =
+    distinctBookIds.length > 0
+      ? await supabase.from("books").select("genre").in("id", distinctBookIds).not("genre", "is", null)
+      : { data: [] };
+  const distinctGenres = new Set((genresRes.data ?? []).map((b) => b.genre).filter((g) => !!g));
+
   return {
     books_published: booksRes.count ?? 0,
     audio_published: audioRes.count ?? 0,
     design_published: designRes.count ?? 0,
+    chapters_read: distinctChapters.size,
+    genres_read_count: distinctGenres.size,
+    night_reads_count: nightReads,
   };
 }
 

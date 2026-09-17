@@ -921,10 +921,15 @@ export function Reader({
     if (progressSaveTimeoutRef.current) clearTimeout(progressSaveTimeoutRef.current);
     progressSaveTimeoutRef.current = setTimeout(() => {
       lastSavedParagraphRef.current = idx;
+      // isLastParagraph — đoạn đang xem là đoạn cuối chương, coi như "đọc
+      // hết chương" — kích hoạt ghi reading_history/streak/tiến trình
+      // nhiệm vụ ở route (xem comment trong route đó). Chỉ cần TỚI đoạn
+      // cuối 1 lần, không cần đọc chậm hết từng đoạn.
+      const isLastParagraph = idx >= paragraphs.length - 1;
       fetch(`/api/books/${bookId}/reading-progress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterId, paragraphIndex: idx }),
+        body: JSON.stringify({ chapterId, paragraphIndex: idx, isLastParagraph }),
       }).catch(() => {
         // best-effort — bỏ qua lỗi mạng/401 (chưa đăng nhập)
       });
