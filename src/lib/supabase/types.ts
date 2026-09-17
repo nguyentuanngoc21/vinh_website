@@ -1646,6 +1646,16 @@ export type Database = {
       };
     };
     Functions: {
+      // migrations/20260916_add_realtime_signup_checks.sql
+      is_email_registered: {
+        Args: { p_email: string };
+        Returns: boolean;
+      };
+      // migrations/20260916_add_unconfirmed_registration_purge.sql
+      find_stale_unconfirmed_user_ids: {
+        Args: { p_cutoff: string; p_limit?: number | null };
+        Returns: string[];
+      };
       increment_book_view_count: {
         Args: { p_book_id: string };
         Returns: void;

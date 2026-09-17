@@ -117,6 +117,37 @@ export async function register(payload: RegisterPayload): Promise<RegisterResult
 }
 
 /**
+ * Real-time "đã dùng chưa" check for register-form.tsx, called on-blur/
+ * debounced while filling the form — GET /api/auth/check-availability.
+ * Only "username" and "email" are supported; CCCD duplicate-checking stays
+ * server-side-at-submit only (see check-availability/route.ts for why).
+ *
+ * Returns `null` (instead of throwing) on any network/server error so the
+ * caller can treat "couldn't check" as neutral rather than blocking the
+ * form on a transient failure.
+ */
+export async function checkAvailability(
+  field: "username" | "email",
+  value: string
+): Promise<boolean | null> {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/auth/check-availability?field=${field}&value=${encodeURIComponent(trimmed)}`
+    );
+  } catch {
+    return null;
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || typeof data.available !== "boolean") return null;
+  return data.available;
+}
+
+/**
  * Calls POST /api/auth/forgot-password. Always resolves `ok: true` on a
  * well-formed request — the backend deliberately returns the same generic
  * message whether or not the email is registered (see that route), so

@@ -222,6 +222,10 @@ create type public.verification_status as enum ('pending', 'approved', 'rejected
 -- thêm luồng admin duyệt tay sau này nếu cần (set 'pending' thay vì
 -- 'approved' lúc insert, rồi admin tự đổi qua policy "admins can view and
 -- review all verifications" bên dưới).
+-- migrations/20260916_add_realtime_signup_checks.sql — partial unique index
+-- (định nghĩa ngay dưới bảng, sau CREATE TABLE) chặn 1 số CCCD dùng cho
+-- nhiều tài khoản. Bỏ qua status = 'rejected' để 1 lượt bị admin từ chối
+-- không khoá vĩnh viễn số đó — vẫn nộp lại được sau.
 create table public.identity_verifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -252,6 +256,58 @@ create policy "admins can view and review all verifications"
   using (exists (
     select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')
   ));
+
+create unique index if not exists identity_verifications_cccd_number_active_idx
+  on public.identity_verifications (cccd_number)
+  where status <> 'rejected';
+
+-- migrations/20260916_add_realtime_signup_checks.sql — email đã có tài
+-- khoản (đã xác nhận) hay chưa, dùng cho check real-time ở form đăng ký
+-- (src/app/api/auth/check-availability/route.ts) trước khi gọi
+-- supabase.auth.signUp() thật. auth.users không được PostgREST expose qua
+-- schema "public" nên cần SECURITY DEFINER đọc thẳng auth.users rồi chỉ trả
+-- về đúng 1 boolean — không lộ thêm thông tin nào khác của tài khoản đó.
+create or replace function public.is_email_registered(p_email text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from auth.users
+    where lower(email) = lower(p_email)
+      and email_confirmed_at is not null
+  );
+$$;
+
+revoke all on function public.is_email_registered(text) from public;
+-- Chỉ gọi từ server (service-role client) — không cần grant cho
+-- anon/authenticated.
+grant execute on function public.is_email_registered(text) to service_role;
+
+-- migrations/20260916_add_unconfirmed_registration_purge.sql — id các tài
+-- khoản bỏ ngang đăng ký, chưa bao giờ xác nhận email, để cron
+-- src/app/api/auth/cron/purge-unconfirmed-registrations xoá — không dọn thì
+-- username/CCCD của những tài khoản đó khoá vĩnh viễn (xem precheck trong
+-- src/app/api/auth/register/route.ts).
+create or replace function public.find_stale_unconfirmed_user_ids(
+  p_cutoff timestamptz,
+  p_limit integer default 500
+)
+returns setof uuid
+language sql
+security definer
+set search_path = public
+as $$
+  select id from auth.users
+  where email_confirmed_at is null
+    and created_at < p_cutoff
+  order by created_at
+  limit p_limit;
+$$;
+
+revoke all on function public.find_stale_unconfirmed_user_ids(timestamptz, integer) from public;
+grant execute on function public.find_stale_unconfirmed_user_ids(timestamptz, integer) to service_role;
 
 -- migrations/20260828_add_agreement_acceptances.sql — 1 dòng/(user, văn
 -- bản) giữ lần xác nhận GẦN NHẤT cho tab "Cam kết & Thỏa thuận" (/ca-nhan).

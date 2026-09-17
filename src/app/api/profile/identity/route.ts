@@ -97,6 +97,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Tải ảnh mặt sau thất bại: ${backUploadError.message}` }, { status: 500 });
   }
 
+  // 1 user chỉ nên có 1 dòng "đang hiệu lực" (status khác 'rejected') tại 1
+  // thời điểm — mọi nơi đọc bảng này (GET ở trên, contract-info-service.ts)
+  // đều chỉ lấy dòng mới nhất, chưa từng cần lịch sử nhiều dòng. Trước đây
+  // route này luôn insert() dòng mới mỗi lần xác minh lại, để lại các dòng
+  // cũ 'pending'/'approved' không dùng tới — vô hại cho tới khi thêm
+  // identity_verifications_cccd_number_active_idx (migrations/
+  // 20260916_add_realtime_signup_checks.sql): user xác minh lại ĐÚNG số
+  // CCCD cũ của chính mình sẽ vỡ unique index vì dòng cũ chưa 'rejected'.
+  // Xoá dòng cũ (nếu có) trước khi insert dòng mới — KHÔNG dùng update():
+  // types.ts cố tình khai Update: never cho bảng này (reviewed_by/
+  // reviewed_at chỉ được đổi qua luồng admin duyệt tay xây riêng sau, chưa
+  // có RPC nào ở bản schema hiện tại) — xoá+insert giữ đúng ràng buộc đó,
+  // không cần nới Update ra chỉ để phục vụ route này.
+  const { data: existingVerification } = await supabase
+    .from("identity_verifications")
+    .select("id")
+    .eq("user_id", userId)
+    .neq("status", "rejected")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingVerification) {
+    const { error: deleteError } = await supabase
+      .from("identity_verifications")
+      .delete()
+      .eq("id", existingVerification.id);
+    if (deleteError) {
+      console.error("[profile/identity] delete previous identity_verifications failed:", deleteError);
+      return NextResponse.json({ error: `Lưu thông tin xác minh thất bại: ${deleteError.message}` }, { status: 500 });
+    }
+  }
+
   const { error: verificationError } = await supabase.from("identity_verifications").insert({
     user_id: userId,
     cccd_number: cccd,
