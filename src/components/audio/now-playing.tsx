@@ -11,11 +11,13 @@ import {
   MoonIcon,
   ShieldCheckIcon,
   LockKeyIcon,
+  ChatCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { VinhMark } from "@/components/ui";
 import { formatClock } from "@/lib/audio/get-audio-catalog";
 import { useNowPlaying } from "@/lib/audio/now-playing-context";
 import { LoginGateModal } from "@/components/access-gate/login-gate-modal";
+import { ContentCommentsPanel } from "@/components/comments/content-comments-panel";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 const SLEEPS: (number | null)[] = [null, 15, 30, 45];
@@ -26,6 +28,7 @@ export function NowPlaying() {
   const [speedIdx, setSpeedIdx] = useState(SPEEDS.indexOf(1));
   const [sleepIdx, setSleepIdx] = useState(0);
   const [gateModalOpen, setGateModalOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sleep = SLEEPS[sleepIdx];
@@ -203,11 +206,26 @@ export function NowPlaying() {
         >
           Xem hồ sơ {track.narratorName}
         </Link>
+        <button
+          type="button"
+          onClick={() => setCommentsOpen(true)}
+          className="flex items-center gap-2 rounded-full border border-white/20 px-[18px] py-[9px] text-[13px] font-semibold text-sidebar-text transition-transform active:scale-90"
+        >
+          <ChatCircleIcon /> Bình luận
+        </button>
         <div className="flex items-center gap-2 text-xs font-medium text-[#6f8794]">
           <ShieldCheckIcon color="var(--color-brand-gold-light)" /> Âm thanh có dấu vân số theo
           phiên nghe
         </div>
       </div>
+
+      {commentsOpen && (
+        <ContentCommentsPanel
+          title="Bình luận audio"
+          apiBase={`/api/audio/${track.id}`}
+          onClose={() => setCommentsOpen(false)}
+        />
+      )}
     </div>
   );
 }

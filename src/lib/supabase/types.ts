@@ -1527,6 +1527,33 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Xem migrations/20260917_add_design_audio_comments.sql.
+      design_comments: {
+        Row: {
+          id: string;
+          design_item_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          design_item_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      design_comment_likes: {
+        Row: { comment_id: string; user_id: string; created_at: string };
+        Insert: { comment_id: string; user_id: string };
+        // Không update — chỉ insert (thích) hoặc delete (bỏ thích).
+        Update: never;
+        Relationships: [];
+      };
       audio_narrations: {
         Row: {
           id: string;
@@ -1552,6 +1579,33 @@ export type Database = {
           source?: ContentSource;
         };
         Update: Partial<Database["public"]["Tables"]["audio_narrations"]["Insert"]>;
+        Relationships: [];
+      };
+      // Xem migrations/20260917_add_design_audio_comments.sql.
+      audio_comments: {
+        Row: {
+          id: string;
+          audio_narration_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          audio_narration_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      audio_comment_likes: {
+        Row: { comment_id: string; user_id: string; created_at: string };
+        Insert: { comment_id: string; user_id: string };
+        // Không update — chỉ insert (thích) hoặc delete (bỏ thích).
+        Update: never;
         Relationships: [];
       };
       audio_progress: {
@@ -1625,6 +1679,15 @@ export type Database = {
       // Xem migrations/20260901_add_design_item_gallery_metadata.sql.
       design_item_like_counts: {
         Row: { design_item_id: string; like_count: number };
+        Relationships: [];
+      };
+      // Xem migrations/20260917_add_design_audio_comments.sql.
+      design_comment_like_counts: {
+        Row: { comment_id: string; like_count: number };
+        Relationships: [];
+      };
+      audio_comment_like_counts: {
+        Row: { comment_id: string; like_count: number };
         Relationships: [];
       };
       public_audio_narrations: {

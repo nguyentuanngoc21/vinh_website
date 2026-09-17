@@ -1744,6 +1744,63 @@ $$ language sql security definer set search_path = public;
 
 grant execute on function public.increment_design_item_share_count(uuid) to anon, authenticated;
 
+-- --- Bình luận cho 1 tác phẩm thiết kế — mirror anchored_comments nhưng bỏ
+-- paragraph_index/char_start/char_end/quest_id (không có khái niệm "đoạn
+-- văn" hay "quest neo comment" ở đây). Reply 1 cấp duy nhất, enforce ở API
+-- route, không phải CHECK DB. Xem migrations/20260917_add_design_audio_comments.sql. ---
+create table public.design_comments (
+  id uuid primary key default gen_random_uuid(),
+  design_item_id uuid not null references public.design_items (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  content text not null check (char_length(trim(content)) > 0),
+  parent_comment_id uuid references public.design_comments (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index design_comments_design_item_id_idx on public.design_comments (design_item_id);
+create index design_comments_parent_idx on public.design_comments (parent_comment_id) where parent_comment_id is not null;
+
+alter table public.design_comments enable row level security;
+
+create policy "design comments are publicly readable"
+  on public.design_comments for select
+  using (true);
+
+create policy "users write their own design comments"
+  on public.design_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own design comments"
+  on public.design_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate design comments"
+  on public.design_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Toggle thích 1 bình luận — cùng pattern design_item_likes (aggregate qua
+-- view riêng, bảng gốc owner-only RLS).
+create table public.design_comment_likes (
+  comment_id uuid not null references public.design_comments (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+create index design_comment_likes_comment_id_idx on public.design_comment_likes (comment_id);
+
+alter table public.design_comment_likes enable row level security;
+
+create policy "users manage their own design comment likes"
+  on public.design_comment_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.design_comment_like_counts as
+  select comment_id, count(*)::integer as like_count
+  from public.design_comment_likes
+  group by comment_id;
+
 -- --- Kho Audio ---
 create table public.audio_narrations (
   id uuid primary key default gen_random_uuid(),
@@ -1800,6 +1857,60 @@ returns void as $$
 $$ language sql security definer set search_path = public;
 
 grant execute on function public.increment_audio_play_count(uuid) to anon, authenticated;
+
+-- --- Bình luận cho 1 bản thu audio — cùng cấu trúc design_comments ở
+-- trên, khác bảng gốc tham chiếu. Xem
+-- migrations/20260917_add_design_audio_comments.sql. ---
+create table public.audio_comments (
+  id uuid primary key default gen_random_uuid(),
+  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  content text not null check (char_length(trim(content)) > 0),
+  parent_comment_id uuid references public.audio_comments (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index audio_comments_audio_narration_id_idx on public.audio_comments (audio_narration_id);
+create index audio_comments_parent_idx on public.audio_comments (parent_comment_id) where parent_comment_id is not null;
+
+alter table public.audio_comments enable row level security;
+
+create policy "audio comments are publicly readable"
+  on public.audio_comments for select
+  using (true);
+
+create policy "users write their own audio comments"
+  on public.audio_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own audio comments"
+  on public.audio_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate audio comments"
+  on public.audio_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create table public.audio_comment_likes (
+  comment_id uuid not null references public.audio_comments (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+create index audio_comment_likes_comment_id_idx on public.audio_comment_likes (comment_id);
+
+alter table public.audio_comment_likes enable row level security;
+
+create policy "users manage their own audio comment likes"
+  on public.audio_comment_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.audio_comment_like_counts as
+  select comment_id, count(*)::integer as like_count
+  from public.audio_comment_likes
+  group by comment_id;
 
 -- --- Liên kết chương ↔ audio (nhiều-nhiều) ---
 -- Bảng này TỰ NÓ không nhạy cảm (không có share_token), nên select công

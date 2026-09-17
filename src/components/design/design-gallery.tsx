@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { HeartIcon, ShareNetworkIcon, ImageSquareIcon } from "@phosphor-icons/react/dist/ssr";
+import { HeartIcon, ShareNetworkIcon, ImageSquareIcon, ChatCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { shareOrCopy } from "@/lib/share";
+import { ContentCommentsPanel } from "@/components/comments/content-comments-panel";
 import {
   DESIGN_CATEGORIES,
   DESIGN_SORTS,
@@ -40,6 +41,7 @@ export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
   const [cat, setCat] = useState<CategoryFilter>("Tất cả");
   const [sort, setSort] = useState<DesignSortKey>("likes");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [commentsOpenId, setCommentsOpenId] = useState<string | null>(null);
   const [likeState, setLikeState] = useState<Record<string, LikeState>>(() =>
     Object.fromEntries(items.map((p) => [p.id, { liked: p.likedByViewer, count: p.likeCount }]))
   );
@@ -339,6 +341,14 @@ export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setCommentsOpenId(open.id)}
+                  className="flex cursor-pointer items-center gap-2 rounded-full border border-[#e2ded7] px-5 py-3 text-sm font-semibold text-brand-ink"
+                >
+                  <ChatCircleIcon />
+                  Bình luận
+                </button>
+                <button
+                  type="button"
                   onClick={() => setOpenId(null)}
                   className="ml-auto cursor-pointer rounded-full border border-[#e2ded7] px-[18px] py-3 text-sm font-semibold text-stone"
                 >
@@ -348,6 +358,14 @@ export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
             </div>
           </div>
         </div>
+      )}
+
+      {commentsOpenId && (
+        <ContentCommentsPanel
+          title="Bình luận tác phẩm"
+          apiBase={`/api/design/${commentsOpenId}`}
+          onClose={() => setCommentsOpenId(null)}
+        />
       )}
     </>
   );
