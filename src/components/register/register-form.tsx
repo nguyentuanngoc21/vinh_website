@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
@@ -13,7 +13,7 @@ import {
   InfoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
-import { resendOtp } from "@/lib/auth";
+import { resendOtp, checkAvailability } from "@/lib/auth";
 import { resolveRedirectTarget } from "@/lib/redirect-target";
 import { useAsyncSubmit } from "@/lib/hooks/use-async-submit";
 import { Field, Button, Alert, Checkbox } from "@/components/ui";
@@ -64,6 +64,25 @@ export function RegisterForm() {
   const [agree, setAgree] = useState(false);
   const { pending, error, run } = useAsyncSubmit(register);
 
+  // Real-time "đã dùng chưa" cho username/email — debounce 500ms sau khi
+  // ngừng gõ, gọi GET /api/auth/check-availability (xem lib/auth.ts). CCCD
+  // KHÔNG có ở đây — chỉ được xác nhận trùng/không lúc submit thật (xem
+  // register/route.ts), vì đó là dữ liệu cá nhân nhạy cảm, không lộ qua
+  // 1 endpoint real-time công khai (xem check-availability/route.ts).
+  //
+  // Chỉ lưu kết quả LẦN CHECK GẦN NHẤT kèm giá trị nó thuộc về — "idle"
+  // (chưa nhập gì) và "checking" (đang chờ debounce/response) được suy ra ở
+  // dưới thay vì set trực tiếp trong effect, vì set-state đồng bộ ngay
+  // trong thân effect (không phải trong callback bất đồng bộ) bị
+  // react-hooks/set-state-in-effect chặn — xem 2 effect useEffect bên dưới,
+  // chúng chỉ setState bên trong setTimeout/await.
+  type AvailabilityResult = "available" | "taken" | "error";
+  type Availability = "idle" | "checking" | AvailabilityResult;
+  const [usernameCheck, setUsernameCheck] = useState<{ value: string; result: AvailabilityResult } | null>(
+    null
+  );
+  const [emailCheck, setEmailCheck] = useState<{ value: string; result: AvailabilityResult } | null>(null);
+
   const uname = username.trim();
   const score = passwordScore(pw);
   const match = pw2.length > 0 && pw === pw2;
@@ -80,7 +99,24 @@ export function RegisterForm() {
   const cccdStarted = cccd.length > 0 || !!files.front || !!files.back;
   const cccdComplete = cccdOk && !!files.front && !!files.back;
   const cccdReady = !cccdStarted || cccdComplete;
-  const ready = filled && match && cccdReady && agree && !pending;
+  const usernameAvailability: Availability = !uname
+    ? "idle"
+    : usernameCheck && usernameCheck.value === uname
+      ? usernameCheck.result
+      : "checking";
+  const emailTrimmed = email.trim();
+  // Chỉ coi là "đang check" khi email đã trông giống email thật — tránh
+  // hiện "Đang kiểm tra…" mãi cho input gõ dở ("a", "an", "an@"...) mà
+  // không effect nào bên dưới thực sự gọi API cho giá trị đó.
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed);
+  const emailAvailability: Availability = !emailLooksValid
+    ? "idle"
+    : emailCheck && emailCheck.value === emailTrimmed
+      ? emailCheck.result
+      : "checking";
+  const usernameTaken = usernameAvailability === "taken";
+  const emailTaken = emailAvailability === "taken";
+  const ready = filled && match && cccdReady && agree && !pending && !usernameTaken && !emailTaken;
 
   const missing = useMemo(() => {
     const list: string[] = [];
@@ -88,9 +124,52 @@ export function RegisterForm() {
     if (pw2.length > 0 && !match) list.push("mật khẩu khớp nhau");
     if (cccdStarted && !cccdOk) list.push("CCCD đủ 12 số");
     if (cccdStarted && (!files.front || !files.back)) list.push("tải cả hai mặt căn cước");
+    if (usernameTaken) list.push("đổi tên tài khoản khác");
+    if (emailTaken) list.push("dùng email khác");
     if (!agree) list.push("đồng ý điều khoản");
     return list;
-  }, [filled, pw2, match, cccdStarted, cccdOk, files, agree]);
+  }, [filled, pw2, match, cccdStarted, cccdOk, files, usernameTaken, emailTaken, agree]);
+
+  // Debounce 500ms sau khi ngừng gõ username — tránh gọi API mỗi ký tự.
+  // setState CHỈ nằm trong callback của setTimeout (bất đồng bộ), không gọi
+  // đồng bộ ngay thân effect — đúng pattern react-hooks/set-state-in-effect
+  // yêu cầu ("subscribe rồi setState trong callback"). `cancelled` chặn 1
+  // response chậm của lần gõ trước ghi đè kết quả của lần gõ sau.
+  useEffect(() => {
+    if (!uname) return;
+    let cancelled = false;
+    const timeout = setTimeout(async () => {
+      const available = await checkAvailability("username", uname);
+      if (cancelled) return;
+      setUsernameCheck({
+        value: uname,
+        result: available === null ? "error" : available ? "available" : "taken",
+      });
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [uname]);
+
+  // Cùng pattern debounce như username, chỉ khác điều kiện kích hoạt (email
+  // phải trông giống email thật trước — xem emailLooksValid ở trên).
+  useEffect(() => {
+    if (!emailLooksValid) return;
+    let cancelled = false;
+    const timeout = setTimeout(async () => {
+      const available = await checkAvailability("email", emailTrimmed);
+      if (cancelled) return;
+      setEmailCheck({
+        value: emailTrimmed,
+        result: available === null ? "error" : available ? "available" : "taken",
+      });
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [emailLooksValid, emailTrimmed]);
 
   // Nhận File đã nén sẵn từ CccdUploadTiles (xem compress-image.ts) — không
   // còn nhận ChangeEvent thô ở đây nữa.
@@ -134,6 +213,30 @@ export function RegisterForm() {
     setResending(false);
     setResendMsg(result.ok ? "Đã gửi lại email xác nhận." : result.error);
   };
+
+  // username/email availability, computed once and handed to <Field status=…>
+  // — "checking" has no error/success tone yet, so it goes through `hint`
+  // instead (Field shows `status` OR `hint`, never both — see field.tsx).
+  const usernameStatus =
+    usernameAvailability === "taken"
+      ? ({ tone: "error", message: "Tên tài khoản đã được sử dụng" } as const)
+      : usernameAvailability === "available"
+        ? ({ tone: "success", message: "Tên tài khoản có thể dùng" } as const)
+        : undefined;
+  const usernameHint =
+    usernameAvailability === "checking"
+      ? "Đang kiểm tra…"
+      : uname
+        ? `vinh.vn/@${uname.toLowerCase().replace(/\s+/g, "")}`
+        : "Dùng để đăng nhập, không đổi được";
+
+  const emailStatus =
+    emailAvailability === "taken"
+      ? ({ tone: "error", message: "Email này đã được đăng ký" } as const)
+      : emailAvailability === "available"
+        ? ({ tone: "success", message: "Email có thể dùng" } as const)
+        : undefined;
+  const emailHint = emailAvailability === "checking" ? "Đang kiểm tra…" : undefined;
 
   // pw2 / cccd validation status, computed once and handed to <Field status=…>
   // instead of each field hand-rolling its own inline `style={{ color: … }}`.
@@ -249,6 +352,8 @@ export function RegisterForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="ban@email.com"
+          status={emailStatus}
+          hint={emailHint}
         />
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -258,11 +363,8 @@ export function RegisterForm() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="minhkhoi"
-            hint={
-              uname
-                ? `vinh.vn/@${uname.toLowerCase().replace(/\s+/g, "")}`
-                : "Dùng để đăng nhập, không đổi được"
-            }
+            status={usernameStatus}
+            hint={usernameHint}
           />
           <Field
             label="Nickname"

@@ -11,6 +11,10 @@
     {
       "path": "/api/admin/cron/purge-deleted-content",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/auth/cron/purge-unconfirmed-registrations",
+      "schedule": "0 22 * * *"
     }
   ]
 }

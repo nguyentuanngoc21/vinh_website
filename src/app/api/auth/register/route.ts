@@ -2,8 +2,21 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { verifyCccdAgainstImages } from "@/lib/ocr";
 import { resolveRedirectTarget } from "@/lib/redirect-target";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  // Đăng ký là request tốn (OCR CCCD, upload ảnh) và giờ còn là nơi DUY
+  // NHẤT biết được 1 số CCCD đã dùng để đăng ký chưa (real-time check ở
+  // check-availability/route.ts cố tình KHÔNG lộ CCCD — xem comment ở đó).
+  // Giới hạn số lần thử/IP để việc đó không trở thành cách dò CCCD hàng loạt.
+  const ip = getClientIp(request);
+  if (!checkRateLimit(`register:${ip}`, 10, 10 * 60_000)) {
+    return NextResponse.json(
+      { error: "Bạn đã thử đăng ký quá nhiều lần. Vui lòng thử lại sau ít phút." },
+      { status: 429 }
+    );
+  }
+
   const form = await request.formData().catch(() => null);
   if (!form) {
     return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
@@ -71,6 +84,48 @@ export async function POST(request: Request) {
     }
   }
 
+  // Kiểm tra trùng username SỚM, trước khi tạo auth.users — "username text
+  // unique" ở bảng profiles (docs/supabase/schema.sql) nghĩa là insert
+  // profiles bên dưới sẽ vỡ ràng buộc unique (Postgrest 409) nếu trùng.
+  // Không kiểm tra trước thì mỗi lần người dùng gõ trùng username sẽ tạo
+  // xong 1 auth.users chưa xác nhận rồi mới vỡ ở bước insert profiles —
+  // vừa trả lỗi 500 khó hiểu, vừa để lại tài khoản auth mồ côi (không có
+  // profile) mà client không có cách nào dọn lại.
+  const precheckAdmin = createServiceRoleClient();
+  const { data: existingUsername } = await precheckAdmin
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+  if (existingUsername) {
+    return NextResponse.json(
+      { error: "Tên tài khoản đã được sử dụng. Vui lòng chọn tên khác." },
+      { status: 409 }
+    );
+  }
+
+  // Cùng lý do với username ở trên: chặn CCCD trùng TRƯỚC khi tạo auth.users
+  // — partial unique index identity_verifications_cccd_number_active_idx
+  // (migrations/20260916_add_realtime_signup_checks.sql, bỏ qua status =
+  // 'rejected') sẽ vỡ ở bước insert identity_verifications bên dưới nếu
+  // không chặn sớm. KHÔNG public real-time cho field này (xem
+  // check-availability/route.ts) — số CCCD chỉ được xác nhận trùng/không ở
+  // đây, lúc submit thật, sau khi rate-limit ở trên.
+  if (cccdSubmitted) {
+    const { data: existingCccd } = await precheckAdmin
+      .from("identity_verifications")
+      .select("user_id")
+      .eq("cccd_number", cccdRaw)
+      .neq("status", "rejected")
+      .limit(1);
+    if (existingCccd && existingCccd.length > 0) {
+      return NextResponse.json(
+        { error: "Số CCCD này đã được dùng để đăng ký một tài khoản khác." },
+        { status: 409 }
+      );
+    }
+  }
+
   const supabase = await createClient();
   const origin = new URL(request.url).origin;
   // Trang cần quay lại sau khi xác nhận xong (rào đọc/nghe cho khách vãng
@@ -129,6 +184,14 @@ export async function POST(request: Request) {
   // Xem comment đầy đủ trong src/lib/supabase/server.ts.
   const admin = createServiceRoleClient();
 
+  // Dọn lại auth.users vừa tạo nếu bất kỳ bước nào bên dưới thất bại —
+  // profiles có "on delete cascade" tới auth.users (docs/supabase/schema.sql)
+  // nên xoá auth user là đủ dọn sạch cả profile vừa insert, không để lại tài
+  // khoản mồ côi (có auth.users, không có/thiếu profiles hoặc
+  // identity_verifications) chặn những lần đăng ký sau với cùng email.
+  const newUserId = authData.user.id;
+  const rollbackAuthUser = () => admin.auth.admin.deleteUser(newUserId).catch(() => {});
+
   // OCR đã khớp ảnh với số CCCD ở bước kiểm tra phía trên (nếu có gửi) —
   // coi là xác minh tự động, giống hệt luồng cập nhật CCCD sau này trong
   // Thông tin cá nhân (xem src/app/api/profile/identity/route.ts), để
@@ -146,9 +209,17 @@ export async function POST(request: Request) {
   });
   if (profileError) {
     console.error("[register] insert profiles failed:", profileError);
+    await rollbackAuthUser();
+    // code "23505" = unique_violation của Postgres — race condition hiếm
+    // (2 request cùng username lọt qua precheck ở trên gần như cùng lúc).
+    const isDuplicateUsername = profileError.code === "23505";
     return NextResponse.json(
-      { error: `Tạo hồ sơ thất bại: ${profileError.message}` },
-      { status: 500 }
+      {
+        error: isDuplicateUsername
+          ? "Tên tài khoản đã được sử dụng. Vui lòng chọn tên khác."
+          : `Tạo hồ sơ thất bại: ${profileError.message}`,
+      },
+      { status: isDuplicateUsername ? 409 : 500 }
     );
   }
 
@@ -169,6 +240,7 @@ export async function POST(request: Request) {
       .upload(frontPath, front);
     if (frontUploadError) {
       console.error("[register] upload cccdFront failed:", frontUploadError);
+      await rollbackAuthUser();
       return NextResponse.json(
         { error: `Tải ảnh mặt trước thất bại: ${frontUploadError.message}` },
         { status: 500 }
@@ -180,6 +252,7 @@ export async function POST(request: Request) {
       .upload(backPath, back);
     if (backUploadError) {
       console.error("[register] upload cccdBack failed:", backUploadError);
+      await rollbackAuthUser();
       return NextResponse.json(
         { error: `Tải ảnh mặt sau thất bại: ${backUploadError.message}` },
         { status: 500 }
@@ -195,9 +268,17 @@ export async function POST(request: Request) {
     });
     if (verificationError) {
       console.error("[register] insert identity_verifications failed:", verificationError);
+      await rollbackAuthUser();
+      // race condition hiếm: 2 request cùng CCCD lọt qua precheck ở trên
+      // gần như cùng lúc, vỡ ở identity_verifications_cccd_number_active_idx.
+      const isDuplicateCccd = verificationError.code === "23505";
       return NextResponse.json(
-        { error: `Lưu thông tin xác minh thất bại: ${verificationError.message}` },
-        { status: 500 }
+        {
+          error: isDuplicateCccd
+            ? "Số CCCD này đã được dùng để đăng ký một tài khoản khác."
+            : `Lưu thông tin xác minh thất bại: ${verificationError.message}`,
+        },
+        { status: isDuplicateCccd ? 409 : 500 }
       );
     }
   }
