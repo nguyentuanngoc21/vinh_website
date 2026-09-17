@@ -611,6 +611,16 @@ export function Reader({
     }
   };
 
+  // Ghi nhận tiến trình nhiệm vụ reader_share_story — chỉ khi shareOrCopy()
+  // thật sự thành công ("shared" hoặc "copied", không phải "failed"). Best-
+  // effort, không cần đăng nhập vẫn gọi được, lỗi/401 bị nuốt im lặng
+  // (chia sẻ vẫn thành công với người dùng dù không tính nhiệm vụ). Xem
+  // src/app/api/books/[bookId]/share/route.ts.
+  const trackShareQuest = () => {
+    if (!bookId) return;
+    fetch(`/api/books/${bookId}/share`, { method: "POST" }).catch(() => {});
+  };
+
   const handleShareStory = async () => {
     if (!bookSlug || typeof window === "undefined") return;
     const result = await shareOrCopy({
@@ -619,6 +629,7 @@ export function Reader({
       url: `${window.location.origin}/truyen/${bookSlug}`,
     });
     if (result === "copied") toast.show("Đã sao chép liên kết", "success");
+    if (result !== "failed") trackShareQuest();
   };
 
   const handleShareExcerpt = async () => {
@@ -629,6 +640,7 @@ export function Reader({
       url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
     });
     if (result === "copied") toast.show("Đã sao chép liên kết", "success");
+    if (result !== "failed") trackShareQuest();
   };
 
   // Gỡ chương NGAY từ trang đọc (admin/super_admin only — xem

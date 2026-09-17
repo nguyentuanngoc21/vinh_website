@@ -1,16 +1,55 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/types";
+import type { BookGenre, Database } from "@/lib/supabase/types";
 import { StreakService } from "@/lib/quests/streak-service";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 
 type Client = SupabaseClient<Database>;
 
-/** task_templates.code các nhiệm vụ "hoàn thành 1 chương" đã biết trước —
- * tăng tiến trình cho TẤT CẢ, không chỉ nhiệm vụ đang có trong pool hôm nay
- * của user (increment_task_progress() tự bỏ qua nếu code không active/không
- * tồn tại — xem catch bên dưới). Thêm code mới vào đây khi Phase 1 import
- * thêm nhiệm vụ "hoàn thành chương" khác. */
-const CHAPTER_COMPLETION_TASK_CODES = ["reader_complete_chapter", "reader_complete_3_chapters"] as const;
+/** Không phải giá trị "Tiên hiệp" đứng riêng — đúng chuỗi BookGenre thật
+ * (src/lib/supabase/types.ts) là "Tiên hiệp/ kiếm hiệp" (gộp 2 thể loại).
+ * reader_read_3_chapters loại trừ đúng thể loại này. */
+const TIEN_HIEP_GENRE = "Tiên hiệp/ kiếm hiệp";
+
+type ChapterContext = {
+  /** Đây là lần đầu user hoàn thành ĐÚNG chương này (mọi ngày, không
+   * riêng hôm nay) — false nếu đọc lại chương đã hoàn thành từ trước.
+   * Chặn farm nhiệm vụ đếm chương bằng cách mở lại chương cũ. */
+  isFirstTimeChapter: boolean;
+  /** Đây là lần đầu user đọc bất kỳ chương nào thuộc thể loại của SÁCH
+   * này (mọi ngày, kể cả hôm nay trước chương này). */
+  isFirstTimeGenre: boolean;
+  bookGenre: BookGenre | null;
+  viewCount: number;
+};
+
+/** task_templates.code các nhiệm vụ tăng tiến trình khi hoàn thành 1
+ * chương — mỗi mã có điều kiện `matches` riêng dựa trên ChapterContext.
+ * Thêm mã mới vào đây khi import thêm nhiệm vụ "đọc chương" khác (Phase
+ * tiếp theo). increment_task_progress() tự bỏ qua mã không active/không
+ * tồn tại (xem catch ở dưới) — an toàn thêm mã trước khi task_templates
+ * có hàng tương ứng. */
+const CHAPTER_COMPLETION_RULES: { code: string; matches: (ctx: ChapterContext) => boolean }[] = [
+  { code: "reader_complete_chapter", matches: (ctx) => ctx.isFirstTimeChapter },
+  { code: "reader_complete_3_chapters", matches: (ctx) => ctx.isFirstTimeChapter },
+  // "Đọc 3 chương bất kỳ... (ngoại trừ tiên hiệp)" — loại trừ đúng 1 thể
+  // loại, cùng điều kiện chống farm với 2 mã trên.
+  { code: "reader_read_3_chapters", matches: (ctx) => ctx.isFirstTimeChapter && ctx.bookGenre !== TIEN_HIEP_GENRE },
+  { code: "reader_read_new_genre", matches: (ctx) => ctx.isFirstTimeGenre },
+  // Không chặn đọc-lại — đây là nhiệm vụ NGÀY (reset mỗi ngày), lặp lại 1
+  // truyện ít/nhiều view mỗi ngày không phải lỗ hổng, cùng cách 1 chuỗi
+  // streak vẫn tính khi quay lại đọc chương cũ.
+  { code: "reader_read_underrated", matches: (ctx) => ctx.viewCount < 50 },
+  { code: "reader_read_top_rated", matches: (ctx) => ctx.viewCount > 300 },
+];
+
+async function hasReadGenreBefore(supabase: Client, userId: string, genre: BookGenre | null): Promise<boolean> {
+  if (!genre) return true; // Không xác định thể loại — không tính là "mới".
+  const { data: historyRows } = await supabase.from("reading_history").select("book_id").eq("user_id", userId);
+  const bookIds = [...new Set((historyRows ?? []).map((r) => r.book_id))];
+  if (bookIds.length === 0) return false;
+  const { count } = await supabase.from("books").select("id", { count: "exact", head: true }).in("id", bookIds).eq("genre", genre);
+  return (count ?? 0) > 0;
+}
 
 /**
  * Gọi khi user thật sự đọc hết 1 chương (cuộn tới đoạn cuối cùng — xem
@@ -28,20 +67,24 @@ export const ReadingEventService = {
     supabase: Client,
     params: { userId: string; bookId: string; chapterId: string }
   ): Promise<void> {
-    // Tra TRƯỚC KHI ghi hôm nay: chương này đã từng có trong lịch sử đọc
-    // của user vào một ngày KHÁC (không phải hôm nay) chưa? Dùng để phân
-    // biệt "đọc lại chương cũ" (vẫn tính streak — quay lại đọc là hoạt
-    // động thật) với "lần đầu hoàn thành chương này" (mới tính vào tiến
-    // trình nhiệm vụ reader_complete_chapter/reader_complete_3_chapters —
-    // không cho phép farm nhiệm vụ ngày bằng cách mở lại chương đã đọc
-    // xong từ trước rồi cuộn xuống cuối trong vài giây).
-    const { count: priorCount } = await supabase
-      .from("reading_history")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", params.userId)
-      .eq("chapter_id", params.chapterId)
-      .lt("read_at", new Date().toISOString().slice(0, 10));
-    const isFirstTimeCompletingThisChapter = (priorCount ?? 0) === 0;
+    const [{ data: book }, { count: priorChapterCount }] = await Promise.all([
+      supabase.from("books").select("genre, view_count").eq("id", params.bookId).maybeSingle(),
+      supabase
+        .from("reading_history")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", params.userId)
+        .eq("chapter_id", params.chapterId)
+        .lt("read_at", new Date().toISOString().slice(0, 10)),
+    ]);
+    const bookGenre = book?.genre ?? null;
+    const isFirstTimeGenre = !(await hasReadGenreBefore(supabase, params.userId, bookGenre));
+
+    const ctx: ChapterContext = {
+      isFirstTimeChapter: (priorChapterCount ?? 0) === 0,
+      isFirstTimeGenre,
+      bookGenre,
+      viewCount: book?.view_count ?? 0,
+    };
 
     const { data: row, error } = await supabase.rpc("record_chapter_read", {
       p_user_id: params.userId,
@@ -65,16 +108,13 @@ export const ReadingEventService = {
       console.error("[reading-event] recordReadingActivity failed:", err);
     }
 
-    if (!isFirstTimeCompletingThisChapter) return;
-
-    // Tiến trình nhiệm vụ "hoàn thành chương" — CHỈ tính khi đây là lần
-    // đầu hoàn thành đúng chương này (mọi ngày, không riêng hôm nay). Best-
-    // effort từng cái, 1 mã chưa tồn tại/chưa active (vd trước khi Phase 1
-    // import xong) không được làm hỏng các mã còn lại hoặc cả request.
-    for (const taskCode of CHAPTER_COMPLETION_TASK_CODES) {
-      const result = await RewardEngine.incrementTaskProgress(supabase, { userId: params.userId, taskCode });
+    // Tiến trình từng nhiệm vụ — best-effort từng mã, 1 mã lỗi/chưa active
+    // không được làm hỏng các mã còn lại hoặc cả request.
+    for (const rule of CHAPTER_COMPLETION_RULES) {
+      if (!rule.matches(ctx)) continue;
+      const result = await RewardEngine.incrementTaskProgress(supabase, { userId: params.userId, taskCode: rule.code });
       if (!result.ok) {
-        console.error(`[reading-event] incrementTaskProgress(${taskCode}) failed:`, result.error);
+        console.error(`[reading-event] incrementTaskProgress(${rule.code}) failed:`, result.error);
       }
     }
   },

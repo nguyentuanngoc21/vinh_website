@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { applyPublicAssetWatermark } from "@/lib/copyright/public-asset-watermark";
 import type { DesignItemCategory } from "@/lib/supabase/types";
+import { RewardEngine } from "@/lib/quests/reward-engine";
 
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME_EXT: Record<string, string> = {
@@ -105,11 +106,20 @@ export async function POST(request: Request) {
   // cookie của hoạ sĩ) đang dùng cho phần còn lại của route. Lỗi ở bước
   // này không nên chặn phản hồi thành công cho hoạ sĩ — ảnh đã lên thật
   // và đã bảo hộ, chỉ là admin dashboard sẽ đếm thiếu 1 dòng.
-  const { error: protectionError } = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient();
+  const { error: protectionError } = await serviceClient
     .from("content_protection_status")
     .insert({ content_type: "design", content_id: item.id, method: "xmp_png" });
   if (protectionError) {
     console.error("[api/design] content_protection_status insert failed:", protectionError);
+  }
+
+  const questResult = await RewardEngine.incrementTaskProgress(serviceClient, {
+    userId: user.id,
+    taskCode: "designer_upload_design",
+  });
+  if (!questResult.ok) {
+    console.error("[api/design] incrementTaskProgress failed:", questResult.error);
   }
 
   return NextResponse.json({ ok: true, id: item.id });

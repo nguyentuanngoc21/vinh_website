@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { RewardEngine } from "@/lib/quests/reward-engine";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types";
 
 const BODY_MAX = 2000;
 // Không mang ý nghĩa thật — app chưa có cơ chế chọn văn bản (bôi đen)
@@ -97,11 +100,12 @@ export async function POST(
 
   const parentCommentId = typeof body?.parentCommentId === "string" ? body.parentCommentId : null;
   let paragraphIndex: number | null = null;
+  let parentAuthorId: string | null = null;
 
   if (parentCommentId) {
     const { data: parent, error: parentError } = await supabase
       .from("anchored_comments")
-      .select("id, chapter_id, paragraph_index, parent_comment_id")
+      .select("id, chapter_id, paragraph_index, parent_comment_id, user_id")
       .eq("id", parentCommentId)
       .maybeSingle();
     if (parentError || !parent || parent.chapter_id !== chapterId) {
@@ -116,6 +120,7 @@ export async function POST(
     // Copy từ cha — KHÔNG tin paragraphIndex client gửi cho reply, tránh
     // anchor lệch khỏi bình luận gốc.
     paragraphIndex = parent.paragraph_index;
+    parentAuthorId = parent.user_id;
   } else {
     const rawParagraphIndex = Number(body?.paragraphIndex);
     if (!Number.isInteger(rawParagraphIndex) || rawParagraphIndex < 0) {
@@ -145,6 +150,8 @@ export async function POST(
     return NextResponse.json({ error: "Gửi bình luận thất bại." }, { status: 500 });
   }
 
+  await trackCommentQuests(supabase, { userId, chapterId, parentCommentId, parentAuthorId });
+
   return NextResponse.json({
     comment: {
       id: comment.id,
@@ -156,4 +163,39 @@ export async function POST(
       isOwn: true,
     },
   });
+}
+
+/**
+ * Tiến trình nhiệm vụ ngày liên quan bình luận — best-effort, không ném
+ * lỗi ra ngoài (mất 1 lần ghi tiến độ không nên làm hỏng việc đăng bình
+ * luận). Bình luận GỐC (không phải reply) tính cho reader_comment_1 +
+ * reader_paragraph_comment — 2 mã cùng tính từ 1 hành động là chủ ý (xem
+ * comment trong reward-engine.ts). Reply chỉ tính author_interact_readers
+ * khi người trả lời đúng là tác giả sách chứa chương này VÀ không tự trả
+ * lời bình luận của chính mình.
+ */
+async function trackCommentQuests(
+  supabase: SupabaseClient<Database>,
+  params: { userId: string; chapterId: string; parentCommentId: string | null; parentAuthorId: string | null }
+): Promise<void> {
+  if (!params.parentCommentId) {
+    for (const taskCode of ["reader_comment_1", "reader_paragraph_comment"]) {
+      const result = await RewardEngine.incrementTaskProgress(supabase, { userId: params.userId, taskCode });
+      if (!result.ok) console.error(`[chapter-comments] incrementTaskProgress(${taskCode}) failed:`, result.error);
+    }
+    return;
+  }
+
+  if (!params.parentAuthorId || params.parentAuthorId === params.userId) return;
+
+  const { data: chapter } = await supabase.from("chapters").select("book_id").eq("id", params.chapterId).maybeSingle();
+  if (!chapter) return;
+  const { data: book } = await supabase.from("books").select("author_id").eq("id", chapter.book_id).maybeSingle();
+  if (!book || book.author_id !== params.userId) return;
+
+  const result = await RewardEngine.incrementTaskProgress(supabase, {
+    userId: params.userId,
+    taskCode: "author_interact_readers",
+  });
+  if (!result.ok) console.error("[chapter-comments] incrementTaskProgress(author_interact_readers) failed:", result.error);
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { RewardEngine } from "@/lib/quests/reward-engine";
 
 /**
  * POST /api/authors/:authorId/follow — toggle theo dõi tác giả (bấm lại =
@@ -52,6 +53,15 @@ export async function POST(
       return NextResponse.json({ error: "Không thể theo dõi. Vui lòng thử lại." }, { status: 500 });
     }
     following = true;
+    // Chỉ tính nhiệm vụ khi thật sự tạo mới quan hệ follow (bỏ qua nhánh
+    // 23505 — đã follow từ trước, không phải "theo dõi tác giả mới").
+    if (!error) {
+      const result = await RewardEngine.incrementTaskProgress(supabase, {
+        userId,
+        taskCode: "reader_follow_new_author",
+      });
+      if (!result.ok) console.error("[follow] incrementTaskProgress failed:", result.error);
+    }
   }
 
   return NextResponse.json({ following });
