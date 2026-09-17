@@ -28,6 +28,21 @@ export const ReadingEventService = {
     supabase: Client,
     params: { userId: string; bookId: string; chapterId: string }
   ): Promise<void> {
+    // Tra TRƯỚC KHI ghi hôm nay: chương này đã từng có trong lịch sử đọc
+    // của user vào một ngày KHÁC (không phải hôm nay) chưa? Dùng để phân
+    // biệt "đọc lại chương cũ" (vẫn tính streak — quay lại đọc là hoạt
+    // động thật) với "lần đầu hoàn thành chương này" (mới tính vào tiến
+    // trình nhiệm vụ reader_complete_chapter/reader_complete_3_chapters —
+    // không cho phép farm nhiệm vụ ngày bằng cách mở lại chương đã đọc
+    // xong từ trước rồi cuộn xuống cuối trong vài giây).
+    const { count: priorCount } = await supabase
+      .from("reading_history")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", params.userId)
+      .eq("chapter_id", params.chapterId)
+      .lt("read_at", new Date().toISOString().slice(0, 10));
+    const isFirstTimeCompletingThisChapter = (priorCount ?? 0) === 0;
+
     const { data: row, error } = await supabase.rpc("record_chapter_read", {
       p_user_id: params.userId,
       p_book_id: params.bookId,
@@ -41,17 +56,21 @@ export const ReadingEventService = {
     // KHÔNG lặp lại streak/tiến trình nhiệm vụ cho cùng 1 lần hoàn thành.
     if (!row) return;
 
-    // Streak + auto-claim milestone — không throw ra ngoài, 1 lỗi ở đây
-    // không nên làm hỏng cả request ghi tiến độ đọc.
+    // Streak + auto-claim milestone — TÍNH CẢ KHI đọc lại chương cũ (quay
+    // lại đọc hôm nay vẫn là hoạt động thật). Không throw ra ngoài, 1 lỗi
+    // ở đây không nên làm hỏng cả request ghi tiến độ đọc.
     try {
       await StreakService.recordReadingActivity(supabase, { userId: params.userId });
     } catch (err) {
       console.error("[reading-event] recordReadingActivity failed:", err);
     }
 
-    // Tiến trình nhiệm vụ "hoàn thành chương" — best-effort từng cái, 1 mã
-    // chưa tồn tại/chưa active (vd trước khi Phase 1 import xong) không
-    // được làm hỏng các mã còn lại hoặc cả request.
+    if (!isFirstTimeCompletingThisChapter) return;
+
+    // Tiến trình nhiệm vụ "hoàn thành chương" — CHỈ tính khi đây là lần
+    // đầu hoàn thành đúng chương này (mọi ngày, không riêng hôm nay). Best-
+    // effort từng cái, 1 mã chưa tồn tại/chưa active (vd trước khi Phase 1
+    // import xong) không được làm hỏng các mã còn lại hoặc cả request.
     for (const taskCode of CHAPTER_COMPLETION_TASK_CODES) {
       const result = await RewardEngine.incrementTaskProgress(supabase, { userId: params.userId, taskCode });
       if (!result.ok) {
