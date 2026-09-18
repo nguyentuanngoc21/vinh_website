@@ -12,6 +12,7 @@ import { computeBookStatus } from "@/lib/story/status";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { RewardEngine } from "@/lib/quests/reward-engine";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -34,8 +35,12 @@ export async function generateMetadata({ params }: PageProps<"/truyen/[slug]">):
   };
 }
 
-export default async function StoryPage({ params }: PageProps<"/truyen/[slug]">) {
+export default async function StoryPage({
+  params,
+  searchParams,
+}: PageProps<"/truyen/[slug]"> & { searchParams: Promise<{ from?: string }> }) {
   const { slug } = await params;
+  const { from } = await searchParams;
   const supabase = await createClient();
   const serviceClient = createServiceRoleClient();
 
@@ -63,6 +68,17 @@ export default async function StoryPage({ params }: PageProps<"/truyen/[slug]">)
       .eq("published", true)
       .order("order_index", { ascending: true }),
   ]);
+
+  // Nhiệm vụ reader_view_recommendations — chỉ khi đến từ mục "Gợi ý cho
+  // bạn" ở trang chủ (?from=goi-y, xem recommended-for-you.tsx), không
+  // tính lượt xem thường. Best-effort, không chặn render trang.
+  if (viewerId && from === "goi-y") {
+    const result = await RewardEngine.incrementTaskProgress(serviceClient, {
+      userId: viewerId,
+      taskCode: "reader_view_recommendations",
+    });
+    if (!result.ok) console.error("[truyen/slug] incrementTaskProgress failed:", result.error);
+  }
 
   const coverUrl = await resolveBookCoverUrl(supabase, book);
 
