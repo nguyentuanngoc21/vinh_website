@@ -179,42 +179,66 @@ function maxGenresWithinWindow(firstReadByGenre: Map<string, number>): number {
  * dùng server/UTC thống nhất, không theo timezone từng user (xem
  * migrations/20260917_add_reading_event_log.sql). */
 async function getMetricCounts(supabase: Client, userId: string): Promise<Record<AchievementMetric, number>> {
-  const [booksRes, audioRes, designRes, readingHistoryRes, topupRes] = await Promise.all([
-    supabase.from("books").select("id", { count: "exact", head: true }).eq("author_id", userId).eq("published", true),
-    supabase.from("audio_narrations").select("id", { count: "exact", head: true }).eq("narrator_id", userId),
-    supabase.from("design_items").select("id", { count: "exact", head: true }).eq("illustrator_id", userId),
-    supabase.from("reading_history").select("book_id, chapter_id, read_at").eq("user_id", userId),
-    supabase
-      .from("transactions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("type", "topup")
-      .neq("status", "reversed"),
-  ]);
+  const [booksRes, audioRes, designRes, readingHistoryRes, topupRes, readingListsRes, highlightsRes] =
+    await Promise.all([
+      supabase.from("books").select("id", { count: "exact", head: true }).eq("author_id", userId).eq("published", true),
+      supabase.from("audio_narrations").select("id", { count: "exact", head: true }).eq("narrator_id", userId),
+      supabase.from("design_items").select("id", { count: "exact", head: true }).eq("illustrator_id", userId),
+      supabase.from("reading_history").select("book_id, chapter_id, read_at").eq("user_id", userId),
+      supabase
+        .from("transactions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("type", "topup")
+        .neq("status", "reversed"),
+      supabase.from("reading_lists").select("id").eq("user_id", userId),
+      supabase.from("highlights").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    ]);
 
   const rows = readingHistoryRes.data ?? [];
   const distinctChapterIds = [...new Set(rows.map((r) => r.chapter_id).filter((id): id is string => id !== null))];
   const distinctBookIds = [...new Set(rows.map((r) => r.book_id))];
 
-  const [chaptersRes, booksGenreRes] = await Promise.all([
+  const listIds = (readingListsRes.data ?? []).map((l) => l.id);
+  const readingListItemsRes = listIds.length
+    ? await supabase.from("reading_list_items").select("book_id").in("list_id", listIds)
+    : { data: [] as { book_id: string }[] };
+  const bookmarkedBookIds = [...new Set((readingListItemsRes.data ?? []).map((i) => i.book_id))];
+
+  // 1 query cho genre/tags/view_count của MỌI sách cần tới (đã đọc + đã
+  // bookmark) — tránh 2 round-trip riêng cho 2 nhóm.
+  const allBookIds = [...new Set([...distinctBookIds, ...bookmarkedBookIds])];
+
+  const [chaptersRes, booksInfoRes] = await Promise.all([
     distinctChapterIds.length > 0
       ? supabase.from("chapters").select("id, book_id, order_index, is_last_chapter").in("id", distinctChapterIds)
       : Promise.resolve({ data: [] as { id: string; book_id: string; order_index: number; is_last_chapter: boolean }[] }),
-    distinctBookIds.length > 0
-      ? supabase.from("books").select("id, genre").in("id", distinctBookIds)
-      : Promise.resolve({ data: [] as { id: string; genre: string | null }[] }),
+    allBookIds.length > 0
+      ? supabase.from("books").select("id, genre, tags, view_count").in("id", allBookIds)
+      : Promise.resolve({ data: [] as { id: string; genre: string | null; tags: string[]; view_count: number }[] }),
   ]);
 
   const chapters = chaptersRes.data ?? [];
-  const genreByBookId = new Map((booksGenreRes.data ?? []).map((b) => [b.id, b.genre]));
+  const booksInfo = booksInfoRes.data ?? [];
+  const genreByBookId = new Map(booksInfo.map((b) => [b.id, b.genre]));
+  const tagsByBookId = new Map(booksInfo.map((b) => [b.id, b.tags]));
+  const viewCountByBookId = new Map(booksInfo.map((b) => [b.id, b.view_count]));
 
   const nightReads = rows.filter((r) => {
     const hour = new Date(r.read_at).getUTCHours();
     return hour >= 22 || hour < 2;
   }).length;
-  const distinctGenres = new Set([...genreByBookId.values()].filter((g): g is string => !!g));
+  // CHỈ tính genre của sách ĐÃ ĐỌC — genreByBookId giờ có cả sách bookmark
+  // (không phải đọc), không được lẫn vào đây.
+  const distinctGenres = new Set(
+    distinctBookIds.map((id) => genreByBookId.get(id)).filter((g): g is string => !!g)
+  );
 
   const finishedStories = new Set(chapters.filter((c) => c.is_last_chapter).map((c) => c.book_id));
+  const sadEndingFinished = [...finishedStories].filter((bookId) =>
+    (tagsByBookId.get(bookId) ?? []).some((tag) => tag.toLowerCase().trim() === "kết buồn")
+  );
+  const underratedFinished = [...finishedStories].filter((bookId) => (viewCountByBookId.get(bookId) ?? 0) < 50);
 
   const booksByGenre = new Map<string, Set<string>>();
   const firstReadByGenre = new Map<string, number>();
@@ -226,6 +250,14 @@ async function getMetricCounts(supabase: Client, userId: string): Promise<Record
     const t = new Date(r.read_at).getTime();
     const cur = firstReadByGenre.get(genre);
     if (cur === undefined || t < cur) firstReadByGenre.set(genre, t);
+  }
+
+  const bookmarkedByGenre = new Map<string, Set<string>>();
+  for (const bookId of bookmarkedBookIds) {
+    const genre = genreByBookId.get(bookId);
+    if (!genre) continue;
+    if (!bookmarkedByGenre.has(genre)) bookmarkedByGenre.set(genre, new Set());
+    bookmarkedByGenre.get(genre)!.add(bookId);
   }
 
   const hasSaturday = rows.some((r) => new Date(r.read_at).getUTCDay() === 6);
@@ -247,6 +279,11 @@ async function getMetricCounts(supabase: Client, userId: string): Promise<Record
     max_books_read_same_genre: Math.max(0, ...[...booksByGenre.values()].map((s) => s.size)),
     max_genres_within_15_days: maxGenresWithinWindow(firstReadByGenre),
     topup_count: topupRes.count ?? 0,
+    sad_ending_finished_count: sadEndingFinished.length,
+    underrated_finished_count: underratedFinished.length,
+    bookmarked_books_count: bookmarkedBookIds.length,
+    max_bookmarked_books_same_genre: Math.max(0, ...[...bookmarkedByGenre.values()].map((s) => s.size)),
+    saved_highlights_count: highlightsRes.count ?? 0,
   };
 }
 

@@ -3817,7 +3817,10 @@ create table public.achievement_templates (
       'finished_stories_count', 'longest_consecutive_chapters',
       'distinct_reading_days_count', 'max_reading_sessions_per_day',
       'max_gap_days_same_book', 'weekend_both_days_read',
-      'max_books_read_same_genre', 'max_genres_within_15_days', 'topup_count'
+      'max_books_read_same_genre', 'max_genres_within_15_days', 'topup_count',
+      'sad_ending_finished_count', 'underrated_finished_count',
+      'bookmarked_books_count', 'max_bookmarked_books_same_genre',
+      'saved_highlights_count'
     )),
   constraint achievement_templates_metric_threshold_check
     check ((metric is null) = (threshold is null)),
@@ -3960,6 +3963,32 @@ begin
       when 'topup_count' then
         (select count(*) from public.transactions
            where user_id = p_user_id and type = 'topup' and status <> 'reversed')
+      when 'sad_ending_finished_count' then
+        (select count(distinct rh.book_id) from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and c.is_last_chapter = true
+             and exists (select 1 from unnest(b.tags) tg where lower(trim(tg)) = 'kết buồn'))
+      when 'underrated_finished_count' then
+        (select count(distinct rh.book_id) from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and c.is_last_chapter = true and b.view_count < 50)
+      when 'bookmarked_books_count' then
+        (select count(distinct rli.book_id) from public.reading_list_items rli
+           join public.reading_lists rl on rl.id = rli.list_id
+           where rl.user_id = p_user_id)
+      when 'max_bookmarked_books_same_genre' then
+        (select coalesce(max(cnt), 0) from (
+           select b.genre, count(distinct rli.book_id) as cnt
+           from public.reading_list_items rli
+           join public.reading_lists rl on rl.id = rli.list_id
+           join public.books b on b.id = rli.book_id
+           where rl.user_id = p_user_id and b.genre is not null
+           group by b.genre
+         ) t)
+      when 'saved_highlights_count' then
+        (select count(*) from public.highlights where user_id = p_user_id)
       else 0
     end;
 

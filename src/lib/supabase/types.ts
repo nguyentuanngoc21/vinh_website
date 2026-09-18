@@ -67,7 +67,12 @@ export type AchievementMetric =
   | "weekend_both_days_read"
   | "max_books_read_same_genre"
   | "max_genres_within_15_days"
-  | "topup_count";
+  | "topup_count"
+  | "sad_ending_finished_count"
+  | "underrated_finished_count"
+  | "bookmarked_books_count"
+  | "max_bookmarked_books_same_genre"
+  | "saved_highlights_count";
 
 export type TransactionType =
   | "signup_bonus"
