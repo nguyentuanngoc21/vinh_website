@@ -3813,7 +3813,11 @@ create table public.achievement_templates (
   constraint achievement_templates_metric_check
     check (metric is null or metric in (
       'books_published', 'audio_published', 'design_published',
-      'chapters_read', 'genres_read_count', 'night_reads_count'
+      'chapters_read', 'genres_read_count', 'night_reads_count',
+      'finished_stories_count', 'longest_consecutive_chapters',
+      'distinct_reading_days_count', 'max_reading_sessions_per_day',
+      'max_gap_days_same_book', 'weekend_both_days_read',
+      'max_books_read_same_genre', 'max_genres_within_15_days', 'topup_count'
     )),
   constraint achievement_templates_metric_threshold_check
     check ((metric is null) = (threshold is null)),
@@ -3893,6 +3897,69 @@ begin
            where user_id = p_user_id
              and (extract(hour from timezone('utc', read_at)) >= 22
                   or extract(hour from timezone('utc', read_at)) < 2))
+      when 'finished_stories_count' then
+        (select count(distinct rh.book_id) from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           where rh.user_id = p_user_id and c.is_last_chapter = true)
+      when 'longest_consecutive_chapters' then
+        (with read_chapters as (
+           select distinct c.book_id, c.order_index
+           from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           where rh.user_id = p_user_id
+         ), grp as (
+           select book_id, order_index - row_number() over (partition by book_id order by order_index) as g
+           from read_chapters
+         )
+         select coalesce(max(run_length), 0) from (
+           select book_id, g, count(*) as run_length from grp group by book_id, g
+         ) runs)
+      when 'distinct_reading_days_count' then
+        (select count(distinct read_at::date) from public.reading_history where user_id = p_user_id)
+      when 'max_reading_sessions_per_day' then
+        (with events as (
+           select read_at::date as d, read_at,
+                  read_at - lag(read_at) over (partition by read_at::date order by read_at) as gap
+           from public.reading_history where user_id = p_user_id
+         )
+         select coalesce(max(session_count), 0) from (
+           select d, count(*) filter (where gap is null or gap > interval '30 minutes') as session_count
+           from events group by d
+         ) s)
+      when 'max_gap_days_same_book' then
+        (with book_events as (
+           select book_id, read_at - lag(read_at) over (partition by book_id order by read_at) as gap
+           from public.reading_history where user_id = p_user_id
+         )
+         select coalesce(max(extract(day from gap)::integer), 0) from book_events)
+      when 'weekend_both_days_read' then
+        (select case when
+           exists(select 1 from public.reading_history where user_id = p_user_id and extract(dow from read_at) = 6)
+           and exists(select 1 from public.reading_history where user_id = p_user_id and extract(dow from read_at) = 0)
+         then 1 else 0 end)
+      when 'max_books_read_same_genre' then
+        (select coalesce(max(cnt), 0) from (
+           select b.genre, count(distinct rh.book_id) as cnt
+           from public.reading_history rh join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and b.genre is not null
+           group by b.genre
+         ) t)
+      when 'max_genres_within_15_days' then
+        (with first_genre_read as (
+           select b.genre, min(rh.read_at) as first_read
+           from public.reading_history rh join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and b.genre is not null
+           group by b.genre
+         )
+         select coalesce(max(cnt), 0) from (
+           select o1.genre, count(*) as cnt
+           from first_genre_read o1
+           join first_genre_read o2 on o2.first_read between o1.first_read and o1.first_read + interval '15 days'
+           group by o1.genre
+         ) t)
+      when 'topup_count' then
+        (select count(*) from public.transactions
+           where user_id = p_user_id and type = 'topup' and status <> 'reversed')
       else 0
     end;
 

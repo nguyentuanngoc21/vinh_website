@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/types";
+import type { AchievementMetric, Database } from "@/lib/supabase/types";
 
 type Client = SupabaseClient<Database>;
 type AchievementTemplateRow = Database["public"]["Tables"]["achievement_templates"]["Row"];
@@ -86,58 +86,167 @@ export const AchievementService = {
   },
 };
 
+const SESSION_GAP_MS = 30 * 60 * 1000;
+const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
+
+/** Chuỗi order_index LIÊN TIẾP dài nhất trong 1 sách, tính trên MỌI sách
+ * user đã đọc — vd đọc chương 3,4,5 (liên tiếp) rồi nhảy sang chương 9 =
+ * chuỗi dài nhất 3, không phải 4. */
+function longestConsecutiveRun(chapters: { book_id: string; order_index: number }[]): number {
+  const indicesByBook = new Map<string, Set<number>>();
+  for (const c of chapters) {
+    if (!indicesByBook.has(c.book_id)) indicesByBook.set(c.book_id, new Set());
+    indicesByBook.get(c.book_id)!.add(c.order_index);
+  }
+  let longest = 0;
+  for (const indices of indicesByBook.values()) {
+    const sorted = [...indices].sort((a, b) => a - b);
+    let run = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      run = i > 0 && sorted[i] === sorted[i - 1] + 1 ? run + 1 : 1;
+      longest = Math.max(longest, run);
+    }
+  }
+  return longest;
+}
+
+/** Số "phiên đọc" nhiều nhất trong 1 NGÀY bất kỳ — phiên = chuỗi lượt đọc
+ * cách nhau tối đa 30 phút, quá 30 phút tính là phiên mới (không có dữ
+ * liệu start/end phiên thật — xem reading_sessions, bảng đó vẫn chưa được
+ * ghi, đây là ước lượng từ reading_history.read_at). */
+function maxSessionsInADay(readAtIso: string[]): number {
+  const byDay = new Map<string, number[]>();
+  for (const iso of readAtIso) {
+    const day = iso.slice(0, 10);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push(new Date(iso).getTime());
+  }
+  let max = 0;
+  for (const times of byDay.values()) {
+    const sorted = times.slice().sort((a, b) => a - b);
+    let sessions = 0;
+    let prev: number | null = null;
+    for (const t of sorted) {
+      if (prev === null || t - prev > SESSION_GAP_MS) sessions++;
+      prev = t;
+    }
+    max = Math.max(max, sessions);
+  }
+  return max;
+}
+
+/** Khoảng cách (ngày) dài nhất giữa 2 lượt đọc LIÊN TIẾP của CÙNG 1 sách —
+ * "quay lại sau N ngày không đọc" dùng chung công thức này với 2 ngưỡng
+ * khác nhau (7/15) ở 2 thành tựu reader_continue_after_pause/reader_comeback_15d. */
+function maxGapDaysSameBook(rows: { book_id: string; read_at: string }[]): number {
+  const byBook = new Map<string, number[]>();
+  for (const r of rows) {
+    if (!byBook.has(r.book_id)) byBook.set(r.book_id, []);
+    byBook.get(r.book_id)!.push(new Date(r.read_at).getTime());
+  }
+  let maxGapDays = 0;
+  for (const times of byBook.values()) {
+    const sorted = times.slice().sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+      maxGapDays = Math.max(maxGapDays, (sorted[i] - sorted[i - 1]) / (24 * 60 * 60 * 1000));
+    }
+  }
+  return Math.floor(maxGapDays);
+}
+
+/** Số thể loại KHÁC NHAU nhiều nhất mà lần-đầu-đọc rơi trong cùng 1 cửa
+ * sổ 15 ngày — dùng mốc "lần đầu đọc mỗi thể loại" làm điểm neo, không
+ * phải mọi lượt đọc (đọc lại 1 thể loại cũ không mở cửa sổ mới). */
+function maxGenresWithinWindow(firstReadByGenre: Map<string, number>): number {
+  const firstReads = [...firstReadByGenre.values()];
+  let max = 0;
+  for (const t0 of firstReads) {
+    const count = firstReads.filter((t) => t >= t0 && t <= t0 + FIFTEEN_DAYS_MS).length;
+    max = Math.max(max, count);
+  }
+  return max;
+}
+
 /** COUNT thật cho từng metric — dùng để hiện progress bar của thành tựu
  * CHƯA unlock. Cùng bảng/cột với getUnlockedRoles() (creator-roles.ts)
  * nhưng cần số đếm thật (so ngưỡng), không chỉ có/không, nên tách riêng
  * thay vì tái dùng thẳng hàm đó.
  *
- * chapters_read/genres_read_count/night_reads_count PHẢI khớp đúng logic
+ * MỌI metric tính từ reading_history ở đây PHẢI khớp đúng công thức
  * trong sync_user_achievements() (docs/supabase/schema.sql, phần 10) — 2
- * nơi tính cùng 1 công thức, đổi 1 bên nhớ đổi bên kia. Giờ-trong-ngày dùng
- * server/UTC thống nhất, không theo timezone từng user (xem
+ * nơi tính cùng 1 công thức (SQL cho unlock thật, JS ở đây cho progress
+ * bar hiển thị), đổi 1 bên nhớ đổi bên kia. Giờ-trong-ngày/ranh giới ngày
+ * dùng server/UTC thống nhất, không theo timezone từng user (xem
  * migrations/20260917_add_reading_event_log.sql). */
-async function getMetricCounts(
-  supabase: Client,
-  userId: string
-): Promise<
-  Record<
-    | "books_published"
-    | "audio_published"
-    | "design_published"
-    | "chapters_read"
-    | "genres_read_count"
-    | "night_reads_count",
-    number
-  >
-> {
-  const [booksRes, audioRes, designRes, readingHistoryRes] = await Promise.all([
+async function getMetricCounts(supabase: Client, userId: string): Promise<Record<AchievementMetric, number>> {
+  const [booksRes, audioRes, designRes, readingHistoryRes, topupRes] = await Promise.all([
     supabase.from("books").select("id", { count: "exact", head: true }).eq("author_id", userId).eq("published", true),
     supabase.from("audio_narrations").select("id", { count: "exact", head: true }).eq("narrator_id", userId),
     supabase.from("design_items").select("id", { count: "exact", head: true }).eq("illustrator_id", userId),
     supabase.from("reading_history").select("book_id, chapter_id, read_at").eq("user_id", userId),
+    supabase
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("type", "topup")
+      .neq("status", "reversed"),
   ]);
 
   const rows = readingHistoryRes.data ?? [];
-  const distinctChapters = new Set(rows.map((r) => r.chapter_id).filter((id): id is string => id !== null));
+  const distinctChapterIds = [...new Set(rows.map((r) => r.chapter_id).filter((id): id is string => id !== null))];
+  const distinctBookIds = [...new Set(rows.map((r) => r.book_id))];
+
+  const [chaptersRes, booksGenreRes] = await Promise.all([
+    distinctChapterIds.length > 0
+      ? supabase.from("chapters").select("id, book_id, order_index, is_last_chapter").in("id", distinctChapterIds)
+      : Promise.resolve({ data: [] as { id: string; book_id: string; order_index: number; is_last_chapter: boolean }[] }),
+    distinctBookIds.length > 0
+      ? supabase.from("books").select("id, genre").in("id", distinctBookIds)
+      : Promise.resolve({ data: [] as { id: string; genre: string | null }[] }),
+  ]);
+
+  const chapters = chaptersRes.data ?? [];
+  const genreByBookId = new Map((booksGenreRes.data ?? []).map((b) => [b.id, b.genre]));
+
   const nightReads = rows.filter((r) => {
     const hour = new Date(r.read_at).getUTCHours();
     return hour >= 22 || hour < 2;
   }).length;
+  const distinctGenres = new Set([...genreByBookId.values()].filter((g): g is string => !!g));
 
-  const distinctBookIds = [...new Set(rows.map((r) => r.book_id))];
-  const genresRes =
-    distinctBookIds.length > 0
-      ? await supabase.from("books").select("genre").in("id", distinctBookIds).not("genre", "is", null)
-      : { data: [] };
-  const distinctGenres = new Set((genresRes.data ?? []).map((b) => b.genre).filter((g) => !!g));
+  const finishedStories = new Set(chapters.filter((c) => c.is_last_chapter).map((c) => c.book_id));
+
+  const booksByGenre = new Map<string, Set<string>>();
+  const firstReadByGenre = new Map<string, number>();
+  for (const r of rows) {
+    const genre = genreByBookId.get(r.book_id);
+    if (!genre) continue;
+    if (!booksByGenre.has(genre)) booksByGenre.set(genre, new Set());
+    booksByGenre.get(genre)!.add(r.book_id);
+    const t = new Date(r.read_at).getTime();
+    const cur = firstReadByGenre.get(genre);
+    if (cur === undefined || t < cur) firstReadByGenre.set(genre, t);
+  }
+
+  const hasSaturday = rows.some((r) => new Date(r.read_at).getUTCDay() === 6);
+  const hasSunday = rows.some((r) => new Date(r.read_at).getUTCDay() === 0);
 
   return {
     books_published: booksRes.count ?? 0,
     audio_published: audioRes.count ?? 0,
     design_published: designRes.count ?? 0,
-    chapters_read: distinctChapters.size,
+    chapters_read: distinctChapterIds.length,
     genres_read_count: distinctGenres.size,
     night_reads_count: nightReads,
+    finished_stories_count: finishedStories.size,
+    longest_consecutive_chapters: longestConsecutiveRun(chapters),
+    distinct_reading_days_count: new Set(rows.map((r) => r.read_at.slice(0, 10))).size,
+    max_reading_sessions_per_day: maxSessionsInADay(rows.map((r) => r.read_at)),
+    max_gap_days_same_book: maxGapDaysSameBook(rows),
+    weekend_both_days_read: hasSaturday && hasSunday ? 1 : 0,
+    max_books_read_same_genre: Math.max(0, ...[...booksByGenre.values()].map((s) => s.size)),
+    max_genres_within_15_days: maxGenresWithinWindow(firstReadByGenre),
+    topup_count: topupRes.count ?? 0,
   };
 }
 

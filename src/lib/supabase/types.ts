@@ -42,6 +42,33 @@ export type BookGenre =
   | "Tiên hiệp/ kiếm hiệp"
   | "Kỳ ảo";
 
+// achievement_templates.metric — NULL = không tự tính (thành tựu
+// streak-linked qua streak_milestones.badge_id). 6 giá trị đầu từ
+// migrations/20260908_add_achievements.sql (3 role) +
+// migrations/20260917_add_reading_event_log.sql (3 giá trị dựa
+// reading_history). 9 giá trị sau từ
+// migrations/20260919_add_reading_behavior_achievements.sql — mỗi giá trị
+// 1 công thức riêng, tính song song ở sync_user_achievements() (SQL,
+// nguồn sự thật cho unlock) và getMetricCounts() (TS,
+// src/lib/quests/achievement-service.ts, chỉ để vẽ progress bar) — PHẢI
+// khớp nhau, sửa 1 bên nhớ sửa bên kia.
+export type AchievementMetric =
+  | "books_published"
+  | "audio_published"
+  | "design_published"
+  | "chapters_read"
+  | "genres_read_count"
+  | "night_reads_count"
+  | "finished_stories_count"
+  | "longest_consecutive_chapters"
+  | "distinct_reading_days_count"
+  | "max_reading_sessions_per_day"
+  | "max_gap_days_same_book"
+  | "weekend_both_days_read"
+  | "max_books_read_same_genre"
+  | "max_genres_within_15_days"
+  | "topup_count";
+
 export type TransactionType =
   | "signup_bonus"
   | "daily_task_reward"
@@ -1419,17 +1446,8 @@ export type Database = {
           // NULL/NULL = not auto-computed (e.g. the row a
           // streak_milestones.badge_id points to — unlock lives in
           // claim_streak_milestone() instead). Non-null pair = evaluated
-          // by sync_user_achievements(). chapters_read/genres_read_count/
-          // night_reads_count added by
-          // migrations/20260917_add_reading_event_log.sql.
-          metric:
-            | "books_published"
-            | "audio_published"
-            | "design_published"
-            | "chapters_read"
-            | "genres_read_count"
-            | "night_reads_count"
-            | null;
+          // by sync_user_achievements().
+          metric: AchievementMetric | null;
           threshold: number | null;
           reward_tokens: number;
           active: boolean;
@@ -1443,14 +1461,7 @@ export type Database = {
           description?: string | null;
           icon?: string | null;
           color_token: string;
-          metric?:
-            | "books_published"
-            | "audio_published"
-            | "design_published"
-            | "chapters_read"
-            | "genres_read_count"
-            | "night_reads_count"
-            | null;
+          metric?: AchievementMetric | null;
           threshold?: number | null;
           reward_tokens?: number;
           active?: boolean;
