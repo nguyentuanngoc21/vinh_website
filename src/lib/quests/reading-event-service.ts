@@ -20,6 +20,10 @@ type ChapterContext = {
   isFirstTimeGenre: boolean;
   bookGenre: BookGenre | null;
   viewCount: number;
+  /** Giờ server/UTC lúc hoàn thành chương (0-23) — quyết định đã chốt ở
+   * migrations/20260917_add_reading_event_log.sql, không theo timezone
+   * từng user. */
+  hourUtc: number;
 };
 
 /** task_templates.code các nhiệm vụ tăng tiến trình khi hoàn thành 1
@@ -40,6 +44,15 @@ const CHAPTER_COMPLETION_RULES: { code: string; matches: (ctx: ChapterContext) =
   // streak vẫn tính khi quay lại đọc chương cũ.
   { code: "reader_read_underrated", matches: (ctx) => ctx.viewCount < 50 },
   { code: "reader_read_top_rated", matches: (ctx) => ctx.viewCount > 300 },
+  // Giờ vàng — không chặn đọc-lại, cùng lý do reader_read_underrated/top_rated
+  // ở trên (nhiệm vụ NGÀY, reset mỗi ngày).
+  { code: "reader_night_owl_read", matches: (ctx) => ctx.hourUtc >= 22 || ctx.hourUtc < 2 },
+  { code: "reader_morning_fly", matches: (ctx) => ctx.hourUtc >= 6 && ctx.hourUtc < 9 },
+  { code: "reader_tea_time", matches: (ctx) => ctx.hourUtc >= 11 && ctx.hourUtc < 14 },
+  // Trùng lịch với 2 mã trên (7-9h/22-1h) — CHỦ Ý theo đúng nội dung bạn
+  // soạn (quest_type engagement, khác discovery của 2 mã kia), không tự
+  // gộp/loại bớt.
+  { code: "reader_peak_hour_session", matches: (ctx) => (ctx.hourUtc >= 7 && ctx.hourUtc < 9) || ctx.hourUtc >= 22 || ctx.hourUtc < 1 },
 ];
 
 async function hasReadGenreBefore(supabase: Client, userId: string, genre: BookGenre | null): Promise<boolean> {
@@ -84,6 +97,7 @@ export const ReadingEventService = {
       isFirstTimeGenre,
       bookGenre,
       viewCount: book?.view_count ?? 0,
+      hourUtc: new Date().getUTCHours(),
     };
 
     const { data: row, error } = await supabase.rpc("record_chapter_read", {
@@ -103,7 +117,19 @@ export const ReadingEventService = {
     // lại đọc hôm nay vẫn là hoạt động thật). Không throw ra ngoài, 1 lỗi
     // ở đây không nên làm hỏng cả request ghi tiến độ đọc.
     try {
-      await StreakService.recordReadingActivity(supabase, { userId: params.userId });
+      const { profile } = await StreakService.recordReadingActivity(supabase, { userId: params.userId });
+
+      // reader_3day_reading_streak — GHI ĐÈ progress bằng streak hiện tại
+      // (chặn ở 3), KHÔNG cộng dồn như các mã khác — xem
+      // migrations/20260918_add_streak_quests_and_time_windows.sql.
+      const setResult = await RewardEngine.setTaskProgress(supabase, {
+        userId: params.userId,
+        taskCode: "reader_3day_reading_streak",
+        progress: Math.min(profile.current_quest_streak, 3),
+      });
+      if (!setResult.ok) {
+        console.error("[reading-event] setTaskProgress(reader_3day_reading_streak) failed:", setResult.error);
+      }
     } catch (err) {
       console.error("[reading-event] recordReadingActivity failed:", err);
     }

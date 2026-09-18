@@ -1819,6 +1819,13 @@ export type Database = {
         Args: { p_user_id: string; p_task_code: string; p_amount?: number };
         Returns: Database["public"]["Tables"]["user_daily_tasks"]["Row"];
       };
+      // Ghi đè progress (không cộng dồn) — dùng cho nhiệm vụ mà tiến trình
+      // thật ra là 1 trạng thái ngoài (streak). Xem
+      // migrations/20260918_add_streak_quests_and_time_windows.sql.
+      set_task_progress: {
+        Args: { p_user_id: string; p_task_code: string; p_progress: number };
+        Returns: Database["public"]["Tables"]["user_daily_tasks"]["Row"];
+      };
       claim_daily_task: {
         Args: { p_user_id: string; p_task_id: string };
         Returns: Database["public"]["Tables"]["transactions"]["Row"];

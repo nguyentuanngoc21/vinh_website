@@ -1330,6 +1330,39 @@ $$ language plpgsql security definer;
 revoke execute on function public.increment_task_progress from public, anon, authenticated;
 grant execute on function public.increment_task_progress to service_role;
 
+-- Gọi khi "tiến trình" thật ra là 1 trạng thái ngoài (vd streak hiện tại),
+-- không phải số lần hành động trong ngày — GHI ĐÈ progress thay vì cộng
+-- dồn như increment_task_progress ở trên. An toàn overwrite trong cùng 1
+-- ngày vì nguồn trạng thái (sync_reading_streak) không giảm giữa ngày. Xem
+-- migrations/20260918_add_streak_quests_and_time_windows.sql.
+create function public.set_task_progress(p_user_id uuid, p_task_code text, p_progress integer)
+returns public.user_daily_tasks as $$
+declare
+  v_template public.task_templates;
+  v_row public.user_daily_tasks;
+begin
+  select * into v_template from public.task_templates where code = p_task_code and active;
+  if v_template is null then
+    raise exception 'Unknown or inactive task code: %', p_task_code;
+  end if;
+
+  insert into public.user_daily_tasks (user_id, template_id, task_date)
+  values (p_user_id, v_template.id, current_date)
+  on conflict (user_id, template_id, task_date) do nothing;
+
+  update public.user_daily_tasks
+    set progress = least(greatest(p_progress, 0), v_template.target_count),
+        completed = p_progress >= v_template.target_count
+    where user_id = p_user_id and template_id = v_template.id and task_date = current_date
+    returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.set_task_progress from public, anon, authenticated;
+grant execute on function public.set_task_progress to service_role;
+
 -- Gọi khi user bấm "nhận thưởng" trên UI — kiểm tra đã hoàn thành & chưa
 -- nhận trước khi cộng token, tránh nhận thưởng 2 lần.
 create function public.claim_daily_task(p_user_id uuid, p_task_id uuid)
