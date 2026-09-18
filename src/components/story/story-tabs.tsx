@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { BOOK_STATUS_LABEL, type BookStatus } from "@/lib/story/status";
 import { ChapterList, type ChapterListRow } from "./chapter-list";
+import { CharacterList, type StoryCharacter } from "./character-list";
 import type { BookGenre } from "@/lib/supabase/types";
 
-type Tab = "tomtat" | "chuong";
+type Tab = "tomtat" | "chuong" | "nhanvat";
 
 type StoryTabsProps = {
   bookSlug: string;
@@ -17,6 +18,7 @@ type StoryTabsProps = {
    * hiện mới→cũ ở tab "Chương" (order_index là tín hiệu thứ tự chương
    * chính thức, nhất quán với 3 nút CTA ở trên). */
   chaptersAscending: ChapterListRow[];
+  characters: StoryCharacter[];
 };
 
 const STATUS_DOT: Record<BookStatus, string> = {
@@ -25,7 +27,7 @@ const STATUS_DOT: Record<BookStatus, string> = {
   hoan_thanh: "bg-info",
 };
 
-export function StoryTabs({ bookSlug, status, lastUpdatedLabel, genre, chaptersAscending }: StoryTabsProps) {
+export function StoryTabs({ bookSlug, status, lastUpdatedLabel, genre, chaptersAscending, characters }: StoryTabsProps) {
   const [tab, setTab] = useState<Tab>("tomtat");
   const chaptersDescending = [...chaptersAscending].reverse();
 
@@ -36,6 +38,7 @@ export function StoryTabs({ bookSlug, status, lastUpdatedLabel, genre, chaptersA
           [
             ["tomtat", "Tóm tắt"],
             ["chuong", `Chương (${chaptersAscending.length})`],
+            ["nhanvat", `Nhân vật (${characters.length})`],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -69,8 +72,10 @@ export function StoryTabs({ bookSlug, status, lastUpdatedLabel, genre, chaptersA
             <dd className="font-medium text-brand-ink">{genre ?? "—"}</dd>
           </div>
         </dl>
-      ) : (
+      ) : tab === "chuong" ? (
         <ChapterList bookSlug={bookSlug} chapters={chaptersDescending} />
+      ) : (
+        <CharacterList characters={characters} />
       )}
     </div>
   );

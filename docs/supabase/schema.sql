@@ -456,6 +456,116 @@ create trigger prevent_unset_last_chapter
   before update on public.chapters
   for each row execute function public.prevent_unset_last_chapter();
 
+-- --- Hệ thống Nhân vật — công cụ THẬT cho tác giả quản lý nhân vật
+-- trong truyện (không chỉ để mở khoá quest/thành tựu). role phân loại
+-- rộng (chính diện/phản diện/trung lập); trope là free-text tác giả tự
+-- gõ (vd "Ma vương", "Trượng nghĩa"), cùng tinh thần books.tags — không
+-- danh mục cố định. Xem migrations/20260919_add_characters.sql. ---
+create table public.characters (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  name text not null check (char_length(trim(name)) > 0),
+  role text not null default 'neutral' check (role in ('hero', 'villain', 'neutral')),
+  trope text,
+  created_at timestamptz not null default now()
+);
+
+create index characters_book_id_idx on public.characters (book_id);
+
+alter table public.characters enable row level security;
+
+-- Cùng 2 nhánh với "published chapters follow their book's visibility" ở
+-- trên — công khai nếu sách đã publish, tác giả luôn xem được sách của
+-- chính mình.
+create policy "characters follow their book's visibility"
+  on public.characters for select
+  using (
+    exists (select 1 from public.books b where b.id = book_id and b.published and b.deleted_at is null)
+    or exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid())
+  );
+
+create policy "authors manage characters in their own books"
+  on public.characters for all
+  using (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid()))
+  with check (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid()));
+
+-- Nhân vật nào xuất hiện ở chương nào (n-n) — tác giả tự gắn khi soạn
+-- chương (src/components/author/chapter-characters-panel.tsx).
+create table public.chapter_characters (
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  character_id uuid not null references public.characters (id) on delete cascade,
+  primary key (chapter_id, character_id)
+);
+
+create index chapter_characters_character_id_idx on public.chapter_characters (character_id);
+
+alter table public.chapter_characters enable row level security;
+
+create policy "chapter_characters follow their chapter's visibility"
+  on public.chapter_characters for select
+  using (
+    exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and c.published and b.published and b.deleted_at is null
+    )
+    or exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and b.author_id = auth.uid()
+    )
+  );
+
+create policy "authors tag characters in their own chapters"
+  on public.chapter_characters for all
+  using (
+    exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and b.author_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and b.author_id = auth.uid()
+    )
+  );
+
+-- Độc giả follow 1 nhân vật — toggle, cùng pattern author_follows (phần 4).
+create table public.character_follows (
+  follower_id uuid not null references auth.users (id) on delete cascade,
+  character_id uuid not null references public.characters (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, character_id)
+);
+
+create index character_follows_character_id_idx on public.character_follows (character_id);
+
+alter table public.character_follows enable row level security;
+
+create policy "users manage their own character follows"
+  on public.character_follows for all
+  using (auth.uid() = follower_id)
+  with check (auth.uid() = follower_id);
+
+-- Bình chọn "mẫu hình nhân vật yêu thích" trong 1 chương cụ thể — 1
+-- vote/chương/user (unique), đổi ý thì UPDATE, không insert thêm.
+create table public.character_trope_votes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  character_id uuid not null references public.characters (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (user_id, chapter_id)
+);
+
+create index character_trope_votes_character_id_idx on public.character_trope_votes (character_id);
+
+alter table public.character_trope_votes enable row level security;
+
+create policy "users manage their own trope votes"
+  on public.character_trope_votes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 -- --- Tags tự do (KHÁC genre — 1 sách vẫn 1 genre, xem phần 9) + lượt
 -- xem. Xem migrations/20260824_add_book_tags_and_view_count.sql. ---
 alter table public.books
@@ -3820,7 +3930,8 @@ create table public.achievement_templates (
       'max_books_read_same_genre', 'max_genres_within_15_days', 'topup_count',
       'sad_ending_finished_count', 'underrated_finished_count',
       'bookmarked_books_count', 'max_bookmarked_books_same_genre',
-      'saved_highlights_count'
+      'saved_highlights_count',
+      'villain_followed_count', 'hero_followed_count', 'character_guardian_achieved'
     )),
   constraint achievement_templates_metric_threshold_check
     check ((metric is null) = (threshold is null)),
@@ -3989,6 +4100,33 @@ begin
          ) t)
       when 'saved_highlights_count' then
         (select count(*) from public.highlights where user_id = p_user_id)
+      when 'villain_followed_count' then
+        (select count(*) from public.character_follows cf
+           join public.characters ch on ch.id = cf.character_id
+           where cf.follower_id = p_user_id and ch.role = 'villain')
+      when 'hero_followed_count' then
+        (select count(*) from public.character_follows cf
+           join public.characters ch on ch.id = cf.character_id
+           where cf.follower_id = p_user_id and ch.role = 'hero')
+      when 'character_guardian_achieved' then
+        (select case when exists (
+           select 1 from public.character_follows cf
+           where cf.follower_id = p_user_id
+             and not exists (
+               select 1 from public.chapter_characters cc
+               join public.chapters c on c.id = cc.chapter_id
+               where cc.character_id = cf.character_id and c.published
+                 and not exists (
+                   select 1 from public.reading_history rh
+                   where rh.user_id = p_user_id and rh.chapter_id = c.id
+                 )
+             )
+             and exists (
+               select 1 from public.chapter_characters cc
+               join public.chapters c on c.id = cc.chapter_id
+               where cc.character_id = cf.character_id and c.published
+             )
+         ) then 1 else 0 end)
       else 0
     end;
 

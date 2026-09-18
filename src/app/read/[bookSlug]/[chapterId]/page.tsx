@@ -86,25 +86,42 @@ export default async function ReadChapterPage({
   // thể. purchase_transactions chỉ cần tra khi chương thật sự có giá — hầu
   // hết chương free, tra thêm 1 query vô ích cho mọi lượt đọc là phí.
   const needsPurchaseLookup = viewerId !== null && chapter.price > 0 && !isOwnBook;
-  const [{ data: votedRow }, { data: followRow }, { data: purchaseRow }, { data: progressRow }] = viewerId
-    ? await Promise.all([
-        serviceClient.from("chapter_votes").select("chapter_id").eq("chapter_id", chapter.id).eq("user_id", viewerId).maybeSingle(),
-        serviceClient.from("author_follows").select("author_id").eq("author_id", book.author_id).eq("follower_id", viewerId).maybeSingle(),
-        needsPurchaseLookup
-          ? serviceClient.from("purchase_transactions").select("id").eq("chapter_id", chapter.id).eq("buyer_id", viewerId).maybeSingle()
-          : Promise.resolve({ data: null }),
-        // Tự cuộn tới đúng đoạn đã đọc dở — CHỈ áp dụng nếu chapter_id đã
-        // lưu khớp đúng chương đang mở (mở chương khác, kể cả cùng sách,
-        // thì bắt đầu từ đầu). Xem
-        // migrations/20260910_add_book_progress_paragraph.sql.
-        serviceClient
-          .from("book_progress")
-          .select("chapter_id, last_paragraph_index")
-          .eq("user_id", viewerId)
-          .eq("book_id", book.id)
-          .maybeSingle(),
-      ])
-    : [{ data: null }, { data: null }, { data: null }, { data: null }];
+  const [{ data: votedRow }, { data: followRow }, { data: purchaseRow }, { data: progressRow }, { data: myTropeVote }] =
+    viewerId
+      ? await Promise.all([
+          serviceClient.from("chapter_votes").select("chapter_id").eq("chapter_id", chapter.id).eq("user_id", viewerId).maybeSingle(),
+          serviceClient.from("author_follows").select("author_id").eq("author_id", book.author_id).eq("follower_id", viewerId).maybeSingle(),
+          needsPurchaseLookup
+            ? serviceClient.from("purchase_transactions").select("id").eq("chapter_id", chapter.id).eq("buyer_id", viewerId).maybeSingle()
+            : Promise.resolve({ data: null }),
+          // Tự cuộn tới đúng đoạn đã đọc dở — CHỈ áp dụng nếu chapter_id đã
+          // lưu khớp đúng chương đang mở (mở chương khác, kể cả cùng sách,
+          // thì bắt đầu từ đầu). Xem
+          // migrations/20260910_add_book_progress_paragraph.sql.
+          serviceClient
+            .from("book_progress")
+            .select("chapter_id, last_paragraph_index")
+            .eq("user_id", viewerId)
+            .eq("book_id", book.id)
+            .maybeSingle(),
+          serviceClient.from("character_trope_votes").select("character_id").eq("user_id", viewerId).eq("chapter_id", chapter.id).maybeSingle(),
+        ])
+      : [{ data: null }, { data: null }, { data: null }, { data: null }, { data: null }];
+
+  // Nhân vật gắn với CHƯƠNG NÀY — cho panel "Bình chọn mẫu hình nhân vật"
+  // (reader_vote_trope). Rỗng thì Reader tự ẩn panel, không bịa dữ liệu.
+  // 2 bước (không dùng embed characters(...)) — tránh phụ thuộc
+  // Relationships của generated types (xem cách achievement-service.ts đã
+  // làm cho reading_history/books).
+  const { data: chapterCharacterRows } = await supabase
+    .from("chapter_characters")
+    .select("character_id")
+    .eq("chapter_id", chapter.id);
+  const taggedCharacterIds = (chapterCharacterRows ?? []).map((r) => r.character_id);
+  const { data: tropeCandidateRows } = taggedCharacterIds.length
+    ? await supabase.from("characters").select("id, name, role, trope").in("id", taggedCharacterIds)
+    : { data: [] as { id: string; name: string; role: "hero" | "villain" | "neutral"; trope: string | null }[] };
+  const tropeCandidates = tropeCandidateRows ?? [];
 
   const initialParagraphIndex =
     progressRow && progressRow.chapter_id === chapter.id ? progressRow.last_paragraph_index : null;
@@ -181,6 +198,8 @@ export default async function ReadChapterPage({
       chapterPrice={chapter.price}
       isLoggedIn={viewerId !== null}
       initialParagraphIndex={initialParagraphIndex}
+      tropeCandidates={tropeCandidates}
+      initialTropeVoteCharacterId={myTropeVote?.character_id ?? null}
     />
   );
 }

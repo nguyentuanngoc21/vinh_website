@@ -179,7 +179,7 @@ function maxGenresWithinWindow(firstReadByGenre: Map<string, number>): number {
  * dùng server/UTC thống nhất, không theo timezone từng user (xem
  * migrations/20260917_add_reading_event_log.sql). */
 async function getMetricCounts(supabase: Client, userId: string): Promise<Record<AchievementMetric, number>> {
-  const [booksRes, audioRes, designRes, readingHistoryRes, topupRes, readingListsRes, highlightsRes] =
+  const [booksRes, audioRes, designRes, readingHistoryRes, topupRes, readingListsRes, highlightsRes, followsRes] =
     await Promise.all([
       supabase.from("books").select("id", { count: "exact", head: true }).eq("author_id", userId).eq("published", true),
       supabase.from("audio_narrations").select("id", { count: "exact", head: true }).eq("narrator_id", userId),
@@ -193,6 +193,7 @@ async function getMetricCounts(supabase: Client, userId: string): Promise<Record
         .neq("status", "reversed"),
       supabase.from("reading_lists").select("id").eq("user_id", userId),
       supabase.from("highlights").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      supabase.from("character_follows").select("character_id").eq("follower_id", userId),
     ]);
 
   const rows = readingHistoryRes.data ?? [];
@@ -263,6 +264,43 @@ async function getMetricCounts(supabase: Client, userId: string): Promise<Record
   const hasSaturday = rows.some((r) => new Date(r.read_at).getUTCDay() === 6);
   const hasSunday = rows.some((r) => new Date(r.read_at).getUTCDay() === 0);
 
+  // Nhân vật — followedCharacterIds dùng chung cho cả 3 metric bên dưới.
+  const followedCharacterIds = [...new Set((followsRes.data ?? []).map((f) => f.character_id))];
+  const [charactersInfoRes, chapterCharsRes] = await Promise.all([
+    followedCharacterIds.length > 0
+      ? supabase.from("characters").select("id, role").in("id", followedCharacterIds)
+      : Promise.resolve({ data: [] as { id: string; role: string }[] }),
+    followedCharacterIds.length > 0
+      ? supabase.from("chapter_characters").select("character_id, chapter_id").in("character_id", followedCharacterIds)
+      : Promise.resolve({ data: [] as { character_id: string; chapter_id: string }[] }),
+  ]);
+  const roleByCharacterId = new Map((charactersInfoRes.data ?? []).map((c) => [c.id, c.role]));
+  const villainFollowedCount = followedCharacterIds.filter((id) => roleByCharacterId.get(id) === "villain").length;
+  const heroFollowedCount = followedCharacterIds.filter((id) => roleByCharacterId.get(id) === "hero").length;
+
+  const taggedChapterIds = [...new Set((chapterCharsRes.data ?? []).map((cc) => cc.chapter_id))];
+  const taggedChaptersInfoRes = taggedChapterIds.length
+    ? await supabase.from("chapters").select("id, published").in("id", taggedChapterIds)
+    : { data: [] as { id: string; published: boolean }[] };
+  const publishedByChapterId = new Map((taggedChaptersInfoRes.data ?? []).map((c) => [c.id, c.published]));
+  const readChapterIdSet = new Set(distinctChapterIds);
+
+  const publishedChaptersByCharacter = new Map<string, string[]>();
+  for (const cc of chapterCharsRes.data ?? []) {
+    if (!publishedByChapterId.get(cc.chapter_id)) continue;
+    if (!publishedChaptersByCharacter.has(cc.character_id)) publishedChaptersByCharacter.set(cc.character_id, []);
+    publishedChaptersByCharacter.get(cc.character_id)!.push(cc.chapter_id);
+  }
+  // Follow >=1 nhân vật MÀ đã đọc hết mọi chương đã xuất bản có gắn nhân
+  // vật đó — loại nhân vật chưa xuất hiện ở chương xuất bản nào (chapterIds
+  // rỗng không nên tự động "hoàn thành").
+  const characterGuardianAchieved = followedCharacterIds.some((charId) => {
+    const chapterIds = publishedChaptersByCharacter.get(charId) ?? [];
+    return chapterIds.length > 0 && chapterIds.every((cid) => readChapterIdSet.has(cid));
+  })
+    ? 1
+    : 0;
+
   return {
     books_published: booksRes.count ?? 0,
     audio_published: audioRes.count ?? 0,
@@ -284,6 +322,9 @@ async function getMetricCounts(supabase: Client, userId: string): Promise<Record
     bookmarked_books_count: bookmarkedBookIds.length,
     max_bookmarked_books_same_genre: Math.max(0, ...[...bookmarkedByGenre.values()].map((s) => s.size)),
     saved_highlights_count: highlightsRes.count ?? 0,
+    villain_followed_count: villainFollowedCount,
+    hero_followed_count: heroFollowedCount,
+    character_guardian_achieved: characterGuardianAchieved,
   };
 }
 

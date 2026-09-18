@@ -62,7 +62,11 @@ export default async function AuthorChapterPage({
     notFound();
   }
 
-  const linkedAudio = await getChapterAudio(supabase, chapter.id);
+  const [linkedAudio, { data: bookCharacters }, { data: taggedRows }] = await Promise.all([
+    getChapterAudio(supabase, chapter.id),
+    supabase.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
+    supabase.from("chapter_characters").select("character_id").eq("chapter_id", chapterId),
+  ]);
 
   return (
     <AuthorWorkspace
@@ -77,6 +81,8 @@ export default async function AuthorChapterPage({
       bookPublishedAt={book.published_at}
       chapter={chapter}
       linkedAudio={linkedAudio}
+      bookCharacters={bookCharacters ?? []}
+      initialTaggedCharacterIds={(taggedRows ?? []).map((r) => r.character_id)}
     />
   );
 }

@@ -46,7 +46,7 @@ export default async function AuthorBookOverviewPage({
     notFound();
   }
 
-  const [{ data: chapters }, coverUrl, { data: grantRow }] = await Promise.all([
+  const [{ data: chapters }, coverUrl, { data: grantRow }, { data: characters }] = await Promise.all([
     supabase
       .from("chapters")
       .select("id, title, order_index, published, price, is_last_chapter")
@@ -62,6 +62,7 @@ export default async function AuthorBookOverviewPage({
       .eq("book_id", bookId)
       .is("revoked_at", null)
       .maybeSingle(),
+    supabase.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
   ]);
 
   const grantProfile = grantRow?.profiles as unknown as { username: string; nickname: string } | null;
@@ -83,6 +84,7 @@ export default async function AuthorBookOverviewPage({
           ? { username: grantProfile.username, nickname: grantProfile.nickname, grantedAt: grantRow.granted_at }
           : null
       }
+      characters={characters ?? []}
     />
   );
 }

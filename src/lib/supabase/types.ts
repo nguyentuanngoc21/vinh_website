@@ -72,7 +72,14 @@ export type AchievementMetric =
   | "underrated_finished_count"
   | "bookmarked_books_count"
   | "max_bookmarked_books_same_genre"
-  | "saved_highlights_count";
+  | "saved_highlights_count"
+  | "villain_followed_count"
+  | "hero_followed_count"
+  | "character_guardian_achieved";
+
+// characters.role — phân loại rộng, KHÁC characters.trope (free-text, tác
+// giả tự gõ). Xem migrations/20260919_add_characters.sql.
+export type CharacterRole = "hero" | "villain" | "neutral";
 
 export type TransactionType =
   | "signup_bonus"
@@ -458,6 +465,59 @@ export type Database = {
           content_purged_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["chapters"]["Insert"]>;
+        Relationships: [];
+      };
+      // Xem migrations/20260919_add_characters.sql.
+      characters: {
+        Row: {
+          id: string;
+          book_id: string;
+          name: string;
+          role: CharacterRole;
+          trope: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          book_id: string;
+          name: string;
+          role?: CharacterRole;
+          trope?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["characters"]["Insert"]>;
+        Relationships: [];
+      };
+      chapter_characters: {
+        Row: { chapter_id: string; character_id: string };
+        Insert: { chapter_id: string; character_id: string };
+        // Không update — chỉ insert (gắn) hoặc delete (gỡ).
+        Update: never;
+        Relationships: [];
+      };
+      character_follows: {
+        Row: { follower_id: string; character_id: string; created_at: string };
+        Insert: { follower_id: string; character_id: string };
+        // Toggle = insert (follow) hoặc delete (unfollow) — không có update.
+        Update: never;
+        Relationships: [];
+      };
+      character_trope_votes: {
+        Row: {
+          id: string;
+          user_id: string;
+          chapter_id: string;
+          character_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          chapter_id: string;
+          character_id: string;
+        };
+        // Đổi ý thì UPDATE character_id (unique user_id+chapter_id), không
+        // insert thêm — xem route trope-vote.
+        Update: { character_id?: string };
         Relationships: [];
       };
       chapter_votes: {

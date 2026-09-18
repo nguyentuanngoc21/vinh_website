@@ -124,6 +124,25 @@ export default async function StoryPage({
     voteCount: voteByChapter.get(c.id) ?? 0,
   }));
 
+  const { data: characterRows } = await supabase
+    .from("characters")
+    .select("id, name, role, trope")
+    .eq("book_id", book.id)
+    .order("created_at", { ascending: true });
+  const characterIds = (characterRows ?? []).map((c) => c.id);
+  const { data: myFollowRows } =
+    viewerId && characterIds.length
+      ? await serviceClient.from("character_follows").select("character_id").eq("follower_id", viewerId).in("character_id", characterIds)
+      : { data: [] as { character_id: string }[] };
+  const followedCharacterIds = new Set((myFollowRows ?? []).map((r) => r.character_id));
+  const characters = (characterRows ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    role: c.role,
+    trope: c.trope,
+    followedByViewer: followedCharacterIds.has(c.id),
+  }));
+
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
@@ -193,6 +212,7 @@ export default async function StoryPage({
               lastUpdatedLabel={latestCreatedAt ? new Date(latestCreatedAt).toLocaleDateString("vi-VN") : null}
               genre={book.genre}
               chaptersAscending={chaptersAscending}
+              characters={characters}
             />
           </div>
         </main>

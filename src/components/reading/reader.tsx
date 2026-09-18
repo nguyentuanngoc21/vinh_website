@@ -23,6 +23,7 @@ import { AuthorPanel } from "./author-panel";
 import { ReadingListModal } from "./reading-list-modal";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { ReadingGate } from "./reading-gate";
+import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
 import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
 import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
@@ -343,6 +344,11 @@ export type ReaderProps = {
    * đọc, hoặc lần trước dừng ở chương khác). Tự cuộn tới 1 lần lúc mount.
    * Xem migrations/20260910_add_book_progress_paragraph.sql. */
   initialParagraphIndex?: number | null;
+  /** Nhân vật đã gắn với chương này (tác giả gắn qua
+   * chapter-characters-panel.tsx) — [] thì panel bình chọn tự ẩn, không
+   * bịa danh sách. Xem migrations/20260919_add_characters.sql. */
+  tropeCandidates?: TropeCandidate[];
+  initialTropeVoteCharacterId?: string | null;
 };
 
 export function Reader({
@@ -371,6 +377,8 @@ export function Reader({
   chapterPrice = 0,
   isLoggedIn = false,
   initialParagraphIndex = null,
+  tropeCandidates = [],
+  initialTropeVoteCharacterId = null,
 }: ReaderProps) {
   const router = useRouter();
   const toast = useToast();
@@ -1493,6 +1501,13 @@ export function Reader({
               <ShareNetworkIcon /> Chia sẻ
             </button>
           </div>
+
+          <TropeVotePanel
+            chapterId={chapterId}
+            candidates={tropeCandidates}
+            initialVotedCharacterId={initialTropeVoteCharacterId}
+            c={c}
+          />
 
           {/* Ẩn trên mobile — bottom bar cố định (xem <nav> cuối trang) đã
               đảm nhiệm điều hướng chương trước/sau ở đó rồi, để tránh lặp. */}
