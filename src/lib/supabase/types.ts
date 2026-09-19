@@ -21,8 +21,41 @@ export type CreatorTag =
 
 export type ContentSource = "independent" | "story_upload";
 
-// Xem migrations/20260901_add_design_item_gallery_metadata.sql.
-export type DesignItemCategory = "bia_truyen" | "minh_hoa" | "fan_art" | "poster_audio";
+// Xem migrations/20260901_add_design_item_gallery_metadata.sql +
+// migrations/20260919_add_design_albums_and_multi_upload.sql (mở rộng 4 →
+// 14, additive — không remap giá trị cũ). 10 giá trị mới khớp cột "Loại
+// sản phẩm" của mega-menu (nav-strip-links.tsx) — xem
+// src/lib/design/get-design-gallery.ts (DESIGN_CATEGORIES).
+export type DesignItemCategory =
+  | "bia_truyen"
+  | "nhan_vat_don"
+  | "nhan_vat_nhom"
+  | "vu_khi_trang_bi"
+  | "boi_canh_phong_canh"
+  | "linh_vat"
+  | "trang_phuc"
+  | "chibi_deform"
+  | "emote_pack"
+  | "logo_icon"
+  | "fan_art"
+  | "tranh_doi"
+  | "minh_hoa"
+  | "poster_audio";
+
+// Xem migrations/20260919_add_design_albums_and_multi_upload.sql +
+// src/lib/design/art-styles.ts. Dùng cho design_albums.art_style — khớp
+// cột "Phong cách nghệ thuật" của mega-menu.
+export type ArtStyle =
+  | "anime_manga"
+  | "ban_ta_thuc"
+  | "ta_thuc"
+  | "chibi"
+  | "flat_vector"
+  | "co_trang"
+  | "dark_fantasy"
+  | "pixel_art"
+  | "painterly"
+  | "render_3d";
 
 // Dùng bởi hệ thống sinh bìa tự động (src/lib/covers/genre-styles.ts) khi
 // books.cover_design_item_id còn null. 10 giá trị = taxonomy CHÍNH THỨC
@@ -1582,6 +1615,10 @@ export type Database = {
           // không bao giờ hiện ở view public_design_items.
           share_token: string;
           created_at: string;
+          // Xem migrations/20260919_add_design_albums_and_multi_upload.sql.
+          album_id: string | null;
+          alt_text: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -1592,8 +1629,35 @@ export type Database = {
           description?: string | null;
           share_count?: number;
           source?: ContentSource;
+          album_id?: string | null;
+          alt_text?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["design_items"]["Insert"]>;
+        Relationships: [];
+      };
+      // Xem migrations/20260919_add_design_albums_and_multi_upload.sql —
+      // "board": name + art_style chia sẻ giữa mọi design_items cùng
+      // album_id. Không có cột bí mật nào (khác design_items.share_token)
+      // nên select công khai thẳng trên bảng gốc.
+      design_albums: {
+        Row: {
+          id: string;
+          illustrator_id: string;
+          name: string;
+          art_style: ArtStyle;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          illustrator_id: string;
+          name: string;
+          art_style: ArtStyle;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["design_albums"]["Insert"]>;
         Relationships: [];
       };
       design_item_likes: {
@@ -1749,6 +1813,8 @@ export type Database = {
           source: ContentSource;
           share_count: number;
           created_at: string;
+          album_id: string | null;
+          alt_text: string | null;
         };
         Relationships: [];
       };

@@ -151,6 +151,29 @@ export default async function ReadChapterPage({
     }
   }
 
+  // Ảnh thiết kế chèn inline — chapters.content chỉ giữ marker
+  // `[[thiet-ke:<designItemId>]]`, KHÔNG BAO GIỜ share_token gốc (xem
+  // chapter-editor.tsx "Chèn ảnh thiết kế" — token chỉ xác thực 1 lần lúc
+  // dán). Resolve id → ảnh ở đây (server, qua view public_design_items —
+  // không cần token để ĐỌC, chỉ cần để CHÈN) rồi truyền map xuống Reader,
+  // để component đọc (client) không phải tự gọi thêm request nào. Quét
+  // trên `content` CUỐI CÙNG (sau rào truy nghiệm/preview ở trên), không
+  // phải chapter.content thô — marker nằm ngoài phần được phép xem thì
+  // không cần resolve.
+  const designImageIds = [...content.matchAll(/\[\[thiet-ke:([0-9a-f-]{36})\]\]/g)].map((m) => m[1]);
+  const { data: designImageRows } = designImageIds.length
+    ? await supabase.from("public_design_items").select("id, image_url, alt_text, title").in("id", designImageIds)
+    : { data: [] as { id: string; image_url: string; alt_text: string | null; title: string }[] };
+  const designImages = Object.fromEntries(
+    (designImageRows ?? []).map((row) => [
+      row.id,
+      {
+        imageUrl: supabase.storage.from("design-images").getPublicUrl(row.image_url).data.publicUrl,
+        altText: row.alt_text ?? row.title,
+      },
+    ])
+  );
+
   // Side effect: tăng view + ghi "chương đọc gần nhất" — chạy SAU khi
   // response đã trả về (không cộng latency vào lần tải trang), nhưng vẫn
   // đảm bảo chạy xong (khác fire-and-forget thuần, có rủi ro bị runtime
@@ -187,6 +210,7 @@ export default async function ReadChapterPage({
       chapterTitle={chapter.title}
       chapterPosition={chapterPosition}
       content={content}
+      designImages={designImages}
       prevChapterId={prevChapterId}
       nextChapterId={nextChapterId}
       chapters={ordered.map((c, i) => ({ id: c.id, title: c.title, position: i + 1 }))}

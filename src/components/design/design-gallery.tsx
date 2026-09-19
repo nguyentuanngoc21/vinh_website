@@ -37,7 +37,14 @@ const CATEGORY_FILTERS: { key: CategoryFilter; label: string }[] = [
 
 type LikeState = { liked: boolean; count: number };
 
-export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
+export function DesignGallery({
+  items,
+  activeAlbum,
+}: {
+  items: GalleryDesignItem[];
+  /** /thiet-ke?album=<id> đang lọc — tên để hiện banner, xem thiet-ke/page.tsx. */
+  activeAlbum?: { id: string; name: string } | null;
+}) {
   const [cat, setCat] = useState<CategoryFilter>("Tất cả");
   const [sort, setSort] = useState<DesignSortKey>("likes");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -138,6 +145,17 @@ export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
         </div>
       </section>
 
+      {activeAlbum && (
+        <div className="mx-11 mt-5 flex items-center justify-between gap-3 rounded-xl bg-[#fdf8ec] px-4 py-2.5 text-[13px] text-brand-ink">
+          <span>
+            Đang xem album <strong>{activeAlbum.name}</strong>
+          </span>
+          <Link href="/thiet-ke" className="whitespace-nowrap font-semibold text-brand-gold-dark no-underline">
+            Xem tất cả
+          </Link>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2.5 px-11 pb-1 pt-6">
         {CATEGORY_FILTERS.map((c) => (
           <button
@@ -232,6 +250,15 @@ export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
                         </span>
                         <span className="truncate">{p.illustratorName}</span>
                       </span>
+                      {p.albumName && (
+                        <Link
+                          href={`/thiet-ke?album=${p.albumId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="truncate rounded-full bg-white/18 px-2 py-0.5 text-[11px] font-semibold text-white no-underline"
+                        >
+                          {p.albumName}
+                        </Link>
+                      )}
                       <span className="flex shrink-0 gap-3">
                         <span className="flex items-center gap-1">
                           <HeartIcon weight="fill" color="var(--color-brand-gold-light)" />
@@ -273,6 +300,15 @@ export function DesignGallery({ items }: { items: GalleryDesignItem[] }) {
               <div className="mt-2.5 font-[family-name:var(--font-lora)] text-[26px] font-bold leading-[1.3] text-brand-ink">
                 {open.title}
               </div>
+              {open.albumName && (
+                <Link
+                  href={`/thiet-ke?album=${open.albumId}`}
+                  className="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-neutral-bg px-3 py-1 text-[12px] font-semibold text-brand-ink no-underline"
+                >
+                  {open.albumName}
+                  {open.artStyleLabel && <span className="text-stone">· {open.artStyleLabel}</span>}
+                </Link>
+              )}
               <div className="mt-[18px] flex items-center gap-[11px]">
                 <div
                   style={{ background: avatarColor(open.illustratorName) }}

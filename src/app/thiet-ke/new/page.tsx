@@ -32,17 +32,18 @@ export default async function NewDesignItemPage() {
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
         <SiteHeader showSearch={false} />
-        <main className="mx-auto max-w-[640px] px-6 py-12 sm:px-11">
+        <main className="mx-auto max-w-[1160px] px-6 py-12 sm:px-11">
           <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">
             THƯ VIỆN THIẾT KẾ
           </div>
           <h1 className="mt-2 font-[family-name:var(--font-lora)] text-[28px] font-bold leading-[1.2] text-brand-ink">
             Đăng thiết kế mới
           </h1>
-          <p className="mt-2.5 text-[14.5px] leading-[1.6] text-stone-dark">
-            Đăng bìa truyện, minh họa, fan art hoặc poster audio lên kho Thiết
-            kế công khai — tác phẩm gắn dấu chìm của bạn, tác giả có thể xem
-            hồ sơ và liên hệ thuê qua trang Kết nối.
+          <p className="mt-2.5 max-w-[640px] text-[14.5px] leading-[1.6] text-stone-dark">
+            Đăng nhiều ảnh cùng lúc — bìa truyện, nhân vật, fan art và hơn 20
+            loại sản phẩm khác — lên kho Thiết kế công khai. Mỗi ảnh gắn dấu
+            chìm của bạn; tác giả có thể xem hồ sơ và liên hệ thuê qua trang
+            Kết nối.
           </p>
           <DesignUploadForm className="mt-8" />
         </main>

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ART_STYLE_LABEL } from "@/lib/design/art-styles";
 import type { Database, DesignItemCategory } from "@/lib/supabase/types";
 
 /**
@@ -17,10 +18,28 @@ import type { Database, DesignItemCategory } from "@/lib/supabase/types";
  * /thiet-ke/new (independent) or was explicitly categorized.
  */
 
+// 14 giá trị (4 cũ + 10 mới, additive — xem
+// migrations/20260919_add_design_albums_and_multi_upload.sql). 12 mục đầu
+// khớp đúng thứ tự cột "Loại sản phẩm" của mega-menu
+// (src/components/nav-strip-links.tsx) — nguồn DUY NHẤT cho danh sách này,
+// nav-strip-links.tsx import lại từ đây thay vì tự khai báo riêng. 2 mục
+// cuối ("Minh họa"/"Poster audio") là 2 giá trị cũ không có mặt trong
+// mega-menu, giữ lại để không mất dữ liệu/lựa chọn của các dòng đã đăng
+// trước migration này.
 export const DESIGN_CATEGORIES: { key: DesignItemCategory; label: string }[] = [
-  { key: "bia_truyen", label: "Bìa truyện" },
+  { key: "bia_truyen", label: "Bìa truyện/sách" },
+  { key: "nhan_vat_don", label: "Nhân vật đơn (character art)" },
+  { key: "nhan_vat_nhom", label: "Nhân vật nhóm / cảnh nhiều người" },
+  { key: "vu_khi_trang_bi", label: "Vũ khí / trang bị" },
+  { key: "boi_canh_phong_canh", label: "Bối cảnh / phong cảnh" },
+  { key: "linh_vat", label: "Linh vật / thú cưng giả tưởng" },
+  { key: "trang_phuc", label: "Trang phục / thiết kế thời trang" },
+  { key: "chibi_deform", label: "Chibi / deform" },
+  { key: "emote_pack", label: "Biểu tượng cảm xúc (emote pack)" },
+  { key: "logo_icon", label: "Logo / huy hiệu / icon" },
+  { key: "fan_art", label: "Fanart" },
+  { key: "tranh_doi", label: "Tranh đôi / couple art" },
   { key: "minh_hoa", label: "Minh họa" },
-  { key: "fan_art", label: "Fan art" },
   { key: "poster_audio", label: "Poster audio" },
 ];
 
@@ -60,17 +79,27 @@ export type GalleryDesignItem = {
   shareCount: number;
   likedByViewer: boolean;
   createdAt: string;
+  // Xem migrations/20260919_add_design_albums_and_multi_upload.sql —
+  // album là thực thể lâu dài, hiện luôn ở đây (không chỉ ở form đăng).
+  albumId: string | null;
+  albumName: string | null;
+  artStyleLabel: string | null;
 };
 
 export async function getDesignGallery(
   supabase: SupabaseClient<Database>,
-  viewerId: string | null
+  viewerId: string | null,
+  // Lọc theo 1 album cụ thể — /thiet-ke?album=<id> (xem
+  // src/app/thiet-ke/page.tsx). undefined/null = mọi album + không-album.
+  albumId?: string | null
 ): Promise<GalleryDesignItem[]> {
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("public_design_items")
-    .select("id, illustrator_id, title, image_url, category, description, share_count, created_at")
+    .select("id, illustrator_id, title, image_url, category, description, share_count, created_at, album_id")
     .not("category", "is", null)
     .order("created_at", { ascending: false });
+  if (albumId) query = query.eq("album_id", albumId);
+  const { data: rows, error } = await query;
   if (error) {
     console.error("[thiet-ke] public_design_items query failed:", error);
   }
@@ -80,14 +109,23 @@ export async function getDesignGallery(
 
   const illustratorIds = [...new Set(items.map((i) => i.illustrator_id))];
   const itemIds = items.map((i) => i.id);
+  const albumIds = [...new Set(items.map((i) => i.album_id).filter((id): id is string => id != null))];
 
-  const [{ data: profiles, error: profilesError }, { data: likeCounts, error: likeCountsError }] =
-    await Promise.all([
-      supabase.from("author_public_profiles").select("id, nickname, avatar_url").in("id", illustratorIds),
-      supabase.from("design_item_like_counts").select("design_item_id, like_count").in("design_item_id", itemIds),
-    ]);
+  const [
+    { data: profiles, error: profilesError },
+    { data: likeCounts, error: likeCountsError },
+    { data: albums, error: albumsError },
+  ] = await Promise.all([
+    supabase.from("author_public_profiles").select("id, nickname, avatar_url").in("id", illustratorIds),
+    supabase.from("design_item_like_counts").select("design_item_id, like_count").in("design_item_id", itemIds),
+    albumIds.length > 0
+      ? supabase.from("design_albums").select("id, name, art_style").in("id", albumIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
   if (profilesError) console.error("[thiet-ke] author_public_profiles query failed:", profilesError);
   if (likeCountsError) console.error("[thiet-ke] design_item_like_counts query failed:", likeCountsError);
+  if (albumsError) console.error("[thiet-ke] design_albums query failed:", albumsError);
+  const albumById = new Map((albums ?? []).map((a) => [a.id, a]));
 
   let likedSet = new Set<string>();
   if (viewerId) {
@@ -111,6 +149,7 @@ export async function getDesignGallery(
     const category = item.category as DesignItemCategory;
     const { data: urlData } = supabase.storage.from("design-images").getPublicUrl(item.image_url);
     const profile = profileById.get(item.illustrator_id);
+    const album = item.album_id ? albumById.get(item.album_id) : null;
     return {
       id: item.id,
       title: item.title,
@@ -126,6 +165,9 @@ export async function getDesignGallery(
       shareCount: item.share_count,
       likedByViewer: likedSet.has(item.id),
       createdAt: item.created_at,
+      albumId: album?.id ?? null,
+      albumName: album?.name ?? null,
+      artStyleLabel: album ? ART_STYLE_LABEL[album.art_style] ?? null : null,
     };
   });
 }

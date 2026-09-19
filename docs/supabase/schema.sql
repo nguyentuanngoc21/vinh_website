@@ -1847,10 +1847,16 @@ create policy "illustrators delete their own design items"
   using (auth.uid() = illustrator_id);
 
 -- View công khai cho trang "duyệt kho Thiết kế" — CỐ Ý không có
--- share_token. Đây là view app dùng để hiện danh sách công khai.
+-- share_token. Đây là view app dùng để hiện danh sách công khai. Lọc
+-- deleted_at is null ngay ở đây (xem
+-- migrations/20260919_add_design_albums_and_multi_upload.sql) — MỌI nơi
+-- đọc công khai (gallery/search/comments/likes) đi qua view này, không
+-- đọc bảng gốc, nên chỉ cần lọc 1 chỗ.
 create view public.public_design_items as
-  select id, illustrator_id, title, image_url, source, created_at, category, description, share_count
-  from public.design_items;
+  select id, illustrator_id, title, image_url, source, created_at, category, description, share_count,
+         album_id, alt_text
+  from public.design_items
+  where deleted_at is null;
 
 -- Bảng riêng cho lượt thích (toggle, 1 dòng/(tác phẩm, người thích)) —
 -- cùng pattern "aggregate qua view riêng, bảng gốc owner-only RLS" như
@@ -1876,6 +1882,78 @@ create view public.design_item_like_counts as
   select design_item_id, count(*)::integer as like_count
   from public.design_item_likes
   group by design_item_id;
+
+-- --- Albums ("board") — long-lived grouping of design_items, shared name
+-- + art_style across every item in it (xem
+-- migrations/20260919_add_design_albums_and_multi_upload.sql). Hiện ở cả
+-- form đăng /thiet-ke/new VÀ trang duyệt công khai /thiet-ke (khác nhãn
+-- nội bộ chỉ dùng lúc đăng) — không có cột bí mật nào nên select công khai
+-- thẳng trên bảng gốc, không cần view public_* riêng như design_items. ---
+create table public.design_albums (
+  id uuid primary key default gen_random_uuid(),
+  illustrator_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  -- 10 giá trị lấy từ cột "Phong cách nghệ thuật" của mega-menu
+  -- (nav-strip-links.tsx) — xem src/lib/design/art-styles.ts.
+  art_style text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint design_albums_art_style_check
+    check (art_style in (
+      'anime_manga', 'ban_ta_thuc', 'ta_thuc', 'chibi', 'flat_vector',
+      'co_trang', 'dark_fantasy', 'pixel_art', 'painterly', 'render_3d'
+    ))
+);
+
+create index design_albums_illustrator_id_idx on public.design_albums (illustrator_id);
+
+alter table public.design_albums enable row level security;
+
+create policy "anyone can view design albums"
+  on public.design_albums for select
+  using (true);
+
+create policy "illustrators insert their own design albums"
+  on public.design_albums for insert
+  with check (auth.uid() = illustrator_id);
+
+create policy "illustrators update their own design albums"
+  on public.design_albums for update
+  using (auth.uid() = illustrator_id);
+
+create policy "illustrators delete their own design albums"
+  on public.design_albums for delete
+  using (auth.uid() = illustrator_id);
+
+-- --- design_items: album_id/alt_text/deleted_at (mở rộng theo cùng
+-- migration ở trên) — category_check mở rộng 4 → 14 giá trị, CỘNG THÊM
+-- không remap: 'bia_truyen'/'fan_art' giữ nguyên slug (chỉ đổi nhãn hiện ở
+-- UI thành "Bìa truyện/sách"/"Fanart"), 'minh_hoa'/'poster_audio' giữ
+-- nguyên không đổi, 10 slug mới cho các mục mega-menu chưa có tương đương.
+-- Xem src/lib/design/get-design-gallery.ts (DESIGN_CATEGORIES). ---
+alter table public.design_items
+  add column album_id uuid references public.design_albums (id) on delete set null,
+  add column alt_text text,
+  add column deleted_at timestamptz;
+
+create index design_items_album_id_idx on public.design_items (album_id) where album_id is not null;
+
+alter table public.design_items drop constraint design_items_category_check;
+alter table public.design_items
+  add constraint design_items_category_check
+  check (category is null or category in (
+    'bia_truyen', 'nhan_vat_don', 'nhan_vat_nhom', 'vu_khi_trang_bi',
+    'boi_canh_phong_canh', 'linh_vat', 'trang_phuc', 'chibi_deform',
+    'emote_pack', 'logo_icon', 'fan_art', 'tranh_doi', 'minh_hoa', 'poster_audio'
+  ));
+
+-- Cột-cấp GRANT — policy "illustrators update their own design items" ở
+-- trên chỉ chặn theo HÀNG, không theo CỘT, nên nếu không có REVOKE/GRANT
+-- này, client tự PATCH thẳng share_token/image_url qua Supabase REST API
+-- được, bỏ qua regenerate_design_share_token() và route upload. Cùng
+-- pattern books (20260825_restrict_books_column_grants.sql).
+revoke update on public.design_items from authenticated;
+grant update (title, description, category, alt_text, album_id, deleted_at) on public.design_items to authenticated;
 
 -- security definer: tăng share_count an toàn dưới race condition, không
 -- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 tác phẩm/lần gọi.
@@ -2364,6 +2442,7 @@ create policy "narrators update their own audio files"
 --   drop table if exists public.chapter_audio_links cascade;
 --   drop table if exists public.audio_narrations cascade;
 --   drop table if exists public.design_items cascade;
+--   drop table if exists public.design_albums cascade;
 --   drop type if exists public.narration_status cascade;
 --   alter table public.books drop column if exists cover_design_item_id;
 --   -- book-covers bucket cũ (nếu có) không còn dùng, để nguyên vô hại

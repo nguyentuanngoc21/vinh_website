@@ -24,10 +24,18 @@ export const metadata: Metadata = {
  * migrations/20260901_add_design_item_gallery_metadata.sql và
  * src/lib/design/get-design-gallery.ts) — overlay đã gỡ.
  */
-export default async function DesignPage() {
+export default async function DesignPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ album?: string }>;
+}) {
+  const { album } = await searchParams;
   const supabase = await createClient();
   const viewerId = await getAuthedUserId();
-  const items = await getDesignGallery(supabase, viewerId);
+  const items = await getDesignGallery(supabase, viewerId, album ?? null);
+  const activeAlbum = album
+    ? ((await supabase.from("design_albums").select("id, name").eq("id", album).maybeSingle()).data ?? null)
+    : null;
 
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
@@ -39,7 +47,7 @@ export default async function DesignPage() {
           ctaHref="/thiet-ke/new"
         />
         <main>
-          <DesignGallery items={items} />
+          <DesignGallery items={items} activeAlbum={activeAlbum} />
 
           <section className="px-11 pb-[46px] pt-[26px]">
             <div className="flex flex-wrap items-center justify-between gap-5 rounded-[20px] bg-brand-ink-dark px-10 py-8 text-white">

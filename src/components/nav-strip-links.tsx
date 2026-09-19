@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MegaMenu, type MegaMenuColumn } from "@/components/mega-menu";
 import { BOOK_GENRES, GENRE_SLUGS } from "@/lib/covers/genre-styles";
+import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
+import { ART_STYLES } from "@/lib/design/art-styles";
 
 export type NavKey = "home" | "audio" | "blog" | "design" | "connect" | "rankings";
 
@@ -42,35 +44,16 @@ export const MEGA_MENUS: Partial<Record<NavKey, MegaMenuColumn[]>> = {
   design: [
     {
       title: "Loại sản phẩm",
-      items: [
-        "Bìa truyện/sách",
-        "Nhân vật đơn (character art)",
-        "Nhân vật nhóm / cảnh nhiều người",
-        "Vũ khí / trang bị",
-        "Bối cảnh / phong cảnh",
-        "Linh vật / thú cưng giả tưởng",
-        "Trang phục / thiết kế thời trang",
-        "Chibi / deform",
-        "Biểu tượng cảm xúc (emote pack)",
-        "Logo / huy hiệu / icon",
-        "Fanart",
-        "Tranh đôi / couple art",
-      ],
+      // Nguồn thật giờ là design_items.category (xem
+      // migrations/20260919_add_design_albums_and_multi_upload.sql) — chỉ
+      // lấy 12 mục đầu của DESIGN_CATEGORIES, bỏ 2 mục cuối ("Minh họa"/
+      // "Poster audio") vốn là 2 giá trị cũ giữ lại cho dữ liệu sẵn có,
+      // không thuộc nội dung mega-menu gốc.
+      items: DESIGN_CATEGORIES.slice(0, 12).map((c) => c.label),
     },
     {
       title: "Phong cách nghệ thuật",
-      items: [
-        "Anime / manga",
-        "Bán tả thực",
-        "Tả thực",
-        "Chibi",
-        "Phẳng / vector (flat design)",
-        "Cổ trang / historical",
-        "Dark fantasy / gothic",
-        "Pixel art",
-        "Tranh vẽ tay (painterly / màu nước)",
-        "3D / render",
-      ],
+      items: ART_STYLES.map((s) => s.label),
     },
   ],
 };

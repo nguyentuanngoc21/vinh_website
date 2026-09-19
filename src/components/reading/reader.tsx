@@ -349,6 +349,11 @@ export type ReaderProps = {
    * bịa danh sách. Xem migrations/20260919_add_characters.sql. */
   tropeCandidates?: TropeCandidate[];
   initialTropeVoteCharacterId?: string | null;
+  /** Ảnh thiết kế chèn inline — page.tsx đã resolve sẵn từ marker
+   * `[[thiet-ke:<designItemId>]]` trong `content` (xem chapter-editor.tsx
+   * "Chèn ảnh thiết kế"). Reader chỉ tra map, không tự gọi API — id không
+   * có trong map (ảnh đã xoá/bị gỡ) thì đoạn đó bị bỏ qua, không lỗi. */
+  designImages?: Record<string, { imageUrl: string; altText: string | null }>;
 };
 
 export function Reader({
@@ -379,6 +384,7 @@ export function Reader({
   initialParagraphIndex = null,
   tropeCandidates = [],
   initialTropeVoteCharacterId = null,
+  designImages = {},
 }: ReaderProps) {
   const router = useRouter();
   const toast = useToast();
@@ -1374,6 +1380,23 @@ export function Reader({
               className="font-[family-name:var(--font-lora)]"
             >
               {paragraphs.map((p, i) => {
+                // Ảnh thiết kế chèn inline — đoạn CHỈ chứa marker
+                // `[[thiet-ke:<id>]]` (xem chapter-editor.tsx). Render
+                // <img>, bỏ hẳn máy bôi đen/bình luận theo đoạn (vô nghĩa
+                // với 1 dòng ảnh) — id không có trong designImages (đã bị
+                // xoá/gỡ từ hoạ sĩ) thì bỏ qua cả đoạn, không lỗi.
+                const imageMatch = p.trim().match(/^\[\[thiet-ke:([0-9a-f-]{36})\]\]$/);
+                if (imageMatch) {
+                  const image = designImages[imageMatch[1]];
+                  if (!image) return null;
+                  return (
+                    <div key={i} className="mb-[1.5em]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.imageUrl} alt={image.altText ?? ""} className="mx-auto max-w-full rounded-xl" />
+                    </div>
+                  );
+                }
+
                 const count = countByParagraph.get(i) ?? 0;
                 const segments = buildHighlightSegments(p, highlightsByParagraph.get(i) ?? []);
                 return (
