@@ -456,6 +456,116 @@ create trigger prevent_unset_last_chapter
   before update on public.chapters
   for each row execute function public.prevent_unset_last_chapter();
 
+-- --- Hệ thống Nhân vật — công cụ THẬT cho tác giả quản lý nhân vật
+-- trong truyện (không chỉ để mở khoá quest/thành tựu). role phân loại
+-- rộng (chính diện/phản diện/trung lập); trope là free-text tác giả tự
+-- gõ (vd "Ma vương", "Trượng nghĩa"), cùng tinh thần books.tags — không
+-- danh mục cố định. Xem migrations/20260919_add_characters.sql. ---
+create table public.characters (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  name text not null check (char_length(trim(name)) > 0),
+  role text not null default 'neutral' check (role in ('hero', 'villain', 'neutral')),
+  trope text,
+  created_at timestamptz not null default now()
+);
+
+create index characters_book_id_idx on public.characters (book_id);
+
+alter table public.characters enable row level security;
+
+-- Cùng 2 nhánh với "published chapters follow their book's visibility" ở
+-- trên — công khai nếu sách đã publish, tác giả luôn xem được sách của
+-- chính mình.
+create policy "characters follow their book's visibility"
+  on public.characters for select
+  using (
+    exists (select 1 from public.books b where b.id = book_id and b.published and b.deleted_at is null)
+    or exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid())
+  );
+
+create policy "authors manage characters in their own books"
+  on public.characters for all
+  using (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid()))
+  with check (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid()));
+
+-- Nhân vật nào xuất hiện ở chương nào (n-n) — tác giả tự gắn khi soạn
+-- chương (src/components/author/chapter-characters-panel.tsx).
+create table public.chapter_characters (
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  character_id uuid not null references public.characters (id) on delete cascade,
+  primary key (chapter_id, character_id)
+);
+
+create index chapter_characters_character_id_idx on public.chapter_characters (character_id);
+
+alter table public.chapter_characters enable row level security;
+
+create policy "chapter_characters follow their chapter's visibility"
+  on public.chapter_characters for select
+  using (
+    exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and c.published and b.published and b.deleted_at is null
+    )
+    or exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and b.author_id = auth.uid()
+    )
+  );
+
+create policy "authors tag characters in their own chapters"
+  on public.chapter_characters for all
+  using (
+    exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and b.author_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.chapters c join public.books b on b.id = c.book_id
+      where c.id = chapter_id and b.author_id = auth.uid()
+    )
+  );
+
+-- Độc giả follow 1 nhân vật — toggle, cùng pattern author_follows (phần 4).
+create table public.character_follows (
+  follower_id uuid not null references auth.users (id) on delete cascade,
+  character_id uuid not null references public.characters (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, character_id)
+);
+
+create index character_follows_character_id_idx on public.character_follows (character_id);
+
+alter table public.character_follows enable row level security;
+
+create policy "users manage their own character follows"
+  on public.character_follows for all
+  using (auth.uid() = follower_id)
+  with check (auth.uid() = follower_id);
+
+-- Bình chọn "mẫu hình nhân vật yêu thích" trong 1 chương cụ thể — 1
+-- vote/chương/user (unique), đổi ý thì UPDATE, không insert thêm.
+create table public.character_trope_votes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  character_id uuid not null references public.characters (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (user_id, chapter_id)
+);
+
+create index character_trope_votes_character_id_idx on public.character_trope_votes (character_id);
+
+alter table public.character_trope_votes enable row level security;
+
+create policy "users manage their own trope votes"
+  on public.character_trope_votes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 -- --- Tags tự do (KHÁC genre — 1 sách vẫn 1 genre, xem phần 9) + lượt
 -- xem. Xem migrations/20260824_add_book_tags_and_view_count.sql. ---
 alter table public.books
@@ -1330,6 +1440,39 @@ $$ language plpgsql security definer;
 revoke execute on function public.increment_task_progress from public, anon, authenticated;
 grant execute on function public.increment_task_progress to service_role;
 
+-- Gọi khi "tiến trình" thật ra là 1 trạng thái ngoài (vd streak hiện tại),
+-- không phải số lần hành động trong ngày — GHI ĐÈ progress thay vì cộng
+-- dồn như increment_task_progress ở trên. An toàn overwrite trong cùng 1
+-- ngày vì nguồn trạng thái (sync_reading_streak) không giảm giữa ngày. Xem
+-- migrations/20260918_add_streak_quests_and_time_windows.sql.
+create function public.set_task_progress(p_user_id uuid, p_task_code text, p_progress integer)
+returns public.user_daily_tasks as $$
+declare
+  v_template public.task_templates;
+  v_row public.user_daily_tasks;
+begin
+  select * into v_template from public.task_templates where code = p_task_code and active;
+  if v_template is null then
+    raise exception 'Unknown or inactive task code: %', p_task_code;
+  end if;
+
+  insert into public.user_daily_tasks (user_id, template_id, task_date)
+  values (p_user_id, v_template.id, current_date)
+  on conflict (user_id, template_id, task_date) do nothing;
+
+  update public.user_daily_tasks
+    set progress = least(greatest(p_progress, 0), v_template.target_count),
+        completed = p_progress >= v_template.target_count
+    where user_id = p_user_id and template_id = v_template.id and task_date = current_date
+    returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.set_task_progress from public, anon, authenticated;
+grant execute on function public.set_task_progress to service_role;
+
 -- Gọi khi user bấm "nhận thưởng" trên UI — kiểm tra đã hoàn thành & chưa
 -- nhận trước khi cộng token, tránh nhận thưởng 2 lần.
 create function public.claim_daily_task(p_user_id uuid, p_task_id uuid)
@@ -1405,10 +1548,45 @@ create table public.reading_history (
 
 alter table public.reading_history enable row level security;
 
-create policy "users manage their own reading history"
-  on public.reading_history for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+-- SELECT-only cho chủ hàng — bảng này nuôi streak + achievement metric
+-- (tiền thưởng thật) từ migrations/20260917_add_reading_event_log.sql, nên
+-- không còn cho phép user tự INSERT/UPDATE/DELETE thẳng qua Supabase
+-- client nữa. Ghi DUY NHẤT qua record_chapter_read() (SECURITY DEFINER,
+-- service_role) ở dưới.
+create policy "users view their own reading history"
+  on public.reading_history for select
+  using (auth.uid() = user_id);
+
+-- Gọi khi user thật sự đọc hết 1 chương (cuộn tới đoạn cuối cùng — xem
+-- src/components/reading/reader.tsx +
+-- src/app/api/books/[bookId]/reading-progress/route.ts). Dedupe theo
+-- (user_id, chapter_id, NGÀY server/UTC) — trả NULL nếu đã ghi hôm nay, để
+-- caller (TS) biết KHÔNG lặp lại side-effect (tăng tiến trình nhiệm vụ,
+-- gọi streak) cho cùng 1 lần hoàn thành do client gửi lại. Xem
+-- migrations/20260917_add_reading_event_log.sql.
+create function public.record_chapter_read(p_user_id uuid, p_book_id uuid, p_chapter_id uuid)
+returns public.reading_history as $$
+declare
+  v_row public.reading_history;
+begin
+  if exists (
+    select 1 from public.reading_history
+    where user_id = p_user_id and chapter_id = p_chapter_id and read_at::date = current_date
+  ) then
+    return null;
+  end if;
+
+  insert into public.reading_history (user_id, book_id, chapter_id)
+  values (p_user_id, p_book_id, p_chapter_id)
+  returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+-- p_user_id trần — chỉ service_role gọi được, cùng lý do increment_task_progress.
+revoke execute on function public.record_chapter_read from public, anon, authenticated;
+grant execute on function public.record_chapter_read to service_role;
 
 -- View công khai, đã ẩn danh (không có user_id) — số lượt đọc mỗi SÁCH
 -- theo TỪNG NGÀY, dùng để tính bảng xếp hạng tuần/tháng/quý thật ở
@@ -1669,10 +1847,16 @@ create policy "illustrators delete their own design items"
   using (auth.uid() = illustrator_id);
 
 -- View công khai cho trang "duyệt kho Thiết kế" — CỐ Ý không có
--- share_token. Đây là view app dùng để hiện danh sách công khai.
+-- share_token. Đây là view app dùng để hiện danh sách công khai. Lọc
+-- deleted_at is null ngay ở đây (xem
+-- migrations/20260919_add_design_albums_and_multi_upload.sql) — MỌI nơi
+-- đọc công khai (gallery/search/comments/likes) đi qua view này, không
+-- đọc bảng gốc, nên chỉ cần lọc 1 chỗ.
 create view public.public_design_items as
-  select id, illustrator_id, title, image_url, source, created_at, category, description, share_count
-  from public.design_items;
+  select id, illustrator_id, title, image_url, source, created_at, category, description, share_count,
+         album_id, alt_text
+  from public.design_items
+  where deleted_at is null;
 
 -- Bảng riêng cho lượt thích (toggle, 1 dòng/(tác phẩm, người thích)) —
 -- cùng pattern "aggregate qua view riêng, bảng gốc owner-only RLS" như
@@ -1699,6 +1883,78 @@ create view public.design_item_like_counts as
   from public.design_item_likes
   group by design_item_id;
 
+-- --- Albums ("board") — long-lived grouping of design_items, shared name
+-- + art_style across every item in it (xem
+-- migrations/20260919_add_design_albums_and_multi_upload.sql). Hiện ở cả
+-- form đăng /thiet-ke/new VÀ trang duyệt công khai /thiet-ke (khác nhãn
+-- nội bộ chỉ dùng lúc đăng) — không có cột bí mật nào nên select công khai
+-- thẳng trên bảng gốc, không cần view public_* riêng như design_items. ---
+create table public.design_albums (
+  id uuid primary key default gen_random_uuid(),
+  illustrator_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  -- 10 giá trị lấy từ cột "Phong cách nghệ thuật" của mega-menu
+  -- (nav-strip-links.tsx) — xem src/lib/design/art-styles.ts.
+  art_style text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint design_albums_art_style_check
+    check (art_style in (
+      'anime_manga', 'ban_ta_thuc', 'ta_thuc', 'chibi', 'flat_vector',
+      'co_trang', 'dark_fantasy', 'pixel_art', 'painterly', 'render_3d'
+    ))
+);
+
+create index design_albums_illustrator_id_idx on public.design_albums (illustrator_id);
+
+alter table public.design_albums enable row level security;
+
+create policy "anyone can view design albums"
+  on public.design_albums for select
+  using (true);
+
+create policy "illustrators insert their own design albums"
+  on public.design_albums for insert
+  with check (auth.uid() = illustrator_id);
+
+create policy "illustrators update their own design albums"
+  on public.design_albums for update
+  using (auth.uid() = illustrator_id);
+
+create policy "illustrators delete their own design albums"
+  on public.design_albums for delete
+  using (auth.uid() = illustrator_id);
+
+-- --- design_items: album_id/alt_text/deleted_at (mở rộng theo cùng
+-- migration ở trên) — category_check mở rộng 4 → 14 giá trị, CỘNG THÊM
+-- không remap: 'bia_truyen'/'fan_art' giữ nguyên slug (chỉ đổi nhãn hiện ở
+-- UI thành "Bìa truyện/sách"/"Fanart"), 'minh_hoa'/'poster_audio' giữ
+-- nguyên không đổi, 10 slug mới cho các mục mega-menu chưa có tương đương.
+-- Xem src/lib/design/get-design-gallery.ts (DESIGN_CATEGORIES). ---
+alter table public.design_items
+  add column album_id uuid references public.design_albums (id) on delete set null,
+  add column alt_text text,
+  add column deleted_at timestamptz;
+
+create index design_items_album_id_idx on public.design_items (album_id) where album_id is not null;
+
+alter table public.design_items drop constraint design_items_category_check;
+alter table public.design_items
+  add constraint design_items_category_check
+  check (category is null or category in (
+    'bia_truyen', 'nhan_vat_don', 'nhan_vat_nhom', 'vu_khi_trang_bi',
+    'boi_canh_phong_canh', 'linh_vat', 'trang_phuc', 'chibi_deform',
+    'emote_pack', 'logo_icon', 'fan_art', 'tranh_doi', 'minh_hoa', 'poster_audio'
+  ));
+
+-- Cột-cấp GRANT — policy "illustrators update their own design items" ở
+-- trên chỉ chặn theo HÀNG, không theo CỘT, nên nếu không có REVOKE/GRANT
+-- này, client tự PATCH thẳng share_token/image_url qua Supabase REST API
+-- được, bỏ qua regenerate_design_share_token() và route upload. Cùng
+-- pattern books (20260825_restrict_books_column_grants.sql).
+revoke update on public.design_items from authenticated;
+grant update (title, description, category, alt_text, album_id, deleted_at) on public.design_items to authenticated;
+
 -- security definer: tăng share_count an toàn dưới race condition, không
 -- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 tác phẩm/lần gọi.
 -- Không yêu cầu đăng nhập, giống increment_book_view_count.
@@ -1708,6 +1964,63 @@ returns void as $$
 $$ language sql security definer set search_path = public;
 
 grant execute on function public.increment_design_item_share_count(uuid) to anon, authenticated;
+
+-- --- Bình luận cho 1 tác phẩm thiết kế — mirror anchored_comments nhưng bỏ
+-- paragraph_index/char_start/char_end/quest_id (không có khái niệm "đoạn
+-- văn" hay "quest neo comment" ở đây). Reply 1 cấp duy nhất, enforce ở API
+-- route, không phải CHECK DB. Xem migrations/20260917_add_design_audio_comments.sql. ---
+create table public.design_comments (
+  id uuid primary key default gen_random_uuid(),
+  design_item_id uuid not null references public.design_items (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  content text not null check (char_length(trim(content)) > 0),
+  parent_comment_id uuid references public.design_comments (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index design_comments_design_item_id_idx on public.design_comments (design_item_id);
+create index design_comments_parent_idx on public.design_comments (parent_comment_id) where parent_comment_id is not null;
+
+alter table public.design_comments enable row level security;
+
+create policy "design comments are publicly readable"
+  on public.design_comments for select
+  using (true);
+
+create policy "users write their own design comments"
+  on public.design_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own design comments"
+  on public.design_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate design comments"
+  on public.design_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Toggle thích 1 bình luận — cùng pattern design_item_likes (aggregate qua
+-- view riêng, bảng gốc owner-only RLS).
+create table public.design_comment_likes (
+  comment_id uuid not null references public.design_comments (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+create index design_comment_likes_comment_id_idx on public.design_comment_likes (comment_id);
+
+alter table public.design_comment_likes enable row level security;
+
+create policy "users manage their own design comment likes"
+  on public.design_comment_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.design_comment_like_counts as
+  select comment_id, count(*)::integer as like_count
+  from public.design_comment_likes
+  group by comment_id;
 
 -- --- Kho Audio ---
 create table public.audio_narrations (
@@ -1765,6 +2078,60 @@ returns void as $$
 $$ language sql security definer set search_path = public;
 
 grant execute on function public.increment_audio_play_count(uuid) to anon, authenticated;
+
+-- --- Bình luận cho 1 bản thu audio — cùng cấu trúc design_comments ở
+-- trên, khác bảng gốc tham chiếu. Xem
+-- migrations/20260917_add_design_audio_comments.sql. ---
+create table public.audio_comments (
+  id uuid primary key default gen_random_uuid(),
+  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  content text not null check (char_length(trim(content)) > 0),
+  parent_comment_id uuid references public.audio_comments (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index audio_comments_audio_narration_id_idx on public.audio_comments (audio_narration_id);
+create index audio_comments_parent_idx on public.audio_comments (parent_comment_id) where parent_comment_id is not null;
+
+alter table public.audio_comments enable row level security;
+
+create policy "audio comments are publicly readable"
+  on public.audio_comments for select
+  using (true);
+
+create policy "users write their own audio comments"
+  on public.audio_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own audio comments"
+  on public.audio_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate audio comments"
+  on public.audio_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create table public.audio_comment_likes (
+  comment_id uuid not null references public.audio_comments (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+create index audio_comment_likes_comment_id_idx on public.audio_comment_likes (comment_id);
+
+alter table public.audio_comment_likes enable row level security;
+
+create policy "users manage their own audio comment likes"
+  on public.audio_comment_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.audio_comment_like_counts as
+  select comment_id, count(*)::integer as like_count
+  from public.audio_comment_likes
+  group by comment_id;
 
 -- --- Liên kết chương ↔ audio (nhiều-nhiều) ---
 -- Bảng này TỰ NÓ không nhạy cảm (không có share_token), nên select công
@@ -2075,6 +2442,7 @@ create policy "narrators update their own audio files"
 --   drop table if exists public.chapter_audio_links cascade;
 --   drop table if exists public.audio_narrations cascade;
 --   drop table if exists public.design_items cascade;
+--   drop table if exists public.design_albums cascade;
 --   drop type if exists public.narration_status cascade;
 --   alter table public.books drop column if exists cover_design_item_id;
 --   -- book-covers bucket cũ (nếu có) không còn dùng, để nguyên vô hại
@@ -3632,7 +4000,18 @@ create table public.achievement_templates (
   constraint achievement_templates_for_role_check
     check (for_role is null or for_role in ('author', 'narrator', 'designer')),
   constraint achievement_templates_metric_check
-    check (metric is null or metric in ('books_published', 'audio_published', 'design_published')),
+    check (metric is null or metric in (
+      'books_published', 'audio_published', 'design_published',
+      'chapters_read', 'genres_read_count', 'night_reads_count',
+      'finished_stories_count', 'longest_consecutive_chapters',
+      'distinct_reading_days_count', 'max_reading_sessions_per_day',
+      'max_gap_days_same_book', 'weekend_both_days_read',
+      'max_books_read_same_genre', 'max_genres_within_15_days', 'topup_count',
+      'sad_ending_finished_count', 'underrated_finished_count',
+      'bookmarked_books_count', 'max_bookmarked_books_same_genre',
+      'saved_highlights_count',
+      'villain_followed_count', 'hero_followed_count', 'character_guardian_achieved'
+    )),
   constraint achievement_templates_metric_threshold_check
     check ((metric is null) = (threshold is null)),
   constraint achievement_templates_threshold_check check (threshold is null or threshold > 0),
@@ -3697,6 +4076,136 @@ begin
         (select count(*) from public.audio_narrations where narrator_id = p_user_id)
       when 'design_published' then
         (select count(*) from public.design_items where illustrator_id = p_user_id)
+      when 'chapters_read' then
+        (select count(distinct chapter_id) from public.reading_history
+           where user_id = p_user_id and chapter_id is not null)
+      when 'genres_read_count' then
+        (select count(distinct b.genre) from public.reading_history rh
+           join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and b.genre is not null)
+      when 'night_reads_count' then
+        -- Giờ server/UTC thống nhất, không theo timezone từng user — cùng
+        -- quyết định đã có cho ranh giới "1 ngày" của quest pool.
+        (select count(*) from public.reading_history
+           where user_id = p_user_id
+             and (extract(hour from timezone('utc', read_at)) >= 22
+                  or extract(hour from timezone('utc', read_at)) < 2))
+      when 'finished_stories_count' then
+        (select count(distinct rh.book_id) from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           where rh.user_id = p_user_id and c.is_last_chapter = true)
+      when 'longest_consecutive_chapters' then
+        (with read_chapters as (
+           select distinct c.book_id, c.order_index
+           from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           where rh.user_id = p_user_id
+         ), grp as (
+           select book_id, order_index - row_number() over (partition by book_id order by order_index) as g
+           from read_chapters
+         )
+         select coalesce(max(run_length), 0) from (
+           select book_id, g, count(*) as run_length from grp group by book_id, g
+         ) runs)
+      when 'distinct_reading_days_count' then
+        (select count(distinct read_at::date) from public.reading_history where user_id = p_user_id)
+      when 'max_reading_sessions_per_day' then
+        (with events as (
+           select read_at::date as d, read_at,
+                  read_at - lag(read_at) over (partition by read_at::date order by read_at) as gap
+           from public.reading_history where user_id = p_user_id
+         )
+         select coalesce(max(session_count), 0) from (
+           select d, count(*) filter (where gap is null or gap > interval '30 minutes') as session_count
+           from events group by d
+         ) s)
+      when 'max_gap_days_same_book' then
+        (with book_events as (
+           select book_id, read_at - lag(read_at) over (partition by book_id order by read_at) as gap
+           from public.reading_history where user_id = p_user_id
+         )
+         select coalesce(max(extract(day from gap)::integer), 0) from book_events)
+      when 'weekend_both_days_read' then
+        (select case when
+           exists(select 1 from public.reading_history where user_id = p_user_id and extract(dow from read_at) = 6)
+           and exists(select 1 from public.reading_history where user_id = p_user_id and extract(dow from read_at) = 0)
+         then 1 else 0 end)
+      when 'max_books_read_same_genre' then
+        (select coalesce(max(cnt), 0) from (
+           select b.genre, count(distinct rh.book_id) as cnt
+           from public.reading_history rh join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and b.genre is not null
+           group by b.genre
+         ) t)
+      when 'max_genres_within_15_days' then
+        (with first_genre_read as (
+           select b.genre, min(rh.read_at) as first_read
+           from public.reading_history rh join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and b.genre is not null
+           group by b.genre
+         )
+         select coalesce(max(cnt), 0) from (
+           select o1.genre, count(*) as cnt
+           from first_genre_read o1
+           join first_genre_read o2 on o2.first_read between o1.first_read and o1.first_read + interval '15 days'
+           group by o1.genre
+         ) t)
+      when 'topup_count' then
+        (select count(*) from public.transactions
+           where user_id = p_user_id and type = 'topup' and status <> 'reversed')
+      when 'sad_ending_finished_count' then
+        (select count(distinct rh.book_id) from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and c.is_last_chapter = true
+             and exists (select 1 from unnest(b.tags) tg where lower(trim(tg)) = 'kết buồn'))
+      when 'underrated_finished_count' then
+        (select count(distinct rh.book_id) from public.reading_history rh
+           join public.chapters c on c.id = rh.chapter_id
+           join public.books b on b.id = rh.book_id
+           where rh.user_id = p_user_id and c.is_last_chapter = true and b.view_count < 50)
+      when 'bookmarked_books_count' then
+        (select count(distinct rli.book_id) from public.reading_list_items rli
+           join public.reading_lists rl on rl.id = rli.list_id
+           where rl.user_id = p_user_id)
+      when 'max_bookmarked_books_same_genre' then
+        (select coalesce(max(cnt), 0) from (
+           select b.genre, count(distinct rli.book_id) as cnt
+           from public.reading_list_items rli
+           join public.reading_lists rl on rl.id = rli.list_id
+           join public.books b on b.id = rli.book_id
+           where rl.user_id = p_user_id and b.genre is not null
+           group by b.genre
+         ) t)
+      when 'saved_highlights_count' then
+        (select count(*) from public.highlights where user_id = p_user_id)
+      when 'villain_followed_count' then
+        (select count(*) from public.character_follows cf
+           join public.characters ch on ch.id = cf.character_id
+           where cf.follower_id = p_user_id and ch.role = 'villain')
+      when 'hero_followed_count' then
+        (select count(*) from public.character_follows cf
+           join public.characters ch on ch.id = cf.character_id
+           where cf.follower_id = p_user_id and ch.role = 'hero')
+      when 'character_guardian_achieved' then
+        (select case when exists (
+           select 1 from public.character_follows cf
+           where cf.follower_id = p_user_id
+             and not exists (
+               select 1 from public.chapter_characters cc
+               join public.chapters c on c.id = cc.chapter_id
+               where cc.character_id = cf.character_id and c.published
+                 and not exists (
+                   select 1 from public.reading_history rh
+                   where rh.user_id = p_user_id and rh.chapter_id = c.id
+                 )
+             )
+             and exists (
+               select 1 from public.chapter_characters cc
+               join public.chapters c on c.id = cc.chapter_id
+               where cc.character_id = cf.character_id and c.published
+             )
+         ) then 1 else 0 end)
       else 0
     end;
 

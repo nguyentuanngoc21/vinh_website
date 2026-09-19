@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ChapterEditor } from "@/components/author/chapter-editor";
 import { PublishPanel } from "@/components/author/publish-panel";
 import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
+import { ChapterCharactersPanel } from "@/components/author/chapter-characters-panel";
+import type { ManagedCharacter } from "@/components/author/character-manager";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import type { BookGenre } from "@/lib/supabase/types";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
@@ -36,6 +38,8 @@ type AuthorWorkspaceProps = {
   bookPublishedAt: string | null;
   chapter: WorkspaceChapter;
   linkedAudio: AudioTrack[];
+  bookCharacters: ManagedCharacter[];
+  initialTaggedCharacterIds: string[];
 };
 
 /**
@@ -57,6 +61,8 @@ export function AuthorWorkspace({
   bookPublishedAt,
   chapter,
   linkedAudio,
+  bookCharacters,
+  initialTaggedCharacterIds,
 }: AuthorWorkspaceProps) {
   const [bookTitle, setBookTitle] = useState(initialBookTitle);
   const [synopsis, setSynopsis] = useState(bookSynopsis ?? "");
@@ -281,6 +287,11 @@ export function AuthorWorkspace({
         onGenreChange={handleGenreChange}
         tags={tags}
         onTagsChange={handleTagsChange}
+      />
+      <ChapterCharactersPanel
+        chapterId={chapter.id}
+        bookCharacters={bookCharacters}
+        initialTaggedCharacterIds={initialTaggedCharacterIds}
       />
       {missingAgreementIds && (
         <RequiredAgreementsModal

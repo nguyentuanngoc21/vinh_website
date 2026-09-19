@@ -14,6 +14,7 @@ import {
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
 import { BookCoverUpload } from "@/components/author/book-cover-upload";
 import { ShareManuscriptPanel, type ManuscriptGrant } from "@/components/author/share-manuscript-panel";
+import { CharacterManager, type ManagedCharacter } from "@/components/author/character-manager";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type OverviewChapter = {
@@ -40,6 +41,7 @@ type BookOverviewProps = {
   chapters: OverviewChapter[];
   bookFinalized: boolean;
   initialManuscriptGrant: ManuscriptGrant | null;
+  characters: ManagedCharacter[];
 };
 
 /**
@@ -59,6 +61,7 @@ export function BookOverview({
   chapters,
   bookFinalized,
   initialManuscriptGrant,
+  characters,
 }: BookOverviewProps) {
   const router = useRouter();
   const [creatingChapter, setCreatingChapter] = useState(false);
@@ -273,6 +276,8 @@ export function BookOverview({
       </div>
 
       <ShareManuscriptPanel bookId={bookId} finalized={bookFinalized} initialGrant={initialManuscriptGrant} />
+
+      <CharacterManager bookId={bookId} initialCharacters={characters} />
 
       {latest && (
         <Link

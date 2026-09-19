@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { RewardEngine } from "@/lib/quests/reward-engine";
 
 async function assertOwnList(
   supabase: ReturnType<typeof createServiceRoleClient>,
@@ -45,6 +46,13 @@ export async function POST(
   if (error && error.code !== "23505") {
     console.error("[reading-lists] add item failed:", error);
     return NextResponse.json({ error: "Không thể thêm vào danh sách. Vui lòng thử lại." }, { status: 500 });
+  }
+
+  // Chỉ tính khi thật sự thêm mới (bỏ qua 23505 — sách đã có sẵn trong
+  // danh sách, không phải hành động "thêm vào tủ sách" mới).
+  if (!error) {
+    const result = await RewardEngine.incrementTaskProgress(supabase, { userId, taskCode: "reader_add_wishlist" });
+    if (!result.ok) console.error("[reading-lists] incrementTaskProgress failed:", result.error);
   }
 
   return NextResponse.json({ ok: true });

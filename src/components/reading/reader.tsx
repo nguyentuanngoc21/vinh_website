@@ -23,6 +23,7 @@ import { AuthorPanel } from "./author-panel";
 import { ReadingListModal } from "./reading-list-modal";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { ReadingGate } from "./reading-gate";
+import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
 import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
 import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
@@ -343,6 +344,16 @@ export type ReaderProps = {
    * đọc, hoặc lần trước dừng ở chương khác). Tự cuộn tới 1 lần lúc mount.
    * Xem migrations/20260910_add_book_progress_paragraph.sql. */
   initialParagraphIndex?: number | null;
+  /** Nhân vật đã gắn với chương này (tác giả gắn qua
+   * chapter-characters-panel.tsx) — [] thì panel bình chọn tự ẩn, không
+   * bịa danh sách. Xem migrations/20260919_add_characters.sql. */
+  tropeCandidates?: TropeCandidate[];
+  initialTropeVoteCharacterId?: string | null;
+  /** Ảnh thiết kế chèn inline — page.tsx đã resolve sẵn từ marker
+   * `[[thiet-ke:<designItemId>]]` trong `content` (xem chapter-editor.tsx
+   * "Chèn ảnh thiết kế"). Reader chỉ tra map, không tự gọi API — id không
+   * có trong map (ảnh đã xoá/bị gỡ) thì đoạn đó bị bỏ qua, không lỗi. */
+  designImages?: Record<string, { imageUrl: string; altText: string | null }>;
 };
 
 export function Reader({
@@ -371,6 +382,9 @@ export function Reader({
   chapterPrice = 0,
   isLoggedIn = false,
   initialParagraphIndex = null,
+  tropeCandidates = [],
+  initialTropeVoteCharacterId = null,
+  designImages = {},
 }: ReaderProps) {
   const router = useRouter();
   const toast = useToast();
@@ -611,6 +625,16 @@ export function Reader({
     }
   };
 
+  // Ghi nhận tiến trình nhiệm vụ reader_share_story — chỉ khi shareOrCopy()
+  // thật sự thành công ("shared" hoặc "copied", không phải "failed"). Best-
+  // effort, không cần đăng nhập vẫn gọi được, lỗi/401 bị nuốt im lặng
+  // (chia sẻ vẫn thành công với người dùng dù không tính nhiệm vụ). Xem
+  // src/app/api/books/[bookId]/share/route.ts.
+  const trackShareQuest = () => {
+    if (!bookId) return;
+    fetch(`/api/books/${bookId}/share`, { method: "POST" }).catch(() => {});
+  };
+
   const handleShareStory = async () => {
     if (!bookSlug || typeof window === "undefined") return;
     const result = await shareOrCopy({
@@ -619,6 +643,7 @@ export function Reader({
       url: `${window.location.origin}/truyen/${bookSlug}`,
     });
     if (result === "copied") toast.show("Đã sao chép liên kết", "success");
+    if (result !== "failed") trackShareQuest();
   };
 
   const handleShareExcerpt = async () => {
@@ -629,6 +654,7 @@ export function Reader({
       url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
     });
     if (result === "copied") toast.show("Đã sao chép liên kết", "success");
+    if (result !== "failed") trackShareQuest();
   };
 
   // Gỡ chương NGAY từ trang đọc (admin/super_admin only — xem
@@ -921,10 +947,15 @@ export function Reader({
     if (progressSaveTimeoutRef.current) clearTimeout(progressSaveTimeoutRef.current);
     progressSaveTimeoutRef.current = setTimeout(() => {
       lastSavedParagraphRef.current = idx;
+      // isLastParagraph — đoạn đang xem là đoạn cuối chương, coi như "đọc
+      // hết chương" — kích hoạt ghi reading_history/streak/tiến trình
+      // nhiệm vụ ở route (xem comment trong route đó). Chỉ cần TỚI đoạn
+      // cuối 1 lần, không cần đọc chậm hết từng đoạn.
+      const isLastParagraph = idx >= paragraphs.length - 1;
       fetch(`/api/books/${bookId}/reading-progress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterId, paragraphIndex: idx }),
+        body: JSON.stringify({ chapterId, paragraphIndex: idx, isLastParagraph }),
       }).catch(() => {
         // best-effort — bỏ qua lỗi mạng/401 (chưa đăng nhập)
       });
@@ -1349,6 +1380,23 @@ export function Reader({
               className="font-[family-name:var(--font-lora)]"
             >
               {paragraphs.map((p, i) => {
+                // Ảnh thiết kế chèn inline — đoạn CHỈ chứa marker
+                // `[[thiet-ke:<id>]]` (xem chapter-editor.tsx). Render
+                // <img>, bỏ hẳn máy bôi đen/bình luận theo đoạn (vô nghĩa
+                // với 1 dòng ảnh) — id không có trong designImages (đã bị
+                // xoá/gỡ từ hoạ sĩ) thì bỏ qua cả đoạn, không lỗi.
+                const imageMatch = p.trim().match(/^\[\[thiet-ke:([0-9a-f-]{36})\]\]$/);
+                if (imageMatch) {
+                  const image = designImages[imageMatch[1]];
+                  if (!image) return null;
+                  return (
+                    <div key={i} className="mb-[1.5em]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.imageUrl} alt={image.altText ?? ""} className="mx-auto max-w-full rounded-xl" />
+                    </div>
+                  );
+                }
+
                 const count = countByParagraph.get(i) ?? 0;
                 const segments = buildHighlightSegments(p, highlightsByParagraph.get(i) ?? []);
                 return (
@@ -1476,6 +1524,13 @@ export function Reader({
               <ShareNetworkIcon /> Chia sẻ
             </button>
           </div>
+
+          <TropeVotePanel
+            chapterId={chapterId}
+            candidates={tropeCandidates}
+            initialVotedCharacterId={initialTropeVoteCharacterId}
+            c={c}
+          />
 
           {/* Ẩn trên mobile — bottom bar cố định (xem <nav> cuối trang) đã
               đảm nhiệm điều hướng chương trước/sau ở đó rồi, để tránh lặp. */}

@@ -93,6 +93,23 @@ export const RewardEngine = {
     return { ok: true, data };
   },
 
+  /** Wraps set_task_progress() — GHI ĐÈ progress (không cộng dồn), dùng
+   * cho nhiệm vụ mà tiến trình là 1 trạng thái ngoài (vd streak hiện tại)
+   * thay vì đếm hành động trong ngày. Xem
+   * migrations/20260918_add_streak_quests_and_time_windows.sql. */
+  async setTaskProgress(
+    supabase: Client,
+    params: { userId: string; taskCode: string; progress: number }
+  ): Promise<QuestResult<UserDailyTaskRow>> {
+    const { data, error } = await supabase.rpc("set_task_progress", {
+      p_user_id: params.userId,
+      p_task_code: params.taskCode,
+      p_progress: params.progress,
+    });
+    if (error) return { ok: false, error: error.message || "Không thể ghi nhận tiến trình nhiệm vụ." };
+    return { ok: true, data };
+  },
+
   /**
    * Checks unlock_condition (app-side — the shape isn't validatable in
    * SQL, see isUnlockConditionMet above), then calls complete_hidden_quest()

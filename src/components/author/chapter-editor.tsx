@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowSquareOutIcon,
@@ -9,6 +9,7 @@ import {
   QuotesIcon,
   MinusIcon,
   TextHTwoIcon,
+  ImageSquareIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Checkbox, Field } from "@/components/ui";
 
@@ -53,6 +54,10 @@ export function ChapterEditor({
   bookPublished,
 }: ChapterEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [imagePromptOpen, setImagePromptOpen] = useState(false);
+  const [imageLinkInput, setImageLinkInput] = useState("");
+  const [imageLinkPending, setImageLinkPending] = useState(false);
+  const [imageLinkError, setImageLinkError] = useState<string | null>(null);
 
   const words = (content.trim().match(/\S+/g) ?? []).length;
   const wordCount = words.toLocaleString("vi-VN");
@@ -89,6 +94,39 @@ export function ChapterEditor({
     const el = textareaRef.current;
     const pos = el?.selectionStart ?? content.length;
     onContentChange(`${content.slice(0, pos)}\n\n---\n\n${content.slice(pos)}`);
+  };
+
+  // "Chèn ảnh thiết kế" — validate link chia sẻ (POST /api/design/resolve-link)
+  // TRƯỚC khi chèn, rồi chèn marker `[[thiet-ke:<id>]]`, KHÔNG PHẢI url gốc.
+  // Lý do bắt buộc: url gốc mang share_token (bí mật) trong query string —
+  // chapters.content là text thô, hiện thẳng ra page source cho mọi độc giả
+  // (xem reader.tsx) nên không bao giờ được lưu token vào đó. reader.tsx tự
+  // resolve lại id → ảnh qua public_design_items (view công khai, không cần
+  // token) lúc hiển thị.
+  const insertDesignImage = async () => {
+    const shareUrl = imageLinkInput.trim();
+    if (!shareUrl) {
+      setImageLinkError("Vui lòng dán link chia sẻ.");
+      return;
+    }
+    setImageLinkPending(true);
+    setImageLinkError(null);
+    const res = await fetch("/api/design/resolve-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shareUrl }),
+    });
+    const data = await res.json().catch(() => null);
+    setImageLinkPending(false);
+    if (!res.ok) {
+      setImageLinkError((data && data.error) || "Link không hợp lệ.");
+      return;
+    }
+    const el = textareaRef.current;
+    const pos = el?.selectionStart ?? content.length;
+    onContentChange(`${content.slice(0, pos)}\n\n[[thiet-ke:${data.designItemId}]]\n\n${content.slice(pos)}`);
+    setImageLinkInput("");
+    setImagePromptOpen(false);
   };
 
   return (
@@ -183,7 +221,45 @@ export function ChapterEditor({
             >
               <MinusIcon size={17} />
             </button>
+            <div className="mx-1.5 h-5 w-px bg-cream-border" />
+            <button
+              type="button"
+              onClick={() => {
+                setImagePromptOpen((cur) => !cur);
+                setImageLinkError(null);
+              }}
+              title="Chèn ảnh thiết kế"
+              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
+            >
+              <ImageSquareIcon size={17} />
+            </button>
           </div>
+
+          {imagePromptOpen && (
+            <div className="mb-5 rounded-lg border border-cream-border bg-white p-3">
+              <div className="flex gap-2">
+                <input
+                  value={imageLinkInput}
+                  onChange={(e) => setImageLinkInput(e.target.value)}
+                  placeholder="Dán link chia sẻ thiết kế (…?id=…&token=…)"
+                  className="flex-1 rounded-lg border border-cream-border px-3 py-2 text-[13px] text-ink outline-none focus:border-brand-gold"
+                />
+                <button
+                  type="button"
+                  onClick={insertDesignImage}
+                  disabled={imageLinkPending}
+                  className="cursor-pointer rounded-lg bg-brand-gold px-4 text-[13px] font-bold text-brand-ink disabled:opacity-60"
+                >
+                  {imageLinkPending ? "Đang kiểm tra…" : "Chèn"}
+                </button>
+              </div>
+              {imageLinkError && <div className="mt-2 text-[12px] font-medium text-[#B02A37]">{imageLinkError}</div>}
+              <p className="mt-2 text-[11.5px] text-stone-alt">
+                Link do hoạ sĩ gửi cho bạn (nút &quot;Tạo link liên kết&quot; ở trang đăng thiết kế) — ảnh sẽ hiện
+                đúng tại vị trí con trỏ đang đặt.
+              </p>
+            </div>
+          )}
 
           <textarea
             ref={textareaRef}

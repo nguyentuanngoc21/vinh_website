@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { AUDIO_GENRES } from "@/lib/audio/get-audio-catalog";
+import { RewardEngine } from "@/lib/quests/reward-engine";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
 const ALLOWED_MIME_EXT: Record<string, string> = {
@@ -97,11 +98,20 @@ export async function POST(request: Request) {
   // dùng service-role, khác `supabase` cookie-bound ở trên. Lỗi ở đây
   // không chặn phản hồi — bản thu đã lên thật, chỉ admin dashboard đếm
   // thiếu 1 dòng.
-  const { error: protectionError } = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient();
+  const { error: protectionError } = await serviceClient
     .from("content_protection_status")
     .insert({ content_type: "audio", content_id: item.id, method: "declared_db_only" });
   if (protectionError) {
     console.error("[api/audio] content_protection_status insert failed:", protectionError);
+  }
+
+  const questResult = await RewardEngine.incrementTaskProgress(serviceClient, {
+    userId: user.id,
+    taskCode: "narrator_upload_audio",
+  });
+  if (!questResult.ok) {
+    console.error("[api/audio] incrementTaskProgress failed:", questResult.error);
   }
 
   return NextResponse.json({ ok: true, id: item.id });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { AUDIO_GENRES } from "@/lib/audio/get-audio-catalog";
+import { RewardEngine } from "@/lib/quests/reward-engine";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
 const ALLOWED_MIME_EXT: Record<string, string> = {
@@ -105,7 +106,8 @@ export async function POST(
   // KHÔNG sửa file audio — xem giải thích đầy đủ ở src/app/api/audio/route.ts.
   // Chỉ ghi nhận đã tuyên bố "không cho AI huấn luyện" vào DB. Lỗi ở đây
   // không chặn phản hồi — bản thu đã lên thật.
-  const { error: protectionError } = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient();
+  const { error: protectionError } = await serviceClient
     .from("content_protection_status")
     .insert({ content_type: "audio", content_id: item.id, method: "declared_db_only" });
   if (protectionError) {
@@ -120,6 +122,14 @@ export async function POST(
   if (linkError) {
     console.error("[chapter audio/record] link failed:", linkError);
     return NextResponse.json({ error: `Gắn audio thất bại: ${linkError.message}` }, { status: 500 });
+  }
+
+  const questResult = await RewardEngine.incrementTaskProgress(serviceClient, {
+    userId: user.id,
+    taskCode: "narrator_upload_audio",
+  });
+  if (!questResult.ok) {
+    console.error("[chapter audio/record] incrementTaskProgress failed:", questResult.error);
   }
 
   return NextResponse.json({ ok: true });

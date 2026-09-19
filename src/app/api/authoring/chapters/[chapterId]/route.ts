@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import {
   hasAcceptedExclusivityPolicy,
   EXCLUSIVITY_AGREEMENT_ERROR,
   EXCLUSIVITY_AGREEMENT_ID,
 } from "@/lib/authoring/exclusivity-agreement";
+import { RewardEngine } from "@/lib/quests/reward-engine";
 
 /**
  * PATCH /api/authoring/chapters/:chapterId — dùng cho cả "Lưu nháp"
@@ -70,9 +71,13 @@ export async function PATCH(
   // action=restore) mới gỡ được cờ này.
   const { data: currentChapter } = await supabase
     .from("chapters")
-    .select("removed_at, removed_reason_detail")
+    .select("removed_at, removed_reason_detail, published")
     .eq("id", chapterId)
     .maybeSingle();
+  // Dùng để phát hiện chiều nháp -> xuất bản THẬT (không phải sửa nội
+  // dung 1 chương đã xuất bản từ trước) — cho nhiệm vụ author_publish_chapter
+  // bên dưới, sau khi update thành công.
+  const wasPublished = currentChapter?.published === true;
   if (currentChapter?.removed_at) {
     return NextResponse.json(
       {
@@ -173,6 +178,22 @@ export async function PATCH(
       .eq("id", data.book_id)
       .eq("published", false);
     if (bookError) console.error("[authoring] publish book failed:", bookError);
+  }
+
+  // Nhiệm vụ "Ra chương mới" — CHỈ tính đúng lần chuyển nháp -> xuất bản
+  // (wasPublished false/null trước update), không tính lần sửa nội dung 1
+  // chương đã xuất bản từ trước. incrementTaskProgress() cần service-role
+  // (RPC revoke EXECUTE khỏi authenticated) — khác `supabase` cookie-bound
+  // đang dùng cho phần còn lại của route.
+  if (update.published === true && !wasPublished) {
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user) {
+      const result = await RewardEngine.incrementTaskProgress(createServiceRoleClient(), {
+        userId: userData.user.id,
+        taskCode: "author_publish_chapter",
+      });
+      if (!result.ok) console.error("[authoring] incrementTaskProgress failed:", result.error);
+    }
   }
 
   return NextResponse.json(data);

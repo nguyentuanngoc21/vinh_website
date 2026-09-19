@@ -22,7 +22,9 @@ export type HomepageBook = {
 
 type BookRow = Database["public"]["Tables"]["books"]["Row"];
 
-async function toHomepageBooks(
+/** Exported for reuse by src/lib/recommendations/get-recommended-books.ts
+ * — cùng join tác giả/chương/bìa, khác nguồn danh sách sách đầu vào. */
+export async function toHomepageBooks(
   supabase: SupabaseClient<Database>,
   rows: BookRow[]
 ): Promise<HomepageBook[]> {

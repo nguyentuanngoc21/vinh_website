@@ -21,8 +21,41 @@ export type CreatorTag =
 
 export type ContentSource = "independent" | "story_upload";
 
-// Xem migrations/20260901_add_design_item_gallery_metadata.sql.
-export type DesignItemCategory = "bia_truyen" | "minh_hoa" | "fan_art" | "poster_audio";
+// Xem migrations/20260901_add_design_item_gallery_metadata.sql +
+// migrations/20260919_add_design_albums_and_multi_upload.sql (mở rộng 4 →
+// 14, additive — không remap giá trị cũ). 10 giá trị mới khớp cột "Loại
+// sản phẩm" của mega-menu (nav-strip-links.tsx) — xem
+// src/lib/design/get-design-gallery.ts (DESIGN_CATEGORIES).
+export type DesignItemCategory =
+  | "bia_truyen"
+  | "nhan_vat_don"
+  | "nhan_vat_nhom"
+  | "vu_khi_trang_bi"
+  | "boi_canh_phong_canh"
+  | "linh_vat"
+  | "trang_phuc"
+  | "chibi_deform"
+  | "emote_pack"
+  | "logo_icon"
+  | "fan_art"
+  | "tranh_doi"
+  | "minh_hoa"
+  | "poster_audio";
+
+// Xem migrations/20260919_add_design_albums_and_multi_upload.sql +
+// src/lib/design/art-styles.ts. Dùng cho design_albums.art_style — khớp
+// cột "Phong cách nghệ thuật" của mega-menu.
+export type ArtStyle =
+  | "anime_manga"
+  | "ban_ta_thuc"
+  | "ta_thuc"
+  | "chibi"
+  | "flat_vector"
+  | "co_trang"
+  | "dark_fantasy"
+  | "pixel_art"
+  | "painterly"
+  | "render_3d";
 
 // Dùng bởi hệ thống sinh bìa tự động (src/lib/covers/genre-styles.ts) khi
 // books.cover_design_item_id còn null. 10 giá trị = taxonomy CHÍNH THỨC
@@ -41,6 +74,45 @@ export type BookGenre =
   | "Khoa học viễn tưởng"
   | "Tiên hiệp/ kiếm hiệp"
   | "Kỳ ảo";
+
+// achievement_templates.metric — NULL = không tự tính (thành tựu
+// streak-linked qua streak_milestones.badge_id). 6 giá trị đầu từ
+// migrations/20260908_add_achievements.sql (3 role) +
+// migrations/20260917_add_reading_event_log.sql (3 giá trị dựa
+// reading_history). 9 giá trị sau từ
+// migrations/20260919_add_reading_behavior_achievements.sql — mỗi giá trị
+// 1 công thức riêng, tính song song ở sync_user_achievements() (SQL,
+// nguồn sự thật cho unlock) và getMetricCounts() (TS,
+// src/lib/quests/achievement-service.ts, chỉ để vẽ progress bar) — PHẢI
+// khớp nhau, sửa 1 bên nhớ sửa bên kia.
+export type AchievementMetric =
+  | "books_published"
+  | "audio_published"
+  | "design_published"
+  | "chapters_read"
+  | "genres_read_count"
+  | "night_reads_count"
+  | "finished_stories_count"
+  | "longest_consecutive_chapters"
+  | "distinct_reading_days_count"
+  | "max_reading_sessions_per_day"
+  | "max_gap_days_same_book"
+  | "weekend_both_days_read"
+  | "max_books_read_same_genre"
+  | "max_genres_within_15_days"
+  | "topup_count"
+  | "sad_ending_finished_count"
+  | "underrated_finished_count"
+  | "bookmarked_books_count"
+  | "max_bookmarked_books_same_genre"
+  | "saved_highlights_count"
+  | "villain_followed_count"
+  | "hero_followed_count"
+  | "character_guardian_achieved";
+
+// characters.role — phân loại rộng, KHÁC characters.trope (free-text, tác
+// giả tự gõ). Xem migrations/20260919_add_characters.sql.
+export type CharacterRole = "hero" | "villain" | "neutral";
 
 export type TransactionType =
   | "signup_bonus"
@@ -426,6 +498,59 @@ export type Database = {
           content_purged_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["chapters"]["Insert"]>;
+        Relationships: [];
+      };
+      // Xem migrations/20260919_add_characters.sql.
+      characters: {
+        Row: {
+          id: string;
+          book_id: string;
+          name: string;
+          role: CharacterRole;
+          trope: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          book_id: string;
+          name: string;
+          role?: CharacterRole;
+          trope?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["characters"]["Insert"]>;
+        Relationships: [];
+      };
+      chapter_characters: {
+        Row: { chapter_id: string; character_id: string };
+        Insert: { chapter_id: string; character_id: string };
+        // Không update — chỉ insert (gắn) hoặc delete (gỡ).
+        Update: never;
+        Relationships: [];
+      };
+      character_follows: {
+        Row: { follower_id: string; character_id: string; created_at: string };
+        Insert: { follower_id: string; character_id: string };
+        // Toggle = insert (follow) hoặc delete (unfollow) — không có update.
+        Update: never;
+        Relationships: [];
+      };
+      character_trope_votes: {
+        Row: {
+          id: string;
+          user_id: string;
+          chapter_id: string;
+          character_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          chapter_id: string;
+          character_id: string;
+        };
+        // Đổi ý thì UPDATE character_id (unique user_id+chapter_id), không
+        // insert thêm — xem route trope-vote.
+        Update: { character_id?: string };
         Relationships: [];
       };
       chapter_votes: {
@@ -1420,7 +1545,7 @@ export type Database = {
           // streak_milestones.badge_id points to — unlock lives in
           // claim_streak_milestone() instead). Non-null pair = evaluated
           // by sync_user_achievements().
-          metric: "books_published" | "audio_published" | "design_published" | null;
+          metric: AchievementMetric | null;
           threshold: number | null;
           reward_tokens: number;
           active: boolean;
@@ -1434,7 +1559,7 @@ export type Database = {
           description?: string | null;
           icon?: string | null;
           color_token: string;
-          metric?: "books_published" | "audio_published" | "design_published" | null;
+          metric?: AchievementMetric | null;
           threshold?: number | null;
           reward_tokens?: number;
           active?: boolean;
@@ -1490,6 +1615,10 @@ export type Database = {
           // không bao giờ hiện ở view public_design_items.
           share_token: string;
           created_at: string;
+          // Xem migrations/20260919_add_design_albums_and_multi_upload.sql.
+          album_id: string | null;
+          alt_text: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -1500,13 +1629,67 @@ export type Database = {
           description?: string | null;
           share_count?: number;
           source?: ContentSource;
+          album_id?: string | null;
+          alt_text?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["design_items"]["Insert"]>;
+        Relationships: [];
+      };
+      // Xem migrations/20260919_add_design_albums_and_multi_upload.sql —
+      // "board": name + art_style chia sẻ giữa mọi design_items cùng
+      // album_id. Không có cột bí mật nào (khác design_items.share_token)
+      // nên select công khai thẳng trên bảng gốc.
+      design_albums: {
+        Row: {
+          id: string;
+          illustrator_id: string;
+          name: string;
+          art_style: ArtStyle;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          illustrator_id: string;
+          name: string;
+          art_style: ArtStyle;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["design_albums"]["Insert"]>;
         Relationships: [];
       };
       design_item_likes: {
         Row: { design_item_id: string; user_id: string; created_at: string };
         Insert: { design_item_id: string; user_id: string };
+        // Không update — chỉ insert (thích) hoặc delete (bỏ thích).
+        Update: never;
+        Relationships: [];
+      };
+      // Xem migrations/20260917_add_design_audio_comments.sql.
+      design_comments: {
+        Row: {
+          id: string;
+          design_item_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          design_item_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      design_comment_likes: {
+        Row: { comment_id: string; user_id: string; created_at: string };
+        Insert: { comment_id: string; user_id: string };
         // Không update — chỉ insert (thích) hoặc delete (bỏ thích).
         Update: never;
         Relationships: [];
@@ -1536,6 +1719,33 @@ export type Database = {
           source?: ContentSource;
         };
         Update: Partial<Database["public"]["Tables"]["audio_narrations"]["Insert"]>;
+        Relationships: [];
+      };
+      // Xem migrations/20260917_add_design_audio_comments.sql.
+      audio_comments: {
+        Row: {
+          id: string;
+          audio_narration_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          audio_narration_id: string;
+          user_id: string;
+          content: string;
+          parent_comment_id?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      audio_comment_likes: {
+        Row: { comment_id: string; user_id: string; created_at: string };
+        Insert: { comment_id: string; user_id: string };
+        // Không update — chỉ insert (thích) hoặc delete (bỏ thích).
+        Update: never;
         Relationships: [];
       };
       audio_progress: {
@@ -1603,12 +1813,23 @@ export type Database = {
           source: ContentSource;
           share_count: number;
           created_at: string;
+          album_id: string | null;
+          alt_text: string | null;
         };
         Relationships: [];
       };
       // Xem migrations/20260901_add_design_item_gallery_metadata.sql.
       design_item_like_counts: {
         Row: { design_item_id: string; like_count: number };
+        Relationships: [];
+      };
+      // Xem migrations/20260917_add_design_audio_comments.sql.
+      design_comment_like_counts: {
+        Row: { comment_id: string; like_count: number };
+        Relationships: [];
+      };
+      audio_comment_like_counts: {
+        Row: { comment_id: string; like_count: number };
         Relationships: [];
       };
       public_audio_narrations: {
@@ -1740,6 +1961,13 @@ export type Database = {
         Args: { p_user_id: string; p_task_code: string; p_amount?: number };
         Returns: Database["public"]["Tables"]["user_daily_tasks"]["Row"];
       };
+      // Ghi đè progress (không cộng dồn) — dùng cho nhiệm vụ mà tiến trình
+      // thật ra là 1 trạng thái ngoài (streak). Xem
+      // migrations/20260918_add_streak_quests_and_time_windows.sql.
+      set_task_progress: {
+        Args: { p_user_id: string; p_task_code: string; p_progress: number };
+        Returns: Database["public"]["Tables"]["user_daily_tasks"]["Row"];
+      };
       claim_daily_task: {
         Args: { p_user_id: string; p_task_id: string };
         Returns: Database["public"]["Tables"]["transactions"]["Row"];
@@ -1775,6 +2003,12 @@ export type Database = {
       sync_reading_streak: {
         Args: { p_user_id: string; p_activity_date?: string };
         Returns: Database["public"]["Tables"]["profiles"]["Row"];
+      };
+      // Dedupe theo (user_id, chapter_id, ngày server) — trả null nếu đã
+      // ghi hôm nay. Xem migrations/20260917_add_reading_event_log.sql.
+      record_chapter_read: {
+        Args: { p_user_id: string; p_book_id: string; p_chapter_id: string };
+        Returns: Database["public"]["Tables"]["reading_history"]["Row"] | null;
       };
       rescue_streak_with_tokens: {
         Args: { p_user_id: string; p_token_cost: number };
