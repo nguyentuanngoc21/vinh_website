@@ -158,21 +158,31 @@ export async function getDesignGallery(
   const imagePaths = [...new Set(items.map((i) => i.image_url))];
   const { data: signedUrlRows, error: signError } = imagePaths.length
     ? await supabase.storage.from("design-images").createSignedUrls(imagePaths, IMAGE_URL_EXPIRY_SECONDS)
-    : { data: [] as { path: string | null; signedUrl: string | null }[], error: null };
+    : { data: [] as { path: string | null; signedUrl: string | null; error: string | null }[], error: null };
   if (signError) console.error("[thiet-ke] createSignedUrls failed:", signError);
-  const signedUrlByPath = new Map((signedUrlRows ?? []).map((r) => [r.path, r.signedUrl]));
+  const signedUrlByPath = new Map<string, string>();
+  for (const row of signedUrlRows ?? []) {
+    if (row.path && row.signedUrl) signedUrlByPath.set(row.path, row.signedUrl);
+    else console.error("[thiet-ke] createSignedUrls: 1 ảnh lỗi ký URL:", row.path, row.error);
+  }
 
   return items.map((item) => {
     const category = item.category as DesignItemCategory;
     const profile = profileById.get(item.illustrator_id);
     const album = item.album_id ? albumById.get(item.album_id) : null;
+    // Ký URL lỗi vì BẤT KỲ lý do gì (không nên xảy ra, nhưng đã có lần lỗi
+    // thật trên production làm cả gallery mất ảnh) -> rơi về getPublicUrl
+    // như trước migration này, KHÔNG BAO GIỜ để <img> vỡ vì thiếu src.
+    const imageUrl =
+      signedUrlByPath.get(item.image_url) ??
+      supabase.storage.from("design-images").getPublicUrl(item.image_url).data.publicUrl;
     return {
       id: item.id,
       title: item.title,
       description: item.description,
       category,
       categoryLabel: CATEGORY_LABEL[category] ?? "Khác",
-      imageUrl: signedUrlByPath.get(item.image_url) ?? "",
+      imageUrl,
       illustratorId: item.illustrator_id,
       illustratorName: profile?.nickname ?? "Ẩn danh",
       illustratorAvatarUrl: profile?.avatar_url ?? null,
