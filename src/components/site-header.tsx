@@ -15,11 +15,6 @@ type SiteHeaderProps = {
   searchType?: SearchType;
   /** Chỉ /tim-kiem/page.tsx truyền vào để hiện lại từ khoá vừa tìm. */
   searchDefaultValue?: string;
-  ctaLabel?: string;
-  /** Where the CTA button goes — defaults to "viết truyện mới". Audio/Thiết
-   * kế pages override this to their own upload flow (/audio/new,
-   * /thiet-ke/new) so the label and destination actually match. */
-  ctaHref?: string;
 };
 
 export function SiteHeader({
@@ -29,8 +24,6 @@ export function SiteHeader({
   searchPlaceholder = "Tìm truyện, tác giả…",
   searchType = "truyen",
   searchDefaultValue,
-  ctaLabel = "Viết truyện",
-  ctaHref = "/author/new",
 }: SiteHeaderProps = {}) {
   return (
     <header className={`${sticky ? "sticky top-0 z-20" : "relative z-10"} flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11`}>
@@ -56,7 +49,7 @@ export function SiteHeader({
           trong header, không bao giờ đẩy cả TRANG tràn ngang. sm:flex-nowrap
           trở lại 1 hàng cố định khi đã đủ chỗ (pill có chữ). */}
       <div className="ml-auto flex flex-wrap items-center justify-end gap-3.5 sm:flex-nowrap">
-        <AuthCluster ctaLabel={ctaLabel} ctaHref={ctaHref} />
+        <AuthCluster />
       </div>
 
       {showNav && (

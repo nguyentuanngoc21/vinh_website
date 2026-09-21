@@ -47,12 +47,7 @@ export default async function AudioHubPage() {
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white pb-24">
-        <SiteHeader
-          searchPlaceholder="Tìm truyện audio…"
-          searchType="audio"
-          ctaLabel="Đăng tải Audio"
-          ctaHref="/audio/new"
-        />
+        <SiteHeader searchPlaceholder="Tìm truyện audio…" searchType="audio" />
         <main>
           {hero && <ContinueListening track={hero.track} positionSeconds={hero.positionSeconds} />}
           <ResumeRow items={rest} />

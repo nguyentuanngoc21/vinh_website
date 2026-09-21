@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Lora } from "next/font/google";
 import Link from "next/link";
+import { ImageSquareIcon } from "@phosphor-icons/react/dist/ssr";
 import { SiteHeader } from "@/components/site-header";
 import { DesignGallery } from "@/components/design/design-gallery";
 import { getDesignGallery } from "@/lib/design/get-design-gallery";
@@ -40,20 +41,15 @@ export default async function DesignPage({
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
-        <SiteHeader
-          searchPlaceholder="Tìm ảnh bìa…"
-          searchType="thiet-ke"
-          ctaLabel="Đăng thiết kế"
-          ctaHref="/thiet-ke/new"
-        />
+        <SiteHeader searchPlaceholder="Tìm ảnh bìa…" searchType="thiet-ke" />
         <main>
           {viewerId && (
             <div className="flex justify-end px-11 pt-5">
               <Link
                 href="/thiet-ke/quan-ly"
-                className="text-[12.5px] font-semibold text-brand-gold-dark no-underline"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#e2ded7] px-4 py-2 text-[12.5px] font-semibold text-brand-ink no-underline transition-colors hover:border-brand-gold hover:bg-[#fdf8ec]"
               >
-                Quản lý ảnh của tôi →
+                <ImageSquareIcon size={14} /> Quản lý ảnh của tôi
               </Link>
             </div>
           )}
