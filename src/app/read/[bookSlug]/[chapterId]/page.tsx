@@ -6,6 +6,7 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId, getAuthedAdminId } from "@/lib/wallet/session";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 import { buildContentPreview } from "@/lib/reading/access-gate";
+import { extractDesignShareLinkId } from "@/lib/design/share-link";
 
 export async function generateMetadata({
   params,
@@ -160,7 +161,16 @@ export default async function ReadChapterPage({
   // trên `content` CUỐI CÙNG (sau rào truy nghiệm/preview ở trên), không
   // phải chapter.content thô — marker nằm ngoài phần được phép xem thì
   // không cần resolve.
-  const designImageIds = [...content.matchAll(/\[\[thiet-ke:([0-9a-f-]{36})\]\]/g)].map((m) => m[1]);
+  // Marker `[[thiet-ke:<id>]]` (chèn qua nút "Chèn ảnh thiết kế") CỘNG
+  // link chia sẻ thô dán thẳng vào 1 đoạn riêng (chưa/không qua nút đó —
+  // xem chapter-editor.tsx và extractDesignShareLinkId) — cả 2 đều resolve
+  // ra ảnh giống nhau ở đây, reader.tsx tự nhận đúng dạng nào khi render.
+  const markerIds = [...content.matchAll(/\[\[thiet-ke:([0-9a-f-]{36})\]\]/g)].map((m) => m[1]);
+  const rawLinkIds = content
+    .split("\n\n")
+    .map((p) => extractDesignShareLinkId(p.trim()))
+    .filter((id): id is string => id !== null);
+  const designImageIds = [...new Set([...markerIds, ...rawLinkIds])];
   const { data: designImageRows } = designImageIds.length
     ? await supabase.from("public_design_items").select("id, image_url, alt_text, title").in("id", designImageIds)
     : { data: [] as { id: string; image_url: string; alt_text: string | null; title: string }[] };
