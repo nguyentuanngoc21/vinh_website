@@ -145,9 +145,25 @@ export async function getDesignGallery(
     workCountByIllustrator.set(item.illustrator_id, (workCountByIllustrator.get(item.illustrator_id) ?? 0) + 1);
   }
 
+  // Signed URL hết hạn sau 10 phút — thay getPublicUrl() (public, không
+  // bao giờ hết hạn) để URL lấy được qua devtools không dùng lại được lâu
+  // dài (nhúng sang web khác, gửi cho người khác dùng về sau). KHÔNG chặn
+  // được việc tải ảnh ngay lúc đang xem — không có cơ chế frontend nào
+  // chặn được điều đó. RLS "design images are publicly readable" (storage
+  // policy) đã cho phép SELECT rộng, createSignedUrl(s) dùng được với
+  // client cookie-bound thông thường, không cần service-role. 1 lần
+  // render đã tải xong ảnh vào <img> thì vẫn hiện đúng dù sau đó hết hạn
+  // (trình duyệt không refetch ảnh đã cache) — chỉ ảnh hưởng lần TẢI MỚI.
+  const IMAGE_URL_EXPIRY_SECONDS = 600;
+  const imagePaths = [...new Set(items.map((i) => i.image_url))];
+  const { data: signedUrlRows, error: signError } = imagePaths.length
+    ? await supabase.storage.from("design-images").createSignedUrls(imagePaths, IMAGE_URL_EXPIRY_SECONDS)
+    : { data: [] as { path: string | null; signedUrl: string | null }[], error: null };
+  if (signError) console.error("[thiet-ke] createSignedUrls failed:", signError);
+  const signedUrlByPath = new Map((signedUrlRows ?? []).map((r) => [r.path, r.signedUrl]));
+
   return items.map((item) => {
     const category = item.category as DesignItemCategory;
-    const { data: urlData } = supabase.storage.from("design-images").getPublicUrl(item.image_url);
     const profile = profileById.get(item.illustrator_id);
     const album = item.album_id ? albumById.get(item.album_id) : null;
     return {
@@ -156,7 +172,7 @@ export async function getDesignGallery(
       description: item.description,
       category,
       categoryLabel: CATEGORY_LABEL[category] ?? "Khác",
-      imageUrl: urlData.publicUrl,
+      imageUrl: signedUrlByPath.get(item.image_url) ?? "",
       illustratorId: item.illustrator_id,
       illustratorName: profile?.nickname ?? "Ẩn danh",
       illustratorAvatarUrl: profile?.avatar_url ?? null,
