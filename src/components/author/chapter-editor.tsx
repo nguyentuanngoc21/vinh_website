@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowSquareOutIcon,
@@ -128,6 +128,54 @@ export function ChapterEditor({
     setImageLinkInput("");
     setImagePromptOpen(false);
   };
+
+  // Tự phát hiện link chia sẻ thiết kế dán/gõ THẲNG vào nội dung (không qua
+  // nút "Chèn ảnh thiết kế" ở trên) — design-upload-form.tsx mô tả với hoạ
+  // sĩ rằng dán link trên 1 dòng riêng là hiển thị được ảnh ngay, nhưng
+  // trước đây chỉ có nút bấm mới đổi được sang marker `[[thiet-ke:<id>]]`
+  // mà reader.tsx hiểu; dán tay thẳng vào textarea thì y nguyên là chữ link,
+  // không hiện ảnh. Quét theo TỪNG DÒNG (đúng "1 dòng riêng"), debounce
+  // theo `content` — không hook onPaste vì lúc event đó bắn ra textarea
+  // CHƯA có giá trị mới. Cùng lý do bảo mật với insertDesignImage(): thay
+  // marker ngay khi phát hiện, KHÔNG bao giờ để share_token (nằm trong url
+  // gốc) tồn tại lâu trong content (state cha lẫn payload lưu chương).
+  useEffect(() => {
+    const lineRe = /^https?:\/\/\S*\/lien-ket-thiet-ke\?\S+$/;
+    const lines = content.split("\n");
+    const candidateIndexes = lines.reduce<number[]>((acc, line, index) => {
+      if (lineRe.test(line.trim())) acc.push(index);
+      return acc;
+    }, []);
+    if (candidateIndexes.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      const nextLines = content.split("\n");
+      let changed = false;
+      for (const index of candidateIndexes) {
+        const shareUrl = nextLines[index]?.trim();
+        // Nội dung có thể đã đổi giữa lúc debounce và lúc fetch xong (người
+        // dùng tự sửa/xoá dòng đó) — bỏ qua nếu không còn khớp.
+        if (!shareUrl || !lineRe.test(shareUrl)) continue;
+        try {
+          const res = await fetch("/api/design/resolve-link", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shareUrl }),
+          });
+          const data = await res.json().catch(() => null);
+          if (res.ok && data?.designItemId) {
+            nextLines[index] = `[[thiet-ke:${data.designItemId}]]`;
+            changed = true;
+          }
+        } catch {
+          // Im lặng — dòng vẫn còn nguyên link, effect tự thử lại lần kế
+          // tiếp content đổi (ví dụ người dùng gõ thêm 1 ký tự rồi xoá).
+        }
+      }
+      if (changed) onContentChange(nextLines.join("\n"));
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [content, onContentChange]);
 
   return (
     <div className="flex flex-col bg-[#FBF8F1] lg:overflow-hidden">
