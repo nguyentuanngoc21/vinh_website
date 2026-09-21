@@ -23,3 +23,21 @@ export function extractDesignShareLinkId(text: string): string | null {
   const id = url.searchParams.get("id");
   return id && UUID_RE.test(id) ? id : null;
 }
+
+/**
+ * "Whitelist" bước 1 (thuần cấu trúc, KHÔNG network) trước khi tốn 1 lượt
+ * gọi /api/design/resolve-link — dùng ở paste handler (chapter-editor.tsx)
+ * để quyết định có nên preventDefault() + xác thực hay cứ để trình duyệt
+ * dán chữ như thường. Khác extractDesignShareLinkId (id-only, cho ĐỌC):
+ * chỗ này đòi cả token vì đây là bước CHÈN — resolve-link cần token để xác
+ * thực quyền, thiếu token thì chưa đáng gọi API.
+ */
+export function isDesignShareLinkShape(text: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return false;
+  }
+  return url.pathname === DESIGN_SHARE_LINK_PATH && !!url.searchParams.get("id") && !!url.searchParams.get("token");
+}

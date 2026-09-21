@@ -12,6 +12,31 @@ import {
   ImageSquareIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Checkbox, Field } from "@/components/ui";
+import { isDesignShareLinkShape } from "@/lib/design/share-link";
+
+/**
+ * Tìm [start, end) của đúng 1 "block/đoạn" (đơn vị `\n\n`-split, khớp
+ * reader.tsx) chứa vị trí `pos` trong `content` — dùng ở handleContentPaste
+ * bên dưới để biết có đang dán vào 1 đoạn TRỐNG không. indexOf/lastIndexOf("\n\n", ...)
+ * trực tiếp trên chuỗi thô KHÔNG dùng được ở đây: 1 đoạn trống nằm GIỮA 2
+ * đoạn khác tạo ra 4 dấu \n liên tiếp ("A" + "\n\n" + "" + "\n\n" + "B"),
+ * mà "\n\n" khớp CHỒNG LẤP ở nhiều vị trí trong 1 dãy \n dài (cả vị trí La
+ * và La+1 đều khớp "\n\n" trong dãy 4 dấu \n đó), khiến lastIndexOf/indexOf
+ * lệch mất 1 ký tự. split("\n\n") không có nhập nhằng này — chỉ khớp
+ * không-chồng-lấp, trái sang phải — nên dùng nó làm nguồn sự thật duy nhất,
+ * đứng module-scope vì hàm thuần, không đụng gì tới state/props.
+ */
+function findParagraphRange(content: string, pos: number): { start: number; end: number } {
+  const paragraphs = content.split("\n\n");
+  let offset = 0;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const start = offset;
+    const end = start + paragraphs[i].length;
+    if (pos <= end || i === paragraphs.length - 1) return { start, end };
+    offset = end + 2;
+  }
+  return { start: 0, end: 0 };
+}
 
 type ChapterEditorProps = {
   bookTitle: string;
@@ -129,33 +154,32 @@ export function ChapterEditor({
     setImagePromptOpen(false);
   };
 
-  // Tự phát hiện link chia sẻ thiết kế dán/gõ THẲNG vào nội dung (không qua
-  // nút "Chèn ảnh thiết kế" ở trên) — design-upload-form.tsx mô tả với hoạ
-  // sĩ rằng dán link trên 1 dòng riêng là hiển thị được ảnh ngay, nhưng
-  // trước đây chỉ có nút bấm mới đổi được sang marker `[[thiet-ke:<id>]]`
-  // mà reader.tsx hiểu; dán tay thẳng vào textarea thì y nguyên là chữ link,
-  // không hiện ảnh. Quét theo TỪNG DÒNG (đúng "1 dòng riêng"), debounce
-  // theo `content` — không hook onPaste vì lúc event đó bắn ra textarea
-  // CHƯA có giá trị mới. Cùng lý do bảo mật với insertDesignImage(): thay
-  // marker ngay khi phát hiện, KHÔNG bao giờ để share_token (nằm trong url
-  // gốc) tồn tại lâu trong content (state cha lẫn payload lưu chương).
+  // Tự "chữa" link chia sẻ thiết kế còn nằm thô trong content ĐÃ LƯU từ
+  // trước (ví dụ dán bằng cách không bắn event `paste` — kéo-thả, hoặc
+  // trước khi handleContentPaste dưới đây tồn tại) — quét theo BLOCK
+  // (`\n\n`, khớp đúng đơn vị "đoạn/paragraph" mà reader.tsx dùng để nhận
+  // ảnh, xem src/lib/design/share-link.ts), KHÔNG theo dòng đơn: link nằm
+  // giữa các dòng thơ ngăn bằng 1 lần Enter (cùng block với chữ khác)
+  // KHÔNG được tự chuyển — đúng quy tắc "URL nằm riêng trong 1 block,
+  // không lẫn text khác". Đường paste chính giờ là handleContentPaste
+  // (chạy NGAY lúc dán, không đợi debounce) — effect này chỉ còn là lưới
+  // an toàn.
   useEffect(() => {
-    const lineRe = /^https?:\/\/\S*\/lien-ket-thiet-ke\?\S+$/;
-    const lines = content.split("\n");
-    const candidateIndexes = lines.reduce<number[]>((acc, line, index) => {
-      if (lineRe.test(line.trim())) acc.push(index);
+    const paragraphs = content.split("\n\n");
+    const candidateIndexes = paragraphs.reduce<number[]>((acc, paragraph, index) => {
+      if (isDesignShareLinkShape(paragraph.trim())) acc.push(index);
       return acc;
     }, []);
     if (candidateIndexes.length === 0) return;
 
     const timer = setTimeout(async () => {
-      const nextLines = content.split("\n");
+      const nextParagraphs = content.split("\n\n");
       let changed = false;
       for (const index of candidateIndexes) {
-        const shareUrl = nextLines[index]?.trim();
+        const shareUrl = nextParagraphs[index]?.trim();
         // Nội dung có thể đã đổi giữa lúc debounce và lúc fetch xong (người
-        // dùng tự sửa/xoá dòng đó) — bỏ qua nếu không còn khớp.
-        if (!shareUrl || !lineRe.test(shareUrl)) continue;
+        // dùng tự sửa/xoá block đó) — bỏ qua nếu không còn khớp.
+        if (!shareUrl || !isDesignShareLinkShape(shareUrl)) continue;
         try {
           const res = await fetch("/api/design/resolve-link", {
             method: "POST",
@@ -164,18 +188,70 @@ export function ChapterEditor({
           });
           const data = await res.json().catch(() => null);
           if (res.ok && data?.designItemId) {
-            nextLines[index] = `[[thiet-ke:${data.designItemId}]]`;
+            nextParagraphs[index] = `[[thiet-ke:${data.designItemId}]]`;
             changed = true;
           }
         } catch {
-          // Im lặng — dòng vẫn còn nguyên link, effect tự thử lại lần kế
+          // Im lặng — block vẫn còn nguyên link, effect tự thử lại lần kế
           // tiếp content đổi (ví dụ người dùng gõ thêm 1 ký tự rồi xoá).
         }
       }
-      if (changed) onContentChange(nextLines.join("\n"));
+      if (changed) onContentChange(nextParagraphs.join("\n\n"));
     }, 600);
     return () => clearTimeout(timer);
   }, [content, onContentChange]);
+
+  // Đường paste CHÍNH — pipeline: lấy plain text đã dán → trim → có phải
+  // NGUYÊN VẸN 1 link thiết kế (id+token) không → cursor đang ở 1
+  // block/đoạn TRỐNG không (không lẫn chữ khác, không có vùng đang chọn)
+  // → validate qua resolve-link (không tự fetch URL ngoài — tránh SSRF,
+  // chỉ tra DB nội bộ) → thành công: preventDefault(), thay block đó bằng
+  // marker + chèn 1 đoạn trống ngay sau để viết tiếp; thất bại: vẫn chèn
+  // NGUYÊN VĂN đã dán (đúng hành vi paste bình thường mà preventDefault
+  // vừa chặn), không mất nội dung. Không thoả bất kỳ điều kiện nào ở trên
+  // (dán kèm chữ khác, hoặc block không trống) → return sớm, KHÔNG
+  // preventDefault, để trình duyệt tự dán chữ như mọi lần paste khác.
+  const handleContentPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget;
+    const pasted = e.clipboardData.getData("text/plain");
+    const trimmed = pasted.trim();
+    if (!trimmed || !isDesignShareLinkShape(trimmed)) return;
+
+    const { selectionStart, selectionEnd } = el;
+    if (selectionStart !== selectionEnd) return; // đang có vùng chọn — không tính là block trống
+
+    const { start: paragraphStart, end: paragraphEnd } = findParagraphRange(content, selectionStart);
+    if (content.slice(paragraphStart, paragraphEnd).trim() !== "") return; // block đang dán vào không trống
+
+    e.preventDefault();
+    fetch("/api/design/resolve-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shareUrl: trimmed }),
+    })
+      .then(async (res) => ({ ok: res.ok, data: await res.json().catch(() => null) }))
+      .catch(() => ({ ok: false, data: null }))
+      .then(({ ok, data }) => {
+        if (ok && data?.designItemId) {
+          const marker = `[[thiet-ke:${data.designItemId}]]`;
+          const next = content.slice(0, paragraphStart) + marker + "\n\n" + content.slice(paragraphEnd);
+          onContentChange(next);
+          const newPos = paragraphStart + marker.length + 2;
+          requestAnimationFrame(() => {
+            el.focus();
+            el.setSelectionRange(newPos, newPos);
+          });
+        } else {
+          const next = content.slice(0, selectionStart) + pasted + content.slice(selectionEnd);
+          onContentChange(next);
+          const newPos = selectionStart + pasted.length;
+          requestAnimationFrame(() => {
+            el.focus();
+            el.setSelectionRange(newPos, newPos);
+          });
+        }
+      });
+  };
 
   return (
     <div className="flex flex-col bg-[#FBF8F1] lg:overflow-hidden">
@@ -314,6 +390,7 @@ export function ChapterEditor({
             className="min-h-[460px] w-full resize-none border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] outline-none"
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
+            onPaste={handleContentPaste}
             placeholder="Bắt đầu viết…"
           />
         </div>
