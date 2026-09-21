@@ -202,7 +202,14 @@ export function DesignGallery({
                   className="group relative mb-[18px] block cursor-pointer break-inside-avoid overflow-hidden rounded-2xl bg-neutral-bg"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.imageUrl} alt={p.title} className="block w-full" loading="lazy" />
+                  <img
+                    src={p.imageUrl}
+                    alt={p.title}
+                    className="no-copy-image block w-full"
+                    loading="lazy"
+                    draggable={false}
+                    onContextMenu={(e) => e.preventDefault()}
+                  />
 
                   {showRank && (
                     <div className="absolute left-3 top-3 rounded-full bg-brand-gold px-2.5 py-1 text-[11px] font-bold tracking-[.5px] text-brand-ink">
@@ -291,7 +298,9 @@ export function DesignGallery({
             <img
               src={open.imageUrl}
               alt={open.title}
-              className="min-h-[220px] w-full object-cover sm:min-h-[460px]"
+              className="no-copy-image min-h-[220px] w-full object-cover sm:min-h-[460px]"
+              draggable={false}
+              onContextMenu={(e) => e.preventDefault()}
             />
             <div className="flex flex-col p-[34px] pb-[30px]">
               <div className="text-[11.5px] font-semibold tracking-[1.2px] text-brand-gold-dark">

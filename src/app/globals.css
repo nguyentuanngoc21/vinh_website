@@ -101,6 +101,17 @@ body {
   font-family: var(--font-sans), sans-serif;
 }
 
+/* Cản copy ảnh THÔNG THƯỜNG (chuột phải "Lưu ảnh", kéo-thả, long-press
+   lưu ảnh trên mobile) cho ảnh công khai ở kho Thiết kế — xem
+   design-gallery.tsx. KHÔNG chặn được screenshot hay lấy thẳng URL ảnh
+   qua devtools/network tab (không có cơ chế frontend nào chặn được việc
+   đó), chỉ là lớp cản người xem thường, không phải DRM. */
+.no-copy-image {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* Trôi nhẹ lớp watermark nền trang đọc (xem reader.tsx) — mỗi ô SVG lặp
    qua background-repeat đã tự xoay sẵn -22° bên trong, nên ở đây chỉ
    dịch chuyển (translate), KHÔNG xoay cả khối: xoay cả khối vuông vức
