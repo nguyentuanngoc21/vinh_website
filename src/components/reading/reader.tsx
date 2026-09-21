@@ -27,6 +27,7 @@ import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
 import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
 import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
+import { extractDesignShareLinkId } from "@/lib/design/share-link";
 import { shareOrCopy } from "@/lib/share";
 import { VinhMark, useToast } from "@/components/ui";
 import { supportMailto } from "@/lib/support";
@@ -1381,13 +1382,19 @@ export function Reader({
             >
               {paragraphs.map((p, i) => {
                 // Ảnh thiết kế chèn inline — đoạn CHỈ chứa marker
-                // `[[thiet-ke:<id>]]` (xem chapter-editor.tsx). Render
-                // <img>, bỏ hẳn máy bôi đen/bình luận theo đoạn (vô nghĩa
-                // với 1 dòng ảnh) — id không có trong designImages (đã bị
-                // xoá/gỡ từ hoạ sĩ) thì bỏ qua cả đoạn, không lỗi.
-                const imageMatch = p.trim().match(/^\[\[thiet-ke:([0-9a-f-]{36})\]\]$/);
-                if (imageMatch) {
-                  const image = designImages[imageMatch[1]];
+                // `[[thiet-ke:<id>]]` (xem chapter-editor.tsx) HOẶC nguyên
+                // link chia sẻ thô dán thẳng vào đoạn đó (chưa/không qua
+                // nút "Chèn ảnh thiết kế" — xem extractDesignShareLinkId,
+                // read/[bookSlug]/[chapterId]/page.tsx trích id giống hệt
+                // cách này để tải trước). Render <img>, bỏ hẳn máy bôi
+                // đen/bình luận theo đoạn (vô nghĩa với 1 dòng ảnh) — id
+                // không có trong designImages (đã bị xoá/gỡ/chưa công
+                // khai) thì bỏ qua cả đoạn, không lỗi.
+                const trimmedParagraph = p.trim();
+                const markerMatch = trimmedParagraph.match(/^\[\[thiet-ke:([0-9a-f-]{36})\]\]$/);
+                const designItemId = markerMatch ? markerMatch[1] : extractDesignShareLinkId(trimmedParagraph);
+                if (designItemId) {
+                  const image = designImages[designItemId];
                   if (!image) return null;
                   return (
                     <div key={i} className="mb-[1.5em]">

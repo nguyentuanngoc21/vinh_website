@@ -26,7 +26,13 @@ export async function GET() {
 
   const { data: rows, error } = await supabase
     .from("design_items")
-    .select("id, title, image_url, category, published_at, created_at, album_id")
+    .select("id, title, description, alt_text, image_url, category, published_at, created_at, album_id, share_token")
+    // Chỉ ảnh đăng ĐỘC LẬP qua /thiet-ke/new — bìa truyện tự động (source
+    // 'story_upload', xem authoring/books/[bookId]/cover/route.ts) không
+    // có category, không có nút "Hoàn tất" nào công khai được, hiện ở đây
+    // sẽ mãi mãi là "Chưa công khai" dù không hề sai — gây hiểu lầm, nên
+    // loại khỏi trang quản lý này ngay từ query.
+    .eq("source", "independent")
     .eq("illustrator_id", userData.user.id)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -49,11 +55,19 @@ export async function GET() {
       return {
         id: item.id,
         title: item.title,
+        description: item.description,
+        altText: item.alt_text,
         imageUrl: urlData.publicUrl,
+        category,
         categoryLabel: category ? CATEGORY_LABEL[category] ?? "Khác" : "Khác",
         published: item.published_at != null,
         createdAt: item.created_at,
+        albumId: item.album_id,
         albumName: item.album_id ? albumById.get(item.album_id) ?? null : null,
+        // Chỉ owner đọc được cột này (RLS) — route này vốn đã owner-scoped
+        // (eq illustrator_id chính người gọi), khác public_design_items
+        // (view public, CỐ Ý không có cột này).
+        shareToken: item.share_token,
       };
     }),
   });
