@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Lora } from "next/font/google";
 import Link from "next/link";
+import { ImageSquareIcon } from "@phosphor-icons/react/dist/ssr";
 import { SiteHeader } from "@/components/site-header";
 import { DesignUploadForm } from "@/components/design/design-upload-form";
 import { createClient } from "@/lib/supabase/server";
@@ -40,9 +41,9 @@ export default async function NewDesignItemPage() {
             </div>
             <Link
               href="/thiet-ke/quan-ly"
-              className="whitespace-nowrap text-[12.5px] font-semibold text-brand-gold-dark no-underline"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#e2ded7] px-4 py-2 text-[12.5px] font-semibold text-brand-ink no-underline transition-colors hover:border-brand-gold hover:bg-[#fdf8ec]"
             >
-              Quản lý ảnh của tôi →
+              <ImageSquareIcon size={14} /> Quản lý ảnh của tôi
             </Link>
           </div>
           <h1 className="mt-2 font-[family-name:var(--font-lora)] text-[28px] font-bold leading-[1.2] text-brand-ink">

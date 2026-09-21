@@ -16,24 +16,27 @@ import {
   SignOutIcon,
   PlusIcon,
   XIcon,
+  CaretDownIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { MessengerBell } from "@/components/messenger/messenger-bell";
 
-export function AuthCluster({
-  ctaLabel = "Viết truyện",
-  ctaHref = "/author/new",
-}: {
-  ctaLabel?: string;
-  ctaHref?: string;
-}) {
+export function AuthCluster() {
   const pathname = usePathname();
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  // Desktop/tablet: cùng danh sách quickActions bên dưới, hiện trong 1
+  // dropdown dưới nút pill "Đăng tải" thay vì FAB nổi — trước đây mỗi trang
+  // (viết truyện/audio/thiết kế) tự đổi ctaLabel/ctaHref của MỘT nút pill,
+  // khiến nút đổi nghĩa theo trang đang mở và (bug) mục "Viết truyện" trong
+  // FAB mobile vô tình trỏ theo ctaHref của trang đó luôn (xem lịch sử props
+  // ctaLabel/ctaHref đã gỡ). Giờ 1 nút cố định, danh sách cố định, mọi trang.
+  const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
   const [prevPathname, setPrevPathname] = useState(pathname);
   const menuRef = useRef<HTMLDivElement>(null);
+  const uploadMenuRef = useRef<HTMLDivElement>(null);
   // MessengerBell + NotificationBell chia sẻ ĐÚNG 1 state "đang mở cái
   // nào" thay vì mỗi bên tự giữ open riêng — mở bong bóng chat sẽ tự đóng
   // chuông thông báo và ngược lại, tránh 2 flyout cùng z-[60] chồng lên
@@ -65,6 +68,19 @@ export function AuthCluster({
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpen]);
 
+  // Đóng dropdown "Đăng tải" (desktop/tablet) khi click ra ngoài — cùng
+  // pattern với dropdown avatar ở trên.
+  useEffect(() => {
+    if (!uploadMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (uploadMenuRef.current && !uploadMenuRef.current.contains(e.target as Node)) {
+        setUploadMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [uploadMenuOpen]);
+
   const initial = session?.name?.[0] ?? "?";
   const userName = session?.name ?? "";
   const userHandle = session?.handle ?? "";
@@ -76,12 +92,11 @@ export function AuthCluster({
   // đổi lại lần nữa: chỉ mở /author/new (KHÔNG ghi Supabase), sách chỉ
   // thật sự được tạo lúc bấm Lưu/Xuất bản lần đầu ở đó (xem
   // new-work-workspace.tsx + POST /api/authoring/books).
-  const ctaHrefResolved = isGuest ? "/dang-nhap" : ctaHref;
   const quickActionOffsetClass = pathname.startsWith("/read") ? "bottom-20" : "bottom-5";
   const quickActions = [
     {
       label: "Viết truyện",
-      href: ctaHrefResolved,
+      href: isGuest ? "/dang-nhap" : "/author/new",
       icon: PencilSimpleLineIcon,
     },
     {
@@ -99,6 +114,7 @@ export function AuthCluster({
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);
     if (quickActionsOpen) setQuickActionsOpen(false);
+    if (uploadMenuOpen) setUploadMenuOpen(false);
   }
 
   return (
@@ -111,20 +127,49 @@ export function AuthCluster({
           Đăng nhập
         </Link>
       )}
-      {/* Desktop/tablet (`sm`+): pill có chữ trong header như trước. Dưới
-          `sm`: KHÔNG còn nằm trong hàng icon nữa (từng góp phần tràn ngang
-          cả trang cùng "Bảng điều khiển" khi thêm Messenger) — thay bằng 1
-          nút nổi cố định góc dưới-phải kiểu bong bóng chat Messenger, xem
-          ngay dưới. Cùng data-tour="tour-cta" ở cả 2 — measureTarget() ở
-          product-tour.tsx tự chọn đúng bản đang HIỂN THỊ (bỏ qua bản
-          display:none), không cần 2 id riêng. */}
-      <Link
-        href={ctaHrefResolved}
-        data-tour="tour-cta"
-        className="hidden shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink no-underline sm:inline-flex"
-      >
-        {ctaLabel}
-      </Link>
+      {/* Desktop/tablet (`sm`+): 1 nút pill "Đăng tải" CỐ ĐỊNH mở dropdown 3
+          lựa chọn (Viết truyện/Đăng audio/Đăng ảnh minh họa) — trước đây mỗi
+          trang (viết truyện/audio/thiết kế) tự đổi label/href của nút này
+          qua props ctaLabel/ctaHref (đã gỡ), khiến nút đổi nghĩa tuỳ trang
+          đang mở, không nhất quán. Giờ giống hệt danh sách FAB mobile bên
+          dưới — cùng 1 quickActions, chỉ khác vỏ ngoài (dropdown cố định vs
+          FAB nổi). Dưới `sm`: KHÔNG còn nằm trong hàng icon nữa (từng góp
+          phần tràn ngang cả trang cùng "Bảng điều khiển" khi thêm
+          Messenger) — dùng FAB nổi riêng, xem ngay dưới. Cùng
+          data-tour="tour-cta" ở cả 2 — measureTarget() ở product-tour.tsx tự
+          chọn đúng bản đang HIỂN THỊ (bỏ qua bản display:none), không cần 2
+          id riêng. */}
+      <div className="relative hidden shrink-0 sm:block" ref={uploadMenuRef}>
+        <button
+          type="button"
+          data-tour="tour-cta"
+          onClick={() => setUploadMenuOpen((v) => !v)}
+          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink"
+        >
+          Đăng tải
+          <CaretDownIcon size={13} weight="bold" className={uploadMenuOpen ? "rotate-180 transition-transform" : "transition-transform"} />
+        </button>
+        {uploadMenuOpen && (
+          <div className="absolute right-0 top-[46px] z-[60] w-[236px] overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.16)]">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={action.label}
+                  href={action.href}
+                  onClick={() => setUploadMenuOpen(false)}
+                  className="flex items-center gap-3 border-b border-[#f1efec] px-4 py-3 text-sm font-semibold text-brand-ink no-underline transition-colors last:border-b-0 hover:bg-cream-card"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-ink text-brand-gold-light">
+                    <Icon size={17} weight="bold" />
+                  </span>
+                  {action.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
       {/* FAB nổi góc dưới-phải, chỉ mobile (dưới `sm`). bottom-20 (80px) —
           ước lượng đủ cao để không đè lên ô soạn tin sticky ở tab Hội thoại
           (~54-60px, xem chat-tab.tsx) hoặc MiniPlayerBar khi có audio đang

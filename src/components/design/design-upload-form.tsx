@@ -322,8 +322,14 @@ export function DesignUploadForm({ className }: { className?: string }) {
           )}
         </div>
 
-        {/* Cột giữa — thông tin ảnh đang chọn */}
-        <div>
+        {/* Cột giữa — thông tin ảnh đang chọn. min-w-0: item lưới mặc định có
+            min-width: auto = kích thước tối đa nội dung bên trong (chuỗi link
+            chia sẻ dài, không xuống dòng) — thiếu min-w-0 thì cả TRACK 1.1fr
+            này bị đẩy rộng ra theo chuỗi đó, tràn ngang cả trang thay vì để
+            div .truncate bên trong tự cắt (đã đúng "min-w-0 flex-1 truncate"
+            ở phần link chia sẻ, nhưng vô nghĩa nếu item lưới cha mẹ nó vẫn nở
+            theo nội dung). */}
+        <div className="min-w-0">
           {selected ? (
             <div className="flex flex-col gap-4">
               <div>

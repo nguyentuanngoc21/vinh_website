@@ -24,8 +24,10 @@ export default function BlogPage() {
             src/lib/blog.ts), không có tab kết quả thật để trỏ tới, nên
             không đặt searchType="blog" giả vờ có (xem
             src/app/tim-kiem/page.tsx, chỉ có 3 tab thật: truyện/audio/
-            thiết kế). */}
-        <SiteHeader searchPlaceholder="Tìm bài viết…" ctaLabel="Viết bài" />
+            thiết kế). CTA "Đăng tải" giờ cố định ở AuthCluster (không còn
+            props ctaLabel/ctaHref theo trang) — Blog chưa có luồng "viết
+            bài" riêng nên không có gì để trỏ tới ở đây nữa. */}
+        <SiteHeader searchPlaceholder="Tìm bài viết…" />
         <DevelopmentOverlay>
           <main>
             <div className="px-11 pb-1.5 pt-9">
