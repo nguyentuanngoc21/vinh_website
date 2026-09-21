@@ -27,7 +27,7 @@ import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
 import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
 import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
-import { extractDesignShareLinkId } from "@/lib/design/share-link";
+import { splitParagraphAroundDesignImages } from "@/lib/design/share-link";
 import { shareOrCopy } from "@/lib/share";
 import { VinhMark, useToast } from "@/components/ui";
 import { supportMailto } from "@/lib/support";
@@ -1381,25 +1381,71 @@ export function Reader({
               className="font-[family-name:var(--font-lora)]"
             >
               {paragraphs.map((p, i) => {
-                // Ảnh thiết kế chèn inline — đoạn CHỈ chứa marker
-                // `[[thiet-ke:<id>]]` (xem chapter-editor.tsx) HOẶC nguyên
-                // link chia sẻ thô dán thẳng vào đoạn đó (chưa/không qua
-                // nút "Chèn ảnh thiết kế" — xem extractDesignShareLinkId,
-                // read/[bookSlug]/[chapterId]/page.tsx trích id giống hệt
-                // cách này để tải trước). Render <img>, bỏ hẳn máy bôi
-                // đen/bình luận theo đoạn (vô nghĩa với 1 dòng ảnh) — id
-                // không có trong designImages (đã bị xoá/gỡ/chưa công
-                // khai) thì bỏ qua cả đoạn, không lỗi.
-                const trimmedParagraph = p.trim();
-                const markerMatch = trimmedParagraph.match(/^\[\[thiet-ke:([0-9a-f-]{36})\]\]$/);
-                const designItemId = markerMatch ? markerMatch[1] : extractDesignShareLinkId(trimmedParagraph);
-                if (designItemId) {
-                  const image = designImages[designItemId];
-                  if (!image) return null;
+                // Ảnh thiết kế chèn inline — marker `[[thiet-ke:<id>]]`
+                // (xem chapter-editor.tsx) HOẶC nguyên link chia sẻ, ở
+                // BẤT KỲ vị trí nào trong đoạn (không đòi phải chiếm
+                // nguyên cả đoạn — quá nhiều tác giả dán link giữa văn
+                // bản liền mạch mà không tách dòng trống thật; server
+                // không có cách nào biết chắc \n\n có tồn tại hay chỉ do
+                // trình duyệt tự xuống dòng lúc hiển thị). Xem
+                // splitParagraphAroundDesignImages, src/lib/design/share-link.ts
+                // — read/[bookSlug]/[chapterId]/page.tsx trích id giống
+                // hệt để tải trước. Đoạn không có link/marker nào ->
+                // splitParagraphAroundDesignImages trả về đúng 1 phần
+                // text nguyên văn, rơi thẳng xuống pipeline bôi đen/bình
+                // luận cũ, không đổi hành vi.
+                const parts = splitParagraphAroundDesignImages(p);
+                const hasImage = parts.some((part) => part.type === "image");
+
+                if (hasImage) {
+                  // Bỏ máy bôi đen cho đoạn có ảnh nhúng (hiếm, và bôi
+                  // đen xuyên qua 1 tấm ảnh không có ý nghĩa rõ ràng) —
+                  // vẫn giữ nút bình luận theo đúng chỉ số đoạn `i` như
+                  // mọi đoạn khác.
+                  const count = countByParagraph.get(i) ?? 0;
                   return (
-                    <div key={i} className="mb-[1.5em]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image.imageUrl} alt={image.altText ?? ""} className="mx-auto max-w-full rounded-xl" />
+                    <div key={i} className="group relative mb-[1.5em]">
+                      {parts.map((part, pi) => {
+                        if (part.type === "text") {
+                          return part.text ? (
+                            <p key={pi} className="whitespace-pre-wrap">
+                              {part.text}
+                            </p>
+                          ) : null;
+                        }
+                        const image = designImages[part.id];
+                        // Chưa validate được (đã bị xoá/gỡ/chưa công khai)
+                        // -> giữ lại NGUYÊN VĂN link/marker đã dán, không
+                        // âm thầm làm mất nội dung tác giả đã viết.
+                        if (!image) return <p key={pi}>{part.raw}</p>;
+                        return (
+                          <div key={pi} className="mb-[1.5em]">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={image.imageUrl}
+                              alt={image.altText ?? ""}
+                              className="mx-auto max-w-full rounded-xl"
+                            />
+                          </div>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setOpenCommentsParagraph(i)}
+                        aria-label={count > 0 ? `${count} bình luận cho đoạn này` : "Bình luận đoạn này"}
+                        style={{ color: c.inkSoft }}
+                        className={`mt-1 flex items-center gap-1 text-xs transition-opacity hover:text-brand-gold-dark ${
+                          count > 0 ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                        }`}
+                      >
+                        {count > 0 ? (
+                          <>
+                            <ChatCircleTextIcon size={15} /> {count}
+                          </>
+                        ) : (
+                          <PlusCircleIcon size={15} />
+                        )}
+                      </button>
                     </div>
                   );
                 }
