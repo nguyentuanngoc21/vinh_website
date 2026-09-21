@@ -1854,9 +1854,9 @@ create policy "illustrators delete their own design items"
 -- đọc bảng gốc, nên chỉ cần lọc 1 chỗ.
 create view public.public_design_items as
   select id, illustrator_id, title, image_url, source, created_at, category, description, share_count,
-         album_id, alt_text
+         album_id, alt_text, published_at
   from public.design_items
-  where deleted_at is null;
+  where deleted_at is null and published_at is not null;
 
 -- Bảng riêng cho lượt thích (toggle, 1 dòng/(tác phẩm, người thích)) —
 -- cùng pattern "aggregate qua view riêng, bảng gốc owner-only RLS" như
@@ -1954,6 +1954,17 @@ alter table public.design_items
 -- pattern books (20260825_restrict_books_column_grants.sql).
 revoke update on public.design_items from authenticated;
 grant update (title, description, category, alt_text, album_id, deleted_at) on public.design_items to authenticated;
+
+-- --- design_items: published_at (xem
+-- migrations/20260921_add_design_item_publish_state.sql) — null = draft
+-- riêng của họa sĩ (chưa hiện qua public_design_items ở trên), có giá trị
+-- = đã công khai. POST /api/design (đăng ảnh) không set cột này, mặc
+-- định NULL; POST /api/design/publish (bấm "Hoàn tất") là nơi duy nhất
+-- set = now(). ---
+alter table public.design_items
+  add column published_at timestamptz;
+
+grant update (published_at) on public.design_items to authenticated;
 
 -- security definer: tăng share_count an toàn dưới race condition, không
 -- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 tác phẩm/lần gọi.

@@ -62,6 +62,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
   const [bulkDeletePending, setBulkDeletePending] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const [albumName, setAlbumName] = useState("");
   const [artStyle, setArtStyle] = useState<ArtStyle | "">("");
@@ -263,6 +264,35 @@ export function DesignUploadForm({ className }: { className?: string }) {
 
   const hasUploading = items.some((it) => it.uploading);
 
+  // Ảnh chèn qua POST /api/design luôn ở trạng thái draft (published_at
+  // NULL, xem migrations/20260921_add_design_item_publish_state.sql) —
+  // chỉ chính họa sĩ xem được, chưa hiện ở /thiet-ke. "Hoàn tất" phải gọi
+  // /api/design/publish để công khai chúng TRƯỚC khi điều hướng đi, nếu
+  // không ảnh sẽ mãi ở trạng thái draft không ai thấy được (kể cả chính
+  // họa sĩ, ngoài trang quản lý riêng).
+  const handleComplete = async () => {
+    const ids = items.filter((it) => it.id).map((it) => it.id as string);
+    if (ids.length === 0) {
+      router.push("/thiet-ke");
+      router.refresh();
+      return;
+    }
+    setPublishing(true);
+    const res = await fetch("/api/design/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      setPublishing(false);
+      setFormError((data && data.error) || "Đăng thiết kế thất bại.");
+      return;
+    }
+    router.push("/thiet-ke");
+    router.refresh();
+  };
+
   return (
     <div className={className}>
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="hidden" />
@@ -432,6 +462,9 @@ export function DesignUploadForm({ className }: { className?: string }) {
                 + Thêm ảnh
               </button>
             </div>
+            <p className="mt-1 text-[11px] leading-[1.5] text-stone">
+              Ảnh chỉ hiện công khai ở kho Thiết kế sau khi bạn bấm &quot;Hoàn tất&quot; bên dưới.
+            </p>
 
             {checkedKeys.size > 0 && (
               <button
@@ -465,7 +498,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12.5px] font-semibold text-ink">{item.title}</div>
                     <div className="text-[11px] text-stone">
-                      {item.uploading ? "Đang lưu…" : item.error ? "Lỗi — bấm để xem" : "Đã lưu"}
+                      {item.uploading ? "Đang lưu…" : item.error ? "Lỗi — bấm để xem" : "Đã lưu — chưa công khai"}
                     </div>
                   </div>
                   {item.uploading ? (
@@ -493,14 +526,11 @@ export function DesignUploadForm({ className }: { className?: string }) {
       <div className="mt-8 flex justify-end">
         <button
           type="button"
-          disabled={items.length === 0 || hasUploading}
-          onClick={() => {
-            router.push("/thiet-ke");
-            router.refresh();
-          }}
+          disabled={items.length === 0 || hasUploading || publishing}
+          onClick={handleComplete}
           className="cursor-pointer rounded-full bg-brand-gold px-6 py-3.5 text-sm font-bold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
         >
-          Hoàn tất
+          {publishing ? "Đang đăng…" : "Hoàn tất"}
         </button>
       </div>
     </div>

@@ -1619,6 +1619,10 @@ export type Database = {
           album_id: string | null;
           alt_text: string | null;
           deleted_at: string | null;
+          // Xem migrations/20260921_add_design_item_publish_state.sql —
+          // null = draft riêng của họa sĩ, có giá trị = đã công khai qua
+          // public_design_items.
+          published_at: string | null;
         };
         Insert: {
           id?: string;
@@ -1632,6 +1636,7 @@ export type Database = {
           album_id?: string | null;
           alt_text?: string | null;
           deleted_at?: string | null;
+          published_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["design_items"]["Insert"]>;
         Relationships: [];
@@ -1815,6 +1820,7 @@ export type Database = {
           created_at: string;
           album_id: string | null;
           alt_text: string | null;
+          published_at: string;
         };
         Relationships: [];
       };

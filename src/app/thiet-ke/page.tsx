@@ -47,6 +47,16 @@ export default async function DesignPage({
           ctaHref="/thiet-ke/new"
         />
         <main>
+          {viewerId && (
+            <div className="flex justify-end px-11 pt-5">
+              <Link
+                href="/thiet-ke/quan-ly"
+                className="text-[12.5px] font-semibold text-brand-gold-dark no-underline"
+              >
+                Quản lý ảnh của tôi →
+              </Link>
+            </div>
+          )}
           <DesignGallery items={items} activeAlbum={activeAlbum} />
 
           <section className="px-11 pb-[46px] pt-[26px]">
