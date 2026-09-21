@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Lora } from "next/font/google";
+import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { DesignUploadForm } from "@/components/design/design-upload-form";
 import { createClient } from "@/lib/supabase/server";
@@ -33,8 +34,16 @@ export default async function NewDesignItemPage() {
       <div className="mx-auto max-w-[1280px] bg-white">
         <SiteHeader showSearch={false} />
         <main className="mx-auto max-w-[1160px] px-6 py-12 sm:px-11">
-          <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">
-            THƯ VIỆN THIẾT KẾ
+          <div className="flex items-start justify-between gap-4">
+            <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">
+              THƯ VIỆN THIẾT KẾ
+            </div>
+            <Link
+              href="/thiet-ke/quan-ly"
+              className="whitespace-nowrap text-[12.5px] font-semibold text-brand-gold-dark no-underline"
+            >
+              Quản lý ảnh của tôi →
+            </Link>
           </div>
           <h1 className="mt-2 font-[family-name:var(--font-lora)] text-[28px] font-bold leading-[1.2] text-brand-ink">
             Đăng thiết kế mới
