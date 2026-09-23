@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':!mobile-vinh'",
   "crons": [
     {
       "path": "/api/wallet/cron/settle-pending",
