@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     const percent = "percent" in nextPenalty ? nextPenalty.percent : 0;
     lastDeductedAmount = Math.max(1, Math.ceil((PENALTY_BASE_TOKEN * percent) / 100));
 
-    const { data: transaction, error: transactionError } = await supabase.rpc("apply_transaction", {
+    const { error: transactionError } = await supabase.rpc("apply_transaction", {
       p_user_id: profileResult.data.id,
       p_type: "screenshot_penalty",
       p_amount: -lastDeductedAmount,
