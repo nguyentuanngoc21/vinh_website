@@ -16,6 +16,12 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Sự kiện đọc (Phase 1): mobile lưu tiến độ qua `/api/mobile/books/[bookId]/reading-progress`
+  (`src/lib/reading/record-progress.ts`), kiểm tra quyền đọc ở server và ghi
+  `reading_history`/chuỗi/nhiệm vụ khi hoàn thành chương. Route web
+  `/api/books/[bookId]/reading-progress` dùng chung service này nên cũng đã kiểm tra
+  quyền đọc. Mục 3 bên dưới đã được xử lý.
+
 - Tin nhắn: danh sách, tìm username, đọc/gửi văn bản, mở từ thông báo đã có.
 - Cam kết: xem văn bản và xác nhận đúng phiên bản đã có.
 - Dịch vụ: tạo/sửa gói, nhiều mức giá, quyền sử dụng, riêng tư, chính sách hoàn

@@ -1,5 +1,6 @@
 import { requireSupabase } from './supabase';
 import { getFirstChapter, type Book } from './books';
+import { mobileApi } from './api';
 
 export type Progress = { book_id: string; chapter_id: string; last_paragraph_index: number | null; updated_at: string };
 export type LibraryEntry = { book: Book; progress?: Progress; lists: { id: string; name: string }[] };
@@ -21,14 +22,18 @@ export async function getProgress(userId: string, bookId: string): Promise<Progr
 }
 // All writes share a queue so a slow previous chapter cannot overwrite the next.
 let progressWrites: Promise<unknown> = Promise.resolve();
-export function saveProgress(userId: string, bookId: string, chapterId: string, paragraphIndex: number) {
+// Goes through the backend (not a direct upsert) so completing a chapter also records
+// reading_history, streak and quest progress exactly like the web Reader.
+export function saveProgress(userId: string, bookId: string, chapterId: string, paragraphIndex: number, completed = false) {
   const write = progressWrites.then(async () => {
     if (!Number.isInteger(paragraphIndex) || paragraphIndex < 0) throw new Error('Vị trí đọc không hợp lệ.');
-    const client = await requireReader(userId);
-    const { error } = await client.from('book_progress').upsert({ user_id: userId, book_id: bookId,
-      chapter_id: chapterId, last_paragraph_index: paragraphIndex, updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,book_id' }).abortSignal(AbortSignal.timeout(15000));
-    if (error) throw new Error('Chưa lưu được vị trí đọc. Kiểm tra mạng và thử lại.');
+    await requireReader(userId);
+    try {
+      await mobileApi(`books/${encodeURIComponent(bookId)}/reading-progress`, userId, { chapterId, paragraphIndex, completed });
+    } catch (e) {
+      // Server messages are plain Errors; network, timeout and parse failures get a generic hint.
+      throw new Error(e instanceof Error && e.name === 'Error' ? e.message : 'Chưa lưu được vị trí đọc. Kiểm tra mạng và thử lại.');
+    }
   });
   progressWrites = write.catch(() => undefined);
   return write;

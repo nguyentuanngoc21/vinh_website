@@ -19,15 +19,15 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 
 | Phase | Nội dung | Quy mô | Phụ thuộc | Trạng thái |
 |---|---|---|---|---|
-| 0 | Chuẩn bị: commit, định danh app, cập nhật audit | Nhỏ | — | Đang làm |
-| 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Đang làm |
+| 0 | Chuẩn bị: commit, định danh app, cập nhật audit | Nhỏ | — | Xong (24/09) |
+| 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Xong (24/09), chờ thử trên thiết bị |
 | 2 | Tài khoản và hồ sơ | Vừa | 0 | Chưa làm |
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Chưa làm |
 | 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Chưa làm |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
 | 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Chưa làm |
 | 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |
-| 8 | Sáng tác (tùy chọn) | Lớn | Quyết định phạm vi | Chờ quyết định |
+| 8 | Sáng tác | Lớn | 2 | Chưa làm |
 | — | Sẵn sàng phát hành (song song) | Vừa | — | Chưa làm |
 
 ## Phase 0 — Chuẩn bị
@@ -44,9 +44,10 @@ Tiêu chí hoàn thành:
 
 - `POST /api/mobile/books/[bookId]/reading-progress`: xác minh Bearer, kiểm tra
   chương thuộc truyện, đã xuất bản và người dùng có quyền đọc; upsert `book_progress`;
-  khi `isLastParagraph` gọi `ReadingEventService.recordChapterCompletion`.
-- Mobile: `saveProgress` gọi API thay vì ghi thẳng Supabase; gửi `isLastParagraph`
-  khi đoạn đang xem là đoạn cuối chương.
+  khi `completed` gọi `ReadingEventService.recordChapterCompletion`
+  (service dùng chung: `src/lib/reading/record-progress.ts`).
+- Mobile: `saveProgress` gọi API thay vì ghi thẳng Supabase; gửi `completed`
+  một lần khi đoạn cuối chương hiện trên màn hình.
 
 Tiêu chí hoàn thành:
 - Đọc hết chương trên mobile cập nhật `reading_history`, chuỗi và nhiệm vụ như web.
@@ -60,7 +61,7 @@ Tiêu chí hoàn thành:
 - 2b: xác minh CCCD (bucket private, signed URL, OCR có timeout), ngân hàng,
   thông tin hợp đồng.
 - Cần `expo-image-picker`, `expo-image-manipulator` → build lại development build.
-- Chờ xác nhận: đăng ký trên mobile có bắt buộc CCCD như web không.
+- Đã chốt (24/09): đăng ký trên mobile bắt buộc xác minh CCCD như web.
 
 ## Phase 3 — Nhiệm vụ, chuỗi, thành tựu
 
@@ -96,17 +97,33 @@ Tiêu chí hoàn thành:
 - Nạp/rút xu: chờ rà soát chính sách IAP App Store/Google Play, hoàn thiện trang nạp
   web (đang dùng dữ liệu mẫu) và adapter chi trả rút xu.
 
-## Phase 8 — Sáng tác (tùy chọn)
+## Phase 8 — Sáng tác
 
-- Không gian tác giả, Thiết kế, đăng bản thu. Có thể giữ trên web.
+- Không gian tác giả, Thiết kế, đăng bản thu. Đã chốt (24/09): nằm trong phạm vi app.
 
 ## Song song — Sẵn sàng phát hành
 
 - Thay icon/splash mẫu của Expo.
 - EAS build; thử trên iOS/Android thật sau mỗi phase thêm module native (2, 5).
 
+## Ghi chú sau Phase 0–1
+
+- Định danh app tạm đặt `vn.vinh.app` (iOS và Android) để thử local. Chủ dự án chưa
+  phát hành app; phải chốt giá trị cuối trước lần upload store đầu tiên — sau đó không đổi được.
+- Phase 1: app đánh dấu hoàn thành khi đoạn cuối hiện trên màn hình; vị trí lưu vẫn
+  là đoạn đầu đang hiển thị. Server kiểm tra chỉ số đoạn nhưng không thể chứng minh
+  người dùng đã thực sự đọc — cùng mức tin cậy với Reader web.
+- Route web `/api/books/[bookId]/reading-progress` trước đây tin `chapterId` và
+  `isLastParagraph` từ client, nên có thể tự gửi request để nhận thưởng cho chương
+  chưa mua. Đã chuyển sang `recordReadingProgress` (chủ dự án đồng ý 24/09): chương
+  khóa chưa mua, sai truyện, đã gỡ hoặc chỉ số đoạn sai giờ bị từ chối.
+
+## Quyết định đã chốt (24/09/2026)
+
+1. Nhiệm vụ (Phase 3) làm trước Đơn hàng (Phase 4).
+2. Đăng ký trên mobile bắt buộc xác minh CCCD như web.
+3. Phase 8 (Sáng tác) nằm trong phạm vi app.
+
 ## Câu hỏi còn mở
 
-1. Thứ tự: Nhiệm vụ (Phase 3) đặt trước Đơn hàng, khác đề xuất trong file audit.
-2. Đăng ký mobile có bắt buộc CCCD ngay lúc đăng ký không.
-3. Phase 8 có trong phạm vi app không.
+1. Định danh app cuối cùng — chốt trước khi phát hành lên store.

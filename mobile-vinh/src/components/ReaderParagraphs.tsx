@@ -35,17 +35,23 @@ function TrackedParagraphs({ userId, bookId, chapterId, canSave, paragraphs, set
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoreTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaved = useRef<number | null>(null);
+  // Completion = the last paragraph was on screen; the saved position stays the first visible one.
+  const reachedEnd = useRef(false);
+  const completionSent = useRef(false);
   const mounted = useRef(true);
   const restoreAttempts = useRef(0);
   const [message, setMessage] = useState('');
   const [restoreFailed, setRestoreFailed] = useState(false);
   const flush = useCallback(async () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    if (!userId || !canSave || !restored.current || current.current === null || lastSaved.current === current.current) return;
+    if (!userId || !canSave || !restored.current || current.current === null) return;
+    const completed = reachedEnd.current && !completionSent.current;
+    if (lastSaved.current === current.current && !completed) return;
     const index = current.current;
     try {
-      await saveProgress(userId, bookId, chapterId, index);
+      await saveProgress(userId, bookId, chapterId, index, completed);
       lastSaved.current = index;
+      if (completed) completionSent.current = true;
       if (mounted.current) setMessage('Đã lưu vị trí đọc');
     } catch (e) { if (mounted.current) setMessage(e instanceof Error ? e.message : 'Chưa lưu được vị trí đọc.'); }
   }, [userId, bookId, chapterId, canSave]);
@@ -73,9 +79,10 @@ function TrackedParagraphs({ userId, bookId, chapterId, canSave, paragraphs, set
       restored.current = true;
       current.current = initialIndex;
     } else current.current = visible[0].index;
+    if (visible.some(v => v.index === paragraphs.length - 1)) reachedEnd.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => { void flush(); }, 1500);
-  }, [initialIndex, flush]);
+  }, [initialIndex, flush, paragraphs.length]);
   return <View style={{ flex: 1 }}>
     {!!message && <Pressable accessibilityRole="button" accessibilityLabel="Lưu lại vị trí đọc" onPress={() => void flush()} style={{ paddingHorizontal: 24, paddingVertical: 8 }}>
       <Text accessibilityLiveRegion="polite" style={{ color: textColor, fontSize: 12 }}>{message}</Text></Pressable>}

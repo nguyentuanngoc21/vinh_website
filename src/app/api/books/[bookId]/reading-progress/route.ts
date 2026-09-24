@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
-import { ReadingEventService } from "@/lib/quests/reading-event-service";
+import { recordReadingProgress } from "@/lib/reading/record-progress";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * POST /api/books/:bookId/reading-progress — ghi lại ĐOẠN VĂN cụ thể
@@ -19,10 +21,12 @@ import { ReadingEventService } from "@/lib/quests/reading-event-service";
  * isLastParagraph (tuỳ chọn, reader.tsx gửi khi đoạn đang xem là đoạn cuối
  * chương) — kích hoạt ReadingEventService.recordChapterCompletion(), nguồn
  * duy nhất ghi reading_history/streak/tiến trình nhiệm vụ "hoàn thành
- * chương". Chờ xong (không phải fire-and-forget) vì có ý nghĩa phần
- * thưởng, nhưng lỗi ở đây KHÔNG làm hỏng việc lưu tiến độ đọc phía trên —
- * xem comment trong reading-event-service.ts. Xem
- * migrations/20260917_add_reading_event_log.sql.
+ * chương". Xem migrations/20260917_add_reading_event_log.sql.
+ *
+ * Mọi kiểm tra (chương đã xuất bản + thuộc đúng truyện, quyền đọc chương
+ * trả phí, chỉ số đoạn hợp lệ) nằm trong recordReadingProgress() — dùng
+ * chung với route mobile. Trước đây route tin chapterId/isLastParagraph từ
+ * client, nên có thể tự gửi request để nhận thưởng cho chương chưa mua.
  */
 export async function POST(
   request: Request,
@@ -39,28 +43,19 @@ export async function POST(
   const chapterId = typeof body?.chapterId === "string" ? body.chapterId : "";
   const paragraphIndex = Number(body?.paragraphIndex);
   const isLastParagraph = body?.isLastParagraph === true;
-  if (!chapterId || !Number.isInteger(paragraphIndex) || paragraphIndex < 0) {
+  if (!UUID.test(bookId) || !UUID.test(chapterId) || !Number.isInteger(paragraphIndex) || paragraphIndex < 0) {
     return NextResponse.json({ error: "Thiếu chapterId/paragraphIndex hợp lệ." }, { status: 400 });
   }
 
-  const { error } = await supabase.from("book_progress").upsert(
-    {
-      user_id: userId,
-      book_id: bookId,
-      chapter_id: chapterId,
-      last_paragraph_index: paragraphIndex,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,book_id" }
-  );
-  if (error) {
-    console.error("[reading-progress] upsert failed:", error);
-    return NextResponse.json({ error: "Không lưu được tiến độ đọc." }, { status: 500 });
+  const result = await recordReadingProgress(supabase, userId, {
+    bookId,
+    chapterId,
+    paragraphIndex,
+    completed: isLastParagraph,
+  });
+  if (!result.ok) {
+    if (result.status === 502) console.error("[reading-progress] failed:", result.error);
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
-
-  if (isLastParagraph) {
-    await ReadingEventService.recordChapterCompletion(supabase, { userId, bookId, chapterId });
-  }
-
   return NextResponse.json({ ok: true });
 }

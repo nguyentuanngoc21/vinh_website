@@ -4,8 +4,8 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const ts = require('typescript');
-function setup({ user = 'alice', failWrite = false, missingChapter = false } = {}) {
-  const writes = []; const calls = []; let progress = null; let activeWrites = 0; let maximumWrites = 0;
+function setup({ user = 'alice', failWrite = false, missingChapter = false, apiError = null } = {}) {
+  const writes = []; const calls = []; const apiCalls = []; let progress = null; let activeWrites = 0; let maximumWrites = 0;
   const client = {
     auth: { getSession: async () => ({ data: { session: user ? { user: { id: user } } : null } }) },
     from(table) {
@@ -41,10 +41,21 @@ function setup({ user = 'alice', failWrite = false, missingChapter = false } = {
   const code = ts.transpileModule(readFileSync(path.join(__dirname, '../src/services/library.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  const imports = { './supabase': { requireSupabase: () => client }, './books': { getFirstChapter: async () => 'first' } };
+  // Stands in for the backend reading-progress route (which upserts book_progress).
+  async function mobileApi(apiPath, userId, body) {
+    apiCalls.push({ path: apiPath, userId, body });
+    activeWrites++; maximumWrites = Math.max(maximumWrites, activeWrites);
+    await new Promise(resolve => setTimeout(resolve, 5)); activeWrites--;
+    if (apiError) { const e = apiError; apiError = null; throw e; }
+    if (failWrite) { failWrite = false; throw new TypeError('Network request failed'); }
+    const bookId = decodeURIComponent(apiPath.split('/')[1]);
+    progress = { user_id: userId, book_id: bookId, chapter_id: body.chapterId, last_paragraph_index: body.paragraphIndex };
+    writes.push({ ...progress, completed: body.completed }); return { ok: true };
+  }
+  const imports = { './supabase': { requireSupabase: () => client }, './books': { getFirstChapter: async () => 'first' }, './api': { mobileApi } };
   const api = {};
   new Function('require', 'exports', code)(name => imports[name], api);
-  return { api, writes, calls, max: () => maximumWrites };
+  return { api, writes, calls, apiCalls, max: () => maximumWrites };
 }
 test('restoration only applies to the same chapter and clamps edited content', () => {
   const { api } = setup();
@@ -73,7 +84,7 @@ test('account switch prevents stale progress and bookmark writes', async () => {
   await assert.rejects(f.api.saveProgress('alice', 'book', 'a', 1));
   await assert.rejects(f.api.setBookSaved('alice', 'list', 'book', true));
   await assert.rejects(f.api.getLibrary('alice'));
-  assert.equal(f.calls.length, 0);
+  assert.equal(f.calls.length, 0); assert.equal(f.apiCalls.length, 0);
 });
 test('library combines web lists and progress, excludes inaccessible books', async () => {
   const f = setup(); await f.api.saveProgress('alice', 'book', 'a', 12);
@@ -93,4 +104,19 @@ test('saving is idempotent and removing targets only one list membership', async
   await f.api.setBookSaved('alice', 'list', 'book', false);
   assert.deepEqual(f.calls[1].filters, [['list_id', 'list'], ['book_id', 'book']]);
   await assert.rejects(f.api.createReadingList('alice', '   '));
+});
+test('progress goes through the backend route with the completion flag', async () => {
+  const f = setup();
+  await f.api.saveProgress('alice', 'book', 'a', 3);
+  await f.api.saveProgress('alice', 'book', 'a', 7, true);
+  assert.deepEqual(f.apiCalls.map(c => c.path), ['books/book/reading-progress', 'books/book/reading-progress']);
+  assert.deepEqual(f.apiCalls.map(c => c.body), [
+    { chapterId: 'a', paragraphIndex: 3, completed: false }, { chapterId: 'a', paragraphIndex: 7, completed: true }]);
+  assert.equal(f.calls.filter(c => c.table === 'book_progress' && c.operation === 'upsert').length, 0);
+});
+test('server refusals keep their message; network failures get a generic hint', async () => {
+  const f = setup({ apiError: new Error('Bạn chưa có quyền đọc chương này.') });
+  await assert.rejects(f.api.saveProgress('alice', 'book', 'a', 1), { message: 'Bạn chưa có quyền đọc chương này.' });
+  const g = setup({ failWrite: true });
+  await assert.rejects(g.api.saveProgress('alice', 'book', 'a', 1), { message: /Kiểm tra mạng/ });
 });

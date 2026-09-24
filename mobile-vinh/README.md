@@ -67,6 +67,11 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
   dừng cuộn, khi rời Reader hoặc đưa app xuống nền. Mở lại từ Tủ sách hoặc
   Trang chủ sẽ tiếp tục đúng chương; Reader khôi phục đoạn đã lưu. Dùng đúng
   cách chia đoạn của web để đồng bộ chỉ số. Không lưu tiến độ cho chương khóa.
+- Tiến độ đọc đi qua `POST /api/mobile/books/[bookId]/reading-progress`, không
+  ghi thẳng Supabase. Server kiểm tra chương thuộc truyện, đã xuất bản, quyền
+  mua/tác giả và chỉ số đoạn. Khi đoạn cuối chương hiện trên màn hình, app gửi
+  `completed` một lần; server ghi `reading_history`, chuỗi ngày đọc và tiến độ
+  nhiệm vụ qua `ReadingEventService` như web, tự chống cộng lặp trong ngày.
 - Audio: danh sách thật từ `public_audio_narrations`, tên người kể, tìm kiếm
   tên/thể loại; player chung toàn app với mini-player trên thanh tab, phát/tạm
   dừng, tua ±15 giây, tốc độ 1–2×, chọn bản thu trong danh sách, hẹn giờ tắt.
@@ -107,7 +112,7 @@ dùng đồng hồ JavaScript và kiểm tra lại khi app hoạt động/trạn
 không bảo đảm dừng đúng giây khi hệ điều hành tạm ngưng JavaScript ở nền.
 Tủ sách và lưu vị trí cần mạng; khi ghi thất bại, Reader báo lỗi và cho bấm lưu
 lại. Chưa có hàng đợi offline; tắt cưỡng bức ứng dụng trước khi đồng bộ có thể
-mất vị trí mới nhất. Ghi tiến độ mobile chưa cộng thưởng nhiệm vụ/reading_history.
+mất vị trí mới nhất. Lưu vị trí cần backend đã có route reading-progress mới.
 Các API web khác chưa được nâng cấp sang Bearer. Không có dữ liệu truyện giả để thay thế lỗi kết nối.
 Icon/splash hiện dùng asset mẫu Expo, cần thay trước khi phát hành.
 
@@ -173,6 +178,7 @@ npm run lint
 node --test scripts/test-reader-api.cjs
 node --test scripts/test-auth-storage.cjs
 node --test scripts/test-library.cjs
+node --test scripts/test-reading-progress.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs
