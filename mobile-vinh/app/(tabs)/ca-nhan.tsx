@@ -53,6 +53,7 @@ function Account({ email: accountEmail, userId, signedIn, restoreError }: { emai
         {signedIn ? <>
           <Text className="mb-3 text-base text-brand-ink">{accountEmail}</Text>
           <Text className="text-base leading-7 text-stone">Bạn có thể tiếp tục đọc trọn vẹn các chương miễn phí và những chương đã mua trên cùng tài khoản.</Text>
+          <ActionButton label="Sửa hồ sơ →" onPress={() => router.push('/ho-so')} secondary />
           <ActionButton label="Thông báo →" onPress={() => router.push('/thong-bao')} secondary />
           <ActionButton label="Tin nhắn →" onPress={() => router.push('/tin-nhan')} secondary />
           <ActionButton label="Cam kết & Thỏa thuận →" onPress={() => router.push('/cam-ket')} secondary />
@@ -63,7 +64,7 @@ function Account({ email: accountEmail, userId, signedIn, restoreError }: { emai
             if (error) throw new Error('Chưa đăng xuất được. Vui lòng thử lại.');
           })} />
         </> : <>
-          <Text className="mb-6 text-base leading-7 text-stone">Dùng email của tài khoản Vịnh hiện có trên web.</Text>
+          <Text className="mb-6 text-base leading-7 text-stone">Dùng email tài khoản Vịnh — tài khoản trên web và app là một.</Text>
           <View className="mb-6 flex-row gap-3">
             {(['password', 'otp'] as const).map(value => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: mode === value }} disabled={busy}
               onPress={() => { setMode(value); setError(''); setPassword(''); setToken(''); }}
@@ -92,7 +93,9 @@ function Account({ email: accountEmail, userId, signedIn, restoreError }: { emai
             <ActionButton label={wait ? `Gửi lại sau ${wait}s` : 'Gửi lại mã'} onPress={() => void perform(send)} disabled={busy || wait > 0} secondary />
             <ActionButton label="Đổi email" onPress={() => { setSentTo(''); setToken(''); setError(''); }} disabled={busy} secondary />
           </> : <ActionButton label={wait ? `Gửi mã sau ${wait}s` : 'Gửi mã đăng nhập'} onPress={() => void perform(send)} disabled={busy || !email.trim() || wait > 0} />}
-          <Text className="mt-6 text-sm leading-6 text-stone">Chưa có tài khoản? Hãy đăng ký trên website Vịnh rồi quay lại đăng nhập.</Text>
+          {mode === 'password' && <ActionButton label="Quên mật khẩu?" onPress={() => router.push('/quen-mat-khau')} disabled={busy} secondary />}
+          <Text className="mt-6 text-sm leading-6 text-stone">Chưa có tài khoản?</Text>
+          <ActionButton label="Tạo tài khoản mới" onPress={() => router.push('/dang-ky')} disabled={busy} secondary />
         </>}
         {busy && <ActivityIndicator color="#143b4d" style={{ marginTop: 20 }} />}
         {!!(error || restoreError) && <Text accessibilityLiveRegion="polite" className="mt-5 rounded-xl bg-white p-4 leading-6 text-red-700">{error || restoreError}</Text>}

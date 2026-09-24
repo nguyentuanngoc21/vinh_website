@@ -45,6 +45,14 @@
           "enableBackgroundPlayback": true,
           "enableBackgroundRecording": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Vịnh cần truy cập ảnh để bạn chọn ảnh đại diện, ảnh bìa hoặc ảnh CCCD.",
+          "cameraPermission": "Vịnh cần dùng camera để bạn chụp ảnh CCCD hoặc ảnh đại diện.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

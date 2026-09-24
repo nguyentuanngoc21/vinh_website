@@ -16,6 +16,10 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Tài khoản và hồ sơ (Phase 2a): đăng ký (CCCD tùy chọn như web, OTP), quên mật
+  khẩu bằng OTP, sửa nickname/giới thiệu/ảnh đại diện/ảnh bìa. Đăng ký web và mobile
+  dùng chung `src/lib/registration.ts`. Còn thiếu (2b): xác minh CCCD sau đăng ký,
+  ngân hàng, thông tin hợp đồng.
 - Sự kiện đọc (Phase 1): mobile lưu tiến độ qua `/api/mobile/books/[bookId]/reading-progress`
   (`src/lib/reading/record-progress.ts`), kiểm tra quyền đọc ở server và ghi
   `reading_history`/chuỗi/nhiệm vụ khi hoàn thành chương. Route web

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 
 // Kích thước tối đa (15MB) không còn kiểm ở route này — file giờ đi thẳng
 // từ trình duyệt lên Storage qua signed upload URL, route chỉ cấp URL.
@@ -25,9 +24,10 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
  * thể lớn hơn ~4.5MB dù route có tự khai "tối đa 5MB". Đi thẳng lên Storage
  * bỏ qua giới hạn đó hoàn toàn.
  */
-export async function GET() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function GET(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -46,8 +46,9 @@ export async function GET() {
 
 /** Bước 1: sinh signed upload URL cho client PUT thẳng file lên Storage. */
 export async function POST(request: Request) {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -74,8 +75,9 @@ export async function POST(request: Request) {
 
 /** Bước 2: client đã upload xong lên `path` — xác nhận và lưu vào hồ sơ. */
 export async function PATCH(request: Request) {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -104,9 +106,10 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ ok: true, avatarUrl });
 }
 
-export async function DELETE() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function DELETE(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

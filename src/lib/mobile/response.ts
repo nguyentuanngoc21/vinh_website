@@ -11,3 +11,11 @@ export async function mobileResponse(request: Request, task: () => Promise<Respo
     return response;
   } catch { return Response.json({ error: 'Dịch vụ tạm thời không khả dụng.' }, { status: 503, headers }); }
 }
+/** For the few mobile routes used before sign-in (registration); callers must rate-limit. */
+export async function publicMobileResponse(task: () => Promise<Response>) {
+  try {
+    const response = await task();
+    for (const [key, value] of Object.entries(headers)) response.headers.set(key, value);
+    return response;
+  } catch { return Response.json({ error: 'Dịch vụ tạm thời không khả dụng.' }, { status: 503, headers }); }
+}

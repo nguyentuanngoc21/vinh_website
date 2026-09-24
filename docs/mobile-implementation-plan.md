@@ -21,7 +21,7 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 |---|---|---|---|---|
 | 0 | Chuẩn bị: commit, định danh app, cập nhật audit | Nhỏ | — | Xong (24/09) |
 | 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Xong (24/09), chờ thử trên thiết bị |
-| 2 | Tài khoản và hồ sơ | Vừa | 0 | Chưa làm |
+| 2 | Tài khoản và hồ sơ | Vừa | 0 | 2a xong (24/09), chờ review; 2b chưa làm |
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Chưa làm |
 | 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Chưa làm |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
@@ -61,7 +61,8 @@ Tiêu chí hoàn thành:
 - 2b: xác minh CCCD (bucket private, signed URL, OCR có timeout), ngân hàng,
   thông tin hợp đồng.
 - Cần `expo-image-picker`, `expo-image-manipulator` → build lại development build.
-- Đã chốt (24/09): đăng ký trên mobile bắt buộc xác minh CCCD như web.
+- Đã chốt (24/09, đính chính): web thực tế để CCCD **tùy chọn** khi đăng ký; mobile giữ
+  đúng quy tắc đó (bổ sung sau ở Hồ sơ). Câu hỏi ban đầu dựa trên giả định sai.
 
 ## Phase 3 — Nhiệm vụ, chuỗi, thành tựu
 
@@ -121,7 +122,7 @@ Tiêu chí hoàn thành:
 ## Quyết định đã chốt (24/09/2026)
 
 1. Nhiệm vụ (Phase 3) làm trước Đơn hàng (Phase 4).
-2. Đăng ký trên mobile bắt buộc xác minh CCCD như web.
+2. Đăng ký trên mobile: CCCD tùy chọn, giống web (đính chính sau khi rà soát code web).
 3. Phase 8 (Sáng tác) nằm trong phạm vi app.
 
 ## Câu hỏi còn mở

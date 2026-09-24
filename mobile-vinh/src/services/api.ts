@@ -17,3 +17,14 @@ export async function mobileApi<T>(path: string, userId: string, body?: unknown)
   if (current.error || current.data.session?.user.id !== userId) throw new Error('Phiên đăng nhập đã thay đổi.');
   return result;
 }
+/** For routes used before sign-in (registration, public legal documents): no Authorization header. */
+export async function publicApi<T>(path: string, body?: FormData): Promise<T> {
+  const base = process.env.EXPO_PUBLIC_API_URL;
+  if (!base) throw new Error('Chưa cấu hình máy chủ ứng dụng.');
+  const response = await fetch(`${base.replace(/\/$/, '')}/api/mobile/${path}`, {
+    method: body ? 'POST' : 'GET', body, signal: AbortSignal.timeout(body ? 120000 : 15000),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Không thể kết nối với máy chủ.');
+  return result;
+}

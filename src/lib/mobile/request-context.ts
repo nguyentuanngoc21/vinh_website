@@ -3,6 +3,28 @@ import type { Database } from '@/lib/supabase/types';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthedUserId } from '@/lib/wallet/session';
 
+const noSession = { auth: { persistSession: false, autoRefreshToken: false } };
+/** Settings for the Supabase project the mobile app signs in to (may differ from the local web DB). */
+function mobileProject() {
+  const url = process.env.MOBILE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.MOBILE_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) throw new Error('Mobile server not configured');
+  return { url, key, anon: () => createClient<Database>(url, key, noSession) };
+}
+// Created only when needed (after a token is verified, or for registration) — never up front.
+function mobileAdmin(url: string) {
+  // Never pair a mobile user's identity with an unrelated development database.
+  const serviceKey = process.env.MOBILE_SUPABASE_SERVICE_ROLE_KEY ||
+    (url === process.env.NEXT_PUBLIC_SUPABASE_URL ? process.env.SUPABASE_SERVICE_ROLE_KEY : undefined);
+  if (!serviceKey) throw new Error('Mobile server not configured');
+  return createClient<Database>(url, serviceKey, noSession);
+}
+/** Both clients for pre-sign-in flows (registration); callers must rate-limit. */
+export function getMobileClients() {
+  const project = mobileProject();
+  return { anon: project.anon(), admin: mobileAdmin(project.url) };
+}
+
 // A supplied Authorization header must never fall back to a web cookie.
 export async function getRequestContext(request: Request) {
   const authorization = request.headers.get('authorization');
@@ -12,18 +34,10 @@ export async function getRequestContext(request: Request) {
   }
   const match = /^Bearer (\S+)$/i.exec(authorization);
   if (!match) throw new Error('Unauthorized');
-  const url = process.env.MOBILE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.MOBILE_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) throw new Error('Mobile server not configured');
-  const verifier = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await verifier.auth.getUser(match[1]);
+  const project = mobileProject();
+  const { data, error } = await project.anon().auth.getUser(match[1]);
   if (error || !data.user) throw new Error('Unauthorized');
-  // Never pair a mobile user's identity with an unrelated development database.
-  const serviceKey = process.env.MOBILE_SUPABASE_SERVICE_ROLE_KEY ||
-    (url === process.env.NEXT_PUBLIC_SUPABASE_URL ? process.env.SUPABASE_SERVICE_ROLE_KEY : undefined);
-  if (!serviceKey) throw new Error('Mobile server not configured');
-  const client = createClient<Database>(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  return { client, userId: data.user.id };
+  return { client: mobileAdmin(project.url), userId: data.user.id };
 }
 
 export function requestError(error: unknown) {

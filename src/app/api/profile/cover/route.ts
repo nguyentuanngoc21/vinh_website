@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 
 // Xem giải thích đầy đủ trong api/profile/avatar/route.ts — cùng lý do,
 // cùng cơ chế signed upload URL, cùng chốt chặn 15MB ở bucket "avatars".
@@ -21,9 +20,10 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
  * api/profile/avatar/route.ts (đọc comment ở đó để biết lý do bỏ qua
  * giới hạn body ~4.5MB của Vercel Serverless Functions).
  */
-export async function GET() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function GET(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -42,8 +42,9 @@ export async function GET() {
 
 /** Bước 1: sinh signed upload URL cho client PUT thẳng file lên Storage. */
 export async function POST(request: Request) {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -70,8 +71,9 @@ export async function POST(request: Request) {
 
 /** Bước 2: client đã upload xong lên `path` — xác nhận và lưu vào hồ sơ. */
 export async function PATCH(request: Request) {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -97,9 +99,10 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ ok: true, coverImageUrl });
 }
 
-export async function DELETE() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function DELETE(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

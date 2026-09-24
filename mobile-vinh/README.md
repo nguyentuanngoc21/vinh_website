@@ -84,6 +84,18 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
   OTP, đếm thời gian gửi lại, khôi phục phiên và đăng xuất trên thiết bị này.
   Phiên dài được chia nhỏ để tránh giới hạn kích thước mỗi mục SecureStore.
   Reader tải lại theo người dùng khi đăng nhập/đăng xuất.
+- Đăng ký (Cá nhân → Tạo tài khoản mới): email, tên tài khoản, nickname, mật khẩu
+  (tối thiểu 8 ký tự), đồng ý Điều khoản/Chính sách (xem được ngay trong app).
+  Xác minh danh tính (tên thật, số điện thoại, CCCD + ảnh hai mặt) là tùy chọn
+  như web; đã nhập CCCD thì phải đủ. Ảnh chụp/chọn được nén JPEG ≤ 1,4 MB, cạnh dài
+  ≤ 1800 px trước khi gửi. Backend `POST /api/mobile/auth/register` dùng chung
+  `src/lib/registration.ts` với web (OCR, chặn trùng username/CCCD, rollback),
+  sau đó nhập mã OTP trong email để xác nhận và đăng nhập.
+- Quên mật khẩu (từ màn đăng nhập): gửi mã → nhập mã → đặt mật khẩu mới, chỉ dùng
+  mã OTP, không dùng link. Không tiết lộ email có tài khoản hay không.
+- Sửa hồ sơ (Cá nhân → Sửa hồ sơ): nickname (chờ 30 ngày giữa hai lần đổi), giới
+  thiệu tối đa 280 ký tự, ảnh đại diện và ảnh bìa (tải thẳng lên Storage bằng
+  signed URL như web, gỡ ảnh có xác nhận).
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -94,7 +106,8 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
 - Types được import type-only từ `../src/lib/supabase/types.ts` của web
   (file hiện tại của repo là handwritten, chưa phải schema generated).
 
-Đăng ký tài khoản mới, IAP, offline, bình luận và ảnh thiết kế inline chưa triển khai.
+IAP, offline, bình luận và ảnh thiết kế inline chưa triển khai. Đã thêm `expo-image-picker`
+và `expo-image-manipulator` (có sẵn trong Expo Go SDK 57); development build cũ cần build lại.
 Thông báo: Cá nhân → Thông báo hiển thị 30 mục mới nhất của tài khoản; kéo làm
 mới, đánh dấu từng mục đã đọc và đồng bộ với web qua RLS. Số chưa đọc chỉ tính
 trong danh sách này. Liên kết nội dung liên quan hiện cần xem trên website Vịnh;
@@ -164,6 +177,8 @@ Mẫu phải chứa `{{ .Token }}` để người dùng nhận mã thay vì ch�
 Mẫu này mới được chuẩn bị trong repo, chưa được áp dụng lên Supabase Dashboard.
 Kiểm tra SMTP và hạn mức gửi email của dự án nếu không nhận được thư.
 Mobile đặt `shouldCreateUser: false`; không tạo tài khoản thiếu hồ sơ của web.
+Đăng ký và quên mật khẩu dùng mẫu `confirm-signup.html` và `reset-password.html` trong
+cùng thư mục (đều chứa `{{ .Token }}`); cần áp dụng đúng dự án Supabase của mobile.
 
 Sau khi sửa env, dừng và khởi động lại backend cùng Expo (`npx expo start --go --clear`).
 Kiểm tra trên điện thoại: đăng nhập tài khoản web → đọc hết chương miễn phí →
@@ -179,6 +194,7 @@ node --test scripts/test-reader-api.cjs
 node --test scripts/test-auth-storage.cjs
 node --test scripts/test-library.cjs
 node --test scripts/test-reading-progress.cjs
+node --test scripts/test-registration.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs
