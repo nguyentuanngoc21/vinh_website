@@ -96,6 +96,12 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
 - Sửa hồ sơ (Cá nhân → Sửa hồ sơ): nickname (chờ 30 ngày giữa hai lần đổi), giới
   thiệu tối đa 280 ký tự, ảnh đại diện và ảnh bìa (tải thẳng lên Storage bằng
   signed URL như web, gỡ ảnh có xác nhận).
+- Thông tin cá nhân (Cá nhân → Thông tin cá nhân), ba phần lưu riêng như web:
+  thông tin hợp đồng (họ tên, ngày sinh chọn bằng lịch, điện thoại, địa chỉ); xác minh
+  CCCD sau đăng ký (số, ngày cấp tùy chọn, ảnh hai mặt, OCR ở server, lưu bucket
+  riêng tư, chỉ hiện 4 số cuối); tài khoản ngân hàng (chọn từ danh sách ngân hàng
+  của web, số tài khoản 6–19 chữ số). Cam kết & Thỏa thuận mở thẳng màn này khi
+  thiếu thông tin các bên.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -106,8 +112,10 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
 - Types được import type-only từ `../src/lib/supabase/types.ts` của web
   (file hiện tại của repo là handwritten, chưa phải schema generated).
 
-IAP, offline, bình luận và ảnh thiết kế inline chưa triển khai. Đã thêm `expo-image-picker`
-và `expo-image-manipulator` (có sẵn trong Expo Go SDK 57); development build cũ cần build lại.
+IAP, offline, bình luận và ảnh thiết kế inline chưa triển khai. Đã thêm `expo-image-picker`,
+`expo-image-manipulator` và `@react-native-community/datetimepicker` (đều có sẵn trong Expo Go
+SDK 57); development build cũ cần build lại. Lịch chọn ngày: Android mở hộp thoại lịch hệ thống,
+iOS mở bảng cuộn có nút Xong/Hủy; bản xem trước web vẫn nhập tay dd/mm/yyyy.
 Thông báo: Cá nhân → Thông báo hiển thị 30 mục mới nhất của tài khoản; kéo làm
 mới, đánh dấu từng mục đã đọc và đồng bộ với web qua RLS. Số chưa đọc chỉ tính
 trong danh sách này. Liên kết nội dung liên quan hiện cần xem trên website Vịnh;
@@ -162,8 +170,8 @@ thật hoặc ghi vào production. Khởi động lại backend
 Cá nhân → Cam kết & Thỏa thuận: xem danh sách, phiên bản, trạng thái xác nhận;
 mở văn bản đầy đủ, tự đánh dấu đồng ý rồi xác nhận. Nội dung và thông tin các bên
 dùng cùng nguồn với web. Thiếu hồ sơ hợp đồng thì cần cập nhật trên web rồi tải
-lại; server từ chối xác nhận phiên bản cũ. Chưa có giao diện sửa thông tin hợp đồng
-hoặc thỏa thuận riêng của đơn hàng. Không tự xác nhận văn bản thật trong kiểm thử.
+lại; server từ chối xác nhận phiên bản cũ. Sửa thông tin hợp đồng ở Thông tin cá nhân;
+thỏa thuận riêng của đơn hàng chưa có. Không tự xác nhận văn bản thật trong kiểm thử.
 WebView tắt JavaScript, chặn liên kết ngoài; web preview dùng iframe sandbox.
 Khởi động lại backend và Expo. Development build cũ chưa có WebView cần build lại;
 Expo Go SDK tương thích đã có WebView.
@@ -195,6 +203,7 @@ node --test scripts/test-auth-storage.cjs
 node --test scripts/test-library.cjs
 node --test scripts/test-reading-progress.cjs
 node --test scripts/test-registration.cjs
+node --test scripts/test-personal-info.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs

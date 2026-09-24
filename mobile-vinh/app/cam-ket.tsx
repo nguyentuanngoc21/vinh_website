@@ -66,7 +66,13 @@ function Panel({ userId }: { userId?: string }) {
         <Text className="px-5 pb-3 text-stone">Phiên bản: {doc.version}</Text>
         <AgreementDocument key={`${doc.id}:${doc.version}`} html={doc.html} onReady={() => setReady(true)} onError={() => { setReady(false); setError('Không hiển thị được văn bản. Hãy tải lại.'); }} />
         <View className="p-4">
-          {!!doc.missingFields.length && <Text className="mb-3 text-red-700">Cần cập nhật trên web: {doc.missingFields.join(', ')}.</Text>}
+          {!!doc.missingFields.length && <>
+            <Text className="mb-2 text-red-700">Cần bổ sung trước khi xác nhận: {doc.missingFields.join(', ')}.</Text>
+            {/* Returning here reloads the list, so the refreshed party details show when the document is reopened. */}
+            <Pressable accessibilityRole="button" onPress={() => router.push('/thong-tin-ca-nhan')} className="mb-3 min-h-12 justify-center">
+              <Text className="font-bold text-brand-ink">Cập nhật Thông tin cá nhân →</Text>
+            </Pressable>
+          </>}
           {accepted ? <Text className="text-brand-ink">Bạn đã xác nhận phiên bản này.</Text> : <>
             <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consent }} disabled={!ready || loading || !!doc.missingFields.length} onPress={() => setConsent(v => !v)} className="py-3">
               <Text className="text-brand-ink">{consent ? '☑' : '☐'} Tôi đã đọc và đồng ý với văn bản này.</Text>

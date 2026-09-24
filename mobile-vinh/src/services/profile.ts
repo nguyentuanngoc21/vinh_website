@@ -33,3 +33,46 @@ export async function uploadProfileImage(userId: string, kind: ImageKind, image:
 export async function removeProfileImage(userId: string, kind: ImageKind) {
   await mobileApi(`profile/${kind}`, userId, { action: 'remove' });
 }
+
+export type IdentityStatus = { cccdVerified: boolean; cccdNumberMasked: string | null; cccdIssuedAt: string | null };
+export function getIdentity(userId: string) {
+  return mobileApi<IdentityStatus>('profile/identity', userId);
+}
+/** Multipart like the web identity form; the server OCR-checks the number against both images. */
+export function submitIdentity(userId: string, form: FormData) {
+  return mobileApi<IdentityStatus & { ok: true }>('profile/identity', userId, form);
+}
+
+export type Bank = { code: string; name: string; shortName: string };
+export type BankDetails = { bankCode: string | null; bankName: string | null; bankAccountNumber: string | null; bankAccountName: string | null; banks: Bank[] };
+export function getBank(userId: string) {
+  return mobileApi<BankDetails>('profile/bank', userId);
+}
+export function saveBank(userId: string, details: { bankCode: string; bankAccountNumber: string; bankAccountName: string }) {
+  return mobileApi<{ ok: true }>('profile/bank', userId, details);
+}
+
+/** "dd/mm/yyyy" typed by the user → "yyyy-mm-dd" for the API; "" stays "" (clears), null when invalid. */
+export function toIsoDate(value: string) {
+  const text = value.trim();
+  if (!text) return '';
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+  if (!match) return null;
+  const [, d, m, y] = match.map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return null;
+  if (y < 1900 || date.getTime() > Date.now()) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+export function fromIsoDate(value: string | null) {
+  const match = value ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
+}
+// Picker dates use local calendar fields (not UTC) so a chosen day never shifts across time zones.
+export function isoFromDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+export function dateFromIso(value: string | null) {
+  const match = value ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+}

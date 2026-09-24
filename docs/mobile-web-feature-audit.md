@@ -18,8 +18,11 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 - Tài khoản và hồ sơ (Phase 2a): đăng ký (CCCD tùy chọn như web, OTP), quên mật
   khẩu bằng OTP, sửa nickname/giới thiệu/ảnh đại diện/ảnh bìa. Đăng ký web và mobile
-  dùng chung `src/lib/registration.ts`. Còn thiếu (2b): xác minh CCCD sau đăng ký,
-  ngân hàng, thông tin hợp đồng.
+  dùng chung `src/lib/registration.ts`.
+- Thông tin cá nhân (Phase 2b): thông tin hợp đồng, xác minh CCCD sau đăng ký và
+  tài khoản ngân hàng, dùng lại route hồ sơ của web qua `/api/mobile/profile/*`.
+  Cam kết mở thẳng màn này khi thiếu thông tin. Phase 2 hoàn tất phần tài khoản;
+  thỏa thuận riêng của đơn hàng thuộc Phase 4.
 - Sự kiện đọc (Phase 1): mobile lưu tiến độ qua `/api/mobile/books/[bookId]/reading-progress`
   (`src/lib/reading/record-progress.ts`), kiểm tra quyền đọc ở server và ghi
   `reading_history`/chuỗi/nhiệm vụ khi hoàn thành chương. Route web

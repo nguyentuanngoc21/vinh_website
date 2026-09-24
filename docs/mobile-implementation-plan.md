@@ -21,7 +21,7 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 |---|---|---|---|---|
 | 0 | Chuẩn bị: commit, định danh app, cập nhật audit | Nhỏ | — | Xong (24/09) |
 | 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Xong (24/09), chờ thử trên thiết bị |
-| 2 | Tài khoản và hồ sơ | Vừa | 0 | 2a xong (24/09), chờ review; 2b chưa làm |
+| 2 | Tài khoản và hồ sơ | Vừa | 0 | Xong (24/09): 2a đã commit, 2b chờ review |
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Chưa làm |
 | 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Chưa làm |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
