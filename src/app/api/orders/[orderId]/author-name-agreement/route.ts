@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { AuthorNameAgreementService } from "@/lib/orders/author-name-agreement-service";
 import { getOrderForActor } from "@/lib/orders/order-service";
 
 /** GET /api/orders/:orderId/author-name-agreement — thỏa thuận hiện có
  * (nếu có) của Order ghostwriting này. */
-export async function GET(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -36,8 +36,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ord
  */
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

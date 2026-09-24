@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService, getOrderForActor } from "@/lib/orders/order-service";
 
 /** GET /api/orders/:orderId/cancel — xem TRƯỚC số tiền sẽ hoàn nếu MÌNH
  * là bên yêu cầu hủy (Mục 3.3: hiển thị số cho 2 bên xác nhận trước khi
  * thực thi) — KHÔNG tạo request nào, chỉ preview. */
-export async function GET(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -38,10 +38,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ord
 
 /** POST /api/orders/:orderId/cancel — "Yêu cầu hủy đơn" — chốt số hoàn
  * tại thời điểm này, chờ bên còn lại đồng ý (PATCH .../cancel/:requestId). */
-export async function POST(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

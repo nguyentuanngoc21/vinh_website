@@ -76,12 +76,14 @@ export function formatDateTime(iso: string) {
 export type FileRequest = { id: string; requested_by: string; status: 'pending' | 'agreed' | 'declined'; created_at: string };
 export type CancelRequest = { id: string; requested_by: string; cancelled_by: 'buyer' | 'seller'; refund_amount: number; status: string };
 export type OrderAction = 'set-scope' | 'save-brief' | 'confirm-brief' | 'submit-draft' | 'approve-draft' | 'request-revision'
-  | 'deliver' | 'confirm-received' | 'attach-book' | 'request-original' | 'resolve-original';
+  | 'deliver' | 'confirm-received' | 'attach-book' | 'request-original' | 'resolve-original'
+  | 'request-cancel' | 'resolve-cancel' | 'send-reminder' | 'report-lost-contact' | 'open-dispute'
+  | 'start-author-agreement' | 'confirm-author-agreement';
 
 /** Every order change goes through the web routes and their atomic RPCs (see /api/mobile/orders/[orderId]/action). */
 export function orderAction(userId: string, orderId: string, action: OrderAction, fields: Record<string, unknown> = {}) {
   // Delivering makes the server download, watermark and re-store the file, which can take a while.
-  return mobileApi<{ order?: Order; request?: FileRequest }>(`orders/${encodeURIComponent(orderId)}/action`, userId, { action, ...fields },
+  return mobileApi<{ order?: Order; request?: FileRequest; agreement?: AuthorAgreement }>(`orders/${encodeURIComponent(orderId)}/action`, userId, { action, ...fields },
     { timeoutMs: action === 'deliver' ? 120000 : undefined });
 }
 export function getOrderRequests(userId: string, orderId: string) {
@@ -111,3 +113,26 @@ export async function deliverWithFile(userId: string, orderId: string, file: Del
   if (error) throw new Error('Tải tệp bàn giao thất bại. Kiểm tra mạng rồi thử lại.');
   return orderAction(userId, orderId, 'deliver', { uploadPath: target.path });
 }
+
+export type RefundPreview = { stage: string | null; pct: number; refund_amount: number; seller_amount: number; used_platform_minimum: boolean };
+/** Server-computed refund if the caller cancels now (the request itself re-computes it; nothing is trusted from the app). */
+export function getCancelPreview(userId: string, orderId: string) {
+  return mobileApi<{ preview: RefundPreview }>(`orders/${encodeURIComponent(orderId)}/cancel-preview`, userId).then(r => r.preview);
+}
+export type LostContactStatus = { eligible: boolean; firstReminderAt: string | null; lastMessageAt: string | null };
+export function getLostContact(userId: string, orderId: string) {
+  return mobileApi<LostContactStatus>(`orders/${encodeURIComponent(orderId)}/lost-contact`, userId);
+}
+export type AuthorAgreement = {
+  id: string; ghostwriter_id: string; ghostwriter_confirmed_at: string | null; ghostwriter_statement_text: string | null;
+  customer_id: string; customer_confirmed_at: string | null; customer_statement_text: string | null;
+  author_display_choice: 'customer_name' | 'co_authorship'; ghostwriter_sample_visible: boolean; customer_profile_visible: boolean;
+};
+export function getAuthorAgreement(userId: string, orderId: string) {
+  return mobileApi<{ agreement: AuthorAgreement | null }>(`orders/${encodeURIComponent(orderId)}/author-name-agreement`, userId).then(r => r.agreement);
+}
+// Same reasons and wording as the web's dispute form (order-card.tsx).
+export const DISPUTE_REASONS: [string, string][] = [
+  ['not_as_described', 'Sản phẩm không đúng như thỏa thuận'], ['no_delivery', 'Không bàn giao đúng hạn'],
+  ['payment_issue', 'Vấn đề thanh toán/hoàn tiền'], ['off_platform', 'Bị yêu cầu giao dịch ngoài nền tảng'], ['other', 'Khác'],
+];

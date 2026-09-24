@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService } from "@/lib/orders/order-service";
 
 /** PATCH /api/orders/:orderId/cancel/:requestId — bên CÒN LẠI đồng ý/từ
@@ -8,8 +7,9 @@ import { OrderService } from "@/lib/orders/order-service";
  * ngay trong resolve_order_cancel_request(). */
 export async function PATCH(request: Request, { params }: { params: Promise<{ orderId: string; requestId: string }> }) {
   const { requestId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

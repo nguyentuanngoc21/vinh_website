@@ -23,7 +23,7 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 | 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Xong (24/09), chờ thử trên thiết bị |
 | 2 | Tài khoản và hồ sơ | Vừa | 0 | Xong (24/09) |
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Xong (24/09), chủ dự án xác nhận đồng bộ với web |
-| 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | 4a, 4b đã commit (24/09); 4c đang làm |
+| 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | 4a, 4b đã commit; 4c xong (24/09), chờ review; 4d chưa làm |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
 | 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Chưa làm |
 | 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |

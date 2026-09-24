@@ -16,6 +16,9 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Đơn hàng — nhánh phụ (Phase 4c): hủy đơn (xem trước hoàn tiền, đồng ý/từ chối), nhắc
+  phản hồi, báo cáo mất liên lạc, tranh chấp, thỏa thuận tên tác giả — qua cùng route
+  `action` và 3 route đọc (`cancel-preview`, `lost-contact`, `author-name-agreement`).
 - Đơn hàng — luồng chính (Phase 4b): phạm vi, brief, bản nháp, duyệt/sửa, bàn giao (signed
   upload, tối đa 30 MB), nghiệm thu, gắn truyện, tệp gốc — qua `/api/mobile/orders/[id]/action`
   chuyển tiếp tới route web. Thêm `GET /api/orders/[id]/requests` (yêu cầu tệp gốc/hủy đang

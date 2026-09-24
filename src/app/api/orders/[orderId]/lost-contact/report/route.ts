@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService, getOrderForActor } from "@/lib/orders/order-service";
 import { canReportLostContact } from "@/lib/orders/lost-contact";
 
@@ -8,10 +7,11 @@ import { canReportLostContact } from "@/lib/orders/lost-contact";
  * lạc" — re-validate điều kiện ở SERVER trước khi ghi (không tin nút đã
  * enable ở client). Xử lý/leo thang tranh chấp là việc của Module 9
  * (chưa làm) — ở đây chỉ ghi mốc bất biến. */
-export async function POST(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

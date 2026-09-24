@@ -119,8 +119,12 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
   xác nhận đã nhận; người thực hiện gắn truyện (viết thuê), gửi bản nháp, bàn giao ảnh/
   audio tối đa 30 MB. Tệp bàn giao tải thẳng lên Storage qua signed URL rồi server
   watermark/lưu như web. Tệp gốc: một bên yêu cầu, bên kia đồng ý/từ chối, sau đó tải
-  bằng link 15 phút. Mọi thao tác không hoàn tác có hộp xác nhận. Hủy đơn, mất liên lạc,
-  tranh chấp (4c) và thanh toán vẫn làm trên website.
+  bằng link 15 phút. Mọi thao tác không hoàn tác có hộp xác nhận.
+- Đơn hàng — nhánh phụ (Phase 4c), mục "Vấn đề với đơn hàng" khi đơn còn mở: yêu cầu hủy
+  (xem trước số xu hoàn do server tính, bên kia đồng ý/từ chối), nhắc phản hồi, báo cáo mất
+  liên lạc (mở sau 7 ngày từ lần nhắc đầu và 72 giờ không ai nhắn), mở tranh chấp (5 lý do
+  như web + mô tả). Đơn viết thuê đã bàn giao có "Đứng tên tác giả thay" với nguyên văn 3
+  điều pháp lý của web. Thanh toán đơn vẫn làm trên website.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -226,6 +230,7 @@ node --test scripts/test-personal-info.cjs
 node --test scripts/test-quests.cjs
 node --test scripts/test-orders.cjs
 node --test scripts/test-order-actions.cjs
+node --test scripts/test-order-issues.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs

@@ -39,6 +39,13 @@ function dispatcher() {
     '@/app/api/orders/[orderId]/attach-book/route': mod([['POST', 'attach']]),
     '@/app/api/orders/[orderId]/original-file/route': mod([['POST', 'request-original']]),
     '@/app/api/orders/[orderId]/original-file/[requestId]/route': mod([['PATCH', 'resolve-original']]),
+    '@/app/api/orders/[orderId]/cancel/route': mod([['POST', 'cancel']]),
+    '@/app/api/orders/[orderId]/cancel/[requestId]/route': mod([['PATCH', 'resolve-cancel']]),
+    '@/app/api/orders/[orderId]/lost-contact/reminder/route': mod([['POST', 'reminder']]),
+    '@/app/api/orders/[orderId]/lost-contact/report/route': mod([['POST', 'report']]),
+    '@/app/api/orders/[orderId]/dispute/route': mod([['POST', 'dispute']]),
+    '@/app/api/orders/[orderId]/author-name-agreement/route': mod([['POST', 'agreement']]),
+    '@/app/api/orders/[orderId]/author-name-agreement/[agreementId]/route': mod([['PATCH', 'agreement-confirm']]),
     '@/lib/mobile/response': response,
   });
   const post = (body, token = 't') => route.POST(new Request(`https://api.test/api/mobile/orders/${ORDER}/action`, {

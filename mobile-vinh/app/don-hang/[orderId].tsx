@@ -7,6 +7,8 @@ import { useAuth } from '../../src/providers/AuthProvider';
 import { Button, Notice, ScreenHeader } from '../../src/components/Form';
 import { StatusPill } from '../../src/components/OrderSummary';
 import { OrderActions } from '../../src/components/OrderActions';
+import { OrderIssues } from '../../src/components/OrderIssues';
+import { AuthorNameAgreement } from '../../src/components/AuthorNameAgreement';
 import {
   depositAmount, eventLabel, formatDateTime, getOrder, getOrderAssets, getOrderEvents, getOrderRequests, partyName, paymentDue,
   SCOPE_LABELS, SERVICE_LABELS, type CancelRequest, type FileRequest, type Order, type OrderAsset, type OrderEvent,
@@ -89,10 +91,9 @@ function Detail({ userId, orderId }: { userId: string; orderId: string }) {
 
       {/* Keyed by status so drafts typed in the action forms reset when the order moves on. */}
       <OrderActions key={order.status} userId={userId} order={order} fileRequest={requests.fileRequest} onChanged={() => void load()} />
-      {requests.cancelRequest && <View className="mt-5 rounded-2xl border border-red-700 bg-white p-4">
-        <Text className="font-bold text-red-700">{requests.cancelRequest.requested_by === userId ? 'Bạn đã yêu cầu hủy đơn' : `${partyName(order)} yêu cầu hủy đơn`}</Text>
-        <Text className="mt-1 leading-6 text-stone">Hoàn {xu(requests.cancelRequest.refund_amount)} cho người đặt nếu hai bên đồng ý. Xử lý yêu cầu hủy hiện thực hiện trên website.</Text>
-      </View>}
+      {service?.service_type === 'ghostwriting' && !!order.book_id && (order.status === 'delivered' || order.status === 'completed') &&
+        <AuthorNameAgreement userId={userId} orderId={order.id} />}
+      <OrderIssues key={`issues:${order.status}`} userId={userId} order={order} cancelRequest={requests.cancelRequest} onChanged={() => void load()} />
 
       <View className="mt-5 rounded-2xl bg-white px-4">
         <Line label="Giá đơn" value={xu(order.price)} />
@@ -130,7 +131,7 @@ function Detail({ userId, orderId }: { userId: string; orderId: string }) {
         <Text className="font-bold text-brand-ink">{eventLabel(event.event_type)}{typeof event.payload?.amount === 'number' ? ` · ${xu(event.payload.amount)}` : ''}</Text>
         <Text className="text-sm text-stone">{formatDateTime(event.created_at)}{event.actor_id ? event.actor_id === userId ? ' · bạn' : ` · ${partyName(order)}` : ' · hệ thống'}</Text>
       </View>)}
-      <Text className="mt-4 text-sm leading-5 text-stone">Hủy đơn, mất liên lạc, tranh chấp và thanh toán hiện thực hiện trên website.</Text>
+      <Text className="mt-4 text-sm leading-5 text-stone">Thanh toán đơn hàng hiện thực hiện trên website.</Text>
     </ScrollView>
   </SafeAreaView>;
 }
