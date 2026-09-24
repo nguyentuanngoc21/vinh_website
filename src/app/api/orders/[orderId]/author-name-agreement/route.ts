@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { AuthorNameAgreementService } from "@/lib/orders/author-name-agreement-service";
 import { getOrderForActor } from "@/lib/orders/order-service";
@@ -67,7 +68,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     });
     return NextResponse.json({ agreement });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không khởi tạo được thỏa thuận.";
+    const message = orderErrorMessage(error, "Không khởi tạo được thỏa thuận.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService } from "@/lib/orders/order-service";
 
@@ -24,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const order = await OrderService.attachBook(supabase, { orderId, actorId: userId, bookId });
     return NextResponse.json({ order });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không gắn được truyện vào đơn hàng.";
+    const message = orderErrorMessage(error, "Không gắn được truyện vào đơn hàng.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService } from "@/lib/orders/order-service";
 
@@ -20,7 +21,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ or
     const resolved = await OrderService.resolveFileRequest(supabase, { requestId, actorId: userId, agree });
     return NextResponse.json({ request: resolved });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không xử lý được yêu cầu.";
+    const message = orderErrorMessage(error, "Không xử lý được yêu cầu.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

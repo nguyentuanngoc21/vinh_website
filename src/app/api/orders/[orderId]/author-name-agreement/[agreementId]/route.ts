@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { AuthorNameAgreementService } from "@/lib/orders/author-name-agreement-service";
 
@@ -17,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ or
     const agreement = await AuthorNameAgreementService.confirm(supabase, { agreementId, actorId: userId });
     return NextResponse.json({ agreement });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không xác nhận được.";
+    const message = orderErrorMessage(error, "Không xác nhận được.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

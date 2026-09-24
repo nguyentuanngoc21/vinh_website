@@ -118,3 +118,38 @@ test('dispute needs a reason and description; author agreement only after delive
     assert.equal((await post(agreement, { choice })).status, expected, `${status}/${choice}`);
   }
 });
+
+test('every exception raised by the order RPCs is shown in Vietnamese, never raw', () => {
+  const { orderErrorMessage } = load('src/lib/orders/rpc-errors.ts');
+  const { readdirSync } = require('node:fs');
+  const fns = ['attach_order_book', 'initiate_author_name_agreement', 'confirm_author_name_agreement', 'request_order_cancel',
+    'resolve_order_cancel_request', 'open_dispute', 'request_order_file', 'resolve_order_file_request'];
+  const sql = readdirSync(path.join(root, 'migrations')).sort().map(f => readFileSync(path.join(root, 'migrations', f), 'utf8'));
+  let checked = 0;
+  for (const fn of fns) {
+    const body = sql.map(s => s.match(new RegExp(String.raw`function\s+(public\.)?${fn}\s*\(([\s\S]*?)\$\$\s*language`, 'i'))).filter(Boolean).at(-1);
+    assert.ok(body, `missing ${fn}`);
+    for (const [, raw] of body[0].matchAll(/raise exception\s+'([^']*)'/gi)) {
+      const message = raw.replace(/%/g, ORDER);
+      const shown = orderErrorMessage(new Error(message), 'FALLBACK', '[test]');
+      assert.notEqual(shown, 'FALLBACK', `${fn}: "${raw}" has no Vietnamese mapping`);
+      assert.doesNotMatch(shown, /^(Only|Order|Cannot|A |Request|The |Book|Agreement|Invalid|Actor)/, `${fn}: still English`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 20, `only ${checked} messages found`);
+  // PostgREST errors are plain objects with a message; unknown text falls back instead of leaking.
+  assert.equal(orderErrorMessage({ message: 'A cancel request is already pending for this order' }, 'x'), 'Đơn đang có một yêu cầu hủy chờ xử lý.');
+  const original = console.error; console.error = () => undefined;
+  try { assert.equal(orderErrorMessage(new Error('duplicate key value violates unique constraint "x"'), 'Không gửi được yêu cầu.'), 'Không gửi được yêu cầu.'); }
+  finally { console.error = original; }
+});
+test('routes return the Vietnamese text instead of the raw exception', async () => {
+  const route = load('src/app/api/orders/[orderId]/original-file/route.ts', {
+    'next/server': next, '@/lib/mobile/request-context': ctx(), '@/lib/orders/rpc-errors': load('src/lib/orders/rpc-errors.ts'),
+    '@/lib/orders/order-service': { getOrderForActor: async () => null,
+      OrderService: { requestFile: async () => { throw new Error('A file request is already pending for this order'); } } },
+  });
+  const res = await route.POST(new Request('https://api.test/x', { method: 'POST' }), params);
+  assert.equal(res.status, 400); assert.deepEqual(await res.json(), { error: 'Đơn đang có một yêu cầu tệp gốc chờ xử lý.' });
+});

@@ -23,7 +23,7 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 | 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Xong (24/09), chờ thử trên thiết bị |
 | 2 | Tài khoản và hồ sơ | Vừa | 0 | Xong (24/09) |
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Xong (24/09), chủ dự án xác nhận đồng bộ với web |
-| 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | 4a, 4b đã commit; 4c xong (24/09), chờ review; 4d chưa làm |
+| 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Xong (24/09): 4a–4c; 4d chuyển sang Phase 5 |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
 | 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Chưa làm |
 | 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |
@@ -75,7 +75,8 @@ Tiêu chí hoàn thành:
 - 4b Luồng chính: brief, phạm vi, bản nháp, duyệt/yêu cầu sửa, giao sản phẩm,
   nghiệm thu, tệp gốc.
 - 4c Nhánh phụ: hủy, mất liên lạc, tranh chấp, thỏa thuận tên tác giả.
-- 4d Mẫu tự động từ đơn hoàn tất.
+- 4d Mẫu tự động từ đơn hoàn tất — **chuyển sang Phase 5** (24/09): web cũng chưa có
+  (`fetchAutoSamples` không có nơi gọi, chưa rõ hiển thị gì); làm cùng trang dịch vụ công khai.
 - Đặt cọc tạm khóa trên app cho tới Phase 7.
 
 Quyết định 24/09/2026 (sau rà soát code đơn hàng):
@@ -93,6 +94,9 @@ Quyết định 24/09/2026 (sau rà soát code đơn hàng):
 - 4b: bàn giao file lớn qua signed upload (`deliver/upload-url` → tải thẳng lên Storage →
   `deliver { uploadPath }`); multipart cũ của web giữ nguyên. Route bàn giao nay từ chối
   trước khi lưu file nếu đơn không ở in_progress (trước đây lưu file thừa rồi RPC mới chặn).
+- 4c: 8 route đơn hàng trả thẳng lỗi SQL tiếng Anh; nay qua `src/lib/orders/rpc-errors.ts`
+  (dịch sang tiếng Việt, lỗi lạ dùng thông báo chung + log server). Test tự đọc mọi
+  `raise exception` của các RPC liên quan để bắt lỗi mới chưa dịch.
 - 4b phát hiện: web không tải lại yêu cầu tệp gốc/hủy đang chờ, bên nhận yêu cầu không có
   nút đồng ý. Mobile đọc qua `GET /api/orders/[id]/requests`; web đã sửa cùng cách
   (chủ dự án đồng ý 24/09).
@@ -100,6 +104,9 @@ Quyết định 24/09/2026 (sau rà soát code đơn hàng):
 ## Phase 5 — Kết nối và tin nhắn nâng cao
 
 - Danh bạ Kết nối, trang hồ sơ người khác.
+- Mẫu tự động từ đơn hoàn tất / tác phẩm tự đứng tên (từ 4d) — cho cả web và mobile. Cần chốt
+  trước: nội dung hiển thị (ảnh watermark, bản thu, tên truyện…) và quy tắc đồng ý của khách
+  (cột `orders.is_private`).
 - Realtime tin nhắn, phân trang tin cũ.
 - Push (`expo-notifications`) + bảng push token (migration).
 - Mở mọi loại liên kết thông báo trong app.

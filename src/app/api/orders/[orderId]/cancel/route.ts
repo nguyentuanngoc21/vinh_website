@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService, getOrderForActor } from "@/lib/orders/order-service";
 
@@ -51,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const request_ = await OrderService.requestCancel(supabase, { orderId, actorId: userId });
     return NextResponse.json({ request: request_ });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không gửi được yêu cầu hủy.";
+    const message = orderErrorMessage(error, "Không gửi được yêu cầu hủy.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

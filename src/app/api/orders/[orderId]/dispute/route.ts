@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { DisputeService } from "@/lib/orders/dispute-service";
 
@@ -25,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const dispute = await DisputeService.open(supabase, { orderId, reporterId: userId, reasonCategory, description });
     return NextResponse.json({ dispute });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không mở được tranh chấp.";
+    const message = orderErrorMessage(error, "Không mở được tranh chấp.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
