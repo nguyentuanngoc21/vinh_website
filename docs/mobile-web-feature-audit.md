@@ -16,6 +16,11 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Đơn hàng — xem (Phase 4a): danh sách đơn của tôi, thẻ đơn trong Tin nhắn, chi tiết,
+  nhật ký, sản phẩm bàn giao. Đã sửa lỗi chèn filter ở `GET /api/orders?withUserId=`
+  (`listOrdersForUser` kiểm tra UUID). Thêm migration
+  `20260924_enforce_order_payment_amounts.sql` (cọc tối thiểu, không trả vượt giá) —
+  **chưa chạy lên database**. Thanh toán đơn trên mobile tạm khóa (làm trên web).
 - Nhiệm vụ, chuỗi, thành tựu (Phase 3): danh sách nhiệm vụ hôm nay, tiến độ, nhận
   thưởng, đổi nhiệm vụ, số ngày chuỗi và trang thành tựu theo vai trò, qua
   `/api/mobile/quests*` và `/api/mobile/achievements` bọc route web. Cứu chuỗi bằng xu

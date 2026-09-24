@@ -109,6 +109,11 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
 - Thành tựu: nhóm Đọc giả/Tác giả/Người thu âm/Thiết kế, thanh tiến độ cho thành tựu
   chưa đạt, ngày đạt và thưởng xu (cộng tự động). Mốc chuỗi đọc hiện trong nhóm Đọc giả.
   Chưa có cứu chuỗi bằng xu — web cũng chưa có giao diện cho chức năng này.
+- Đơn hàng (Phase 4a, chỉ xem): Cá nhân → Đơn hàng của tôi (lọc Tất cả/Tôi đặt/Tôi nhận)
+  và thẻ đơn trong hội thoại Tin nhắn như web. Chi tiết: trạng thái, giá/cọc/đã trả/còn
+  lại (xu), phạm vi, brief, số lần sửa, mốc thời gian, sản phẩm bàn giao (ảnh watermark
+  hoặc bản thu, link ký 15 phút) và nhật ký sự kiện. Thanh toán đơn tạm thực hiện trên
+  website (chủ dự án quyết định 24/09); các thao tác khác trên đơn làm ở 4b/4c.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -131,7 +136,7 @@ khi mở màn hình và không tạo thông báo mẫu trên database thật.
 Tin nhắn: Cá nhân → Tin nhắn, xem hội thoại hiện có trên web, đọc/gửi văn bản
 tối đa 4.000 ký tự, tách hòm thư cá nhân/kiểm duyệt. Thông báo có liên kết hội
 thoại mở được trực tiếp trong app. Nút Làm mới tải tin mới; chưa có realtime/push,
-có tìm chính xác username để bắt đầu cuộc trò chuyện; chưa có thẻ đơn hàng trong chat.
+có tìm chính xác username để bắt đầu cuộc trò chuyện; hội thoại cá nhân hiện thẻ đơn hàng.
 Danh sách suy ra từ 300 tin gần nhất; mỗi hội thoại tải 200 tin mới nhất,
 chưa phân trang lịch sử cũ. Khi gửi bị timeout, làm mới kiểm tra trước khi gửi lại.
 API xác minh JWT và chọn đúng database mobile; không tự gửi tin thật trong kiểm thử.
@@ -212,6 +217,7 @@ node --test scripts/test-reading-progress.cjs
 node --test scripts/test-registration.cjs
 node --test scripts/test-personal-info.cjs
 node --test scripts/test-quests.cjs
+node --test scripts/test-orders.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs

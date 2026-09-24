@@ -30,6 +30,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     if (message.includes("Insufficient balance")) {
       return NextResponse.json({ error: "Số dư token không đủ." }, { status: 400 });
     }
+    // Giới hạn số tiền do record_order_payment() cưỡng chế — xem
+    // migrations/20260924_enforce_order_payment_amounts.sql.
+    const minDeposit = /Deposit must be at least (\d+)/.exec(message);
+    if (minDeposit) {
+      return NextResponse.json({ error: `Tiền cọc tối thiểu là ${minDeposit[1]} token.` }, { status: 400 });
+    }
+    const overpay = /Payment exceeds order price \(remaining (-?\d+)\)/.exec(message);
+    if (overpay) {
+      return NextResponse.json({ error: `Số tiền vượt giá đơn — chỉ còn ${overpay[1]} token cần thanh toán.` }, { status: 400 });
+    }
     console.error("[orders] payment failed:", error);
     return NextResponse.json({ error: "Không thực hiện được thanh toán." }, { status: 400 });
   }

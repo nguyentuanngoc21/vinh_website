@@ -59,6 +59,7 @@ function Account({ email: accountEmail, userId, signedIn, restoreError }: { emai
           <ActionButton label="Thành tựu →" onPress={() => router.push('/thanh-tuu')} secondary />
           <ActionButton label="Thông báo →" onPress={() => router.push('/thong-bao')} secondary />
           <ActionButton label="Tin nhắn →" onPress={() => router.push('/tin-nhan')} secondary />
+          <ActionButton label="Đơn hàng của tôi →" onPress={() => router.push('/don-hang')} secondary />
           <ActionButton label="Cam kết & Thỏa thuận →" onPress={() => router.push('/cam-ket')} secondary />
           <ActionButton label="Dịch vụ của tôi →" onPress={() => router.push('/dich-vu')} secondary />
           {userId && <AccountOverview key={userId} userId={userId} />}

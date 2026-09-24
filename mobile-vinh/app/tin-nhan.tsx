@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../src/providers/AuthProvider';
 import { mobileApi } from '../src/services/api';
+import { ThreadOrders } from '../src/components/OrderSummary';
 type Conversation = { userId: string; context: string; nickname: string; unreadCount: number; lastMessage: { body: string } };
 type Message = { id: string; body: string; mine: boolean; flagged: boolean };
 type Thread = { counterparty: { nickname: string }; messages: Message[]; markReadFailed?: boolean };
@@ -83,6 +84,7 @@ function Inbox({ userId, initialChat, initialContext }: { userId?: string; initi
       {!!userId && <Pressable accessibilityRole="button" disabled={loading || sending} onPress={() => { load(); }} className="py-3"><Text className="text-brand-ink">Làm mới ↻</Text></Pressable>}
       {!!error && <Text accessibilityLiveRegion="polite" className="text-red-700">{error}</Text>}
       {chat && thread?.markReadFailed && <Text className="text-red-700">Chưa đồng bộ được trạng thái đã đọc. Hãy làm mới để thử lại.</Text>}
+      {!!userId && !!chat && context === 'personal' && <ThreadOrders key={chat} userId={userId} otherUserId={chat} />}
     </View>
     {!userId ? <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/ca-nhan')} className="p-6"><Text className="text-brand-ink">Đăng nhập để xem tin nhắn →</Text></Pressable>
       : loading ? <ActivityIndicator color="#143b4d" /> : chat ? <>

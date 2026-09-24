@@ -3469,7 +3469,9 @@ create index order_events_order_idx on public.order_events (order_id, created_at
 -- confirm_order_received) xem
 -- migrations/20260901_add_order_system_core.sql — không lặp lại ở đây để
 -- tránh 2 bản dễ lệch nhau; file migration đó LÀ nguồn sự thật cho phần
--- thân hàm.
+-- thân hàm. Ngoại lệ: record_order_payment() được thay bởi
+-- migrations/20260924_enforce_order_payment_amounts.sql (lần trả đầu phải
+-- >= round(price * deposit_pct / 100), tổng đã trả không vượt price).
 
 -- 12d. Danh mục tag cố định cho service_listings (Mục 2.2 đặc tả) — xem
 -- migrations/20260901_add_service_tag_catalog.sql,

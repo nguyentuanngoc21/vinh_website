@@ -32,6 +32,32 @@ export async function getOrderForActor(supabase: Client, orderId: string, actorI
   return data;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Orders where `userId` is buyer or seller, newest first — optionally only
+ * those with one counterpart (`withUserId`, the chat thread's other party).
+ * Both ids are interpolated into a PostgREST `.or()` filter, so they MUST be
+ * validated as UUIDs first: an unchecked value could close the `and(...)`
+ * group and append its own conditions, matching other users' orders. */
+export async function listOrdersForUser(supabase: Client, userId: string, withUserId?: string | null) {
+  if (!UUID.test(userId) || (withUserId != null && !UUID.test(withUserId))) {
+    return { ok: false as const, status: 400, error: "Mã người dùng không hợp lệ." };
+  }
+  const filter = withUserId
+    ? `and(buyer_id.eq.${userId},seller_id.eq.${withUserId}),and(buyer_id.eq.${withUserId},seller_id.eq.${userId})`
+    : `buyer_id.eq.${userId},seller_id.eq.${userId}`;
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*, service_listings(name, service_type)")
+    .or(filter)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[orders] list failed:", error);
+    return { ok: false as const, status: 500, error: "Không tải được đơn hàng." };
+  }
+  return { ok: true as const, orders: data ?? [] };
+}
+
 export const OrderService = {
   async createOrder(
     supabase: Client,

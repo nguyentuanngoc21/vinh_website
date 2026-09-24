@@ -23,7 +23,7 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 | 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Xong (24/09), chờ thử trên thiết bị |
 | 2 | Tài khoản và hồ sơ | Vừa | 0 | Xong (24/09) |
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Xong (24/09), chủ dự án xác nhận đồng bộ với web |
-| 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Chưa làm |
+| 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | 4a xong (24/09); migration đã test PASS trên dev/staging, chờ áp production |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
 | 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Chưa làm |
 | 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |
@@ -77,6 +77,19 @@ Tiêu chí hoàn thành:
 - 4c Nhánh phụ: hủy, mất liên lạc, tranh chấp, thỏa thuận tên tác giả.
 - 4d Mẫu tự động từ đơn hoàn tất.
 - Đặt cọc tạm khóa trên app cho tới Phase 7.
+
+Quyết định 24/09/2026 (sau rà soát code đơn hàng):
+- Sửa lỗi chèn filter ở `GET /api/orders?withUserId=` trong 4a (đã làm).
+- Server cưỡng chế số tiền: lần trả đầu >= round(price × deposit_pct / 100), tổng đã trả
+  không vượt price. Không bắt buộc trả đủ trước khi bàn giao. Migration
+  `migrations/20260924_enforce_order_payment_amounts.sql`, test
+  `docs/supabase/tests/20260924_order_payment_amounts.test.sql` — chạy dev/staging trước,
+  kiểm tra đơn cũ lệch số tiền (câu truy vấn trong phần Notes) rồi mới lên production.
+- Thanh toán đơn bằng xu trên mobile: tạm khóa, hướng dẫn thanh toán trên web.
+- Xem đơn ở cả màn "Đơn hàng của tôi" và thẻ đơn trong Tin nhắn.
+- Ghi nhận: route bàn giao cho phép 30 MB nhưng Vercel giới hạn body ~4,5 MB — tệp lớn sẽ
+  lỗi trên cả web và mobile; cần chuyển sang signed upload URL (xử lý ở 4b).
+- Web hiển thị giá đơn bằng "₫" trong khi thanh toán trừ xu; mobile hiển thị "xu".
 
 ## Phase 5 — Kết nối và tin nhắn nâng cao
 
