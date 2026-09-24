@@ -90,21 +90,22 @@ export function shouldForceStopAccepting(listing: ServiceListing): boolean {
   return listing.is_accepting_orders && computeMissingFields(listing).length > 0;
 }
 
-/**
- * Mục 2.2 — sample "auto": 5 sản phẩm mới nhất mà seller đã HOÀN TẤT trên
- * Nền tảng, loại trừ order.is_private, mới nhất trước.
- * - illustration/voice: nguồn là chính Order đã completed CÙNG service_type
- *   với listing đang xét (đơn giản hoá — đặc tả nói "sản phẩm đã hoàn
- *   thành trên Nền tảng" nói chung, ở đây thu hẹp đúng loại hình để sample
- *   không lẫn công việc khác loại).
- * - ghostwriting: nguồn là books.author_id = seller VÀ is_ghostwritten =
- *   false (tác phẩm tự đứng tên thật trên Vịnh, không lẫn hàng viết thuê —
- *   Mục 2.2 + yêu cầu bổ sung #2, xem migrations/20260901_add_ghostwriting_authorship.sql).
- */
+/** Mẫu tự động khi người bán KHÔNG tự tải mẫu lên — Bộ quy tắc Commission
+ * Điều 2 mục 1 (src/lib/legal/bo-quy-tac-commission.ts):
+ * - illustration/voice: "5 sản phẩm mới nhất của người đó trên Nền tảng" —
+ *   thiết kế/bản thu ĐÃ xuất bản công khai (public_design_items /
+ *   public_audio_narrations), nên không cần xin thêm sự đồng ý của ai. KHÔNG
+ *   lấy từ đơn đã hoàn tất: sản phẩm bàn giao nằm ở bucket riêng tư của đơn.
+ * - ghostwriting: 5 truyện gần nhất người viết TỰ đứng tên (Cấp 1, Điều 6.5),
+ *   loại Cấp 2/3 (Điều 6.6). Schema chưa có giá trị riêng cho Cấp 1 của truyện
+ *   viết thuê (author_name_agreements chỉ có co_authorship/customer_name) và
+ *   /ket-noi mặc định ẩn truyện viết thuê — nên chỉ lấy is_ghostwritten = false.
+ * Chủ dự án chốt cách hiểu này ngày 24/09/2026 (docs/mobile-implementation-plan.md). */
+export type AutoSample = { kind: "image" | "audio" | "book"; title: string; ref: string; url: string | null };
 export async function fetchAutoSamples(
   supabase: Client,
   params: { sellerId: string; serviceType: ServiceListing["service_type"] }
-): Promise<{ title: string; ref: string }[]> {
+): Promise<AutoSample[]> {
   if (params.serviceType === "ghostwriting") {
     const { data } = await supabase
       .from("books")
@@ -115,19 +116,30 @@ export async function fetchAutoSamples(
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(5);
-    return (data ?? []).map((b) => ({ title: b.title, ref: b.id }));
+    return (data ?? []).map((b) => ({ kind: "book" as const, title: b.title, ref: b.id, url: null }));
   }
-
+  if (params.serviceType === "voice") {
+    const { data } = await supabase
+      .from("public_audio_narrations")
+      .select("id, title, audio_url")
+      .eq("narrator_id", params.sellerId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    return (data ?? []).map((a) => ({
+      kind: "audio" as const, title: a.title, ref: a.id,
+      url: supabase.storage.from("audio-narrations").getPublicUrl(a.audio_url).data.publicUrl,
+    }));
+  }
   const { data } = await supabase
-    .from("orders")
-    .select("id, code, completed_at, service_listings!inner(service_type)")
-    .eq("seller_id", params.sellerId)
-    .eq("status", "completed")
-    .eq("is_private", false)
-    .eq("service_listings.service_type", params.serviceType)
-    .order("completed_at", { ascending: false })
+    .from("public_design_items")
+    .select("id, title, image_url")
+    .eq("illustrator_id", params.sellerId)
+    .order("created_at", { ascending: false })
     .limit(5);
-  return (data ?? []).map((o) => ({ title: o.code, ref: o.id }));
+  return (data ?? []).map((d) => ({
+    kind: "image" as const, title: d.title, ref: d.id,
+    url: supabase.storage.from("design-images").getPublicUrl(d.image_url).data.publicUrl,
+  }));
 }
 
 export type CommissionStatus = "available" | "busy" | "off";

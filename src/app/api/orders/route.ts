@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService, listOrdersForUser } from "@/lib/orders/order-service";
 
@@ -43,8 +41,9 @@ export async function GET(request: Request) {
  * không được đổi theo.
  */
 export async function POST(request: Request) {
-  const supabase = createServiceRoleClient();
-  const buyerId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId: buyerId } = auth;
   if (!buyerId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

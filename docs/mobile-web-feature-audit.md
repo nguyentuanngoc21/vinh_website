@@ -16,6 +16,11 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Kết nối + tin nhắn (Phase 5): danh bạ, hồ sơ, theo dõi, chi tiết gói và đặt dịch vụ trên
+  mobile; truy vấn `/ket-noi` tách thành `src/lib/connect/directory.ts` dùng chung. Mẫu tự động
+  theo Bộ quy tắc (tác phẩm công khai). Tin nhắn/thông báo realtime + tải tin cũ hơn
+  (`?before=&limit=` ở route hội thoại). **Đã sửa lỗ hổng:** `GET /api/profile/services/[id]/samples`
+  không kiểm tra người gọi. Push chuyển sang chuẩn bị phát hành.
 - Đơn hàng — nhánh phụ (Phase 4c): hủy đơn (xem trước hoàn tiền, đồng ý/từ chối), nhắc
   phản hồi, báo cáo mất liên lạc, tranh chấp, thỏa thuận tên tác giả — qua cùng route
   `action` và 3 route đọc (`cancel-preview`, `lost-contact`, `author-name-agreement`).

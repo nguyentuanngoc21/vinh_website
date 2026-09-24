@@ -3,6 +3,8 @@ import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import { isLikelyOffPlatform } from "@/lib/orders/off-platform-detector";
 
 const THREAD_MESSAGE_LIMIT = 200;
+// `created_at` exactly as returned in a previous page (PostgREST keeps microseconds).
+const CURSOR = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})$/;
 const BODY_MAX = 4000;
 type MessageContext = "personal" | "moderation";
 
@@ -27,7 +29,16 @@ export async function GET(
 ) {
   const { userId: counterpartyId } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(counterpartyId)) return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
-  const context = resolveContext(new URL(request.url).searchParams.get("context"));
+  const searchParams = new URL(request.url).searchParams;
+  const context = resolveContext(searchParams.get("context"));
+  // Tải tin cũ hơn (tùy chọn): ?before=<createdAt của tin cũ nhất đang có>&limit=N.
+  // Không truyền thì giữ nguyên hành vi cũ (200 tin mới nhất).
+  const before = searchParams.get("before");
+  if (before !== null && !CURSOR.test(before)) {
+    return NextResponse.json({ error: "Mốc thời gian không hợp lệ." }, { status: 400 });
+  }
+  const limitParam = Number(searchParams.get("limit"));
+  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, THREAD_MESSAGE_LIMIT) : THREAD_MESSAGE_LIMIT;
   let auth;
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
@@ -44,15 +55,19 @@ export async function GET(
     return NextResponse.json({ error: "Không tìm thấy người dùng." }, { status: 404 });
   }
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("direct_messages")
     .select("id, sender_id, body, created_at, flagged_off_platform")
     .eq("context", context)
     .or(
       `and(sender_id.eq.${userId},recipient_id.eq.${counterpartyId}),and(sender_id.eq.${counterpartyId},recipient_id.eq.${userId})`
-    )
+    );
+  // Strictly older than the cursor: created_at has microsecond precision, so two messages of one
+  // thread sharing a timestamp (and one being skipped at a page edge) is not a practical case.
+  if (before) query = query.lt("created_at", before);
+  const { data: rows, error } = await query
     .order("created_at", { ascending: false }).order('id', { ascending: false })
-    .limit(THREAD_MESSAGE_LIMIT);
+    .limit(limit);
   if (error) {
     console.error("[messages] thread fetch failed:", error);
     return NextResponse.json({ error: "Không tải được hội thoại." }, { status: 500 });
@@ -72,6 +87,7 @@ export async function GET(
   return NextResponse.json({
     context,
     markReadFailed: !!readResult.error,
+    hasMore: (rows?.length ?? 0) === limit,
     counterparty: {
       userId: counterparty.id,
       nickname: counterparty.nickname,

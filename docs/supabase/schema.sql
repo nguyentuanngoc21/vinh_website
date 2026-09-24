@@ -3910,6 +3910,25 @@ create index notifications_user_unread_idx
 create index notifications_user_created_idx
   on public.notifications (user_id, created_at desc);
 
+-- Realtime cho tin nhắn + thông báo (app mobile đăng ký postgres_changes; RLS
+-- SELECT ở trên quyết định ai nhận hàng nào) — xem
+-- migrations/20260924_enable_realtime_messages_notifications.sql. Đặt sau khi cả
+-- direct_messages và notifications đã được tạo.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    return;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'direct_messages') then
+    alter publication supabase_realtime add table public.direct_messages;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notifications') then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end $$;
+
 -- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context) —
 -- cho phép 1 admin vừa gửi tin gỡ chương (kiểm duyệt) vừa tự chat bình
 -- thường với CÙNG 1 tác giả mà không bị trộn vào chung 1 hòm thư. Danh

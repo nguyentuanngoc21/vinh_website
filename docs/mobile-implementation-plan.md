@@ -24,8 +24,8 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 | 2 | Tài khoản và hồ sơ | Vừa | 0 | Xong (24/09) |
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Xong (24/09), chủ dự án xác nhận đồng bộ với web |
 | 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Xong (24/09): 4a–4c; 4d chuyển sang Phase 5 |
-| 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
-| 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Chưa làm |
+| 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | 5a–5c xong (24/09); migration realtime chờ áp; push → chuẩn bị phát hành |
+| 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Đang rà soát |
 | 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |
 | 8 | Sáng tác | Lớn | 2 | Chưa làm |
 | — | Sẵn sàng phát hành (song song) | Vừa | — | Chưa làm |
@@ -102,6 +102,26 @@ Quyết định 24/09/2026 (sau rà soát code đơn hàng):
   (chủ dự án đồng ý 24/09).
 
 ## Phase 5 — Kết nối và tin nhắn nâng cao
+
+Quyết định 24/09/2026 (sau rà soát):
+- 5a Kết nối + hồ sơ: tách truy vấn `/ket-noi` thành service dùng chung web/mobile; theo dõi;
+  xem chi tiết gói (từng mức giá, điều khoản, mẫu) rồi đặt dịch vụ. Sửa lỗ hổng
+  `GET /api/profile/services/[listingId]/samples` (không kiểm tra người gọi): chỉ chủ gói, hoặc
+  gói đang nhận đơn và không riêng tư.
+- 5b Tin nhắn: Supabase Realtime (migration thêm `direct_messages`, `notifications` vào
+  publication `supabase_realtime`) + tải tin cũ hơn bằng con trỏ `(created_at, id)`.
+- 5c Mẫu tự động theo Bộ quy tắc Commission Điều 2 mục 1: tác phẩm công khai của người bán
+  (5 thiết kế/audio đã xuất bản mới nhất; viết thuê: 5 truyện tự đứng tên, gồm cấp 1 khi thỏa
+  thuận cho hiển thị) — cho cả web và mobile, không dùng đơn hoàn tất.
+- 5d Push: chuyển sang giai đoạn chuẩn bị phát hành (cần EAS projectId, FCM, APNs, build mới).
+- Liên kết thông báo: hiện chỉ có 1 loại (hội thoại kiểm duyệt), mobile đã mở được — không cần làm thêm.
+- Ghi nhận (chưa quyết): `POST /api/orders` không chặn gói "đang bận"/tắt commission, không
+  kiểm tra người bán đã đồng ý Bộ quy tắc Commission.
+- Ghi nhận (chưa quyết): Bộ quy tắc Điều 6.5 coi truyện viết thuê Cấp 1 (đứng tên người viết)
+  là mặc định và được tính vào mẫu, nhưng schema chỉ lưu Cấp 2/3 và `/ket-noi` mặc định ẩn
+  truyện viết thuê — mẫu tự động hiện chỉ lấy truyện `is_ghostwritten = false`.
+- Web chưa hiển thị mẫu (tự tải hoặc tự động) cho người mua; mobile hiện ở màn chi tiết gói
+  qua `getListingForViewer` (`src/lib/orders/public-listing.ts`), web có thể dùng lại.
 
 - Danh bạ Kết nối, trang hồ sơ người khác.
 - Mẫu tự động từ đơn hoàn tất / tác phẩm tự đứng tên (từ 4d) — cho cả web và mobile. Cần chốt

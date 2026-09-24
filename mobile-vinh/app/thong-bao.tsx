@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/providers/AuthProvider';
 import { getNotifications, markNotificationRead, Notification } from '../src/services/notifications';
 import { notificationChat } from '../src/services/notification-link';
+import { subscribeNotifications } from '../src/services/realtime';
 
 export default function Notifications() {
   const { session, loading } = useAuth();
@@ -29,6 +30,11 @@ function Inbox({ userId }: { userId?: string }) {
     return () => { sequence.current++; };
   }, [userId]);
   useFocusEffect(load);
+  // New notifications appear without leaving the screen (needs the realtime migration).
+  useEffect(() => {
+    if (!userId) return;
+    return subscribeNotifications(userId, () => { load(); });
+  }, [userId, load]);
   async function mark(id: string) {
     if (!userId || writeLock.current || loading) return;
     writeLock.current = true; setBusy(id); setError('');

@@ -125,6 +125,16 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
   liên lạc (mở sau 7 ngày từ lần nhắc đầu và 72 giờ không ai nhắn), mở tranh chấp (5 lý do
   như web + mô tả). Đơn viết thuê đã bàn giao có "Đứng tên tác giả thay" với nguyên văn 3
   điều pháp lý của web. Thanh toán đơn vẫn làm trên website.
+- Kết nối (Phase 5a): Cá nhân → Kết nối — cùng 60 người mới nhất như web `/ket-noi`
+  (truy vấn dùng chung `src/lib/connect/directory.ts`), tìm theo tên/@tài khoản, lọc Đọc
+  giả/Tác giả/Họa sĩ/Lồng tiếng/Blogger. Hồ sơ: ảnh bìa, giới thiệu, theo dõi/bỏ theo dõi,
+  nhắn tin, dịch vụ, truyện (mở chi tiết truyện), audio (phát bằng player chung), thiết kế.
+  Chi tiết gói: mọi mức giá, cọc, hạn giao, số lần sửa, phạm vi, nhận/không nhận, quyền sử
+  dụng, hoàn tiền theo giai đoạn, mẫu; chọn mức giá rồi Đặt dịch vụ (đơn mới ở Đang soạn,
+  chưa trừ xu). Mẫu tự động (5c) theo Bộ quy tắc Commission Điều 2.1.
+- Tin nhắn realtime (Phase 5b): tin mới hiện ngay trong hội thoại và danh sách, tải tin cũ
+  hơn từng 50 tin; Thông báo tự cập nhật. Cần migration
+  `20260924_enable_realtime_messages_notifications.sql` trên dự án Supabase của mobile.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -146,7 +156,7 @@ thông báo đẩy khi app đóng chưa có. Không tự đánh dấu
 khi mở màn hình và không tạo thông báo mẫu trên database thật.
 Tin nhắn: Cá nhân → Tin nhắn, xem hội thoại hiện có trên web, đọc/gửi văn bản
 tối đa 4.000 ký tự, tách hòm thư cá nhân/kiểm duyệt. Thông báo có liên kết hội
-thoại mở được trực tiếp trong app. Nút Làm mới tải tin mới; chưa có realtime/push,
+thoại mở được trực tiếp trong app. Có realtime (5b); chưa có push,
 có tìm chính xác username để bắt đầu cuộc trò chuyện; hội thoại cá nhân hiện thẻ đơn hàng.
 Danh sách suy ra từ 300 tin gần nhất; mỗi hội thoại tải 200 tin mới nhất,
 chưa phân trang lịch sử cũ. Khi gửi bị timeout, làm mới kiểm tra trước khi gửi lại.
@@ -231,6 +241,8 @@ node --test scripts/test-quests.cjs
 node --test scripts/test-orders.cjs
 node --test scripts/test-order-actions.cjs
 node --test scripts/test-order-issues.cjs
+node --test scripts/test-connect.cjs
+node --test scripts/test-realtime.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs

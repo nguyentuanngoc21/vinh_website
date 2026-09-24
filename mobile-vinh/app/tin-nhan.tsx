@@ -1,13 +1,15 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../src/providers/AuthProvider';
 import { mobileApi } from '../src/services/api';
 import { ThreadOrders } from '../src/components/OrderSummary';
+import { belongsToThread, subscribeMessages } from '../src/services/realtime';
 type Conversation = { userId: string; context: string; nickname: string; unreadCount: number; lastMessage: { body: string } };
-type Message = { id: string; body: string; mine: boolean; flagged: boolean };
-type Thread = { counterparty: { nickname: string }; messages: Message[]; markReadFailed?: boolean };
+type Message = { id: string; body: string; createdAt: string; mine: boolean; flagged: boolean };
+type Thread = { counterparty: { nickname: string }; messages: Message[]; markReadFailed?: boolean; hasMore?: boolean };
+const OLDER_PAGE = 50;
 export default function Messages() {
   const { session, loading } = useAuth();
   const params = useLocalSearchParams<{ chat?: string; context?: string }>();
@@ -25,6 +27,7 @@ function Inbox({ userId, initialChat, initialContext }: { userId?: string; initi
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const generation = useRef(0);
   const sendLock = useRef(false);
   const findLock = useRef(false);
@@ -43,6 +46,42 @@ function Inbox({ userId, initialChat, initialContext }: { userId?: string; initi
     return () => { generation.current++; };
   }, [chat, context, userId]);
   useFocusEffect(load);
+  // Realtime: latest values through refs so one subscription per signed-in user is enough.
+  const live = useRef({ chat, context, load });
+  useEffect(() => { live.current = { chat, context, load }; }, [chat, context, load]);
+  useEffect(() => {
+    if (!userId) return;
+    let listTimer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = subscribeMessages(userId, row => {
+      const { chat: openChat, context: openContext } = live.current;
+      if (!openChat) {
+        // Inbox list: coalesce bursts into one reload.
+        if (listTimer) clearTimeout(listTimer);
+        listTimer = setTimeout(() => live.current.load(), 400);
+        return;
+      }
+      if (!belongsToThread(row, userId, openChat, openContext)) return;
+      const mine = row.sender_id === userId;
+      const message: Message = { id: row.id, body: row.body, createdAt: row.created_at, mine, flagged: mine && row.flagged_off_platform };
+      setThread(old => old && !old.messages.some(m => m.id === message.id) ? { ...old, messages: [...old.messages, message] } : old);
+      // Mark it read like a normal load: the thread GET marks exactly the rows it returns.
+      if (!mine) void mobileApi(`messages/${encodeURIComponent(openChat)}?context=${openContext}&limit=1`, userId).catch(() => undefined);
+    });
+    return () => { if (listTimer) clearTimeout(listTimer); unsubscribe(); };
+  }, [userId]);
+  async function loadOlder() {
+    const oldest = thread?.messages[0];
+    if (!userId || !oldest || loadingOlder) return;
+    setLoadingOlder(true); setError('');
+    const request = generation.current;
+    try {
+      const older = await mobileApi<Thread>(`messages/${encodeURIComponent(chat)}?context=${context}&before=${encodeURIComponent(oldest.createdAt)}&limit=${OLDER_PAGE}`, userId);
+      if (generation.current !== request) return;
+      setThread(old => old ? { ...old, hasMore: older.hasMore,
+        messages: [...older.messages.filter(m => !old.messages.some(x => x.id === m.id)), ...old.messages] } : old);
+    } catch (e) { if (generation.current === request) setError(e instanceof Error ? e.message : 'Không tải được tin cũ hơn.'); }
+    finally { setLoadingOlder(false); }
+  }
   function select(id: string, kind = 'personal') {
     generation.current++; setChat(id); setContext(kind); setThread(null); setDraft(''); setError('');
   }
@@ -65,7 +104,8 @@ function Inbox({ userId, initialChat, initialContext }: { userId?: string; initi
       if (generation.current !== request) return;
       setDraft('');
       if (result.context !== context) { setThread(null); setContext(result.context); }
-      else setThread(old => old ? { ...old, messages: [...old.messages, result.message] } : old);
+      // The realtime insert may have arrived first; keep one copy.
+      else setThread(old => old ? { ...old, messages: old.messages.some(m => m.id === result.message.id) ? old.messages : [...old.messages, result.message] } : old);
     } catch (e) { if (generation.current === request) setError((e instanceof Error ? e.message : 'Không gửi được tin.') + ' Hãy làm mới để kiểm tra trước khi gửi lại.'); }
     finally { sendLock.current = false; setSending(false); }
   }
@@ -80,7 +120,7 @@ function Inbox({ userId, initialChat, initialContext }: { userId?: string; initi
           <Text className="font-bold text-brand-ink">{finding ? 'Đang tìm…' : 'Mở cuộc trò chuyện mới →'}</Text>
         </Pressable>
       </View>}
-      {chat && <Text className="mt-2 text-stone">{context === 'moderation' ? 'Hòm thư kiểm duyệt' : 'Hội thoại cá nhân'} · 200 tin gần nhất</Text>}
+      {chat && <Text className="mt-2 text-stone">{context === 'moderation' ? 'Hòm thư kiểm duyệt' : 'Hội thoại cá nhân'} · tin mới hiện ngay</Text>}
       {!!userId && <Pressable accessibilityRole="button" disabled={loading || sending} onPress={() => { load(); }} className="py-3"><Text className="text-brand-ink">Làm mới ↻</Text></Pressable>}
       {!!error && <Text accessibilityLiveRegion="polite" className="text-red-700">{error}</Text>}
       {chat && thread?.markReadFailed && <Text className="text-red-700">Chưa đồng bộ được trạng thái đã đọc. Hãy làm mới để thử lại.</Text>}
@@ -89,6 +129,8 @@ function Inbox({ userId, initialChat, initialContext }: { userId?: string; initi
     {!userId ? <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/ca-nhan')} className="p-6"><Text className="text-brand-ink">Đăng nhập để xem tin nhắn →</Text></Pressable>
       : loading ? <ActivityIndicator color="#143b4d" /> : chat ? <>
         <FlatList data={thread?.messages ?? []} keyExtractor={m => m.id} contentContainerStyle={{ padding: 20 }}
+          ListHeaderComponent={thread?.hasMore ? <Pressable accessibilityRole="button" disabled={loadingOlder} onPress={() => void loadOlder()} className="mb-3 min-h-12 items-center justify-center">
+            <Text className="text-brand-ink">{loadingOlder ? 'Đang tải…' : '↑ Tải tin cũ hơn'}</Text></Pressable> : null}
           ListEmptyComponent={!error ? <Text className="text-stone">Chưa có tin nhắn.</Text> : null}
           renderItem={({ item }) => <View className={`mb-3 rounded-2xl p-4 ${item.mine ? 'ml-8 bg-brand-ink' : 'mr-8 bg-white'}`}>
             <Text selectable className={item.mine ? 'text-white' : 'text-brand-ink'}>{item.body}</Text>

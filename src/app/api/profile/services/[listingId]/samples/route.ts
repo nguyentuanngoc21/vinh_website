@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 
 // Cùng khuôn ALLOWED_MIME_EXT với src/app/api/profile/cover/route.ts +
@@ -15,10 +14,22 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
 };
 const SAMPLE_MAX_BYTES = 15 * 1024 * 1024; // ảnh minh họa/đoạn audio mẫu, lớn hơn cover 1 chút
 
-/** GET /api/profile/services/:listingId/samples */
-export async function GET(_request: Request, { params }: { params: Promise<{ listingId: string }> }) {
+/** GET /api/profile/services/:listingId/samples — chủ gói xem mọi mẫu; người khác
+ * chỉ xem khi gói đang nhận đơn và không riêng tư. Trước đây route không kiểm tra
+ * người gọi: ai biết ID gói cũng lấy được đường dẫn mẫu, kể cả gói ẩn/chưa mở. */
+export async function GET(request: Request, { params }: { params: Promise<{ listingId: string }> }) {
   const { listingId } = await params;
-  const supabase = createServiceRoleClient();
+  let auth;
+  try { auth = await getRequestContext(request); } catch (error) { return requestError(error); }
+  const { client: supabase, userId } = auth;
+  const { data: listing } = await supabase
+    .from("service_listings")
+    .select("seller_id, is_accepting_orders, is_private")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (!listing || (listing.seller_id !== userId && (!listing.is_accepting_orders || listing.is_private))) {
+    return NextResponse.json({ error: "Không tìm thấy dịch vụ." }, { status: 404 });
+  }
   const { data, error } = await supabase
     .from("service_samples")
     .select("*")
