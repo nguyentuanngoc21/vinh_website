@@ -29,7 +29,7 @@ const DOCS = [
     exportName: "dieuKhoanSuDungHtml",
   },
   {
-    source: path.join(ROOT, "docs", "Chính sách bảo mật - UTD 03092026.docx"),
+    source: path.join(ROOT, "docs", "Chính sách bảo mật - UTD 24092026.docx"),
     outFile: "chinh-sach-bao-mat.ts",
     exportName: "chinhSachBaoMatHtml",
   },
