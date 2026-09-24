@@ -2,10 +2,10 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { useAuth } from '../../src/providers/AuthProvider';
-import { Button, Notice, ScreenHeader } from '../../src/components/Form';
-import { OrderRow } from '../../src/components/OrderSummary';
-import { listOrders, type Order } from '../../src/services/orders';
+import { useAuth } from '../src/providers/AuthProvider';
+import { Button, Notice, ScreenHeader } from '../src/components/Form';
+import { OrderRow } from '../src/components/OrderSummary';
+import { listOrders, type Order } from '../src/services/orders';
 
 type Filter = 'all' | 'buyer' | 'seller';
 const FILTERS: [Filter, string][] = [['all', 'Tất cả'], ['buyer', 'Tôi đặt'], ['seller', 'Tôi nhận']];

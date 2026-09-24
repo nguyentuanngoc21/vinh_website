@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService } from "@/lib/orders/order-service";
 
 /** PATCH /api/orders/:orderId/brief — lưu nháp brief (buyer, trước khi khóa). */
 export async function PATCH(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -25,10 +25,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ or
 }
 
 /** POST /api/orders/:orderId/brief — "Duyệt brief" (buyer, khóa lại). */
-export async function POST(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

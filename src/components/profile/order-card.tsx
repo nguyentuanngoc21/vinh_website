@@ -122,6 +122,29 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.status]);
 
+  // Yêu cầu file gốc/hủy đơn đang chờ — tải từ server để BÊN NHẬN yêu cầu cũng
+  // thấy nút đồng ý/từ chối (trước đây chỉ có trong state của người gửi, mất
+  // khi tải lại trang và không bao giờ tới được bên kia). File gốc đã được đồng
+  // ý thì lấy luôn link tải cho cả 2 bên. Xem api/orders/[orderId]/requests.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/orders/${order.id}/requests`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(async (data) => {
+        if (cancelled || !data) return;
+        setFileRequest(data.fileRequest ?? null);
+        setCancelRequest(data.cancelRequest ?? null);
+        if (data.fileRequest?.status === "agreed") {
+          const res = await fetch(`/api/orders/${order.id}/original-file`);
+          const body = await res.json().catch(() => null);
+          if (!cancelled && res.ok) setOriginalUrl(body?.url ?? null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [order.id, order.status]);
+
   useEffect(() => {
     if (!isOpenOrder) return;
     fetch(`/api/orders/${order.id}/lost-contact`)
@@ -531,7 +554,10 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
             )
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {!fileRequest && (
+            {fileRequest?.status === "declined" && (
+              <span className="text-xs text-stone">Yêu cầu file gốc trước đã bị từ chối.</span>
+            )}
+            {(!fileRequest || fileRequest.status === "declined") && (
               <button
                 type="button"
                 disabled={pending}

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService } from "@/lib/orders/order-service";
 
 /** POST /api/orders/:orderId/confirm — "Xác nhận đã nhận" (buyer). Cộng
@@ -8,10 +7,11 @@ import { OrderService } from "@/lib/orders/order-service";
  * dùng lại cron settle-pending sẵn có) và đóng đơn. Xem
  * src/app/api/orders/cron/auto-confirm cho nhánh hệ thống tự xác nhận
  * sau 7 ngày nếu buyer không bấm. */
-export async function POST(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

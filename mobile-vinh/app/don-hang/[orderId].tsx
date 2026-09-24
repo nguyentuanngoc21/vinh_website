@@ -6,9 +6,10 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { Button, Notice, ScreenHeader } from '../../src/components/Form';
 import { StatusPill } from '../../src/components/OrderSummary';
+import { OrderActions } from '../../src/components/OrderActions';
 import {
-  depositAmount, eventLabel, formatDateTime, getOrder, getOrderAssets, getOrderEvents, partyName, paymentDue,
-  SCOPE_LABELS, SERVICE_LABELS, type Order, type OrderAsset, type OrderEvent,
+  depositAmount, eventLabel, formatDateTime, getOrder, getOrderAssets, getOrderEvents, getOrderRequests, partyName, paymentDue,
+  SCOPE_LABELS, SERVICE_LABELS, type CancelRequest, type FileRequest, type Order, type OrderAsset, type OrderEvent,
 } from '../../src/services/orders';
 
 export default function OrderDetail() {
@@ -34,6 +35,7 @@ function Detail({ userId, orderId }: { userId: string; orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [events, setEvents] = useState<OrderEvent[]>([]);
   const [assets, setAssets] = useState<OrderAsset[]>([]);
+  const [requests, setRequests] = useState<{ fileRequest: FileRequest | null; cancelRequest: CancelRequest | null }>({ fileRequest: null, cancelRequest: null });
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [assetError, setAssetError] = useState('');
@@ -47,10 +49,12 @@ function Detail({ userId, orderId }: { userId: string; orderId: string }) {
       if (request !== sequence.current) return;
       setOrder(next);
       // Timeline and deliverables are secondary: show the order even if they fail.
-      const [nextEvents, nextAssets] = await Promise.allSettled([getOrderEvents(userId, orderId),
-        next.status === 'delivered' || next.status === 'completed' || next.status === 'disputed' ? getOrderAssets(userId, orderId) : Promise.resolve([])]);
+      const [nextEvents, nextAssets, nextRequests] = await Promise.allSettled([getOrderEvents(userId, orderId),
+        next.status === 'delivered' || next.status === 'completed' || next.status === 'disputed' ? getOrderAssets(userId, orderId) : Promise.resolve([]),
+        getOrderRequests(userId, orderId)]);
       if (request !== sequence.current) return;
       if (nextEvents.status === 'fulfilled') setEvents(nextEvents.value);
+      if (nextRequests.status === 'fulfilled') setRequests(nextRequests.value);
       if (nextAssets.status === 'fulfilled') { setAssets(nextAssets.value); setAssetError(''); }
       else setAssetError('Không tải được sản phẩm bàn giao. Kéo xuống để thử lại.');
     } catch (e) { if (request === sequence.current) setError(e instanceof Error ? e.message : 'Không tải được đơn hàng.'); }
@@ -81,6 +85,13 @@ function Detail({ userId, orderId }: { userId: string; orderId: string }) {
         <Text className="mt-1 leading-6 text-stone">Thanh toán đơn hàng hiện thực hiện trên website Vịnh, trong hội thoại với {partyName(order)}.</Text>
         {!!web && /^https?:\/\//.test(web) && <Button label="Mở website để thanh toán" secondary
           onPress={() => void WebBrowser.openBrowserAsync(`${web}/ca-nhan?tab=chat&chat=${order.counterpart.id}`)} />}
+      </View>}
+
+      {/* Keyed by status so drafts typed in the action forms reset when the order moves on. */}
+      <OrderActions key={order.status} userId={userId} order={order} fileRequest={requests.fileRequest} onChanged={() => void load()} />
+      {requests.cancelRequest && <View className="mt-5 rounded-2xl border border-red-700 bg-white p-4">
+        <Text className="font-bold text-red-700">{requests.cancelRequest.requested_by === userId ? 'Bạn đã yêu cầu hủy đơn' : `${partyName(order)} yêu cầu hủy đơn`}</Text>
+        <Text className="mt-1 leading-6 text-stone">Hoàn {xu(requests.cancelRequest.refund_amount)} cho người đặt nếu hai bên đồng ý. Xử lý yêu cầu hủy hiện thực hiện trên website.</Text>
       </View>}
 
       <View className="mt-5 rounded-2xl bg-white px-4">
@@ -119,7 +130,7 @@ function Detail({ userId, orderId }: { userId: string; orderId: string }) {
         <Text className="font-bold text-brand-ink">{eventLabel(event.event_type)}{typeof event.payload?.amount === 'number' ? ` · ${xu(event.payload.amount)}` : ''}</Text>
         <Text className="text-sm text-stone">{formatDateTime(event.created_at)}{event.actor_id ? event.actor_id === userId ? ' · bạn' : ` · ${partyName(order)}` : ' · hệ thống'}</Text>
       </View>)}
-      <Text className="mt-4 text-sm leading-5 text-stone">Các thao tác trên đơn (brief, bản nháp, bàn giao, hủy…) đang được đưa lên app; hiện vẫn thực hiện trên website.</Text>
+      <Text className="mt-4 text-sm leading-5 text-stone">Hủy đơn, mất liên lạc, tranh chấp và thanh toán hiện thực hiện trên website.</Text>
     </ScrollView>
   </SafeAreaView>;
 }

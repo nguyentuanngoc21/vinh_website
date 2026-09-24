@@ -113,7 +113,14 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
   và thẻ đơn trong hội thoại Tin nhắn như web. Chi tiết: trạng thái, giá/cọc/đã trả/còn
   lại (xu), phạm vi, brief, số lần sửa, mốc thời gian, sản phẩm bàn giao (ảnh watermark
   hoặc bản thu, link ký 15 phút) và nhật ký sự kiện. Thanh toán đơn tạm thực hiện trên
-  website (chủ dự án quyết định 24/09); các thao tác khác trên đơn làm ở 4b/4c.
+  website (chủ dự án quyết định 24/09).
+- Đơn hàng — luồng chính (Phase 4b), mục "Việc cần làm" theo vai trò/trạng thái như web:
+  người đặt chọn phạm vi, lưu/chốt brief, duyệt bản nháp hoặc yêu cầu sửa (có ghi chú),
+  xác nhận đã nhận; người thực hiện gắn truyện (viết thuê), gửi bản nháp, bàn giao ảnh/
+  audio tối đa 30 MB. Tệp bàn giao tải thẳng lên Storage qua signed URL rồi server
+  watermark/lưu như web. Tệp gốc: một bên yêu cầu, bên kia đồng ý/từ chối, sau đó tải
+  bằng link 15 phút. Mọi thao tác không hoàn tác có hộp xác nhận. Hủy đơn, mất liên lạc,
+  tranh chấp (4c) và thanh toán vẫn làm trên website.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -218,6 +225,7 @@ node --test scripts/test-registration.cjs
 node --test scripts/test-personal-info.cjs
 node --test scripts/test-quests.cjs
 node --test scripts/test-orders.cjs
+node --test scripts/test-order-actions.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs

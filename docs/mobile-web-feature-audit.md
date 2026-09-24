@@ -16,6 +16,14 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Đơn hàng — luồng chính (Phase 4b): phạm vi, brief, bản nháp, duyệt/sửa, bàn giao (signed
+  upload, tối đa 30 MB), nghiệm thu, gắn truyện, tệp gốc — qua `/api/mobile/orders/[id]/action`
+  chuyển tiếp tới route web. Thêm `GET /api/orders/[id]/requests` (yêu cầu tệp gốc/hủy đang
+  chờ) và `POST /api/orders/[id]/deliver/upload-url`. Route bàn giao web nay kiểm tra trạng
+  thái trước khi lưu file và nhận thêm `{ uploadPath }`.
+  **Đã sửa lỗi web:** `order-card.tsx` trước đây chỉ giữ yêu cầu tệp gốc/hủy trong state của
+  người gửi — bên kia không thấy để đồng ý. Nay thẻ đơn tải `/requests` khi mở, hiện link
+  tải file gốc đã được đồng ý cho cả 2 bên và cho yêu cầu lại sau khi bị từ chối.
 - Đơn hàng — xem (Phase 4a): danh sách đơn của tôi, thẻ đơn trong Tin nhắn, chi tiết,
   nhật ký, sản phẩm bàn giao. Đã sửa lỗi chèn filter ở `GET /api/orders?withUserId=`
   (`listOrdersForUser` kiểm tra UUID). Thêm migration
