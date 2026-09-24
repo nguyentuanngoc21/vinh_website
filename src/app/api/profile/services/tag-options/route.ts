@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import type { ServiceType } from "@/lib/supabase/types";
 
 const SERVICE_TYPES: ServiceType[] = ["illustration", "voice", "ghostwriting"];
@@ -16,7 +17,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "serviceType không hợp lệ." }, { status: 400 });
   }
 
-  const supabase = createServiceRoleClient();
+  let supabase;
+  try { supabase = request.headers.has('authorization') ? (await getRequestContext(request)).client : createServiceRoleClient(); }
+  catch (error) { return requestError(error); }
   const { data, error } = await supabase
     .from("service_tag_options")
     .select("group_key, group_label, label, tier, rule, multi, optional, warn_text")

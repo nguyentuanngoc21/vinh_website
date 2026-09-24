@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 
 // Cùng khuôn ALLOWED_MIME_EXT với src/app/api/profile/cover/route.ts +
 // src/app/api/authoring/books/[bookId]/cover/route.ts — thêm audio cho
@@ -37,8 +37,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ lis
  * chính tác phẩm của seller, xem fetchAutoSamples()). */
 export async function POST(request: Request, { params }: { params: Promise<{ listingId: string }> }) {
   const { listingId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (error) { return requestError(error); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -64,6 +65,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ lis
   if (!ext) {
     return NextResponse.json({ error: "Định dạng không hỗ trợ." }, { status: 400 });
   }
+  if ((listing.service_type === 'voice' && !file.type.startsWith('audio/')) ||
+      (listing.service_type === 'illustration' && !file.type.startsWith('image/'))) {
+    return NextResponse.json({ error: 'Chọn đúng loại mẫu: ảnh cho minh họa, audio cho thu âm.' }, { status: 400 });
+  }
   if (file.size > SAMPLE_MAX_BYTES) {
     return NextResponse.json({ error: "File tối đa 15MB." }, { status: 400 });
   }
@@ -82,6 +87,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ lis
     .select("*")
     .single();
   if (error || !sample) {
+    await supabase.storage.from(bucket).remove([path]);
     console.error("[services] sample insert failed:", error);
     return NextResponse.json({ error: "Không lưu được sample." }, { status: 500 });
   }

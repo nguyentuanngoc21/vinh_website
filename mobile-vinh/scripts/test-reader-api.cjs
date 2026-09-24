@@ -51,6 +51,7 @@ test('guest gets preview only, with uncached response', async () => {
   const response = await setup().get();
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   const body = await response.json();
+  assert.equal(body.bookId, 'book');
   assert.equal(body.gate, 'login'); assert.equal(body.content, 'One\n\nTwo'); assert.equal(body.nextId, 'next');
 });
 test('guest and unpaid user cannot fetch paid content', async () => {

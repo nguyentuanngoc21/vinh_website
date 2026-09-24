@@ -1,0 +1,112 @@
+# Kế hoạch triển khai app mobile Vịnh
+
+Lập ngày 24/09/2026. Căn cứ: `mobile-vinh/README.md`, `docs/mobile-web-feature-audit.md`
+và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành từng phase.
+
+## Nguyên tắc chung
+
+- Backend: mỗi tính năng có route `/api/mobile/*` dùng `getRequestContext`
+  (`src/lib/mobile/request-context.ts`) và gọi lại service sẵn có trong `src/lib/*`.
+  Không sao chép nghiệp vụ, giữ nguyên kiểm tra quyền của web.
+- Kiểm thử: mỗi phase có `mobile-vinh/scripts/test-*.cjs` dùng DB giả, không ghi production.
+- Kiểm tra: `npx tsc --noEmit` + `npm run lint` (web và mobile), `npm run build` (web),
+  `npx expo export --platform all` (mobile).
+- Cập nhật `mobile-vinh/README.md` và `docs/mobile-web-feature-audit.md` theo từng phase.
+- Kết thúc mỗi phase: báo cáo → review → commit → sang phase sau.
+- Thay đổi schema: migration theo `docs/DEV_WORKFLOW.md`, báo trước khi làm.
+
+## Tổng quan
+
+| Phase | Nội dung | Quy mô | Phụ thuộc | Trạng thái |
+|---|---|---|---|---|
+| 0 | Chuẩn bị: commit, định danh app, cập nhật audit | Nhỏ | — | Đang làm |
+| 1 | Sự kiện đọc hợp lệ | Nhỏ | 0 | Đang làm |
+| 2 | Tài khoản và hồ sơ | Vừa | 0 | Chưa làm |
+| 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Chưa làm |
+| 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Chưa làm |
+| 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | Chưa làm |
+| 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Chưa làm |
+| 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |
+| 8 | Sáng tác (tùy chọn) | Lớn | Quyết định phạm vi | Chờ quyết định |
+| — | Sẵn sàng phát hành (song song) | Vừa | — | Chưa làm |
+
+## Phase 0 — Chuẩn bị
+
+- Commit phần mobile đang dở.
+- Thêm `ios.bundleIdentifier` và `android.package` vào `mobile-vinh/app.json`.
+- Cập nhật bảng trong `docs/mobile-web-feature-audit.md` cho khớp thực tế.
+
+Tiêu chí hoàn thành:
+- Git sạch; `expo export` thành công.
+- File audit phản ánh đúng các tính năng đã có (tin nhắn, cam kết, dịch vụ).
+
+## Phase 1 — Sự kiện đọc hợp lệ
+
+- `POST /api/mobile/books/[bookId]/reading-progress`: xác minh Bearer, kiểm tra
+  chương thuộc truyện, đã xuất bản và người dùng có quyền đọc; upsert `book_progress`;
+  khi `isLastParagraph` gọi `ReadingEventService.recordChapterCompletion`.
+- Mobile: `saveProgress` gọi API thay vì ghi thẳng Supabase; gửi `isLastParagraph`
+  khi đoạn đang xem là đoạn cuối chương.
+
+Tiêu chí hoàn thành:
+- Đọc hết chương trên mobile cập nhật `reading_history`, chuỗi và nhiệm vụ như web.
+- Chương khóa/không có quyền không ghi tiến độ hoặc sự kiện.
+- Gửi lặp không cộng thưởng hai lần (chống lặp phía server của `ReadingEventService`).
+
+## Phase 2 — Tài khoản và hồ sơ
+
+- 2a: đăng ký (OTP), quên/đặt lại mật khẩu (OTP, theo `docs/SUPABASE_SETUP.md` §5),
+  sửa tên/bio/avatar/ảnh bìa có nén ảnh.
+- 2b: xác minh CCCD (bucket private, signed URL, OCR có timeout), ngân hàng,
+  thông tin hợp đồng.
+- Cần `expo-image-picker`, `expo-image-manipulator` → build lại development build.
+- Chờ xác nhận: đăng ký trên mobile có bắt buộc CCCD như web không.
+
+## Phase 3 — Nhiệm vụ, chuỗi, thành tựu
+
+- Route mobile cho `quests/pool`, `claim`, `reset`, thành tựu.
+- Màn Nhiệm vụ (danh sách, tiến độ, đổi, nhận thưởng), hiển thị chuỗi và mốc, màn Thành tựu.
+
+## Phase 4 — Vòng đời đơn hàng
+
+- 4a Xem: danh sách, chi tiết, dòng sự kiện, thẻ đơn hàng trong chat.
+- 4b Luồng chính: brief, phạm vi, bản nháp, duyệt/yêu cầu sửa, giao sản phẩm,
+  nghiệm thu, tệp gốc.
+- 4c Nhánh phụ: hủy, mất liên lạc, tranh chấp, thỏa thuận tên tác giả.
+- 4d Mẫu tự động từ đơn hoàn tất.
+- Đặt cọc tạm khóa trên app cho tới Phase 7.
+
+## Phase 5 — Kết nối và tin nhắn nâng cao
+
+- Danh bạ Kết nối, trang hồ sơ người khác.
+- Realtime tin nhắn, phân trang tin cũ.
+- Push (`expo-notifications`) + bảng push token (migration).
+- Mở mọi loại liên kết thông báo trong app.
+
+## Phase 6 — Tương tác đọc và khám phá
+
+- Bình luận theo đoạn, highlight, bình chọn chương/trope, theo dõi tác giả/nhân vật,
+  danh sách nhân vật.
+- Tìm theo tác giả/nội dung, bảng xếp hạng (một số tab web còn là dữ liệu mẫu).
+- Audio: lưu vị trí nghe, tự phát bản tiếp theo, ghi lượt phát.
+
+## Phase 7 — Thanh toán (cần quyết định)
+
+- Mua chương bằng xu sẵn có: tương đối độc lập, có thể làm sớm hơn.
+- Nạp/rút xu: chờ rà soát chính sách IAP App Store/Google Play, hoàn thiện trang nạp
+  web (đang dùng dữ liệu mẫu) và adapter chi trả rút xu.
+
+## Phase 8 — Sáng tác (tùy chọn)
+
+- Không gian tác giả, Thiết kế, đăng bản thu. Có thể giữ trên web.
+
+## Song song — Sẵn sàng phát hành
+
+- Thay icon/splash mẫu của Expo.
+- EAS build; thử trên iOS/Android thật sau mỗi phase thêm module native (2, 5).
+
+## Câu hỏi còn mở
+
+1. Thứ tự: Nhiệm vụ (Phase 3) đặt trước Đơn hàng, khác đề xuất trong file audit.
+2. Đăng ký mobile có bắt buộc CCCD ngay lúc đăng ký không.
+3. Phase 8 có trong phạm vi app không.

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 
 const RECENT_MESSAGE_LIMIT = 300;
 
@@ -15,9 +14,10 @@ const RECENT_MESSAGE_LIMIT = 300;
  * bằng cách lấy N tin gần nhất rồi group trong JS — cùng tinh thần "join
  * bằng JS" đã dùng ở src/app/author/layout.tsx.
  */
-export async function GET() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function GET(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

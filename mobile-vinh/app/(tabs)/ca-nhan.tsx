@@ -2,16 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { AccountOverview } from '../../src/components/AccountOverview';
+import { router } from 'expo-router';
 import { requireSupabase } from '../../src/services/supabase';
 import { loginWithPassword, normalizeEmail, sendLoginCode, verifyLoginCode } from '../../src/services/auth';
 
 export default function Profile() {
   const { session, loading, error } = useAuth();
   if (loading) return <SafeAreaView className="flex-1 items-center justify-center bg-cream-card"><ActivityIndicator color="#143b4d" /></SafeAreaView>;
-  return <Account key={session?.user.id ?? 'guest'} email={session?.user.email} signedIn={!!session} restoreError={error} />;
+  return <Account key={session?.user.id ?? 'guest'} userId={session?.user.id} email={session?.user.email} signedIn={!!session} restoreError={error} />;
 }
 
-function Account({ email: accountEmail, signedIn, restoreError }: { email?: string; signedIn: boolean; restoreError: string }) {
+function Account({ email: accountEmail, userId, signedIn, restoreError }: { email?: string; userId?: string; signedIn: boolean; restoreError: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
@@ -51,7 +53,11 @@ function Account({ email: accountEmail, signedIn, restoreError }: { email?: stri
         {signedIn ? <>
           <Text className="mb-3 text-base text-brand-ink">{accountEmail}</Text>
           <Text className="text-base leading-7 text-stone">Bạn có thể tiếp tục đọc trọn vẹn các chương miễn phí và những chương đã mua trên cùng tài khoản.</Text>
-          <View className="mt-6 rounded-2xl border border-cream-border p-5"><Text className="leading-6 text-stone">Tủ sách, nhiệm vụ và ví xu sẽ được bổ sung trong các bản tiếp theo.</Text></View>
+          <ActionButton label="Thông báo →" onPress={() => router.push('/thong-bao')} secondary />
+          <ActionButton label="Tin nhắn →" onPress={() => router.push('/tin-nhan')} secondary />
+          <ActionButton label="Cam kết & Thỏa thuận →" onPress={() => router.push('/cam-ket')} secondary />
+          <ActionButton label="Dịch vụ của tôi →" onPress={() => router.push('/dich-vu')} secondary />
+          {userId && <AccountOverview key={userId} userId={userId} />}
           <ActionButton label="Đăng xuất trên thiết bị này" disabled={busy} secondary onPress={() => void perform(async () => {
             const { error } = await requireSupabase().auth.signOut({ scope: 'local' });
             if (error) throw new Error('Chưa đăng xuất được. Vui lòng thử lại.');

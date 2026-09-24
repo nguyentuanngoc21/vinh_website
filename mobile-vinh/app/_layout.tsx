@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import { supabase } from '../src/services/supabase';
 import { AuthProvider } from '../src/providers/AuthProvider';
+import { AudioProvider } from '../src/providers/AudioProvider';
 export { ErrorBoundary } from 'expo-router';
 export default function RootLayout() {
   useEffect(() => {
@@ -16,5 +17,5 @@ export default function RootLayout() {
     const subscription = AppState.addEventListener('change', sync);
     return () => { subscription.remove(); supabase?.auth.stopAutoRefresh(); };
   }, []);
-  return <AuthProvider><Stack screenOptions={{ headerShown: false }} /></AuthProvider>;
+  return <AuthProvider><AudioProvider><Stack screenOptions={{ headerShown: false }} /></AudioProvider></AuthProvider>;
 }

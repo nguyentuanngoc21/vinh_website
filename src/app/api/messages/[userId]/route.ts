@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import { isLikelyOffPlatform } from "@/lib/orders/off-platform-detector";
 
 const THREAD_MESSAGE_LIMIT = 200;
@@ -27,9 +26,11 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId: counterpartyId } = await params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(counterpartyId)) return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
   const context = resolveContext(new URL(request.url).searchParams.get("context"));
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -50,29 +51,27 @@ export async function GET(
     .or(
       `and(sender_id.eq.${userId},recipient_id.eq.${counterpartyId}),and(sender_id.eq.${counterpartyId},recipient_id.eq.${userId})`
     )
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false }).order('id', { ascending: false })
     .limit(THREAD_MESSAGE_LIMIT);
   if (error) {
     console.error("[messages] thread fetch failed:", error);
     return NextResponse.json({ error: "Không tải được hội thoại." }, { status: 500 });
   }
 
-  // Không await — đánh dấu đã đọc là tác dụng phụ, không cần chặn phản
-  // hồi GET này. Chỉ đánh dấu đúng hòm thư đang mở (context), không đụng
-  // tới hòm thư còn lại giữa cùng 2 người.
-  supabase
+  // Mark only the returned messages, never unseen older history or new arrivals.
+  const readResult = rows?.length ? await supabase
     .from("direct_messages")
     .update({ read_at: new Date().toISOString() })
     .eq("sender_id", counterpartyId)
     .eq("recipient_id", userId)
     .eq("context", context)
+    .in('id', rows.map(row => row.id))
     .is("read_at", null)
-    .then(({ error: markReadError }) => {
-      if (markReadError) console.error("[messages] mark read failed:", markReadError);
-    });
+    : { error: null };
 
   return NextResponse.json({
     context,
+    markReadFailed: !!readResult.error,
     counterparty: {
       userId: counterparty.id,
       nickname: counterparty.nickname,
@@ -82,7 +81,7 @@ export async function GET(
       // đổi tên/avatar hiển thị (danh tính người gửi luôn thật).
       isModerationThread: context === "moderation",
     },
-    messages: (rows ?? []).map((m) => ({
+    messages: (rows ?? []).reverse().map((m) => ({
       id: m.id,
       body: m.body,
       createdAt: m.created_at,
@@ -111,8 +110,10 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId: recipientId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipientId)) return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

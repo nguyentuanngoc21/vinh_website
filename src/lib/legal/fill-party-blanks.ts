@@ -31,7 +31,12 @@ function fillOne(html: string, label: string, rawValue: string | null | undefine
   // trước khi tới các dấu chấm; không có phần này thì bản có
   // <strong>Nhãn:</strong> ..... không khớp được.
   const pattern = new RegExp(`(${escapeRegExp(label)}\\s*:\\s*(?:<[^>]+>\\s*)*)\\.{4,}`, "i");
-  return html.replace(pattern, `$1<u>${display}</u>`);
+  // display có thể chứa ký tự "$" từ dữ liệu người dùng (địa chỉ, SĐT...) —
+  // .replace() diễn giải đặc biệt $$, $&, $`, $', $n trong CHUỖI THAY THẾ
+  // bất kể nó tới từ đâu, nên phải escape "$" thành "$$" ở đây để tránh
+  // chèn nhầm nội dung văn bản (vd giá trị "$'" sẽ chèn toàn bộ phần HTML
+  // sau vị trí khớp) khi hiển thị lại cho chính người dùng đó.
+  return html.replace(pattern, `$1<u>${display.replace(/\$/g, "$$$$")}</u>`);
 }
 
 /**

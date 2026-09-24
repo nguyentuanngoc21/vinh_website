@@ -49,6 +49,7 @@ function ReaderContent({ chapterId }: { chapterId: string }) {
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.panel }}>
       {button('←', () => router.canGoBack() ? router.back() : router.replace('/'))}
       <Text numberOfLines={1} style={{ flex: 1, color: colors.muted, marginHorizontal: 12 }}>{chapter?.bookTitle || 'Đọc truyện'}</Text>
+      {chapter && button('Mục lục', () => router.replace({ pathname: '/truyen/[bookId]', params: { bookId: chapter.bookId } }))}
       {button('Aa', () => setShowSettings(true), false, !ready)}
     </View>
     {!chapter && !error && <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={colors.text} /></View>}
