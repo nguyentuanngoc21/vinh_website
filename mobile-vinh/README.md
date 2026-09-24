@@ -102,6 +102,13 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
   riêng tư, chỉ hiện 4 số cuối); tài khoản ngân hàng (chọn từ danh sách ngân hàng
   của web, số tài khoản 6–19 chữ số). Cam kết & Thỏa thuận mở thẳng màn này khi
   thiếu thông tin các bên.
+- Nhiệm vụ (Cá nhân → Nhiệm vụ hôm nay): pool nhiệm vụ hôm nay (tự tạo khi mở lần
+  đầu), tiến độ, nhận thưởng xu, đổi nhiệm vụ có xác nhận trong giới hạn lượt/ngày,
+  số ngày chuỗi đọc. Tải lại khi quay về màn hình và khi kéo xuống. Đọc hết chương
+  trên mobile (Phase 1) được tính vào tiến độ như web.
+- Thành tựu: nhóm Đọc giả/Tác giả/Người thu âm/Thiết kế, thanh tiến độ cho thành tựu
+  chưa đạt, ngày đạt và thưởng xu (cộng tự động). Mốc chuỗi đọc hiện trong nhóm Đọc giả.
+  Chưa có cứu chuỗi bằng xu — web cũng chưa có giao diện cho chức năng này.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -204,6 +211,7 @@ node --test scripts/test-library.cjs
 node --test scripts/test-reading-progress.cjs
 node --test scripts/test-registration.cjs
 node --test scripts/test-personal-info.cjs
+node --test scripts/test-quests.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs

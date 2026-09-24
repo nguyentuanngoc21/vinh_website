@@ -55,6 +55,8 @@ function Account({ email: accountEmail, userId, signedIn, restoreError }: { emai
           <Text className="text-base leading-7 text-stone">Bạn có thể tiếp tục đọc trọn vẹn các chương miễn phí và những chương đã mua trên cùng tài khoản.</Text>
           <ActionButton label="Sửa hồ sơ →" onPress={() => router.push('/ho-so')} secondary />
           <ActionButton label="Thông tin cá nhân →" onPress={() => router.push('/thong-tin-ca-nhan')} secondary />
+          <ActionButton label="Nhiệm vụ hôm nay →" onPress={() => router.push('/nhiem-vu')} secondary />
+          <ActionButton label="Thành tựu →" onPress={() => router.push('/thanh-tuu')} secondary />
           <ActionButton label="Thông báo →" onPress={() => router.push('/thong-bao')} secondary />
           <ActionButton label="Tin nhắn →" onPress={() => router.push('/tin-nhan')} secondary />
           <ActionButton label="Cam kết & Thỏa thuận →" onPress={() => router.push('/cam-ket')} secondary />

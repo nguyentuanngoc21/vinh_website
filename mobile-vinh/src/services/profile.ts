@@ -6,6 +6,7 @@ export type MyProfile = {
   username: string; nickname: string; bio: string; nicknameUpdatedAt: string | null;
   avatarUrl: string | null; coverImageUrl: string | null;
   realName: string; phone: string; dateOfBirth: string | null; address: string;
+  currentQuestStreak: number;
 };
 export const NICKNAME_MAX = 40;
 export const BIO_MAX = 280;

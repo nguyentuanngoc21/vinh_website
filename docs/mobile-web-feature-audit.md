@@ -16,6 +16,10 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Nhiệm vụ, chuỗi, thành tựu (Phase 3): danh sách nhiệm vụ hôm nay, tiến độ, nhận
+  thưởng, đổi nhiệm vụ, số ngày chuỗi và trang thành tựu theo vai trò, qua
+  `/api/mobile/quests*` và `/api/mobile/achievements` bọc route web. Cứu chuỗi bằng xu
+  vẫn chưa có giao diện ở cả web và mobile.
 - Tài khoản và hồ sơ (Phase 2a): đăng ký (CCCD tùy chọn như web, OTP), quên mật
   khẩu bằng OTP, sửa nickname/giới thiệu/ảnh đại diện/ảnh bìa. Đăng ký web và mobile
   dùng chung `src/lib/registration.ts`.

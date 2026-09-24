@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { AchievementService } from "@/lib/quests/achievement-service";
 
 /**
@@ -8,9 +7,10 @@ import { AchievementService } from "@/lib/quests/achievement-service";
  * thiết kế/đọc giả), tự đồng bộ (lazy-pull) trước khi trả về, giống
  * /api/quests/pool tự tạo pool hôm nay. FE lọc/tô màu theo `forRole`.
  */
-export async function GET() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function GET(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
