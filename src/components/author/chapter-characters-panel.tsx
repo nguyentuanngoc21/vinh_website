@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UsersThreeIcon } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 import type { ManagedCharacter } from "@/components/author/character-manager";
 
 const ROLE_LABEL: Record<ManagedCharacter["role"], string> = {
@@ -19,13 +19,18 @@ const ROLE_LABEL: Record<ManagedCharacter["role"], string> = {
  * tags…), không cần nút "Lưu" riêng.
  */
 export function ChapterCharactersPanel({
+  bookId,
   chapterId,
   bookCharacters,
   initialTaggedCharacterIds,
+  onTaggedChange,
 }: {
+  bookId: string;
   chapterId: string;
   bookCharacters: ManagedCharacter[];
   initialTaggedCharacterIds: string[];
+  /** Báo số nhân vật đã gắn cho publish-panel.tsx (dấu ✓ của mục). */
+  onTaggedChange?: (count: number) => void;
 }) {
   const [tagged, setTagged] = useState<Set<string>>(new Set(initialTaggedCharacterIds));
   const [saving, setSaving] = useState(false);
@@ -51,6 +56,7 @@ export function ChapterCharactersPanel({
         return;
       }
       setTagged(next);
+      onTaggedChange?.(next.size);
     } catch {
       setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
     } finally {
@@ -58,13 +64,24 @@ export function ChapterCharactersPanel({
     }
   };
 
-  if (bookCharacters.length === 0) return null;
+  // Trước đây trả null khi truyện chưa có nhân vật — tác giả không biết tính năng này tồn tại.
+  if (bookCharacters.length === 0) {
+    return (
+      <p className="text-[12.5px] leading-relaxed text-stone-alt">
+        Truyện chưa có nhân vật.{" "}
+        <Link href={`/author/${bookId}`} className="font-semibold text-brand-gold-dark hover:text-brand-ink">
+          Thêm nhân vật ở trang tác phẩm
+        </Link>{" "}
+        để gắn vào chương và cho độc giả bình chọn trope.
+      </p>
+    );
+  }
 
   return (
-    <div className="mt-5 rounded-[12px] border border-cream-border bg-white p-5">
-      <div className="mb-3 flex items-center gap-2 text-xs font-bold tracking-wide text-stone-alt">
-        <UsersThreeIcon size={14} weight="bold" /> NHÂN VẬT TRONG CHƯƠNG NÀY
-      </div>
+    <div>
+      <p className="mb-2.5 text-[12px] text-stone-alt">
+        Chọn nhân vật xuất hiện trong chương — độc giả bình chọn trope trong số này. Tự lưu khi chọn.
+      </p>
       <div className="flex flex-wrap gap-2">
         {bookCharacters.map((c) => (
           <button
@@ -72,7 +89,8 @@ export function ChapterCharactersPanel({
             type="button"
             disabled={saving}
             onClick={() => toggle(c.id)}
-            className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 ${
+            aria-pressed={tagged.has(c.id)}
+            className={`min-h-9 rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 ${
               tagged.has(c.id)
                 ? "border-brand-gold bg-brand-gold text-brand-ink"
                 : "border-cream-border bg-white text-stone-dark"
@@ -82,7 +100,7 @@ export function ChapterCharactersPanel({
           </button>
         ))}
       </div>
-      {error && <div className="mt-2.5 text-[12.5px] font-medium text-[#B02A37]">{error}</div>}
+      {error && <div className="mt-2.5 text-[12.5px] font-medium text-error">{error}</div>}
     </div>
   );
 }

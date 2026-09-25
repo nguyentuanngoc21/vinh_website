@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 
 /**
  * POST /api/authoring/books/:bookId/finalize — "Hoàn thiện" (một chiều,
@@ -8,11 +8,16 @@ import { createClient } from "@/lib/supabase/server";
  * (trigger lock_manuscript_grants_on_finalize) — không đổi trường
  * author_display/is_ghostwritten nào (Module 5/6, việc riêng, phase sau).
  */
-export async function POST(_request: Request, { params }: { params: Promise<{ bookId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 
@@ -21,7 +26,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ bo
     .select("id, author_id, finalized_at")
     .eq("id", bookId)
     .maybeSingle();
-  if (!current || current.author_id !== userData.user.id) {
+  if (!current || current.author_id !== userId) {
     return NextResponse.json({ error: "Không tìm thấy truyện hoặc bạn không có quyền." }, { status: 404 });
   }
   if (current.finalized_at) {

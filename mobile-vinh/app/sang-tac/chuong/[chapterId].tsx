@@ -9,6 +9,7 @@ import {
   type EditableChapter,
 } from '../../../src/services/authoring';
 import { promptMissingAgreement } from '../../../src/services/agreement-prompt';
+import { ChapterCharacters } from '../../../src/components/ChapterCharacters';
 
 // The web chapter editor (/author/[bookId]/[chapterId]) as plain text: paragraphs are separated by a
 // blank line, exactly as the reader splits them. No B/I/H2 buttons — the reader shows no markdown.
@@ -128,6 +129,7 @@ function Editor({ userId, data, initial }: { userId: string; data: EditableChapt
           style={{ minHeight: 360, textAlignVertical: 'top' }} />
         <Field label="Giá chương (xu, 0 = miễn phí)" value={price} onChangeText={setPrice} editable={!busy && !locked} keyboardType="number-pad" maxLength={7}
           error={priceValid ? undefined : 'Nhập số nguyên từ 0 trở lên.'} />
+        <ChapterCharacters userId={userId} chapterId={chapter.id} bookId={book.id} characters={data.characters} initial={data.taggedCharacterIds} disabled={locked} />
         <Check checked={markLast} onToggle={toggleLast}>
           <Text className="font-bold text-brand-ink">Đây là chương cuối</Text>
           <Text className="mt-1 leading-5 text-stone">{saved.isLastChapter ? 'Đã đánh dấu — không thể bỏ.' : 'Không thể bỏ đánh dấu sau khi lưu.'}</Text>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import type { CharacterRole } from "@/lib/supabase/types";
 
 const ROLES: CharacterRole[] = ["hero", "villain", "neutral"];
@@ -33,7 +33,16 @@ export async function POST(
   const tropeRaw = typeof body?.trope === "string" ? body.trope.trim().slice(0, MAX_TROPE_LENGTH) : "";
   const trope = tropeRaw || null;
 
-  const supabase = await createClient();
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
+  }
   const { data, error } = await supabase
     .from("characters")
     .insert({ book_id: bookId, name, role, trope })

@@ -1,4 +1,5 @@
 import { PATCH as saveChapter, DELETE as deleteChapter } from '@/app/api/authoring/chapters/[chapterId]/route';
+import { PUT as setCharacters } from '@/app/api/authoring/chapters/[chapterId]/characters/route';
 import { getUserContext, requestError } from '@/lib/mobile/request-context';
 import { mobileResponse } from '@/lib/mobile/response';
 import { forwardRequest, pick } from '@/lib/mobile/forward';
@@ -31,6 +32,8 @@ export function POST(request: Request, context: Ctx) {
         return saveChapter(forwardRequest(request, 'PATCH', pick(body, ['title', 'content', 'published', 'price', 'is_last_chapter'])), context);
       case 'delete':
         return deleteChapter(forwardRequest(request, 'DELETE'), context);
+      case 'set-characters':
+        return setCharacters(forwardRequest(request, 'PUT', { characterIds: body.characterIds }), context);
       default:
         return Response.json({ error: 'Thao tác không hợp lệ.' }, { status: 400 });
     }

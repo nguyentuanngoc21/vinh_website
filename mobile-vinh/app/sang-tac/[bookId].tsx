@@ -10,6 +10,8 @@ import {
   type BookDetail, type BookFields, type ChapterRow,
 } from '../../src/services/authoring';
 import { promptMissingAgreement } from '../../src/services/agreement-prompt';
+import { CharacterManager } from '../../src/components/CharacterManager';
+import { ManuscriptShare } from '../../src/components/ManuscriptShare';
 
 // The web /author/[bookId] overview: book details, chapters (drafts and removed ones too).
 export default function BookOverview() {
@@ -39,7 +41,8 @@ function Overview({ userId, bookId }: { userId: string; bookId: string }) {
     const request = ++sequence.current;
     getMyBook(userId, bookId).then(next => {
       if (request !== sequence.current) return;
-      setBook(next); setInfo(toInfo(next)); setOrder(null);
+      // Keep unsaved edits to the book details when another section reloads the book.
+      setBook(next); setInfo(prev => prev ?? toInfo(next)); setOrder(null);
     }).catch(e => { if (request === sequence.current) setError(e instanceof Error ? e.message : 'Không tải được truyện.'); });
     return () => { sequence.current++; };
   }, [userId, bookId]);
@@ -131,9 +134,16 @@ function Overview({ userId, bookId }: { userId: string; bookId: string }) {
           <Button label="Hủy sắp xếp" disabled={busy} secondary onPress={() => setOrder(null)} />
         </> : <>
           <Button label={busy ? 'Đang xử lý…' : '+ Chương mới'} disabled={busy} onPress={newChapter} />
+          <Button label="Nhập bản thảo (.txt, .docx)" disabled={busy} secondary onPress={() => router.push({ pathname: '/sang-tac/nhap', params: { bookId } })} />
           {book.chapters.length > 1 && <Button label="Sắp xếp chương" disabled={busy} secondary onPress={() => setOrder(book.chapters)} />}
         </>}
         <Text className="mt-2 leading-5 text-stone">Chỉ xoá được chương nháp chưa có người mua. Chương cuối luôn đứng cuối.</Text>
+
+        <Text className="mb-3 mt-8 text-lg font-bold text-brand-ink">Nhân vật ({book.characters.length})</Text>
+        <CharacterManager userId={userId} bookId={bookId} characters={book.characters} onChanged={load} />
+
+        <Text className="mb-3 mt-8 text-lg font-bold text-brand-ink">Chia sẻ bản thảo</Text>
+        <ManuscriptShare userId={userId} book={book} onChanged={load} />
 
         <Text className="mb-3 mt-8 text-lg font-bold text-brand-ink">Thông tin truyện</Text>
         <BookInfoForm value={info} onChange={setInfo} disabled={busy} exclusivityLocked={book.exclusivityLocked} />

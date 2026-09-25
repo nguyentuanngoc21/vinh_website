@@ -15,6 +15,7 @@ export type ChapterRow = { id: string; title: string; orderIndex: number; publis
 export type BookDetail = {
   id: string; title: string; synopsis: string | null; genre: string | null; tags: string[]; slug: string; published: boolean;
   isExclusive: boolean; exclusivityLocked: boolean; finalized: boolean; coverUrl: string | null; characters: Character[]; chapters: ChapterRow[];
+  manuscriptGrant: { username: string; nickname: string | null; grantedAt: string; locked: boolean } | null;
 };
 export type EditableChapter = {
   book: { id: string; title: string; isExclusive: boolean };
@@ -44,6 +45,52 @@ export const reorderChapters = (userId: string, bookId: string, chapterIds: stri
 export const saveChapter = (userId: string, chapterId: string, fields: ChapterFields) =>
   mobileApi<{ published: boolean }>(chapterPath(chapterId), userId, { action: 'save', ...fields }, { timeoutMs: 30000 });
 export const deleteChapter = (userId: string, chapterId: string) => mobileApi(chapterPath(chapterId), userId, { action: 'delete' });
+
+// Characters (same limits as /api/authoring/books/[bookId]/characters): name ≤ 60, trope ≤ 40.
+export const CHARACTER_ROLES = [['hero', 'Chính diện'], ['villain', 'Phản diện'], ['neutral', 'Trung lập']] as const;
+export type CharacterFields = { name: string; role: string; trope: string | null };
+export const addCharacter = (userId: string, bookId: string, fields: CharacterFields) =>
+  mobileApi<{ character: Character }>(bookPath(bookId), userId, { action: 'add-character', ...fields });
+export const updateCharacter = (userId: string, bookId: string, characterId: string, fields: CharacterFields) =>
+  mobileApi<{ character: Character }>(bookPath(bookId), userId, { action: 'update-character', characterId, ...fields });
+export const deleteCharacter = (userId: string, bookId: string, characterId: string) =>
+  mobileApi(bookPath(bookId), userId, { action: 'delete-character', characterId });
+export const setChapterCharacters = (userId: string, chapterId: string, characterIds: string[]) =>
+  mobileApi<{ characterIds: string[] }>(chapterPath(chapterId), userId, { action: 'set-characters', characterIds });
+
+// Manuscript sharing: one account at a time until Hoàn thiện (irreversible — locks the grant).
+export const shareManuscript = (userId: string, bookId: string, username: string) => mobileApi(bookPath(bookId), userId, { action: 'share', username });
+export const unshareManuscript = (userId: string, bookId: string) => mobileApi(bookPath(bookId), userId, { action: 'unshare' });
+export const finalizeBook = (userId: string, bookId: string) => mobileApi(bookPath(bookId), userId, { action: 'finalize' });
+
+// Manuscript import. .docx is converted on the server (mammoth, ≤ 4 MB); .txt is read on the device.
+export const MAX_DOCX_BYTES = 4 * 1024 * 1024;
+export type HeadingChapter = { no: number; title: string; content: string; words: number };
+export function extractDocx(userId: string, file: { uri: string; name: string; mimeType?: string | null }) {
+  const form = new FormData();
+  form.append('file', { uri: file.uri, name: file.name, type: file.mimeType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } as unknown as Blob);
+  return mobileApi<{ text: string; headingChapters: HeadingChapter[] }>('authoring/manuscripts/extract', userId, form, { timeoutMs: 90000 });
+}
+export async function readTextFile(uri: string) {
+  return (await new File(uri).text()).replace(/\r\n?/g, '\n');
+}
+/**
+ * Splits chapters into requests under ~3 MB of JSON each (the bulk route rejects > 4 MB and the
+ * platform body limit is ~4.5 MB), keeping order. A single chapter is at most 200,000 characters.
+ */
+export function batchChapters<T extends { title: string; content: string }>(chapters: T[], maxBytes = 3 * 1024 * 1024) {
+  const batches: T[][] = [];
+  let current: T[] = [];
+  let size = 0;
+  for (const c of chapters) {
+    // UTF-8 upper bound: Vietnamese letters take up to 3 bytes; JSON escaping adds a little.
+    const bytes = (c.title.length + c.content.length) * 3 + 64;
+    if (current.length && size + bytes > maxBytes) { batches.push(current); current = []; size = 0; }
+    current.push(c); size += bytes;
+  }
+  if (current.length) batches.push(current);
+  return batches;
+}
 
 /** Web-style tag input: comma-separated, trimmed, no duplicates, at most 20. */
 export function parseTags(text: string) {

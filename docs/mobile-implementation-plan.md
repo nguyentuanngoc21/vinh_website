@@ -27,7 +27,7 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | 5a–5c xong (24/09); migration realtime chờ áp; push → chuẩn bị phát hành |
 | 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Xong (24/09), đã review |
 | 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định — làm sau cùng (25/09) |
-| 8 | Sáng tác | Lớn | 2 | 8a–8b xong (25/09), đã review; 8c–8e đang làm — trước Phase 7 |
+| 8 | Sáng tác | Lớn | 2 | 8a–8b xong, đã review; 8c xong (25/09), chờ review; 8d–8e tiếp theo — trước Phase 7 |
 | — | Sẵn sàng phát hành (song song) | Vừa | — | Chưa làm |
 
 ## Phase 0 — Chuẩn bị
@@ -199,6 +199,19 @@ Tiến độ 8a–8b (25/09, đã review):
   người mua". Test: docs/supabase/tests/20260925_chapter_delete_and_reorder.test.sql (11 PASS).
 - Web (25/09, chờ review): trang tổng quan truyện có nút Sắp xếp chương (↑↓, Lưu thứ tự) và nút Xoá cho
   chương nháp xoá được; nhãn "Bị gỡ" cho chương đang bị quản trị viên gỡ.
+
+Tiến độ 8c (25/09, chờ review):
+- Route web nhận Bearer: `books/[bookId]/characters` (POST), `characters/[characterId]` (PATCH/DELETE),
+  `chapters/[chapterId]/characters` (PUT), `books/[bookId]/share` (POST/DELETE), `finalize` (POST),
+  `manuscripts/extract` (POST, multipart). Mobile: thêm action vào dispatcher sách/chương và
+  `api/mobile/authoring/manuscripts/extract`.
+- App tách chương bằng bản sao `mobile-vinh/src/services/split-chapters.ts`; test đối chiếu kết quả với
+  bản web.
+- Ghi nhận (chưa sửa): trên web, "Nhập bản thảo" vào truyện mới không cho chọn độc quyền — luôn tạo
+  truyện độc quyền, nên tác giả chưa xác nhận Chính sách độc quyền bị lỗi 403 và không nhập được.
+  App đã có ô chọn độc quyền.
+- Sửa web: mục "Nhân vật trong chương" trước đây nằm ngoài lưới 2 cột của trang soạn (bị khuất) và ẩn hẳn
+  khi truyện chưa có nhân vật; nay là một mục trong panel bên phải, có gợi ý + link khi chưa có nhân vật.
 
 ## Song song — Sẵn sàng phát hành
 

@@ -34,6 +34,8 @@ function Works({ userId }: { userId?: string }) {
       <Text accessibilityRole="header" className="mb-2 text-2xl font-bold text-brand-ink">Sáng tác của tôi</Text>
       {!!userId && <Pressable accessibilityRole="button" onPress={() => router.push('/sang-tac/moi')} className="mb-3 min-h-12 items-center justify-center rounded-2xl bg-brand-ink p-4">
         <Text className="font-bold text-white">+ Tác phẩm mới</Text></Pressable>}
+      {!!userId && <Pressable accessibilityRole="button" onPress={() => router.push('/sang-tac/nhap')} className="mb-3 min-h-12 items-center justify-center rounded-2xl border border-brand-ink p-4">
+        <Text className="font-bold text-brand-ink">Nhập bản thảo thành truyện mới</Text></Pressable>}
       {!!error && <Text accessibilityLiveRegion="polite" className="mb-2 text-red-700">{error}</Text>}
     </View>
     {!userId ? <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/ca-nhan')} className="p-6"><Text className="text-brand-ink">Đăng nhập để sáng tác →</Text></Pressable>

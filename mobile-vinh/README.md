@@ -155,6 +155,11 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
   (theo tài khoản và chương) và hỏi khôi phục khi mở lại. Chương bị quản trị viên gỡ hiện lý do và
   khoá sửa. Thiếu Chính sách độc quyền → mở thẳng văn bản đó trong Cam kết. Cần migration
   `20260925_add_chapter_delete_and_reorder.sql` cho xoá/sắp xếp chương.
+- Sáng tác (Phase 8c): nhân vật (thêm/sửa/xoá, vai trò, trope) và gắn nhân vật vào chương; chia sẻ
+  bản thảo cho 1 tài khoản, gỡ chia sẻ, Hoàn thiện (khoá vĩnh viễn); nhập bản thảo .txt (đọc trên
+  máy), .docx (≤ 4 MB, đổi sang văn bản trên máy chủ) hoặc dán văn bản, tách chương như web
+  (Heading Word / "Chương N" / 3 dòng trống / một chương, tối đa 300 chương), vào truyện mới
+  (chọn độc quyền) hoặc cuối truyện đang mở; chương gửi theo lô dưới ~3 MB.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ

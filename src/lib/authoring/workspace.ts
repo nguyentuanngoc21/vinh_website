@@ -62,7 +62,7 @@ async function ownBook(client: Client, userId: string, bookId: string) {
 export async function getAuthorBook(client: Client, userId: string, bookId: string) {
   const book = await ownBook(client, userId, bookId);
   if (!book) return null;
-  const [{ data: chapters }, coverUrl, { data: characters }] = await Promise.all([
+  const [{ data: chapters }, coverUrl, { data: characters }, { data: grant }] = await Promise.all([
     client
       .from("chapters")
       .select("id, title, order_index, published, price, is_last_chapter, removed_at, removed_reason_detail")
@@ -70,7 +70,15 @@ export async function getAuthorBook(client: Client, userId: string, bookId: stri
       .order("order_index", { ascending: true }),
     resolveBookCoverUrl(client, book),
     client.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
+    // Tối đa 1 lượt chia sẻ bản thảo đang hoạt động/sách (partial unique index) — như author/[bookId]/page.tsx.
+    client
+      .from("manuscript_access_grants")
+      .select("granted_at, locked_at, profiles:granted_to_user_id(username, nickname)")
+      .eq("book_id", bookId)
+      .is("revoked_at", null)
+      .maybeSingle(),
   ]);
+  const grantProfile = grant?.profiles as unknown as { username: string; nickname: string | null } | null;
   // Chỉ chương nháp mới xoá được; chương nháp đã có người mua (xuất bản rồi lưu
   // nháp lại) thì app ẩn nút Xoá thay vì chờ route trả 409.
   const draftIds = (chapters ?? []).filter((c) => !c.published).map((c) => c.id);
@@ -93,6 +101,10 @@ export async function getAuthorBook(client: Client, userId: string, bookId: stri
       publishedAt: book.published_at,
     }),
     finalized: !!book.finalized_at,
+    manuscriptGrant:
+      grant && grantProfile
+        ? { username: grantProfile.username, nickname: grantProfile.nickname, grantedAt: grant.granted_at, locked: !!grant.locked_at }
+        : null,
     coverUrl,
     characters: characters ?? [],
     chapters: (chapters ?? []).map((c) => ({

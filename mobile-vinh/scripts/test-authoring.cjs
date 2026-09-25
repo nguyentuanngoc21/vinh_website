@@ -1,5 +1,5 @@
 /* global __dirname */
-// Phase 8a/8b authoring with fake clients: no real books, chapters or agreements are written.
+// Phase 8a–8c authoring with fake clients: no real books, chapters or agreements are written.
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -152,8 +152,11 @@ function dispatch(file, handlers) {
   const imports = { '@/lib/mobile/response': response, '@/lib/mobile/forward': forward,
     '@/lib/mobile/request-context': { getUserContext: async () => { throw Error('not in POST'); }, requestError: () => null },
     '@/lib/authoring/workspace': {} };
+  // Web handlers a test doesn't care about still have to be importable; calling one fails the test.
+  const unused = new Proxy({}, { get: (_t, exp) => async () => { throw new Error(`unexpected call ${String(exp)}`); } });
+  const authoring = /^@\/app\/api\/authoring\//;
   for (const [mod, names] of Object.entries(handlers)) imports[mod] = Object.fromEntries(names.map(([exp, name]) => [exp, h(name)]));
-  return { route: load(file, imports), calls };
+  return { route: load(file, new Proxy(imports, { has: (t, k) => k in t || authoring.test(k), get: (t, k) => (k in t ? t[k] : unused) })), calls };
 }
 const send = (route, body, ctx) => route.POST(new Request('https://api.test/x', { method: 'POST', headers: { Authorization: 'Bearer t' }, body: JSON.stringify(body) }), ctx);
 
@@ -230,4 +233,96 @@ test('agreement prompt: only a 403 with missingAgreementIds opens Cam kết', ()
   assert.equal(prompt.promptMissingAgreement(new api.ApiError('Cần xác nhận', 403, { missingAgreementIds: ['chinh-sach-doc-quyen'] })), true);
   alerts[0][2][1].onPress();
   assert.deepEqual(alerts[1], ['push', { pathname: '/cam-ket', params: { id: 'chinh-sach-doc-quyen' } }]);
+});
+
+// ---- Phase 8c ----
+test('8c book dispatcher: characters, share, unshare, finalize reach their web handlers', async () => {
+  const { route, calls } = dispatch('src/app/api/mobile/authoring/books/[bookId]/route.ts', {
+    '@/app/api/authoring/books/[bookId]/route': [['PATCH', 'update'], ['DELETE', 'delete']],
+    '@/app/api/authoring/books/[bookId]/chapters/route': [['POST', 'add']],
+    '@/app/api/authoring/books/[bookId]/chapters/order/route': [['PUT', 'reorder']],
+    '@/app/api/authoring/books/[bookId]/characters/route': [['POST', 'add-character']],
+    '@/app/api/authoring/books/[bookId]/characters/[characterId]/route': [['PATCH', 'update-character'], ['DELETE', 'delete-character']],
+    '@/app/api/authoring/books/[bookId]/share/route': [['POST', 'share'], ['DELETE', 'unshare']],
+    '@/app/api/authoring/books/[bookId]/finalize/route': [['POST', 'finalize']],
+  });
+  const ctx = { params: Promise.resolve({ bookId: BOOK }) };
+  const K = '30000000-0000-0000-0000-000000000001';
+  await send(route, { action: 'add-character', name: 'A', role: 'hero', trope: null, book_id: 'x' }, ctx);
+  await send(route, { action: 'update-character', characterId: K, name: 'B' }, ctx);
+  await send(route, { action: 'delete-character', characterId: "x' or 1=1" }, ctx);
+  await send(route, { action: 'share', username: '@ban', granted_by_user_id: OTHER }, ctx);
+  await send(route, { action: 'unshare' }, ctx);
+  await send(route, { action: 'finalize', finalized_at: null }, ctx);
+  assert.deepEqual(calls.map(c => [c.name, c.method, c.body, c.params.bookId, c.params.characterId]), [
+    ['add-character', 'POST', { name: 'A', role: 'hero', trope: null }, BOOK, undefined],
+    ['update-character', 'PATCH', { name: 'B' }, BOOK, K],
+    ['delete-character', 'DELETE', null, BOOK, '00000000-0000-0000-0000-000000000000'],
+    ['share', 'POST', { username: '@ban' }, BOOK, undefined],
+    ['unshare', 'DELETE', null, BOOK, undefined],
+    ['finalize', 'POST', null, BOOK, undefined],
+  ]);
+});
+
+test('8c chapter dispatcher tags characters; docx extract passes the request through with its Bearer', async () => {
+  const chapter = dispatch('src/app/api/mobile/authoring/chapters/[chapterId]/route.ts', {
+    '@/app/api/authoring/chapters/[chapterId]/route': [['PATCH', 'save'], ['DELETE', 'delete']],
+    '@/app/api/authoring/chapters/[chapterId]/characters/route': [['PUT', 'set']],
+  });
+  await send(chapter.route, { action: 'set-characters', characterIds: ['k1'], chapter_id: 'x' }, params(CH(1)));
+  assert.deepEqual([chapter.calls[0].name, chapter.calls[0].method, chapter.calls[0].body], ['set', 'PUT', { characterIds: ['k1'] }]);
+  let seen = null;
+  const extract = load('src/app/api/mobile/authoring/manuscripts/extract/route.ts', {
+    '@/app/api/authoring/manuscripts/extract/route': { POST: async (req) => { seen = req; return Response.json({ text: 't', headingChapters: [] }); } },
+    '@/lib/mobile/response': response,
+  });
+  const req = new Request('https://api.test/x', { method: 'POST', headers: { Authorization: 'Bearer t' }, body: new FormData() });
+  assert.equal((await extract.POST(req)).status, 200); assert.equal(seen, req);
+  assert.equal((await extract.POST(new Request('https://api.test/x', { method: 'POST', body: new FormData() }))).status, 401);
+});
+
+test('8c web routes: signed-out callers get 401 before any write; no sharing with yourself', async () => {
+  const db = fakeDb({ profiles: [{ id: ME, username: 'toi' }, { id: OTHER, username: 'ban' }], manuscript_access_grants: [] });
+  const characters = load('src/app/api/authoring/books/[bookId]/characters/route.ts', { 'next/server': next, '@/lib/mobile/request-context': userCtx(db.client, null) });
+  const res = await characters.POST(new Request('https://api.test/x', { method: 'POST', body: JSON.stringify({ name: 'A' }) }), { params: Promise.resolve({ bookId: BOOK }) });
+  assert.equal(res.status, 401); assert.equal(db.log.length, 0);
+  const share = load('src/app/api/authoring/books/[bookId]/share/route.ts', { 'next/server': next, '@/lib/mobile/request-context': userCtx(db.client) });
+  const self = await share.POST(new Request('https://api.test/x', { method: 'POST', body: JSON.stringify({ username: '@toi' }) }), { params: Promise.resolve({ bookId: BOOK }) });
+  assert.equal(self.status, 400);
+  assert.ok(!db.log.some(l => l.table === 'manuscript_access_grants'), 'no grant written');
+});
+
+test('8c import: the app copy of split-chapters gives the web result; batches stay under the body limit', () => {
+  const web = load('src/lib/authoring/split-chapters.ts');
+  const app = load('mobile-vinh/src/services/split-chapters.ts');
+  const samples = [
+    'Lời tựa\n\nChương 1: Mở màn\nĐoạn một.\n\nĐoạn hai.\nchương 2 - Gặp gỡ\nNội dung.\nCHƯƠNG 3\nKết.',
+    'Phần A\n\n\n\nPhần B\n\n\nPhần C', 'Không có mốc nào cả, huy chương vàng.', '   ',
+    Array.from({ length: 320 }, (_, i) => `Chương ${i + 1}\nx`).join('\n'),
+  ];
+  for (const text of samples) for (const mode of ['chuong', 'blank', 'none']) assert.deepEqual(app.splitChapters(text, mode), web.splitChapters(text, mode));
+  const html = '<h1>Một</h1><p>a &amp; b</p><h2>Hai</h2><p>c</p>';
+  assert.deepEqual(app.extractHeadingChapters(html), web.extractHeadingChapters(html));
+  assert.equal(app.MAX_DETECTED_CHAPTERS, web.MAX_DETECTED_CHAPTERS);
+
+  const svc = load('mobile-vinh/src/services/authoring.ts', { 'expo-file-system': { File: class {}, Paths: {} }, './api': { mobileApi: async () => ({}) } });
+  const big = Array.from({ length: 30 }, (_, i) => ({ title: `C${i}`, content: 'ạ'.repeat(150_000) }));
+  const batches = svc.batchChapters(big);
+  assert.deepEqual(batches.flat().map(c => c.title), big.map(c => c.title), 'order and content kept');
+  for (const b of batches) assert.ok(Buffer.byteLength(JSON.stringify({ action: 'add-chapters', chapters: b })) < 4 * 1024 * 1024);
+  assert.deepEqual(svc.batchChapters([]), []);
+});
+
+test('8c workspace exposes the active manuscript grant', async () => {
+  const workspace = load('src/lib/authoring/workspace.ts', {
+    '@/lib/covers/resolve-book-cover': { resolveBookCoverUrl: async () => null },
+    '@/lib/authoring/exclusivity-lock': { isExclusivityLocked: () => false },
+    '@/lib/audio/get-chapter-audio': { getChapterAudio: async () => [] },
+  });
+  const tables = library();
+  tables.books[0] = { ...tables.books[0], title: 'B', tags: [] };
+  tables.characters = [];
+  tables.manuscript_access_grants = [{ book_id: BOOK, revoked_at: null, granted_at: '2026-09-25', locked_at: null, profiles: { username: 'ban', nickname: 'Bạn' } }];
+  const book = await workspace.getAuthorBook(fakeDb(tables).client, ME, BOOK);
+  assert.deepEqual(book.manuscriptGrant, { username: 'ban', nickname: 'Bạn', grantedAt: '2026-09-25', locked: false });
 });
