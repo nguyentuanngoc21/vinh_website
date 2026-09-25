@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import {
   hasAcceptedExclusivityPolicy,
   EXCLUSIVITY_AGREEMENT_ERROR,
   EXCLUSIVITY_AGREEMENT_ID,
 } from "@/lib/authoring/exclusivity-agreement";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { MAX_CHAPTER_CONTENT_LENGTH } from "@/lib/authoring/chapter-limits";
 
 /**
  * PATCH /api/authoring/chapters/:chapterId — dùng cho cả "Lưu nháp"
@@ -38,7 +39,15 @@ export async function PATCH(
   } = {};
 
   if (typeof body.title === "string" && body.title.trim()) update.title = body.title.trim();
-  if (typeof body.content === "string") update.content = body.content;
+  if (typeof body.content === "string") {
+    if (body.content.length > MAX_CHAPTER_CONTENT_LENGTH) {
+      return NextResponse.json(
+        { error: `Nội dung chương tối đa ${MAX_CHAPTER_CONTENT_LENGTH.toLocaleString("vi-VN")} ký tự.` },
+        { status: 413 }
+      );
+    }
+    update.content = body.content;
+  }
   if (typeof body.published === "boolean") update.published = body.published;
   if (typeof body.price === "number" && Number.isFinite(body.price) && body.price >= 0) {
     update.price = Math.round(body.price);
@@ -59,7 +68,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Không có gì để cập nhật." }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId, admin } = auth;
+  if (!userId) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
+  }
 
   // Chương đang bị ADMIN gỡ (removed_at khác null, xem
   // migrations/20260908_add_chapter_moderation_and_notifications.sql) —
@@ -128,8 +146,7 @@ export async function PATCH(
         .eq("id", chapterBook.book_id)
         .maybeSingle();
       if (book?.is_exclusive) {
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user || !(await hasAcceptedExclusivityPolicy(supabase, userData.user.id))) {
+        if (!(await hasAcceptedExclusivityPolicy(supabase, userId))) {
           return NextResponse.json(
             { error: EXCLUSIVITY_AGREEMENT_ERROR, missingAgreementIds: [EXCLUSIVITY_AGREEMENT_ID] },
             { status: 403 }
@@ -184,17 +201,86 @@ export async function PATCH(
   // (wasPublished false/null trước update), không tính lần sửa nội dung 1
   // chương đã xuất bản từ trước. incrementTaskProgress() cần service-role
   // (RPC revoke EXECUTE khỏi authenticated) — khác `supabase` cookie-bound
-  // đang dùng cho phần còn lại của route.
+  // đang dùng cho phần còn lại của route. admin() là service-role của CÙNG
+  // project với người gọi (web hoặc mobile).
   if (update.published === true && !wasPublished) {
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData.user) {
-      const result = await RewardEngine.incrementTaskProgress(createServiceRoleClient(), {
-        userId: userData.user.id,
-        taskCode: "author_publish_chapter",
-      });
-      if (!result.ok) console.error("[authoring] incrementTaskProgress failed:", result.error);
-    }
+    const result = await RewardEngine.incrementTaskProgress(admin(), {
+      userId,
+      taskCode: "author_publish_chapter",
+    });
+    if (!result.ok) console.error("[authoring] incrementTaskProgress failed:", result.error);
   }
 
   return NextResponse.json(data);
+}
+
+/**
+ * DELETE /api/authoring/chapters/:chapterId — xoá HẲN 1 chương (chương không
+ * có deleted_at). Quy tắc (25/09/2026), policy "authors delete draft chapters
+ * on their own books" (migrations/20260925_add_chapter_delete_and_reorder.sql)
+ * là chốt chặn thật ở DB, kiểm lại ở đây để trả lỗi tiếng Việt:
+ *   - chỉ chương NHÁP (đang xuất bản thì lưu nháp trước);
+ *   - không phải chương đang bị admin gỡ (giữ bằng chứng kiểm duyệt);
+ *   - không phải chương cuối (is_last_chapter không đảo được — xoá sẽ lách luật);
+ *   - chưa có giao dịch mua (purchase_transactions.chapter_id không FK — tự kiểm,
+ *     giống DELETE /api/authoring/books/[bookId]).
+ * Bình luận/highlight/lịch sử đọc của chương bị xoá theo (on delete cascade).
+ * order_index các chương sau KHÔNG dồn lại — thứ tự tương đối giữ nguyên.
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ chapterId: string }> }
+) {
+  const { chapterId } = await params;
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
+  }
+
+  const { data: chapter } = await supabase
+    .from("chapters")
+    .select("id, book_id, published, removed_at, is_last_chapter")
+    .eq("id", chapterId)
+    .maybeSingle();
+  const { data: book } = chapter
+    ? await supabase.from("books").select("author_id, deleted_at").eq("id", chapter.book_id).maybeSingle()
+    : { data: null };
+  if (!chapter || !book || book.author_id !== userId || book.deleted_at) {
+    return NextResponse.json({ error: "Không tìm thấy chương hoặc bạn không có quyền xoá." }, { status: 404 });
+  }
+  if (chapter.published) {
+    return NextResponse.json({ error: "Chỉ xoá được chương nháp. Hãy lưu nháp chương này trước." }, { status: 409 });
+  }
+  if (chapter.removed_at) {
+    return NextResponse.json({ error: "Chương đang bị quản trị viên gỡ, không thể xoá." }, { status: 403 });
+  }
+  if (chapter.is_last_chapter) {
+    return NextResponse.json({ error: "Không thể xoá chương đã đánh dấu là chương cuối." }, { status: 409 });
+  }
+
+  const { data: purchase } = await supabase
+    .from("purchase_transactions")
+    .select("id")
+    .eq("chapter_id", chapterId)
+    .limit(1)
+    .maybeSingle();
+  if (purchase) {
+    return NextResponse.json({ error: "Chương đã có người mua, không thể xoá." }, { status: 409 });
+  }
+
+  const { error, count } = await supabase.from("chapters").delete({ count: "exact" }).eq("id", chapterId);
+  if (error) {
+    console.error("[authoring] delete chapter failed:", error);
+    return NextResponse.json({ error: "Xoá thất bại. Vui lòng thử lại." }, { status: 500 });
+  }
+  if (!count) {
+    return NextResponse.json({ error: "Không xoá được chương này." }, { status: 409 });
+  }
+  return NextResponse.json({ ok: true });
 }

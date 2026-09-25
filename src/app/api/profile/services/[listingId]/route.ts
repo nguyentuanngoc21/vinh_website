@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
+import { validateServiceTags } from '@/lib/orders/validate-service-tags';
 import { computeMissingFields } from "@/lib/orders/service-listing-service";
 import {
   hasAcceptedCommissionRules,
@@ -45,8 +47,9 @@ const EDITABLE_KEYS = [
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ listingId: string }> }) {
   const { listingId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (error) { return requestError(error); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -67,6 +70,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ li
     if (body && Object.prototype.hasOwnProperty.call(body, key)) patch[key] = body[key];
   }
   const requestedAccepting = typeof body?.isAcceptingOrders === "boolean" ? body.isAcceptingOrders : undefined;
+  if ('tags' in patch) {
+    const { data: options, error: optionsError } = await supabase.from('service_tag_options')
+      .select('group_key,label,multi').eq('service_type', current.service_type);
+    if (optionsError) return NextResponse.json({ error: 'Không tải được danh mục phân loại. Hãy thử lại.' }, { status: 503 });
+    if (!validateServiceTags(patch.tags, options ?? [])) return NextResponse.json({ error: 'Phân loại không còn hợp lệ. Hãy mở lại gói và chọn theo danh mục hiện tại.' }, { status: 400 });
+  }
 
   const merged = { ...current, ...patch } as ListingRow;
   let finalAccepting = current.is_accepting_orders;
@@ -108,6 +117,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ li
   const requestedAcceptingCommissions =
     typeof body?.isAcceptingCommissions === "boolean" ? body.isAcceptingCommissions : undefined;
   let finalAcceptingCommissions = current.is_accepting_commissions;
+  if (patch.monthly_commission_limit === null && current.is_accepting_commissions && requestedAcceptingCommissions !== false) {
+    return NextResponse.json({ error: 'Hãy tắt nhận commission trước khi xóa hạn mức.' }, { status: 400 });
+  }
   if (requestedAcceptingCommissions === true) {
     const mergedLimit = merged.monthly_commission_limit;
     if (mergedLimit == null) {

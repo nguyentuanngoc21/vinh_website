@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
-import { OrderService } from "@/lib/orders/order-service";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
+import { OrderService, listOrdersForUser } from "@/lib/orders/order-service";
 
 /**
  * GET /api/orders?withUserId=:id — mọi đơn giữa mình và :id (2 chiều —
@@ -12,8 +11,9 @@ import { OrderService } from "@/lib/orders/order-service";
  * author_follows, xem migrations/20260901_add_order_system_core.sql).
  */
 export async function GET(request: Request) {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -23,19 +23,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Thiếu withUserId." }, { status: 400 });
   }
 
-  const { data: orders, error } = await supabase
-    .from("orders")
-    .select("*, service_listings(name, service_type)")
-    .or(
-      `and(buyer_id.eq.${userId},seller_id.eq.${withUserId}),and(buyer_id.eq.${withUserId},seller_id.eq.${userId})`
-    )
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("[orders] list failed:", error);
-    return NextResponse.json({ error: "Không tải được đơn hàng." }, { status: 500 });
+  // listOrdersForUser() kiểm tra UUID trước khi ghép vào filter .or() — trước
+  // đây withUserId được ghép thẳng, có thể bị chèn điều kiện để lọc ra đơn
+  // của người khác.
+  const result = await listOrdersForUser(supabase, userId, withUserId);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
-
-  return NextResponse.json({ orders: orders ?? [] });
+  return NextResponse.json({ orders: result.orders });
 }
 
 /**
@@ -46,8 +41,9 @@ export async function GET(request: Request) {
  * không được đổi theo.
  */
 export async function POST(request: Request) {
-  const supabase = createServiceRoleClient();
-  const buyerId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId: buyerId } = auth;
   if (!buyerId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

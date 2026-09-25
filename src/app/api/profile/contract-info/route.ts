@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import { PLATFORM_FIXED_INFO } from "@/lib/legal/contract-parties";
 import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
 
@@ -18,9 +17,10 @@ import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
  * kia vốn phục vụ hiển thị chung nên mask theo tinh thần "không
  * over-select dữ liệu nhạy cảm" trong schema.sql.
  */
-export async function GET() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function GET(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

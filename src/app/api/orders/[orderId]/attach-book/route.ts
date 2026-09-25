@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { OrderService } from "@/lib/orders/order-service";
 
 /** POST /api/orders/:orderId/attach-book — seller (ghostwriter) gắn 1
@@ -8,8 +8,9 @@ import { OrderService } from "@/lib/orders/order-service";
  * (xem attach_order_book() trong migrations/20260901_add_manuscript_share.sql). */
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -24,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const order = await OrderService.attachBook(supabase, { orderId, actorId: userId, bookId });
     return NextResponse.json({ order });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không gắn được truyện vào đơn hàng.";
+    const message = orderErrorMessage(error, "Không gắn được truyện vào đơn hàng.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

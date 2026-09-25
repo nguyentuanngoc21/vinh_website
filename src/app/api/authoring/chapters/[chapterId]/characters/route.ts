@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 
 /**
  * PUT /api/authoring/chapters/:chapterId/characters — thay TOÀN BỘ tập
@@ -22,7 +22,16 @@ export async function PUT(
     return NextResponse.json({ error: "Danh sách nhân vật không hợp lệ." }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
+  }
 
   const { data: chapter } = await supabase.from("chapters").select("id, book_id").eq("id", chapterId).maybeSingle();
   if (!chapter) {

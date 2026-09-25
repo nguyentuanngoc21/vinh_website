@@ -49,6 +49,12 @@ python-service/.venv
 python-service/**/__pycache__
 *.pyc
 
+# mobile-vinh/ (Expo/React Native app — separate project, not part of the Next.js build)
+mobile-vinh/node_modules
+mobile-vinh/.expo
+mobile-vinh/dist
+mobile-vinh/web-build
+
 # Vercel plugin content manually copied for Claude Code (third-party, not project code)
 .claude/skills/
 .claude/agents/

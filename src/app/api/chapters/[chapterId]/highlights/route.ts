@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
+import { checkChapterAccess } from "@/lib/reading/chapter-access";
 
 const MAX_HIGHLIGHT_CHARS = 2000;
 
@@ -17,8 +17,9 @@ export async function GET(
   { params }: { params: Promise<{ chapterId: string }> }
 ) {
   const { chapterId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ highlights: [] });
   }
@@ -55,10 +56,17 @@ export async function POST(
   { params }: { params: Promise<{ chapterId: string }> }
 ) {
   const { chapterId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập để highlight." }, { status: 401 });
+  }
+  // Chỉ người đọc được chương mới tương tác được (trước đây nhận mọi chapterId,
+  // kể cả chương khoá chưa mua hoặc chưa xuất bản) — xem src/lib/reading/chapter-access.ts.
+  const access = await checkChapterAccess(supabase, userId, chapterId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const body = await request.json().catch(() => null);

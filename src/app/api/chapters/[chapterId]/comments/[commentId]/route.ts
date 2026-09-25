@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 
 /**
  * DELETE /api/chapters/:chapterId/comments/:commentId — chỉ chủ bình
@@ -13,12 +12,13 @@ import { getAuthedUserId } from "@/lib/wallet/session";
  * không cần dọn thêm ở đây.
  */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ chapterId: string; commentId: string }> }
 ) {
   const { chapterId, commentId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }

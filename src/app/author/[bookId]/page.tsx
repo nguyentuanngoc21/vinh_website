@@ -49,7 +49,7 @@ export default async function AuthorBookOverviewPage({
   const [{ data: chapters }, coverUrl, { data: grantRow }, { data: characters }] = await Promise.all([
     supabase
       .from("chapters")
-      .select("id, title, order_index, published, price, is_last_chapter")
+      .select("id, title, order_index, published, price, is_last_chapter, removed_at")
       .eq("book_id", bookId)
       .order("order_index", { ascending: true }),
     resolveBookCoverUrl(supabase, book),
@@ -65,6 +65,19 @@ export default async function AuthorBookOverviewPage({
     supabase.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
   ]);
 
+  // Chương nháp đã có người mua (xuất bản rồi lưu nháp lại) không xoá được —
+  // chỉ để ẩn nút Xoá; DELETE /api/authoring/chapters/[chapterId] vẫn là chốt chặn thật.
+  const draftIds = (chapters ?? []).filter((c) => !c.published).map((c) => c.id);
+  const { data: sales } = draftIds.length
+    ? await supabase.from("purchase_transactions").select("chapter_id").in("chapter_id", draftIds)
+    : { data: [] as { chapter_id: string }[] };
+  const sold = new Set((sales ?? []).map((s) => s.chapter_id));
+  const overviewChapters = (chapters ?? []).map(({ removed_at, ...c }) => ({
+    ...c,
+    removed: !!removed_at,
+    sold: sold.has(c.id),
+  }));
+
   const grantProfile = grantRow?.profiles as unknown as { username: string; nickname: string } | null;
 
   return (
@@ -77,7 +90,7 @@ export default async function AuthorBookOverviewPage({
       bookPublished={book.published}
       bookIsExclusive={book.is_exclusive}
       coverUrl={coverUrl}
-      chapters={chapters ?? []}
+      chapters={overviewChapters}
       bookFinalized={!!book.finalized_at}
       initialManuscriptGrant={
         grantRow && grantProfile

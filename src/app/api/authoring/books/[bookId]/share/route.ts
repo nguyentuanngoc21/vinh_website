@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 
 /**
  * POST /api/authoring/books/:bookId/share — Share bản thảo kiểu Drive
@@ -14,9 +14,14 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function POST(request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 
@@ -30,13 +35,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
   if (!target) {
     return NextResponse.json({ error: "Không tìm thấy tài khoản này." }, { status: 404 });
   }
-  if (target.id === userData.user.id) {
+  if (target.id === userId) {
     return NextResponse.json({ error: "Không thể share cho chính mình." }, { status: 400 });
   }
 
   const { data: grant, error } = await supabase
     .from("manuscript_access_grants")
-    .insert({ book_id: bookId, granted_to_user_id: target.id, granted_by_user_id: userData.user.id })
+    .insert({ book_id: bookId, granted_to_user_id: target.id, granted_by_user_id: userId })
     .select("*")
     .single();
   if (error) {
@@ -59,11 +64,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
 /** DELETE /api/authoring/books/:bookId/share — gỡ share đang hoạt động
  * (revoked_at = now()). Có thể share lại người khác sau đó (miễn book
  * chưa Hoàn thiện) — chỉ cần POST lại. */
-export async function DELETE(_request: Request, { params }: { params: Promise<{ bookId: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { isCaptureShortcut, isEditableTarget } from "@/lib/reading/capture-detection";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -883,14 +884,12 @@ export function Reader({
     // nghĩa là lần này sẽ bị trừ token/khoá thật. applyPenalty ở trên sẽ
     // ghi đè thông điệp này bằng phản hồi thật từ server ngay sau đó — đây
     // chỉ là phản hồi tức thời trong lúc chờ.
+    // Chỉ phím tắt chụp/lưu thật, bỏ qua ô nhập liệu — xem
+    // src/lib/reading/capture-detection.ts (lỗi Shift+S trước đây).
+    const isTyping = (target: EventTarget | null) => target instanceof HTMLElement && isEditableTarget(target);
     const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === "PrintScreen" ||
-        event.code === "PrintScreen" ||
-        event.key === "F13" ||
-        ((event.key === "s" || event.key === "S") && (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey)) ||
-        (event.key === "s" && event.metaKey && event.shiftKey)
-      ) {
+      if (isTyping(event.target)) return;
+      if (isCaptureShortcut(event)) {
         setScreenshotDetected(true);
         setWarningMessage(
           penaltyRef.current.count === 0
@@ -900,7 +899,13 @@ export function Reader({
       }
     };
 
-    const onCopy = () => {
+    const onCopy = (event: ClipboardEvent) => {
+      // Chỉ tính khi sao chép NỘI DUNG CHƯƠNG — không tính chữ trong ô nhập
+      // liệu, bình luận hay phần giao diện khác của trang.
+      if (isTyping(event.target) || isTyping(document.activeElement)) return;
+      const selection = document.getSelection();
+      if (!selection || selection.isCollapsed) return;
+      if (!paragraphRefs.current.some((p) => p && selection.containsNode(p, true))) return;
       setScreenshotDetected(true);
       setWarningMessage(
         penaltyRef.current.count === 0

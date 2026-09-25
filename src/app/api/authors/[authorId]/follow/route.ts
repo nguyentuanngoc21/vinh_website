@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 
 /**
  * POST /api/authors/:authorId/follow — toggle theo dõi tác giả (bấm lại =
@@ -12,12 +11,13 @@ import { RewardEngine } from "@/lib/quests/reward-engine";
  * là chốt chặn cuối cùng nếu cả 2 lớp trên đều bị vượt qua.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ authorId: string }> }
 ) {
   const { authorId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập để theo dõi." }, { status: 401 });
   }

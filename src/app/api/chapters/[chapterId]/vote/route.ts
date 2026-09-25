@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
+import { checkChapterAccess } from "@/lib/reading/chapter-access";
 
 /**
  * POST /api/chapters/:chapterId/vote — toggle bình chọn chương (bấm lại =
@@ -12,14 +12,21 @@ import { getAuthedUserId } from "@/lib/wallet/session";
  * — KHÔNG dựa vào auth.uid() của RLS trên chapter_votes.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ chapterId: string }> }
 ) {
   const { chapterId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập để bình chọn." }, { status: 401 });
+  }
+  // Chỉ người đọc được chương mới tương tác được (trước đây nhận mọi chapterId,
+  // kể cả chương khoá chưa mua hoặc chưa xuất bản) — xem src/lib/reading/chapter-access.ts.
+  const access = await checkChapterAccess(supabase, userId, chapterId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const { data: existing } = await supabase

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { findBankByCode } from "@/lib/banks";
 
 // Số tài khoản ngân hàng VN thực tế thường dài 6–19 chữ số tuỳ ngân hàng
@@ -9,9 +8,10 @@ import { findBankByCode } from "@/lib/banks";
 const ACCOUNT_NUMBER_REGEX = /^\d{6,19}$/;
 const ACCOUNT_NAME_MAX = 100;
 
-export async function GET() {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+export async function GET(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -34,8 +34,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

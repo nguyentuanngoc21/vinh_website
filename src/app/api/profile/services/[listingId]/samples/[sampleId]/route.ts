@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 
 /** DELETE /api/profile/services/:listingId/samples/:sampleId — gỡ 1
  * sample đã upload (không xoá object trong storage — cùng quyết định đã
  * ghi chú ở profile/cover/route.ts: chưa có luồng dọn storage nào trong
  * repo, không thêm phức tạp ở đây). */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ listingId: string; sampleId: string }> }
 ) {
   const { listingId, sampleId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (error) { return requestError(error); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

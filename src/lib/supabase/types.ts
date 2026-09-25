@@ -1986,6 +1986,11 @@ export type Database = {
         Args: { p_chapter_id: string; p_audio_narration_id: string; p_share_token: string };
         Returns: Database["public"]["Tables"]["chapter_audio_links"]["Row"];
       };
+      // migrations/20260925_add_chapter_delete_and_reorder.sql
+      reorder_book_chapters: {
+        Args: { p_book_id: string; p_chapter_ids: string[] };
+        Returns: void;
+      };
       link_cover_to_book: {
         Args: { p_book_id: string; p_design_item_id: string; p_share_token: string };
         Returns: Database["public"]["Tables"]["books"]["Row"];

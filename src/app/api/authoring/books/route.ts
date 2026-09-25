@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import { slugifyTitle } from "@/lib/authoring/slugify";
+import { MAX_CHAPTER_CONTENT_LENGTH } from "@/lib/authoring/chapter-limits";
 import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 import {
   hasAcceptedExclusivityPolicy,
@@ -36,7 +37,7 @@ function parseTags(value: unknown): string[] {
  * trước) — thiếu chapterTitle/chapterContent thì tạo "Chương 1" rỗng như
  * hành vi cũ.
  *
- * Dùng createClient() (RLS thật qua auth.getUser()), KHÔNG service-role —
+ * Dùng getUserContext() (RLS thật của người gọi: cookie web hoặc Bearer mobile), KHÔNG service-role —
  * author_id luôn là uuid của chính người gọi, policy "authors manage
  * their own books" (docs/supabase/schema.sql) cho phép insert bình
  * thường, không cần bypass RLS.
@@ -49,17 +50,22 @@ function parseTags(value: unknown): string[] {
  * sách published thì ai cũng select được nhưng ở đây không lọc theo
  * published nên vẫn đúng — chỉ cần đủ 2 field, không rò rỉ gì thêm).
  */
-export async function GET() {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
+export async function GET(request: Request) {
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 
   const { data, error } = await supabase
     .from("books")
     .select("id, title")
-    .eq("author_id", userData.user.id)
+    .eq("author_id", userId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (error) {
@@ -81,6 +87,12 @@ export async function POST(request: Request) {
 
   const chapterTitle = (typeof body?.chapterTitle === "string" ? body.chapterTitle.trim() : "") || "Chương 1";
   const chapterContent = typeof body?.chapterContent === "string" ? body.chapterContent : "";
+  if (chapterContent.length > MAX_CHAPTER_CONTENT_LENGTH) {
+    return NextResponse.json(
+      { error: `Nội dung chương tối đa ${MAX_CHAPTER_CONTENT_LENGTH.toLocaleString("vi-VN")} ký tự.` },
+      { status: 413 }
+    );
+  }
   const chapterPublished = body?.published === true;
   let chapterPrice = 0;
   if (typeof body?.price === "number" && Number.isFinite(body.price) && body.price >= 0) {
@@ -97,13 +109,18 @@ export async function POST(request: Request) {
   }
   const isLastChapter = body?.isLastChapter === true;
 
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 
-  if (isExclusive && !(await hasAcceptedExclusivityPolicy(supabase, userData.user.id))) {
+  if (isExclusive && !(await hasAcceptedExclusivityPolicy(supabase, userId))) {
     return NextResponse.json(
       { error: EXCLUSIVITY_AGREEMENT_ERROR, missingAgreementIds: [EXCLUSIVITY_AGREEMENT_ID] },
       { status: 403 }
@@ -113,7 +130,7 @@ export async function POST(request: Request) {
   const { data: book, error: bookError } = await supabase
     .from("books")
     .insert({
-      author_id: userData.user.id,
+      author_id: userId,
       title,
       slug: slugifyTitle(title),
       synopsis,

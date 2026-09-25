@@ -3469,7 +3469,9 @@ create index order_events_order_idx on public.order_events (order_id, created_at
 -- confirm_order_received) xem
 -- migrations/20260901_add_order_system_core.sql — không lặp lại ở đây để
 -- tránh 2 bản dễ lệch nhau; file migration đó LÀ nguồn sự thật cho phần
--- thân hàm.
+-- thân hàm. Ngoại lệ: record_order_payment() được thay bởi
+-- migrations/20260924_enforce_order_payment_amounts.sql (lần trả đầu phải
+-- >= round(price * deposit_pct / 100), tổng đã trả không vượt price).
 
 -- 12d. Danh mục tag cố định cho service_listings (Mục 2.2 đặc tả) — xem
 -- migrations/20260901_add_service_tag_catalog.sql,
@@ -3908,6 +3910,25 @@ create index notifications_user_unread_idx
 create index notifications_user_created_idx
   on public.notifications (user_id, created_at desc);
 
+-- Realtime cho tin nhắn + thông báo (app mobile đăng ký postgres_changes; RLS
+-- SELECT ở trên quyết định ai nhận hàng nào) — xem
+-- migrations/20260924_enable_realtime_messages_notifications.sql. Đặt sau khi cả
+-- direct_messages và notifications đã được tạo.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    return;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'direct_messages') then
+    alter publication supabase_realtime add table public.direct_messages;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notifications') then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end $$;
+
 -- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context) —
 -- cho phép 1 admin vừa gửi tin gỡ chương (kiểm duyệt) vừa tự chat bình
 -- thường với CÙNG 1 tác giả mà không bị trộn vào chung 1 hòm thư. Danh
@@ -4243,3 +4264,62 @@ $$ language plpgsql security definer;
 
 revoke execute on function public.sync_user_achievements from public, anon, authenticated;
 grant execute on function public.sync_user_achievements to service_role;
+-- --- Xoá chương nháp + sắp xếp thứ tự chương (tác giả, web + mobile).
+-- Xem migrations/20260925_add_chapter_delete_and_reorder.sql. ---
+drop policy if exists "authors delete draft chapters on their own books" on public.chapters;
+create policy "authors delete draft chapters on their own books"
+  on public.chapters for delete
+  using (
+    not published
+    and removed_at is null
+    and not is_last_chapter
+    and exists (
+      select 1 from public.books b
+      where b.id = book_id and b.author_id = auth.uid() and b.deleted_at is null
+    )
+  );
+
+create or replace function public.reorder_book_chapters(p_book_id uuid, p_chapter_ids uuid[])
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_total integer;
+  v_last uuid;
+begin
+  if not exists (
+    select 1 from public.books
+    where id = p_book_id and author_id = auth.uid() and deleted_at is null
+  ) then
+    raise exception 'Book % not found or not owned by caller', p_book_id;
+  end if;
+
+  -- Khoá các chương của sách: 2 lần sắp xếp song song không ghi đè lẫn nhau.
+  perform 1 from public.chapters where book_id = p_book_id for update;
+  select count(*) into v_total from public.chapters where book_id = p_book_id;
+
+  if coalesce(array_length(p_chapter_ids, 1), 0) <> v_total
+     or (select count(distinct x) from unnest(p_chapter_ids) as x) <> v_total
+     or exists (
+       select 1 from unnest(p_chapter_ids) as x
+       where not exists (select 1 from public.chapters c where c.id = x and c.book_id = p_book_id)
+     ) then
+    raise exception 'Chapter list must contain every chapter of the book exactly once';
+  end if;
+
+  select id into v_last from public.chapters where book_id = p_book_id and is_last_chapter;
+  if v_last is not null and p_chapter_ids[v_total] <> v_last then
+    raise exception 'The last chapter must stay last';
+  end if;
+
+  update public.chapters c
+     set order_index = t.ord
+    from unnest(p_chapter_ids) with ordinality as t(id, ord)
+   where c.id = t.id and c.book_id = p_book_id and c.order_index is distinct from t.ord::integer;
+end;
+$$;
+
+revoke execute on function public.reorder_book_chapters(uuid, uuid[]) from public, anon;
+grant execute on function public.reorder_book_chapters(uuid, uuid[]) to authenticated;

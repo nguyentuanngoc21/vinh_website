@@ -64,6 +64,7 @@ export function AuthorWorkspace({
   bookCharacters,
   initialTaggedCharacterIds,
 }: AuthorWorkspaceProps) {
+  const [taggedCount, setTaggedCount] = useState(initialTaggedCharacterIds.length);
   const [bookTitle, setBookTitle] = useState(initialBookTitle);
   const [synopsis, setSynopsis] = useState(bookSynopsis ?? "");
   // Server truyền trạng thái published của SÁCH lúc trang tải — chương
@@ -287,11 +288,18 @@ export function AuthorWorkspace({
         onGenreChange={handleGenreChange}
         tags={tags}
         onTagsChange={handleTagsChange}
-      />
-      <ChapterCharactersPanel
-        chapterId={chapter.id}
-        bookCharacters={bookCharacters}
-        initialTaggedCharacterIds={initialTaggedCharacterIds}
+        chapterCharacters={{
+          done: taggedCount > 0,
+          node: (
+            <ChapterCharactersPanel
+              bookId={bookId}
+              chapterId={chapter.id}
+              bookCharacters={bookCharacters}
+              initialTaggedCharacterIds={initialTaggedCharacterIds}
+              onTaggedChange={setTaggedCount}
+            />
+          ),
+        }}
       />
       {missingAgreementIds && (
         <RequiredAgreementsModal

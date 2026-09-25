@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { orderErrorMessage } from "@/lib/orders/rpc-errors";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { DisputeService } from "@/lib/orders/dispute-service";
 
 /** POST /api/orders/:orderId/dispute — "Mở tranh chấp" (Mục 9). Tự chụp
@@ -8,8 +8,9 @@ import { DisputeService } from "@/lib/orders/dispute-service";
  * gì khác ngoài lý do/mô tả. */
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -25,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const dispute = await DisputeService.open(supabase, { orderId, reporterId: userId, reasonCategory, description });
     return NextResponse.json({ dispute });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Không mở được tranh chấp.";
+    const message = orderErrorMessage(error, "Không mở được tranh chấp.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

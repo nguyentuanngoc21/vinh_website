@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 
 /** DELETE /api/audio/:audioNarrationId/comments/:commentId — chỉ chủ bình
  * luận tự xoá được. */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ audioNarrationId: string; commentId: string }> }
 ) {
   const { audioNarrationId, commentId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }

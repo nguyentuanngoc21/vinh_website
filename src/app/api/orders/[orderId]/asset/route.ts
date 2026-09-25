@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { getOrderForActor } from "@/lib/orders/order-service";
 
 const SIGNED_URL_TTL_SECONDS = 15 * 60; // 15 phút — đủ để xem/nghe 1 lượt, không phải link vĩnh viễn
@@ -11,10 +10,11 @@ const SIGNED_URL_TTL_SECONDS = 15 * 60; // 15 phút — đủ để xem/nghe 1 l
  * Mục 4.2: "không expose URL file tải trực tiếp"). Sinh MỚI mỗi lần gọi,
  * không cache URL cũ — hết hạn ${SIGNED_URL_TTL_SECONDS}s.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

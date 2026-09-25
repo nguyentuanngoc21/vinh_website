@@ -38,9 +38,11 @@ type PublishPanelProps = {
   onGenreChange: (genre: BookGenre) => void;
   tags: string[];
   onTagsChange: (tags: string[]) => void;
+  /** Mục "Nhân vật trong chương" — chỉ có khi chương đã tồn tại (author-workspace.tsx). */
+  chapterCharacters?: { node: ReactNode; done: boolean };
 };
 
-type SectionId = "info" | "classify" | "monetize" | "copyright";
+type SectionId = "info" | "classify" | "characters" | "monetize" | "copyright";
 
 function ChecklistSection({
   id,
@@ -80,7 +82,10 @@ function ChecklistSection({
           className={`shrink-0 text-stone-alt transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
-      {open && <div className="pb-5">{children}</div>}
+      {/* hidden thay vì gỡ khỏi cây: mục con tự lưu (nhân vật trong chương) giữ nguyên state khi thu gọn. */}
+      <div hidden={!open} className="pb-5">
+        {children}
+      </div>
     </section>
   );
 }
@@ -113,10 +118,12 @@ export function PublishPanel({
   onGenreChange,
   tags,
   onTagsChange,
+  chapterCharacters,
 }: PublishPanelProps) {
   const [openSections, setOpenSections] = useState<Record<SectionId, boolean>>({
     info: true,
     classify: true,
+    characters: true,
     monetize: false,
     copyright: false,
   });
@@ -209,6 +216,18 @@ export function PublishPanel({
             </div>
           </div>
         </ChecklistSection>
+
+        {chapterCharacters && (
+          <ChecklistSection
+            id="characters"
+            title="Nhân vật trong chương"
+            done={chapterCharacters.done}
+            open={openSections.characters}
+            onToggle={toggleSection}
+          >
+            {chapterCharacters.node}
+          </ChecklistSection>
+        )}
 
         <ChecklistSection
           id="monetize"

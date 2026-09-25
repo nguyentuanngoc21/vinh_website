@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import { isLikelyOffPlatform } from "@/lib/orders/off-platform-detector";
 
 const THREAD_MESSAGE_LIMIT = 200;
+// `created_at` exactly as returned in a previous page (PostgREST keeps microseconds).
+const CURSOR = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})$/;
 const BODY_MAX = 4000;
 type MessageContext = "personal" | "moderation";
 
@@ -27,9 +28,20 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId: counterpartyId } = await params;
-  const context = resolveContext(new URL(request.url).searchParams.get("context"));
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(counterpartyId)) return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+  const searchParams = new URL(request.url).searchParams;
+  const context = resolveContext(searchParams.get("context"));
+  // Tải tin cũ hơn (tùy chọn): ?before=<createdAt của tin cũ nhất đang có>&limit=N.
+  // Không truyền thì giữ nguyên hành vi cũ (200 tin mới nhất).
+  const before = searchParams.get("before");
+  if (before !== null && !CURSOR.test(before)) {
+    return NextResponse.json({ error: "Mốc thời gian không hợp lệ." }, { status: 400 });
+  }
+  const limitParam = Number(searchParams.get("limit"));
+  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, THREAD_MESSAGE_LIMIT) : THREAD_MESSAGE_LIMIT;
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -43,36 +55,39 @@ export async function GET(
     return NextResponse.json({ error: "Không tìm thấy người dùng." }, { status: 404 });
   }
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("direct_messages")
     .select("id, sender_id, body, created_at, flagged_off_platform")
     .eq("context", context)
     .or(
       `and(sender_id.eq.${userId},recipient_id.eq.${counterpartyId}),and(sender_id.eq.${counterpartyId},recipient_id.eq.${userId})`
-    )
-    .order("created_at", { ascending: true })
-    .limit(THREAD_MESSAGE_LIMIT);
+    );
+  // Strictly older than the cursor: created_at has microsecond precision, so two messages of one
+  // thread sharing a timestamp (and one being skipped at a page edge) is not a practical case.
+  if (before) query = query.lt("created_at", before);
+  const { data: rows, error } = await query
+    .order("created_at", { ascending: false }).order('id', { ascending: false })
+    .limit(limit);
   if (error) {
     console.error("[messages] thread fetch failed:", error);
     return NextResponse.json({ error: "Không tải được hội thoại." }, { status: 500 });
   }
 
-  // Không await — đánh dấu đã đọc là tác dụng phụ, không cần chặn phản
-  // hồi GET này. Chỉ đánh dấu đúng hòm thư đang mở (context), không đụng
-  // tới hòm thư còn lại giữa cùng 2 người.
-  supabase
+  // Mark only the returned messages, never unseen older history or new arrivals.
+  const readResult = rows?.length ? await supabase
     .from("direct_messages")
     .update({ read_at: new Date().toISOString() })
     .eq("sender_id", counterpartyId)
     .eq("recipient_id", userId)
     .eq("context", context)
+    .in('id', rows.map(row => row.id))
     .is("read_at", null)
-    .then(({ error: markReadError }) => {
-      if (markReadError) console.error("[messages] mark read failed:", markReadError);
-    });
+    : { error: null };
 
   return NextResponse.json({
     context,
+    markReadFailed: !!readResult.error,
+    hasMore: (rows?.length ?? 0) === limit,
     counterparty: {
       userId: counterparty.id,
       nickname: counterparty.nickname,
@@ -82,7 +97,7 @@ export async function GET(
       // đổi tên/avatar hiển thị (danh tính người gửi luôn thật).
       isModerationThread: context === "moderation",
     },
-    messages: (rows ?? []).map((m) => ({
+    messages: (rows ?? []).reverse().map((m) => ({
       id: m.id,
       body: m.body,
       createdAt: m.created_at,
@@ -111,8 +126,10 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId: recipientId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipientId)) return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

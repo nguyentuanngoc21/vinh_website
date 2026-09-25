@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import { getAgreement } from "@/lib/legal/registry";
 import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
 import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
@@ -9,8 +8,8 @@ import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
  * POST /api/profile/agreements/:agreementId/accept — ghi nhận việc người
  * dùng hiện tại vừa xác nhận (nút "Xác nhận" ở bảng, hoặc "Tôi đồng ý"
  * trong popup xem văn bản) một thỏa thuận, ở ĐÚNG version hiện tại của nó
- * (registry.ts AGREEMENTS[...].updatedAt) — không nhận version từ client,
- * tránh việc client tự gửi version cũ để "xác nhận khống".
+ * (registry.ts AGREEMENTS[...].updatedAt). Mobile gửi version đã xem để
+ * kiểm tra xung đột; giá trị lưu luôn lấy từ registry phía server.
  *
  * CHỐT CHẶN THẬT (không chỉ dựa vào client): nếu văn bản có khai báo
  * field "Bên A" ở AGREEMENT_PARTY_INFO (contract-parties.ts) — tức văn
@@ -27,7 +26,7 @@ import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
  * migrations/20260828_add_agreement_acceptances.sql.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ agreementId: string }> }
 ) {
   const { agreementId } = await params;
@@ -36,10 +35,17 @@ export async function POST(
     return NextResponse.json({ error: "Không tìm thấy thỏa thuận." }, { status: 404 });
   }
 
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (request.headers.has('authorization')) {
+    const body = await request.json().catch(() => null);
+    if (body?.version !== agreement.updatedAt) return NextResponse.json(
+      { error: 'Văn bản đã thay đổi. Hãy mở lại và đọc phiên bản mới trước khi xác nhận.' }, { status: 409 });
   }
 
   const authorFields = AGREEMENT_PARTY_INFO[agreementId as keyof typeof AGREEMENT_PARTY_INFO]?.author;

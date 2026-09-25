@@ -4,7 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowDownIcon,
   ArrowSquareOutIcon,
+  ArrowsDownUpIcon,
+  ArrowUpIcon,
   CoinsIcon,
   PencilSimpleIcon,
   PlusIcon,
@@ -24,7 +27,26 @@ export type OverviewChapter = {
   published: boolean;
   price: number;
   is_last_chapter: boolean;
+  /** Đang bị admin gỡ (chapters.removed_at). */
+  removed: boolean;
+  /** Chương nháp đã có giao dịch mua — không xoá được. */
+  sold: boolean;
 };
+
+/** Cùng điều kiện với DELETE /api/authoring/chapters/[chapterId] (server vẫn là chốt chặn thật). */
+function canDeleteChapter(c: OverviewChapter) {
+  return !c.published && !c.removed && !c.is_last_chapter && !c.sold;
+}
+
+/** Đổi chỗ 1 chương lên/xuống; chương cuối luôn đứng cuối (RPC reorder_book_chapters cũng chặn). */
+function moveChapter(list: OverviewChapter[], index: number, delta: -1 | 1) {
+  const target = index + delta;
+  if (target < 0 || target >= list.length) return null;
+  if (list[index].is_last_chapter || list[target].is_last_chapter) return null;
+  const next = [...list];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
 
 type BookOverviewProps = {
   bookId: string;
@@ -71,6 +93,10 @@ export function BookOverview({
   const [editingSynopsis, setEditingSynopsis] = useState(false);
   const [synopsisDraft, setSynopsisDraft] = useState(synopsis);
   const [savingSynopsis, setSavingSynopsis] = useState(false);
+  // Khác null khi đang ở chế độ sắp xếp — thứ tự tạm, chỉ lưu khi bấm "Lưu thứ tự".
+  const [order, setOrder] = useState<OverviewChapter[] | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null);
 
   const latest = chapters[chapters.length - 1] ?? null;
   const publishedCount = chapters.filter((c) => c.published).length;
@@ -119,6 +145,53 @@ export function BookOverview({
     } catch {
       alert("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
       setCreatingChapter(false);
+    }
+  };
+
+  const handleDeleteChapter = async (chapter: OverviewChapter) => {
+    if (deletingChapterId || !canDeleteChapter(chapter)) return;
+    if (
+      !window.confirm(
+        `Xoá chương "${chapter.title}"? Chương nháp sẽ bị xoá hẳn, kèm bình luận và highlight của chương. Không hoàn tác được.`
+      )
+    )
+      return;
+    setDeletingChapterId(chapter.id);
+    try {
+      const res = await fetch(`/api/authoring/chapters/${chapter.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert((data && typeof data.error === "string" && data.error) || "Không xoá được chương. Vui lòng thử lại.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
+    } finally {
+      setDeletingChapterId(null);
+    }
+  };
+
+  const saveOrder = async () => {
+    if (!order || savingOrder) return;
+    setSavingOrder(true);
+    try {
+      const res = await fetch(`/api/authoring/books/${bookId}/chapters/order`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chapterIds: order.map((c) => c.id) }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert((data && typeof data.error === "string" && data.error) || "Không lưu được thứ tự. Vui lòng thử lại.");
+        return;
+      }
+      setOrder(null);
+      router.refresh();
+    } catch {
+      alert("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
+    } finally {
+      setSavingOrder(false);
     }
   };
 
@@ -293,55 +366,152 @@ export function BookOverview({
         </Link>
       )}
 
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs font-bold tracking-wide text-stone-alt">DANH SÁCH CHƯƠNG</div>
+        {order ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={saveOrder}
+              disabled={savingOrder}
+              className="min-h-10 rounded-[9px] bg-brand-gold px-4 py-2 text-[13px] font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
+            >
+              {savingOrder ? "Đang lưu…" : "Lưu thứ tự"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrder(null)}
+              disabled={savingOrder}
+              className="min-h-10 rounded-[9px] border border-cream-border bg-white px-4 py-2 text-[13px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+            >
+              Hủy
+            </button>
+          </div>
+        ) : (
+          chapters.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setOrder(chapters)}
+              className="flex min-h-10 items-center gap-1.5 text-[12.5px] font-semibold text-brand-gold-dark transition-colors hover:text-brand-ink"
+            >
+              <ArrowsDownUpIcon size={14} weight="bold" /> Sắp xếp chương
+            </button>
+          )
+        )}
+      </div>
+
       <div className="overflow-hidden rounded-[12px] border border-cream-border bg-white">
-        {/* Header cột chỉ có ý nghĩa ở layout lưới 4 cột (sm:+) — trên
-            điện thoại mỗi chương đã hiển thị dạng thẻ 2 dòng tự giải
-            thích, không cần nhãn cột nữa. */}
-        <div className="hidden border-b border-cream-border bg-cream-card px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-stone-alt sm:grid sm:grid-cols-[40px_1fr_100px_90px] sm:gap-3">
-          <span />
-          <span>CHƯƠNG</span>
-          <span>TRẠNG THÁI</span>
-          <span>GIÁ</span>
+        {/* Header cột chỉ có ý nghĩa ở layout lưới (sm:+) — trên điện thoại
+            mỗi chương đã hiển thị dạng thẻ 2 dòng tự giải thích. */}
+        <div className="hidden border-b border-cream-border bg-cream-card py-2.5 pl-4 pr-2 text-[10.5px] font-bold tracking-wide text-stone-alt sm:flex sm:items-center">
+          <div className="grid flex-1 grid-cols-[40px_1fr_100px_90px] gap-3">
+            <span />
+            <span>CHƯƠNG</span>
+            <span>TRẠNG THÁI</span>
+            <span>GIÁ</span>
+          </div>
+          <span className="w-[88px]" />
         </div>
-        {chapters.map((c) => (
-          <Link
-            key={c.id}
-            href={`/author/${bookId}/${c.id}`}
-            className="flex flex-col gap-1.5 border-b border-[#F2ECE0] px-4 py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card sm:grid sm:grid-cols-[40px_1fr_100px_90px] sm:items-center sm:gap-3"
-          >
-            {/* sm:contents — bỏ 2 div bọc khỏi box model từ sm trở lên, để
-                4 <span> bên trong thành item trực tiếp của grid 4 cột
-                (khớp layout gốc); dưới sm chúng chỉ là 2 dòng flex thường. */}
-            <div className="flex min-w-0 items-center gap-2 sm:contents">
-              <span className="shrink-0 text-[11.5px] font-bold text-stone-alt">{c.order_index}</span>
-              <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-brand-ink sm:flex-none">
-                {c.title}
-              </span>
-            </div>
-            <div className="flex items-center gap-2.5 sm:contents">
-              <span
-                className={`w-fit rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
-                  c.published ? "bg-[#E4F1EA] text-[#256B4C]" : "bg-cream-card-alt text-stone-dark"
-                }`}
-              >
-                {c.published ? "Đã đăng" : "Bản nháp"}
-              </span>
-              <span className="flex items-center gap-1 text-[13px] font-semibold text-stone-dark">
-                {c.price > 0 ? (
+        {(order ?? chapters).map((c, i, list) => {
+          const content = (
+            <>
+              {/* sm:contents — bỏ 2 div bọc khỏi box model từ sm trở lên, để
+                  4 <span> bên trong thành item trực tiếp của grid 4 cột;
+                  dưới sm chúng chỉ là 2 dòng flex thường. */}
+              <div className="flex min-w-0 items-center gap-2 sm:contents">
+                <span className="shrink-0 text-[11.5px] font-bold text-stone-alt">{order ? i + 1 : c.order_index}</span>
+                <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-brand-ink sm:flex-none">
+                  {c.title}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5 sm:contents">
+                <span
+                  className={`w-fit rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
+                    c.removed
+                      ? "bg-error-bg text-error"
+                      : c.published
+                        ? "bg-success-form-bg text-success-form"
+                        : "bg-cream-card-alt text-stone-dark"
+                  }`}
+                >
+                  {c.removed ? "Bị gỡ" : c.published ? "Đã đăng" : "Bản nháp"}
+                  {c.is_last_chapter ? " · Cuối" : ""}
+                </span>
+                <span className="flex items-center gap-1 text-[13px] font-semibold text-stone-dark">
+                  {c.price > 0 ? (
+                    <>
+                      <CoinsIcon size={13} color="var(--color-brand-gold)" /> {c.price}
+                    </>
+                  ) : (
+                    "Miễn phí"
+                  )}
+                </span>
+              </div>
+            </>
+          );
+          const rowGrid =
+            "flex min-w-0 flex-1 flex-col gap-1.5 py-3 pl-4 sm:grid sm:grid-cols-[40px_1fr_100px_90px] sm:items-center sm:gap-3";
+          const canUp = !!order && !!moveChapter(list, i, -1);
+          const canDown = !!order && !!moveChapter(list, i, 1);
+          return (
+            <div key={c.id} className="flex items-center gap-1 border-b border-cream-card-alt pr-2 last:border-b-0">
+              {order ? (
+                <div className={rowGrid}>{content}</div>
+              ) : (
+                <Link
+                  href={`/author/${bookId}/${c.id}`}
+                  className={`${rowGrid} no-underline transition-colors hover:bg-cream-card`}
+                >
+                  {content}
+                </Link>
+              )}
+              <div className="flex w-[88px] shrink-0 justify-end gap-1">
+                {order ? (
                   <>
-                    <CoinsIcon size={13} color="var(--color-brand-gold)" /> {c.price}
+                    <button
+                      type="button"
+                      aria-label={`Đưa "${c.title}" lên`}
+                      onClick={() => setOrder(moveChapter(list, i, -1) ?? list)}
+                      disabled={!canUp || savingOrder}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-cream-border text-brand-ink disabled:opacity-30"
+                    >
+                      <ArrowUpIcon size={16} weight="bold" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Đưa "${c.title}" xuống`}
+                      onClick={() => setOrder(moveChapter(list, i, 1) ?? list)}
+                      disabled={!canDown || savingOrder}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-cream-border text-brand-ink disabled:opacity-30"
+                    >
+                      <ArrowDownIcon size={16} weight="bold" />
+                    </button>
                   </>
                 ) : (
-                  "Miễn phí"
+                  canDeleteChapter(c) && (
+                    <button
+                      type="button"
+                      aria-label={`Xoá "${c.title}"`}
+                      title="Xoá chương nháp"
+                      onClick={() => handleDeleteChapter(c)}
+                      disabled={!!deletingChapterId}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg text-error transition-colors hover:bg-error-bg disabled:opacity-40"
+                    >
+                      <TrashIcon size={16} />
+                    </button>
+                  )
                 )}
-              </span>
+              </div>
             </div>
-          </Link>
-        ))}
+          );
+        })}
         {chapters.length === 0 && (
           <div className="px-4 py-6 text-center text-sm text-stone-light">Chưa có chương nào.</div>
         )}
       </div>
+      <p className="mb-6 mt-2 text-[12px] text-stone-alt">
+        Chỉ xoá được chương nháp chưa có người mua và chưa đánh dấu chương cuối. Chương cuối luôn đứng cuối.
+      </p>
 
       <ImportManuscriptModal
         open={showImport}

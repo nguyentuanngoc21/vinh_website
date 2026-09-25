@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import mammoth from "mammoth";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import { extractHeadingChapters } from "@/lib/authoring/split-chapters";
 
 // ~4.5MB là giới hạn body thật của Vercel Route Handler cho Route Handlers
@@ -26,9 +26,13 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024;
  * vẫn còn 3 chế độ tách theo chữ (split-chapters.ts) làm phương án chính.
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  let userId: string | null;
+  try {
+    ({ userId } = await getUserContext(request));
+  } catch (e) {
+    return requestError(e);
+  }
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 

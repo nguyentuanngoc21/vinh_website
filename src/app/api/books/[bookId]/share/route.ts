@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 
 /**
@@ -14,12 +13,13 @@ import { RewardEngine } from "@/lib/quests/reward-engine";
  * dùng, chỉ là không tính nhiệm vụ).
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   await params; // bookId không cần dùng — nhiệm vụ không phân biệt theo sách.
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
