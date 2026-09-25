@@ -197,7 +197,8 @@ Tiến độ 8a–8b (25/09, đã review):
 - Migration `20260925_add_chapter_delete_and_reorder.sql`: policy xoá chương nháp (không bị gỡ,
   không phải chương cuối, sách chưa xoá) + RPC `reorder_book_chapters`. Route kiểm thêm "chưa có
   người mua". Test: docs/supabase/tests/20260925_chapter_delete_and_reorder.test.sql (11 PASS).
-- Web chưa có nút xoá/sắp xếp chương trong giao diện (API đã dùng chung được).
+- Web (25/09, chờ review): trang tổng quan truyện có nút Sắp xếp chương (↑↓, Lưu thứ tự) và nút Xoá cho
+  chương nháp xoá được; nhãn "Bị gỡ" cho chương đang bị quản trị viên gỡ.
 
 ## Song song — Sẵn sàng phát hành
 
