@@ -1,4 +1,10 @@
 import { requireSupabase } from './supabase';
+/** Server error with its status and body (e.g. 403 { missingAgreementIds } from the authoring routes). */
+export class ApiError extends Error {
+  status: number;
+  data: Record<string, unknown>;
+  constructor(message: string, status: number, data: Record<string, unknown>) { super(message); this.status = status; this.data = data; }
+}
 export async function mobileApi<T>(path: string, userId: string, body?: unknown, options: { timeoutMs?: number } = {}): Promise<T> {
   const base = process.env.EXPO_PUBLIC_API_URL;
   if (!base) throw new Error('Chưa cấu hình máy chủ ứng dụng.');
@@ -13,7 +19,7 @@ export async function mobileApi<T>(path: string, userId: string, body?: unknown,
     signal: AbortSignal.timeout(options.timeoutMs ?? (multipart ? 120000 : 15000)),
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'Không thể kết nối với máy chủ.');
+  if (!response.ok) throw new ApiError(result.error || 'Không thể kết nối với máy chủ.', response.status, result ?? {});
   const current = await client.auth.getSession();
   if (current.error || current.data.session?.user.id !== userId) throw new Error('Phiên đăng nhập đã thay đổi.');
   return result;

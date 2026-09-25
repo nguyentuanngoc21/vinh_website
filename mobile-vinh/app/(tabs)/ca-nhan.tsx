@@ -63,6 +63,7 @@ function Account({ email: accountEmail, userId, signedIn, restoreError }: { emai
           <ActionButton label="Kết nối — tìm người sáng tác →" onPress={() => router.push('/ket-noi')} secondary />
           <ActionButton label="Cam kết & Thỏa thuận →" onPress={() => router.push('/cam-ket')} secondary />
           <ActionButton label="Dịch vụ của tôi →" onPress={() => router.push('/dich-vu')} secondary />
+          <ActionButton label="Sáng tác của tôi →" onPress={() => router.push('/sang-tac')} secondary />
           {userId && <AccountOverview key={userId} userId={userId} />}
           <ActionButton label="Đăng xuất trên thiết bị này" disabled={busy} secondary onPress={() => void perform(async () => {
             const { error } = await requireSupabase().auth.signOut({ scope: 'local' });

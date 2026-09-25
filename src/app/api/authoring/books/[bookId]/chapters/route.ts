@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import { MAX_DETECTED_CHAPTERS } from "@/lib/authoring/split-chapters";
+import { MAX_CHAPTER_CONTENT_LENGTH as MAX_CONTENT_LENGTH } from "@/lib/authoring/chapter-limits";
 
 // ~4.5MB là giới hạn body thật của Vercel Route Handler (không cấu hình
 // được lớn hơn) — chặn sớm ở đây bằng content-length để trả lỗi tiếng Việt
 // gọn, thay vì để lộ lỗi 413 thô của platform.
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
-const MAX_CONTENT_LENGTH = 200_000; // ~ đủ cho 1 chương rất dài, chặn lạm dụng
 
 type ChapterInput = { title: string; content: string };
 
@@ -29,7 +29,7 @@ function isChapterInput(value: unknown): value is ChapterInput {
  * "+ Chương mới" thủ công ở trang tổng quan truyện (1 chương rỗng) — nên
  * không cần route riêng cho việc thêm 1 chương tay.
  *
- * Dùng createClient() (RLS thật), KHÔNG service-role — giống mọi route
+ * Dùng getUserContext() (RLS thật), KHÔNG service-role — giống mọi route
  * authoring khác. RLS insert trên chapters yêu cầu book_id thuộc 1 sách
  * mà author_id = auth.uid(), nhưng SELECT trên books rộng hơn (cho phép
  * đọc sách đã published của người khác) nên vẫn phải tự kiểm author_id ở
@@ -60,9 +60,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
     return NextResponse.json({ error: "Dữ liệu chương không hợp lệ." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 
@@ -72,7 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
     .eq("id", bookId)
     .maybeSingle();
 
-  if (!book || book.author_id !== userData.user.id) {
+  if (!book || book.author_id !== userId) {
     return NextResponse.json({ error: "Không tìm thấy truyện hoặc bạn không có quyền sửa." }, { status: 404 });
   }
 

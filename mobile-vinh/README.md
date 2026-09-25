@@ -147,6 +147,14 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
 - Audio (Phase 6c): lưu vị trí nghe (dùng chung với web), "Nghe tiếp", tiếp tục đúng chỗ khi mở
   lại, lượt nghe 1 lần/bản thu/phiên, bình luận audio (thích, trả lời, xoá), nút 🎧 Nghe cho
   audio gắn với chương trong Reader.
+- Sáng tác (Phase 8a–8b, Cá nhân → Sáng tác của tôi): danh sách tác phẩm (cả bản nháp), tạo
+  tác phẩm mới cùng chương đầu, sửa tên/thể loại/tóm tắt/thẻ/độc quyền, thêm chương, soạn chương
+  văn bản thuần (tối đa 200.000 ký tự, cách một dòng trống để tách đoạn), lưu nháp/xuất bản/chuyển
+  về nháp, giá chương, đánh dấu chương cuối (một chiều), xoá chương nháp chưa có người mua, sắp xếp
+  chương (chương cuối luôn đứng cuối), xoá tác phẩm. Nội dung chưa lưu được giữ trong tệp trên máy
+  (theo tài khoản và chương) và hỏi khôi phục khi mở lại. Chương bị quản trị viên gỡ hiện lý do và
+  khoá sửa. Thiếu Chính sách độc quyền → mở thẳng văn bản đó trong Cam kết. Cần migration
+  `20260925_add_chapter_delete_and_reorder.sql` cho xoá/sắp xếp chương.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -265,6 +273,7 @@ node --test scripts/test-notifications.cjs
 node --test scripts/test-mobile-messages.cjs
 node --test scripts/test-agreements.cjs
 node --test scripts/test-services.cjs
+node --test scripts/test-authoring.cjs
 npm run check:supabase
 node scripts/check-supabase.mjs --reader # Cần backend đang chạy
 npx expo install --check

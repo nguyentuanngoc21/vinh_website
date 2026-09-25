@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import {
@@ -70,7 +70,16 @@ export async function PATCH(
     update.tags = tags;
   }
 
-  const supabase = await createClient();
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
+  }
 
   if (typeof body.is_exclusive === "boolean") {
     if (body.is_exclusive === false) {
@@ -103,8 +112,7 @@ export async function PATCH(
       // nhận Chính sách độc quyền xuất bản, cùng version hiện tại. Cần
       // auth.getUser() ở đây vì PATCH thường không fetch user (RLS "authors
       // update their own books" đã tự chặn ownership rồi).
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user || !(await hasAcceptedExclusivityPolicy(supabase, userData.user.id))) {
+      if (!(await hasAcceptedExclusivityPolicy(supabase, userId))) {
         return NextResponse.json(
           { error: EXCLUSIVITY_AGREEMENT_ERROR, missingAgreementIds: [EXCLUSIVITY_AGREEMENT_ID] },
           { status: 403 }
@@ -150,14 +158,18 @@ export async function PATCH(
  * nhưng an toàn hơn cho 1 sản phẩm có giao dịch token thật.
  */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   const { bookId } = await params;
-  const supabase = await createClient();
-
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  let auth;
+  try {
+    auth = await getUserContext(request);
+  } catch (e) {
+    return requestError(e);
+  }
+  const { supabase, userId } = auth;
+  if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
   }
 
@@ -167,7 +179,7 @@ export async function DELETE(
     .eq("id", bookId)
     .maybeSingle();
 
-  if (!book || book.author_id !== userData.user.id || book.deleted_at) {
+  if (!book || book.author_id !== userId || book.deleted_at) {
     return NextResponse.json(
       { error: "Không tìm thấy truyện hoặc bạn không có quyền xoá." },
       { status: 404 }

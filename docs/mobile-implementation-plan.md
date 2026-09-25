@@ -26,8 +26,8 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 | 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Xong (24/09): 4a–4c; 4d chuyển sang Phase 5 |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | 5a–5c xong (24/09); migration realtime chờ áp; push → chuẩn bị phát hành |
 | 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Xong (24/09), đã review |
-| 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |
-| 8 | Sáng tác | Lớn | 2 | Chưa làm |
+| 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định — làm sau cùng (25/09) |
+| 8 | Sáng tác | Lớn | 2 | 8a–8b xong (25/09), đã review; 8c–8e đang làm — trước Phase 7 |
 | — | Sẵn sàng phát hành (song song) | Vừa | — | Chưa làm |
 
 ## Phase 0 — Chuẩn bị
@@ -163,6 +163,41 @@ Quyết định 24/09/2026 (sau rà soát):
 ## Phase 8 — Sáng tác
 
 - Không gian tác giả, Thiết kế, đăng bản thu. Đã chốt (24/09): nằm trong phạm vi app.
+
+Rà soát (25/09): mọi route sáng tác chỉ nhận cookie web và dựa vào RLS/`auth.uid()` để
+kiểm tra chủ sở hữu, nên mobile dùng helper mới `getUserContext` (khóa publishable +
+token người gọi, bắt buộc xác thực) thay vì client service-role của `getRequestContext`.
+
+| Phần | Nội dung |
+|---|---|
+| 8a | Hạ tầng `getUserContext` + dispatcher; danh sách truyện, tổng quan (có nháp, trạng thái bị gỡ), tải chương để sửa |
+| 8b | Tạo/sửa truyện, tạo chương, lưu nháp/xuất bản, luồng cam kết độc quyền, xóa/sắp xếp chương |
+| 8c | Nhân vật + gắn nhân vật, chia sẻ bản thảo, Hoàn thiện; nhập bản thảo .txt/.docx |
+| 8d | Bìa (ảnh nén hoặc link họa sĩ), audio chương (link hoặc tự thu) qua link tải ký |
+| 8e | Thiết kế: đăng, quản lý, thư viện; đăng audio của người lồng tiếng |
+
+Quyết định (25/09):
+1. Upload lớn (audio 60 MB, bìa 8 MB) chuyển sang link tải ký (signed upload URL) cho
+   cả web và mobile — sửa luôn lỗi vượt giới hạn body Vercel trên web.
+2. Trình soạn: văn bản thuần, tự lưu nháp trên máy, chèn ảnh bằng link thiết kế; thêm
+   giới hạn 200.000 ký tự cho PATCH chương trên web. Không làm nút B/I/H2 (trang đọc
+   không hiển thị markdown).
+3. Thêm: nhập bản thảo .txt/.docx; xóa/sắp xếp chương (web cũng chưa có).
+4. `cam-ket-quyen-so-huu`: giữ nguyên hiện trạng (chưa bắt buộc), ghi nhận là việc mở.
+5. Không làm: bảng bản quyền (dữ liệu mẫu), thống kê thu nhập, đọc bản thảo được chia sẻ.
+
+Tiến độ 8a–8b (25/09, đã review):
+- `getUserContext` (src/lib/mobile/request-context.ts): Bearer → khóa publishable + token người
+  gọi (RLS, `auth.uid()` đúng); không header → cookie web; `admin()` là service-role CÙNG project.
+- Route web đã nhận Bearer: `authoring/books` (GET/POST), `books/[bookId]` (PATCH/DELETE),
+  `books/[bookId]/chapters` (POST), `chapters/[chapterId]` (PATCH + DELETE mới),
+  `books/[bookId]/chapters/order` (PUT mới). Mobile gọi qua `api/mobile/authoring/**` với `{action}`.
+- Sửa trên web: giới hạn 200.000 ký tự cho PATCH chương và POST tạo truyện; quest
+  `author_publish_chapter` dùng service-role đúng project.
+- Migration `20260925_add_chapter_delete_and_reorder.sql`: policy xoá chương nháp (không bị gỡ,
+  không phải chương cuối, sách chưa xoá) + RPC `reorder_book_chapters`. Route kiểm thêm "chưa có
+  người mua". Test: docs/supabase/tests/20260925_chapter_delete_and_reorder.test.sql (11 PASS).
+- Web chưa có nút xoá/sắp xếp chương trong giao diện (API đã dùng chung được).
 
 ## Song song — Sẵn sàng phát hành
 

@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../src/providers/AuthProvider';
 import { mobileApi } from '../src/services/api';
 import { AgreementDocument } from '../src/components/AgreementDocument';
@@ -9,10 +9,12 @@ type Agreement = { id: string; name: string; desc: string; updatedAt: string; ac
 type Document = { id: string; name: string; version: string; html: string; missingFields: string[] };
 export default function Agreements() {
   const { session, loading } = useAuth();
+  // ?id= opens that agreement directly (e.g. from the author workspace's exclusivity prompt).
+  const { id } = useLocalSearchParams<{ id?: string }>();
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
-  return <Panel key={session?.user.id ?? 'guest'} userId={session?.user.id} />;
+  return <Panel key={session?.user.id ?? 'guest'} userId={session?.user.id} initialId={typeof id === 'string' ? id : undefined} />;
 }
-function Panel({ userId }: { userId?: string }) {
+function Panel({ userId, initialId }: { userId?: string; initialId?: string }) {
   const [items, setItems] = useState<Agreement[]>([]);
   const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,12 +24,20 @@ function Panel({ userId }: { userId?: string }) {
   const [success, setSuccess] = useState('');
   const sequence = useRef(0);
   const lock = useRef(false);
+  const pendingOpen = useRef(initialId);
+  const openRef = useRef<(id: string) => Promise<void>>(async () => undefined);
   const load = useCallback(() => {
     const request = ++sequence.current;
     setDoc(null); setReady(false); setConsent(false);
     if (userId) {
       setLoading(true); setError('');
-      mobileApi<{ agreements: Agreement[] }>('agreements', userId).then(result => { if (request === sequence.current) setItems(result.agreements); })
+      mobileApi<{ agreements: Agreement[] }>('agreements', userId).then(result => {
+        if (request !== sequence.current) return;
+        setItems(result.agreements);
+        const wanted = pendingOpen.current;
+        pendingOpen.current = undefined;
+        if (wanted && result.agreements.some(a => a.id === wanted)) void openRef.current(wanted);
+      })
         .catch(e => { if (request === sequence.current) setError(e instanceof Error ? e.message : 'Không tải được danh sách.'); })
         .finally(() => { if (request === sequence.current) setLoading(false); });
     }
@@ -52,6 +62,7 @@ function Panel({ userId }: { userId?: string }) {
     } catch (e) { if (request === sequence.current) { setConsent(false); setError(e instanceof Error ? e.message : 'Chưa xác nhận được.'); } }
     finally { lock.current = false; if (request === sequence.current) setLoading(false); }
   }
+  useEffect(() => { openRef.current = open; });
   const accepted = doc && items.some(item => item.id === doc.id && item.updatedAt === doc.version && item.accepted);
   return <SafeAreaView className="flex-1 bg-cream-card">
     <View className="p-5">

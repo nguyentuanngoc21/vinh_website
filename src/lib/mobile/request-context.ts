@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/types';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createClient as createCookieClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getAuthedUserId } from '@/lib/wallet/session';
 
 const noSession = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -66,3 +66,30 @@ export async function getReadContext(request: Request) {
   return { client, userId: data.user.id };
 }
 
+/**
+ * Client for writes that rely on RLS / auth.uid() (authoring: "authors manage their own books",
+ * link_cover_to_book, …). Bearer → the mobile project with the publishable key and the caller's
+ * token, so policies and SECURITY DEFINER checks see the real user; no header → the web cookie
+ * client. Never the service-role client: several authoring routes have no owner check of their
+ * own. `admin()` gives the SAME project's service-role client, for the narrow server-side writes
+ * those routes already make (quest progress, content_protection_status).
+ */
+export async function getUserContext(request: Request): Promise<{
+  supabase: SupabaseClient<Database>; userId: string | null; admin: () => SupabaseClient<Database>;
+}> {
+  const authorization = request.headers.get('authorization');
+  if (!authorization) {
+    const supabase = await createCookieClient();
+    const { data } = await supabase.auth.getUser();
+    return { supabase, userId: data.user?.id ?? null, admin: createServiceRoleClient };
+  }
+  const match = /^Bearer (\S+)$/i.exec(authorization);
+  if (!match) throw new Error('Unauthorized');
+  const project = mobileProject();
+  const supabase = createClient<Database>(project.url, project.key, {
+    ...noSession, global: { headers: { Authorization: `Bearer ${match[1]}` } },
+  });
+  const { data, error } = await supabase.auth.getUser(match[1]);
+  if (error || !data.user) throw new Error('Unauthorized');
+  return { supabase, userId: data.user.id, admin: () => mobileAdmin(project.url) };
+}
