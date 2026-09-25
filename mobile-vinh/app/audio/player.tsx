@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAudio } from '../../src/providers/AudioProvider';
 import { formatAudioTime } from '../../src/services/audio';
+import { useAuth } from '../../src/providers/AuthProvider';
+import { AudioComments } from '../../src/components/AudioComments';
 
 export default function AudioPlayer() {
   const audio = useAudio();
+  const { session } = useAuth();
+  const [commentsOpen, setCommentsOpen] = useState(false);
   return <SafeAreaView className="flex-1 bg-cream-card"><ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
     <Pressable accessibilityRole="button" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/audio')} className="mb-6 self-start py-3"><Text className="font-bold text-brand-ink">← Quay lại</Text></Pressable>
     {!audio.track ? <Text className="py-12 text-center text-stone">Chọn một bản thu ở tab Audio để bắt đầu nghe.</Text> : <>
@@ -24,6 +29,7 @@ export default function AudioPlayer() {
         <Control label={audio.error ? 'Thử lại' : audio.status.playing ? 'Tạm dừng' : 'Phát'} disabled={audio.loading} onPress={() => void audio.toggle()} />
         <Control label="+15 giây" disabled={audio.loading || !audio.status.isLoaded} onPress={() => void audio.seek(audio.status.currentTime + 15)} />
       </View>
+      {!!session && <View className="mt-4 items-center"><Control label="💬 Bình luận" onPress={() => setCommentsOpen(true)} /></View>}
       <Text className="mb-3 mt-8 font-bold text-brand-ink">Tốc độ</Text>
       <View className="flex-row flex-wrap gap-2">{[1, 1.25, 1.5, 2].map(rate => <Control key={rate} label={`${rate}×`} selected={audio.status.playbackRate === rate} disabled={!audio.status.isLoaded} onPress={() => audio.rate(rate)} />)}</View>
       <Text className="mb-3 mt-8 font-bold text-brand-ink">Hẹn giờ tắt</Text>
@@ -36,7 +42,10 @@ export default function AudioPlayer() {
         {audio.track?.id === track.id && <Text className="ml-2 text-brand-ink">♫</Text>}
       </Pressable>)}
     </>}
-  </ScrollView></SafeAreaView>;
+  </ScrollView>
+    {!!session && !!audio.track && <AudioComments key={audio.track.id} userId={session.user.id} audioId={audio.track.id} title={audio.track.title}
+      visible={commentsOpen} onClose={() => setCommentsOpen(false)} />}
+  </SafeAreaView>;
 }
 function Control({ label, onPress, disabled, selected }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}

@@ -3,11 +3,15 @@ import { ActivityIndicator, AppState, FlatList, Platform, Pressable, Text, View,
 import { useFocusEffect } from 'expo-router';
 import { getProgress, resumeIndex, saveProgress } from '../services/library';
 import type { Settings } from '../hooks/useReaderSettings';
+import { highlightSegments, type Highlight } from '../services/reading';
 
 type Props = {
   userId?: string; bookId: string; chapterId: string; canSave: boolean;
   paragraphs: string[]; settings: Settings; textColor: string;
   header: ReactElement; footer: ReactElement;
+  // Reading interactions (only when the chapter is readable and the user is signed in).
+  highlights?: Highlight[]; commentCounts?: Map<number, number>; markColor?: string;
+  onParagraphAction?: (index: number) => void; onOpenComments?: (index: number) => void;
 };
 const viewabilityConfig = { itemVisiblePercentThreshold: 1, minimumViewTime: 150 };
 export function ReaderParagraphs(props: Props) {
@@ -28,7 +32,8 @@ export function ReaderParagraphs(props: Props) {
   return <TrackedParagraphs {...props} initialIndex={position} />;
 }
 
-function TrackedParagraphs({ userId, bookId, chapterId, canSave, paragraphs, settings, textColor, header, footer, initialIndex }: Props & { initialIndex: number }) {
+function TrackedParagraphs({ userId, bookId, chapterId, canSave, paragraphs, settings, textColor, header, footer, initialIndex,
+  highlights, commentCounts, markColor, onParagraphAction, onOpenComments }: Props & { initialIndex: number }) {
   const list = useRef<FlatList<string>>(null);
   const current = useRef<number | null>(null);
   const restored = useRef(initialIndex === 0);
@@ -100,8 +105,23 @@ function TrackedParagraphs({ userId, bookId, chapterId, canSave, paragraphs, set
         restoreTimer.current = setTimeout(restore, 200);
       }}
       ListHeaderComponent={header} ListFooterComponent={footer}
-      renderItem={({ item }) => <Text selectable style={{ color: textColor, fontSize: settings.size,
-        lineHeight: settings.size * settings.spacing, marginBottom: settings.size,
-        fontFamily: settings.font === 'serif' ? Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' }) : undefined }}>{item}</Text>} />
+      renderItem={({ item, index }) => {
+        const font = settings.font === 'serif' ? Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' }) : undefined;
+        const marks = highlights?.filter(h => h.paragraphIndex === index) ?? [];
+        const count = commentCounts?.get(index) ?? 0;
+        // Chapter text is not selectable (no copy); long-press opens the paragraph actions instead.
+        return <Pressable onLongPress={onParagraphAction ? () => onParagraphAction(index) : undefined} delayLongPress={350}
+          accessibilityHint={onParagraphAction ? 'Nhấn giữ để bình luận, đánh dấu hoặc chia sẻ đoạn này' : undefined}>
+          <Text style={{ color: textColor, fontSize: settings.size, lineHeight: settings.size * settings.spacing,
+            marginBottom: count ? 4 : settings.size, fontFamily: font }}>
+            {marks.length ? highlightSegments(item, marks).map((seg, i) => <Text key={i}
+              style={seg.marked ? { backgroundColor: markColor ?? '#f5e3a3' } : undefined}>{seg.text}</Text>) : item}
+          </Text>
+          {count > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`${count} bình luận ở đoạn này`} onPress={() => onOpenComments?.(index)}
+            style={{ alignSelf: 'flex-end', minHeight: 36, paddingHorizontal: 8, justifyContent: 'center', marginBottom: settings.size }}>
+            <Text style={{ color: textColor, fontSize: 13, opacity: 0.75 }}>💬 {count}</Text>
+          </Pressable>}
+        </Pressable>;
+      }} />
   </View>;
 }

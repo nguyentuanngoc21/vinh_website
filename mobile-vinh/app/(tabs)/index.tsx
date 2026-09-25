@@ -4,12 +4,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { Book, getBooks } from '../../src/services/books';
+import { getDiscover, markRecommendationView, type HomepageBook } from '../../src/services/discover';
+import { BookCover } from '../../src/components/BookCover';
+import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [genre, setGenre] = useState('Tất cả');
+  const { session } = useAuth();
+  const userId = session?.user.id;
+  // Covers and "Gợi ý cho bạn" (web home sections); the book list below still works if this fails.
+  const [recommended, setRecommended] = useState<HomepageBook[]>([]);
+  useEffect(() => {
+    let active = true;
+    getDiscover().then(d => { if (active) setRecommended(d.recommended); }).catch(() => { if (active) setRecommended([]); });
+    return () => { active = false; };
+  }, [userId]);
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try { setBooks(await getBooks()); }
@@ -40,10 +52,21 @@ export default function Home() {
         </View>
         <Text className="mb-2 text-sm text-stone">Chào bạn,</Text>
         <Text className="mb-6 text-3xl font-bold leading-10 text-brand-ink">Hôm nay, mình đọc gì?</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Tìm tên truyện" onPress={() => router.push('/tim-kiem')}
+        <Pressable accessibilityRole="button" accessibilityLabel="Tìm truyện, audio, thiết kế" onPress={() => router.push('/tim-kiem')}
           className="mb-5 rounded-2xl border border-cream-border bg-white px-5 py-4">
-          <Text className="text-base text-stone">Tìm một câu chuyện…</Text>
+          <Text className="text-base text-stone">Tìm truyện, tác giả, audio, thiết kế…</Text>
         </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/xep-hang')}
+          className="mb-5 min-h-12 flex-row items-center justify-between rounded-2xl border border-cream-border bg-white px-5 py-3">
+          <Text className="font-bold text-brand-ink">🏆 Bảng xếp hạng truyện</Text><Text className="text-brand-ink">→</Text>
+        </Pressable>
+        {!!recommended.length && <>
+          <Text className="mb-3 text-xl font-bold text-brand-ink">Gợi ý cho bạn</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingBottom: 24 }}>
+            {recommended.map(b => <BookCover key={b.id} title={b.title} coverUrl={b.coverUrl} subtitle={b.authorNickname}
+              onPress={() => { if (userId) void markRecommendationView(userId, b.id); router.push({ pathname: '/truyen/[bookId]', params: { bookId: b.id } }); }} />)}
+          </ScrollView>
+        </>}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 24 }}>
           {genres.map(g => <Pressable key={g} accessibilityRole="button" accessibilityState={{ selected: genre === g }} onPress={() => setGenre(g)}
             className={`rounded-full border border-cream-border px-5 py-3 ${genre === g ? 'bg-brand-ink' : 'bg-cream-card'}`}>

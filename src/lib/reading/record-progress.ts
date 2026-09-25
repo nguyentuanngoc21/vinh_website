@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/types';
 import { ReadingEventService } from '@/lib/quests/reading-event-service';
+import { checkChapterAccess } from '@/lib/reading/chapter-access';
 
 type Client = SupabaseClient<Database>;
 export type ProgressInput = { bookId: string; chapterId: string; paragraphIndex: number; completed: boolean };
@@ -19,20 +20,9 @@ export type ProgressResult = { ok: true } | { ok: false; status: 400 | 403 | 404
  */
 export async function recordReadingProgress(client: Client, userId: string, input: ProgressInput): Promise<ProgressResult> {
   const { bookId, chapterId, paragraphIndex, completed } = input;
-  const chapter = await client.from('chapters').select('id,book_id,price,content').eq('id', chapterId)
-    .eq('published', true).is('removed_at', null).maybeSingle();
-  if (chapter.error) return { ok: false, status: 502, error: 'Không kiểm tra được chương.' };
-  if (!chapter.data || chapter.data.book_id !== bookId) return { ok: false, status: 404, error: 'Không tìm thấy chương.' };
-  const book = await client.from('books').select('id,author_id').eq('id', bookId)
-    .eq('published', true).is('deleted_at', null).maybeSingle();
-  if (book.error) return { ok: false, status: 502, error: 'Không kiểm tra được truyện.' };
-  if (!book.data) return { ok: false, status: 404, error: 'Không tìm thấy truyện.' };
-  if (chapter.data.price > 0 && book.data.author_id !== userId) {
-    const purchase = await client.from('purchase_transactions').select('id')
-      .eq('chapter_id', chapterId).eq('buyer_id', userId).maybeSingle();
-    if (purchase.error) return { ok: false, status: 502, error: 'Không kiểm tra được quyền đọc.' };
-    if (!purchase.data) return { ok: false, status: 403, error: 'Bạn chưa có quyền đọc chương này.' };
-  }
+  const access = await checkChapterAccess(client, userId, chapterId, bookId);
+  if (!access.ok) return access;
+  const chapter = { data: access.chapter };
   const paragraphCount = chapter.data.content ? chapter.data.content.split('\n\n').length : 0;
   if (paragraphIndex >= Math.max(1, paragraphCount)) return { ok: false, status: 400, error: 'Vị trí đọc không hợp lệ.' };
 

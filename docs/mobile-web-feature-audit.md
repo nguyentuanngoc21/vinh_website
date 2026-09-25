@@ -16,6 +16,12 @@ vẫn là công việc tiếp theo, chưa được đánh dấu hoàn thành.
 
 ## Trạng thái hiện tại — 24/09/2026
 
+- Tương tác đọc, khám phá, audio (Phase 6): bình luận theo đoạn, highlight cả đoạn, bình chọn,
+  trope, theo dõi tác giả, chia sẻ; tìm kiếm/xếp hạng/gợi ý như web; vị trí nghe, lượt nghe,
+  bình luận audio, audio gắn chương. **Sửa lỗi web:** (1) phạt chụp màn hình bị kích hoạt khi
+  gõ Shift+S hoặc sao chép trong ô nhập liệu (`src/lib/reading/capture-detection.ts`);
+  (2) bình luận/highlight/bình chọn/trope không kiểm tra quyền đọc chương — nay dùng
+  `src/lib/reading/chapter-access.ts` (chung với tiến độ đọc).
 - Kết nối + tin nhắn (Phase 5): danh bạ, hồ sơ, theo dõi, chi tiết gói và đặt dịch vụ trên
   mobile; truy vấn `/ket-noi` tách thành `src/lib/connect/directory.ts` dùng chung. Mẫu tự động
   theo Bộ quy tắc (tác phẩm công khai). Tin nhắn/thông báo realtime + tải tin cũ hơn

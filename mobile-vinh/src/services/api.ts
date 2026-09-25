@@ -29,3 +29,16 @@ export async function publicApi<T>(path: string, body?: FormData): Promise<T> {
   if (!response.ok) throw new Error(result.error || 'Không thể kết nối với máy chủ.');
   return result;
 }
+/** Public reads that also personalise when signed in (home, search, rankings): Bearer only if a session exists. */
+export async function readApi<T>(path: string): Promise<T> {
+  const base = process.env.EXPO_PUBLIC_API_URL;
+  if (!base) throw new Error('Chưa cấu hình máy chủ ứng dụng.');
+  const { data } = await requireSupabase().auth.getSession();
+  const token = data.session?.access_token;
+  const response = await fetch(`${base.replace(/\/$/, '')}/api/mobile/${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(15000),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Không thể kết nối với máy chủ.');
+  return result;
+}

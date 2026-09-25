@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 
 /**
  * POST /api/characters/:characterId/follow — toggle theo dõi 1 nhân vật
@@ -10,12 +9,13 @@ import { getAuthedUserId } from "@/lib/wallet/session";
  * getAuthedUserId().
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ characterId: string }> }
 ) {
   const { characterId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập để theo dõi." }, { status: 401 });
   }

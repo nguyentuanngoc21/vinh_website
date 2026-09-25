@@ -135,6 +135,18 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
 - Tin nhắn realtime (Phase 5b): tin mới hiện ngay trong hội thoại và danh sách, tải tin cũ
   hơn từng 50 tin; Thông báo tự cập nhật. Cần migration
   `20260924_enable_realtime_messages_notifications.sql` trên dự án Supabase của mobile.
+- Tương tác khi đọc (Phase 6a): nhấn giữ một đoạn → Bình luận / Đánh dấu cả đoạn / Chia sẻ
+  đoạn này; đoạn có bình luận hiện số lượng (mở bảng bình luận, trả lời 1 cấp, xoá của mình);
+  highlight từng phần tạo trên web vẫn hiển thị đúng. Cuối chương: bình chọn, bình chọn nhân
+  vật (trope), theo dõi tác giả, chia sẻ truyện (chỉ tính nhiệm vụ khi thật sự chia sẻ). Chữ
+  chương không chọn/sao chép được; chặn chụp/quay màn hình trong Reader (Android, iOS 13+),
+  không trừ xu. Link chia sẻ dùng `EXPO_PUBLIC_SITE_URL` (tùy chọn).
+- Khám phá (Phase 6b): trang chủ có "Gợi ý cho bạn" (khi đăng nhập, tính nhiệm vụ xem gợi ý) và
+  lối vào Bảng xếp hạng (tuần/tháng/quý/toàn thời gian, lọc thể loại). Tìm kiếm như web: tên
+  tác phẩm hoặc người sáng tác, 3 tab Truyện/Audio/Thiết kế.
+- Audio (Phase 6c): lưu vị trí nghe (dùng chung với web), "Nghe tiếp", tiếp tục đúng chỗ khi mở
+  lại, lượt nghe 1 lần/bản thu/phiên, bình luận audio (thích, trả lời, xoá), nút 🎧 Nghe cho
+  audio gắn với chương trong Reader.
 - Cá nhân hiển thị nickname, username, giới thiệu, số dư xu khả dụng/chờ xử lý
   từ `profiles` và 20 giao dịch mới nhất từ `transactions`. Tự tải lại khi quay về
   tab, có nút Làm mới; lỗi tải hồ sơ và lịch sử được hiển thị riêng. Dữ liệu chỉ
@@ -145,7 +157,7 @@ Khởi động lại Expo sau khi sửa biến môi trường. `npm run web` m�
 - Types được import type-only từ `../src/lib/supabase/types.ts` của web
   (file hiện tại của repo là handwritten, chưa phải schema generated).
 
-IAP, offline, bình luận và ảnh thiết kế inline chưa triển khai. Đã thêm `expo-image-picker`,
+IAP, offline và ảnh thiết kế inline chưa triển khai. Đã thêm `expo-screen-capture` (có trong Expo Go). Đã thêm `expo-image-picker`,
 `expo-image-manipulator` và `@react-native-community/datetimepicker` (đều có sẵn trong Expo Go
 SDK 57); development build cũ cần build lại. Lịch chọn ngày: Android mở hộp thoại lịch hệ thống,
 iOS mở bảng cuộn có nút Xong/Hủy; bản xem trước web vẫn nhập tay dd/mm/yyyy.
@@ -243,6 +255,9 @@ node --test scripts/test-order-actions.cjs
 node --test scripts/test-order-issues.cjs
 node --test scripts/test-connect.cjs
 node --test scripts/test-realtime.cjs
+node --test scripts/test-capture-detection.cjs
+node --test scripts/test-reader-interactions.cjs
+node --test scripts/test-discover-audio.cjs
 node --test scripts/test-audio.cjs
 node --test scripts/test-book-detail.cjs
 node --test scripts/test-account.cjs

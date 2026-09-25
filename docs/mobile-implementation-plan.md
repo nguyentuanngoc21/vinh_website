@@ -25,7 +25,7 @@ và mã nguồn hiện tại. Cập nhật cột Trạng thái khi hoàn thành 
 | 3 | Nhiệm vụ, chuỗi, thành tựu | Vừa | 1 | Xong (24/09), chủ dự án xác nhận đồng bộ với web |
 | 4 | Vòng đời đơn hàng | Lớn | 2b (thông tin hợp đồng) | Xong (24/09): 4a–4c; 4d chuyển sang Phase 5 |
 | 5 | Kết nối, tin nhắn nâng cao, push | Vừa | — | 5a–5c xong (24/09); migration realtime chờ áp; push → chuẩn bị phát hành |
-| 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Đang rà soát |
+| 6 | Tương tác đọc, khám phá, audio nâng cao | Vừa | 1 | Xong (24/09), đã review |
 | 7 | Thanh toán | Lớn | Quyết định của công ty | Chờ quyết định |
 | 8 | Sáng tác | Lớn | 2 | Chưa làm |
 | — | Sẵn sàng phát hành (song song) | Vừa | — | Chưa làm |
@@ -132,6 +132,22 @@ Quyết định 24/09/2026 (sau rà soát):
 - Mở mọi loại liên kết thông báo trong app.
 
 ## Phase 6 — Tương tác đọc và khám phá
+
+Quyết định 24/09/2026 (sau rà soát):
+- 6a Tương tác đọc: bình luận theo đoạn, bình chọn chương, bình chọn trope, theo dõi tác giả trong
+  Reader, chia sẻ (chỉ tính nhiệm vụ khi chia sẻ thật), highlight **cả đoạn** (cùng bảng highlights).
+- Ghi bình luận/highlight/bình chọn/trope **yêu cầu quyền đọc** (chương đã xuất bản; chương trả phí
+  cần là tác giả hoặc đã mua) — áp dụng cho cả web và mobile. Đọc bình luận vẫn công khai.
+- Chống chụp trên mobile: Android chặn chụp/quay trong Reader, iOS phát hiện và cảnh báo; tắt chọn/sao
+  chép chữ chương; **không trừ xu** (expo-screen-capture, cần build lại).
+- Sửa lỗi web: phạt chụp màn hình bị kích hoạt khi gõ Shift+S hoặc sao chép trong ô nhập liệu — chỉ
+  bắt PrintScreen, Win/Cmd+Shift+S, Ctrl/Cmd+S; bỏ qua ô nhập liệu; chỉ tính sao chép nội dung chương.
+- 6b Khám phá: tìm kiếm như web, xếp hạng truyện, gợi ý cho bạn, trang chủ có bìa/tác giả.
+- 6c Audio: lưu/tiếp tục vị trí nghe, lượt nghe, bình luận audio, audio gắn chương trong Reader.
+- Ghi nhận: đọc công khai (trang chủ, tìm kiếm, xếp hạng) dùng `getReadContext` — publishable key +
+  token người gọi để RLS áp dụng như web; không dùng service-role cho dữ liệu công khai.
+- Ghi nhận (chưa làm): trên web, chia sẻ bị hủy vẫn được tính nhiệm vụ (`src/lib/share.ts` trả
+  "shared" khi AbortError); mobile chỉ tính khi hệ điều hành báo đã chia sẻ.
 
 - Bình luận theo đoạn, highlight, bình chọn chương/trope, theo dõi tác giả/nhân vật,
   danh sách nhân vật.

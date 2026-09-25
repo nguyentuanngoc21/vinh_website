@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 
 /**
  * POST /api/audio/:audioNarrationId/comments/:commentId/like — toggle
@@ -10,12 +9,13 @@ import { getAuthedUserId } from "@/lib/wallet/session";
  * đối xứng UI với thiết kế, chỉ không có side-effect quest.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ audioNarrationId: string; commentId: string }> }
 ) {
   const { audioNarrationId, commentId } = await params;
-  const supabase = createServiceRoleClient();
-  const userId = await getAuthedUserId(supabase);
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
   if (!userId) {
     return NextResponse.json({ error: "Vui lòng đăng nhập để thích." }, { status: 401 });
   }

@@ -25,12 +25,13 @@ test('empty database shows empty catalog instead of sample tracks', async () => 
   const { getAudioCatalog } = load('services/audio.ts', { './supabase': { requireSupabase: () => ({ from: () => query }) } });
   assert.deepEqual(await getAudioCatalog(), []);
 });
-function playerFixture(user = 'alice') {
+function playerFixture(user = 'alice', savedPositions = {}) {
+  const saves = []; const plays = [];
   let cursor = 0; const cells = []; const effects = []; const cleanups = []; const listeners = new Set();
   let session = user ? { user: { id: user } } : null; let authChanged;
   const calls = []; let source = null;
   const player = {
-    currentTime: 0, playing: false,
+    currentTime: 0, playing: false, isLoaded: true, duration: 100,
     pause() { this.playing = false; calls.push(['pause']); },
     play() { this.playing = true; calls.push(['play', source]); },
     replace(value) { source = value?.uri ?? null; calls.push(['replace', source]); },
@@ -47,6 +48,7 @@ function playerFixture(user = 'alice') {
     useState(value) { const index = cursor++; if (!(index in cells)) cells[index] = value; return [cells[index], next => { cells[index] = next; }]; },
     useRef(value) { const index = cursor++; if (!(index in cells)) cells[index] = { current: value }; return cells[index]; },
     useEffect(effect) { const index = cursor++; if (!(index in cells)) { cells[index] = true; effects.push(effect); } },
+    useCallback(fn) { cursor++; return fn; },
   };
   const { AudioProvider } = load('providers/AudioProvider.tsx', {
     react, 'react/jsx-runtime': { jsx: (_type, props) => props },
@@ -56,9 +58,14 @@ function playerFixture(user = 'alice') {
       async getSession() { return { data: { session }, error: null }; },
       onAuthStateChange(callback) { authChanged = callback; return { data: { subscription: { unsubscribe() {} } } }; },
     } } },
+    '../services/audio': {
+      getListeningProgress: async () => Object.entries(savedPositions).map(([audioId, positionSeconds]) => ({ audioId, positionSeconds, updatedAt: 't' })),
+      saveListeningProgress: async (userId, audioId, seconds) => { saves.push([userId, audioId, seconds]); },
+      recordPlay: async (id) => { plays.push(id); },
+    },
   });
   function render() { cursor = 0; const value = AudioProvider({ children: null }).value; while (effects.length) cleanups.push(effects.shift()()); return value; }
-  return { render, calls, player, status, emit: event => { for (const callback of [...listeners]) callback(event); },
+  return { render, calls, player, status, saves, plays, emit: event => { for (const callback of [...listeners]) callback(event); },
     signOut() { session = null; authChanged('SIGNED_OUT', null); },
     close() { for (const cleanup of cleanups) cleanup?.(); } };
 }
@@ -88,4 +95,30 @@ test('source load failure is visible; seek is bounded and unsupported rates igno
     assert.deepEqual(f.calls.filter(c => c[0] === 'seek'), [['seek', 0], ['seek', 100]]);
     assert.equal(f.calls.some(c => c[0] === 'rate'), false);
   } finally { f.close(); }
+});
+test('resumes the saved position, counts one play per track and saves on pause', async () => {
+  const fixture = playerFixture('alice', { a: 42, b: 99 });
+  const audio = fixture.render();
+  const loading = audio.play(track('a'));
+  await new Promise(r => setTimeout(r, 0));
+  fixture.emit({ isLoaded: true });
+  await loading;
+  assert.ok(fixture.calls.some(c => c[0] === 'seek' && c[1] === 42), 'resumed at 42s');
+  assert.deepEqual(fixture.plays, ['a']);
+  // Near the end (99 of 100 s): start over instead of resuming.
+  const again = audio.play(track('b'));
+  await new Promise(r => setTimeout(r, 0));
+  fixture.emit({ isLoaded: true });
+  await again;
+  assert.ok(!fixture.calls.some(c => c[0] === 'seek' && c[1] === 99));
+  fixture.player.currentTime = 12.5;
+  fixture.emit({ isLoaded: true, playing: true });
+  fixture.emit({ isLoaded: true, playing: false });
+  assert.deepEqual(fixture.saves.at(-1), ['alice', 'b', 12.5]);
+  const replay = audio.play(track('a'));
+  await new Promise(r => setTimeout(r, 0));
+  fixture.emit({ isLoaded: true });
+  await replay;
+  assert.deepEqual(fixture.plays, ['a', 'b'], 'a is not counted twice in one session');
+  fixture.close();
 });

@@ -37,6 +37,7 @@ function setup({ price = 0, purchased = false, author = 'author', chapterBook = 
   };
   const service = load('src/lib/reading/record-progress.ts', {
     '@/lib/quests/reading-event-service': { ReadingEventService: { recordChapterCompletion: async (_c, p) => { events.push(p); } } },
+    '@/lib/reading/chapter-access': load('src/lib/reading/chapter-access.ts'),
   });
   const route = load('src/app/api/mobile/books/[bookId]/reading-progress/route.ts', {
     '@/lib/mobile/request-context': {

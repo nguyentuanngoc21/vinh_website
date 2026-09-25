@@ -1,8 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, type AudioStatus } from 'expo-audio';
 import { supabase } from '../services/supabase';
-import type { AudioTrack } from '../services/audio';
+import { getListeningProgress, recordPlay, saveListeningProgress, type AudioTrack } from '../services/audio';
+
+const SAVE_EVERY_MS = 8000; // same cadence as the web player (now-playing-context.tsx)
+const RESUME_MIN_SECONDS = 5;
 
 type AudioContextValue = {
   track: AudioTrack | null; queue: AudioTrack[]; status: AudioStatus; loading: boolean;
@@ -31,8 +34,20 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const owner = useRef<string | null>(null);
   const deadline = useRef<number | null>(null);
   const mounted = useRef(true);
+  // Listening position sync with the web (audio_progress) and one play count per track per session.
+  const current = useRef<AudioTrack | null>(null);
+  const lastSave = useRef(0);
+  const wasPlaying = useRef(false);
+  const counted = useRef(new Set<string>());
+  const persist = useCallback(() => {
+    const listening = current.current;
+    if (!listening || !owner.current || !player.isLoaded) return;
+    lastSave.current = Date.now();
+    void saveListeningProgress(owner.current, listening.id, player.currentTime).catch(() => undefined);
+  }, [player]);
 
   function stop() {
+    persist(); current.current = null;
     generation.current++; cancelLoad.current?.(); cancelLoad.current = null;
     player.pause(); player.replace(null);
     if (Platform.OS !== 'web') player.clearLockScreenControls();
@@ -43,6 +58,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     mounted.current = true;
     const subscription = supabase?.auth.onAuthStateChange((_event, session) => {
       if (owner.current && session?.user.id !== owner.current) {
+        // Never save the previous account's position under the new one.
+        current.current = null;
         generation.current++; cancelLoad.current?.();
         player.pause(); player.replace(null);
         if (Platform.OS !== 'web') player.clearLockScreenControls();
@@ -59,12 +76,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       }
     };
     const timer = setInterval(check, 1000);
-    const listener = AppState.addEventListener('change', check);
-    const progress = player.addListener('playbackStatusUpdate', check);
+    const listener = AppState.addEventListener('change', state => { check(); if (state !== 'active') persist(); });
+    const progress = player.addListener('playbackStatusUpdate', state => {
+      check();
+      // Save while playing (throttled) and whenever playback stops (pause, end, interruption).
+      if (state.playing && Date.now() - lastSave.current >= SAVE_EVERY_MS) persist();
+      else if (wasPlaying.current && !state.playing) persist();
+      wasPlaying.current = state.playing;
+    });
     return () => { clearInterval(timer); listener.remove(); progress.remove(); };
-  }, [player]);
+  }, [player, persist]);
 
   async function play(next: AudioTrack, playlist: AudioTrack[] = [next]) {
+    if (current.current && current.current.id !== next.id) persist();
     const operation = ++generation.current;
     cancelLoad.current?.();
     setError(''); setLoading(true);
@@ -76,7 +100,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       owner.current = auth.data.session.user.id;
       await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix', allowsRecording: false });
       if (operation !== generation.current || !mounted.current) return;
-      setTrack(next); setQueue(playlist);
+      setTrack(next); setQueue(playlist); current.current = next;
+      const saved = getListeningProgress(auth.data.session.user.id).then(list => list.find(p => p.audioId === next.id)?.positionSeconds ?? 0).catch(() => 0);
       await new Promise<void>((resolve, reject) => {
         let done = false;
         const finish = (failure?: Error) => {
@@ -93,6 +118,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         try { player.replace({ uri: next.audioUrl }); } catch { finish(new Error('Không mở được nguồn audio.')); }
       });
       if (operation !== generation.current || !mounted.current) return;
+      // Resume where the listener stopped (on web or mobile), unless it was at the very end.
+      const position = await saved;
+      if (operation !== generation.current || !mounted.current) return;
+      const duration = player.duration;
+      if (position > RESUME_MIN_SECONDS && (!duration || position < duration - RESUME_MIN_SECONDS)) await player.seekTo(position).catch(() => undefined);
+      if (!counted.current.has(next.id)) { counted.current.add(next.id); void recordPlay(next.id); }
       if (Platform.OS !== 'web') player.setActiveForLockScreen(true,
         { title: next.title, artist: next.narratorName, albumTitle: 'Vịnh · Audio Drama' },
         { showSeekBackward: true, showSeekForward: true });
