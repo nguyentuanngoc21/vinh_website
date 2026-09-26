@@ -23,7 +23,7 @@ type TabKey = (typeof TABS)[number][0];
 export function ContestAdminDetail(props: {
   contest: ContestRow;
   events: StatusEvent[];
-  submissions: { items: AdminSubmission[]; total: number };
+  submissions: { items: AdminSubmission[]; total: number; scores_refreshed_at: string | null };
   awards: AdminAward[];
   candidates: Pick<AdminSubmission, "id" | "book_title" | "author_name">[];
   resultsVisible: boolean;

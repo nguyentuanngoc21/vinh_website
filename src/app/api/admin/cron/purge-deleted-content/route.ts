@@ -60,6 +60,7 @@ export async function GET(request: Request) {
   const expiredBookIds = (expiredBooks ?? []).map((b) => b.id);
 
   let chaptersPurgedViaBook = 0;
+  const purgedChapterIds: string[] = [];
   if (expiredBookIds.length > 0) {
     const { data: updatedChapters, error: chaptersError } = await supabase
       .from("chapters")
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
       console.error("[admin] purge-deleted-content: purge chapters of expired books failed:", chaptersError);
     } else {
       chaptersPurgedViaBook = updatedChapters?.length ?? 0;
+      purgedChapterIds.push(...(updatedChapters ?? []).map((c) => c.id));
     }
 
     const { error: booksError } = await supabase
@@ -95,7 +97,23 @@ export async function GET(request: Request) {
     console.error("[admin] purge-deleted-content: purge standalone removed chapters failed:", standaloneError);
   }
 
+  purgedChapterIds.push(...(updatedStandaloneChapters ?? []).map((c) => c.id));
+
+  // 3. Bản chụp bài dự thi (Contest Engine, migrations/20260926_add_contest_snapshots.sql)
+  // giữ nội dung đã chấm — dọn theo cùng sách/chương vừa dọn, để bản chụp không
+  // thành đường giữ lại nội dung vi phạm / đã gỡ. Chạy SAU bước 1–2.
+  let purgedSnapshotChapters = 0;
+  if (expiredBookIds.length > 0 || purgedChapterIds.length > 0) {
+    const { data: snapCount, error: snapError } = await supabase.rpc("purge_contest_snapshots", {
+      p_book_ids: expiredBookIds,
+      p_chapter_ids: purgedChapterIds,
+    });
+    if (snapError) console.error("[admin] purge-deleted-content: purge contest snapshots failed:", snapError);
+    else purgedSnapshotChapters = snapCount ?? 0;
+  }
+
   return NextResponse.json({
+    purgedSnapshotChapters,
     purgedBooks: expiredBookIds.length,
     purgedChaptersViaBook: chaptersPurgedViaBook,
     purgedChaptersStandalone: updatedStandaloneChapters?.length ?? 0,

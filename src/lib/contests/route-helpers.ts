@@ -48,7 +48,7 @@ export function optionalText(v: unknown, max = 2000): string | null {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Id không phải UUID không khớp dòng nào — trả 404 thay vì để Postgres báo lỗi kiểu (500). */
-export function requireUuid(v: unknown, code: "book_not_found" | "submission_not_found" | "contest_not_found"): string {
+export function requireUuid(v: unknown, code: "book_not_found" | "submission_not_found" | "contest_not_found" | "award_not_found"): string {
   if (typeof v !== "string" || !UUID.test(v)) throw new ContestError(code);
   return v;
 }

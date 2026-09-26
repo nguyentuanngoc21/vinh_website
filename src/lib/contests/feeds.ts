@@ -24,6 +24,7 @@ import {
   encodeRankingCursor,
 } from "@/lib/contests/ranking";
 import { toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-books";
+import { freezeScores, getScoreState } from "@/lib/contests/scores-service";
 
 type Client = SupabaseClient<Database>;
 type BookRow = Database["public"]["Tables"]["books"]["Row"];
@@ -126,7 +127,11 @@ export async function getContestEntries(
   };
 }
 
-/** BXH Độc giả yêu thích (popular-v1). Các loại khác mở ở Phase 2. */
+/**
+ * BXH Độc giả yêu thích. Trong lúc bình chọn (và mọi cuộc thi popular-v1):
+ * đếm phiếu hợp lệ trực tiếp. popular-v2 sau khi công bố kết quả: phiếu đã
+ * lọc trên bảng điểm đã chốt (P3, P8) — cùng số liệu admin dùng để trao giải.
+ */
 export async function getPopularRanking(
   client: Client,
   input: { contest: ContestRow; capabilities: ContestCapabilities; cursor?: string | null; limit?: number }
@@ -135,15 +140,19 @@ export async function getPopularRanking(
   const cursor = decodeRankingCursor(input.cursor);
   if (cursor === "invalid") throw new ContestError("invalid_cursor");
   const limit = clampLimit(input.limit, 20);
-
-  const { data, error } = await client.rpc("get_contest_ranking", {
+  const page = {
     p_contest_id: input.contest.id,
     p_limit: limit,
     p_after_rank: cursor?.rank ?? null,
     p_after_submitted_at: cursor?.submitted_at ?? null,
     p_after_id: cursor?.id ?? null,
-  });
-  throwIfError(error, "get_contest_ranking");
+  };
+
+  const useFinalScores = await ensureFinalScores(client, input.contest, input.capabilities);
+  const { data, error } = useFinalScores
+    ? await client.rpc("get_contest_score_ranking", { ...page, p_kind: "popular" })
+    : await client.rpc("get_contest_ranking", page);
+  throwIfError(error, useFinalScores ? "get_contest_score_ranking" : "get_contest_ranking");
   const rows = data ?? [];
   const cards = await cardsFor(client, rows.map((r) => r.book_id));
   const valuesVisible = input.capabilities.popular_values_visible;
@@ -164,6 +173,24 @@ export async function getPopularRanking(
         : null,
     values_visible: valuesVisible,
   };
+}
+
+/**
+ * true khi BXH Độc giả yêu thích phải đọc bảng điểm đã chốt (popular-v2, đã
+ * công bố kết quả). Chưa chốt (lần chốt lúc công bố bị lỗi) → chốt ngay tại
+ * đây; nếu vẫn lỗi thì tạm hiển thị phiếu trực tiếp và để cron 0h chốt lại,
+ * thay vì làm hỏng trang kết quả.
+ */
+async function ensureFinalScores(client: Client, contest: ContestRow, capabilities: ContestCapabilities): Promise<boolean> {
+  if (readContestConfig(contest).scoring.popular_formula_id !== "popular-v2" || !capabilities.results_visible) return false;
+  try {
+    const state = await getScoreState(client, contest.id);
+    if (!state?.frozen_at) await freezeScores(client, contest.id);
+    return true;
+  } catch (error) {
+    console.error("[contests] freeze scores on read failed:", error);
+    return false;
+  }
 }
 
 /** Khối "Top truyện" trên microsite (Q3). */

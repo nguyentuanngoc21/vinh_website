@@ -8,6 +8,7 @@ import { ContestAdminDetail } from "@/components/admin/contests/contest-admin-de
 import { getContestById, getStatusEvents, listAwards, listSubmissionsForAdmin } from "@/lib/contests/admin-service";
 import { areResultsVisible } from "@/lib/contests/capabilities";
 import { ContestError } from "@/lib/contests/errors";
+import { ensureFreshScores } from "@/lib/contests/scores-service";
 import { CONTEST_STATUS_LABEL } from "@/lib/contests/labels";
 
 export const metadata: Metadata = { title: "Cuộc thi · Vịnh Admin" };
@@ -24,6 +25,8 @@ export default async function AdminContestDetailPage({ params }: { params: Promi
     throw error;
   }
 
+  // Làm mới bảng điểm (bỏ qua nếu chưa quá 15 phút) trước khi đọc số liệu.
+  if (contest.status !== "draft") await ensureFreshScores(supabase, contestId);
   const [events, submissions, awards, eligible, shortlisted] = await Promise.all([
     getStatusEvents(supabase, contestId),
     listSubmissionsForAdmin(supabase, { contestId }),

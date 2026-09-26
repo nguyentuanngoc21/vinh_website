@@ -183,7 +183,8 @@ export function getContestCapabilities(input: {
     can_submit,
     can_withdraw,
     can_resubmit,
-    can_edit_submission: hasActiveEntry && beforeDeadline,
+    // Admin đóng nhận bài sớm thì bản chụp đã chốt dù chưa tới submission_end.
+    can_edit_submission: hasActiveEntry && beforeDeadline && (contest.status === "submission_open" || contest.status === "announced"),
     can_vote,
     results_visible,
     rankings_visible: { popular: popularVisible, trending: false, jury: results_visible, final: results_visible },

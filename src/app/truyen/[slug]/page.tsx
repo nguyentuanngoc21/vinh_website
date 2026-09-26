@@ -8,6 +8,10 @@ import { BookCover } from "@/components/covers/book-cover";
 import { Pill } from "@/components/ui";
 import { StoryCtaButtons } from "@/components/story/story-cta-buttons";
 import { StoryTabs } from "@/components/story/story-tabs";
+import { StoryContestCards } from "@/components/contests/story-contest-cards";
+import { ReadingSourceMarker } from "@/components/reading/reading-source-marker";
+import { readingSourceFromParam } from "@/lib/reading/reading-source";
+import { getStoryContestCards } from "@/lib/contests/public-view";
 import { computeBookStatus } from "@/lib/story/status";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
@@ -41,6 +45,8 @@ export default async function StoryPage({
 }: PageProps<"/truyen/[slug]"> & { searchParams: Promise<{ from?: string }> }) {
   const { slug } = await params;
   const { from } = await searchParams;
+  // Nguồn truy cập cho phiên đọc (analytics) — xem src/lib/reading/reading-source.ts.
+  const readingSource = readingSourceFromParam(from);
   const supabase = await createClient();
   const serviceClient = createServiceRoleClient();
 
@@ -68,6 +74,13 @@ export default async function StoryPage({
       .eq("published", true)
       .order("order_index", { ascending: true }),
   ]);
+
+  // Contest card (dự thi / đạt giải) — suy ra từ contest_submissions /
+  // contest_awards, không lưu cờ trên books. Lỗi ở đây không làm hỏng trang truyện.
+  const contestCards = await getStoryContestCards(serviceClient, { bookId: book.id, viewerId }).catch((error) => {
+    console.error("[truyen/slug] contest cards failed:", error);
+    return [];
+  });
 
   // Nhiệm vụ reader_view_recommendations — chỉ khi đến từ mục "Gợi ý cho
   // bạn" ở trang chủ (?from=goi-y, xem recommended-for-you.tsx), không
@@ -188,6 +201,9 @@ export default async function StoryPage({
                   continueChapterId={continueChapterId}
                 />
               </div>
+
+              <StoryContestCards cards={contestCards} />
+              {readingSource && <ReadingSourceMarker bookId={book.id} source={readingSource} />}
 
               {book.tags.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">

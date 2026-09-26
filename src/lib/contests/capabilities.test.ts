@@ -80,6 +80,11 @@ describe("rút / nộp lại / sửa", () => {
     expect(caps({}, { sub: withdrawn, resubmit: true }).can_resubmit).toBe(true);
   });
 
+  it("admin đóng nhận bài sớm: không còn sửa được bản dự thi", () => {
+    expect(caps({ status: "submission_closed" }, { sub: eligible }).can_edit_submission).toBe(false);
+    expect(caps({}, { sub: eligible }).can_edit_submission).toBe(true);
+  });
+
   it("bài bị loại không rút, không sửa", () => {
     const c = caps({}, { sub: { status: "disqualified", review_flags: [] } });
     expect(c.can_withdraw).toBe(false);

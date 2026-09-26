@@ -18,6 +18,7 @@ import { ContestError } from "@/lib/contests/errors";
 import { getContestEntries, getPopularRanking, getTopEntries, type EntrySort } from "@/lib/contests/feeds";
 import { CONTEST_STATUS_LABEL } from "@/lib/contests/labels";
 import { isFinished, PHASE_COPY, resolveTab, tabsFor, type TabKey } from "@/lib/contests/phase-copy";
+import type { LegacyStats } from "@/lib/contests/lifecycle-service";
 import { listPublicAwards, loadContestPage, type ContestPageData, type PublicAward } from "@/lib/contests/public-view";
 
 type Props = {
@@ -343,9 +344,15 @@ async function TabContent({
     .select("to_status, created_at")
     .eq("contest_id", row.id)
     .order("created_at", { ascending: true });
+  // Chụp lúc lưu trữ (lifecycle-service captureLegacyStats); trước đó dùng số đếm trực tiếp.
+  const legacy = row.legacy_stats as Partial<LegacyStats> | null;
+  const fmt = (n: number) => n.toLocaleString("vi-VN");
   const stats: [string, string][] = [
-    [data.counts.entries.toLocaleString("vi-VN"), "tác phẩm dự thi"],
-    [data.counts.authors.toLocaleString("vi-VN"), "tác giả"],
+    [fmt(legacy?.entries ?? data.counts.entries), "tác phẩm dự thi"],
+    [fmt(legacy?.authors ?? data.counts.authors), "tác giả"],
+    ...(legacy?.words ? [[fmt(legacy.words), "chữ được chấm"] as [string, string]] : []),
+    ...(legacy?.valid_votes !== undefined ? [[fmt(legacy.valid_votes), "phiếu bình chọn hợp lệ"] as [string, string]] : []),
+    ...(legacy?.awards ? [[fmt(legacy.awards), "giải thưởng"] as [string, string]] : []),
   ];
   return (
     <div className="grid grid-cols-1 gap-9 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -421,7 +428,7 @@ function Results({ awards, publishedAt, visible }: { awards: PublicAward[]; publ
                 );
                 const cls = `flex flex-col items-center rounded-[20px] border text-center ${big ? "order-first border-cream-gold-border bg-cream-card px-5 pb-6 pt-7 md:order-none" : "border-border-light bg-neutral-bg/60 px-5 pb-5 pt-5"}`;
                 return a.book && !a.revoked ? (
-                  <Link key={a.id} href={`/truyen/${a.book.slug}`} className={`${cls} no-underline`}>{inner}</Link>
+                  <Link key={a.id} href={`/truyen/${a.book.slug}?from=cuoc-thi`} className={`${cls} no-underline`}>{inner}</Link>
                 ) : (
                   <div key={a.id} className={cls}>{inner}</div>
                 );

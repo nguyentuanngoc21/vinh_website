@@ -16,7 +16,7 @@ const TRANSITION_NOTES: Partial<Record<ContestStatus, string>> = {
   announced: "Cuộc thi xuất hiện công khai. Từ lúc này thể lệ, đường dẫn, giải thưởng và điều kiện dự thi bị khoá vĩnh viễn.",
   submission_open: "Tác giả gửi được bài (trong khung giờ nhận bài). Người đã bật “Nhắc tôi khi mở” sẽ nhận thông báo.",
   submission_closed:
-    "Chưa có bản chụp (snapshot) bản dự thi — tính năng ở Slice 1.6. Không dùng bước này cho cuộc thi thật cho đến khi Slice 1.6 xong (D3).",
+    "Chụp bản dự thi của mọi bài (bản được chấm) và kiểm lại điều kiện số chương / số chữ — bài tụt điều kiện được gắn cờ để bạn quyết định. Tác giả vẫn sửa truyện được nhưng không tính vào bản chấm.",
   community_voting: "Mở bình chọn trong khung giờ đã đặt. Công thức chấm bị khoá từ lúc mở bình chọn.",
   results: "Công bố kết quả: giải thưởng và BXH Ban giám khảo/Chung cuộc hiện công khai. Hạn chế thu phí và khoá độc quyền được gỡ.",
   archived: "Lưu trữ vĩnh viễn — trang cuộc thi vẫn tồn tại ở mục Dấu ấn các mùa thi.",
@@ -62,7 +62,7 @@ export function ContestStatusPanel({ contest, events }: { contest: ContestRow; e
         {next.length > 0 ? (
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {next.map((s) => (
-              <Button key={s} type="button" variant={s === "submission_closed" ? "ghost" : "dark"} fullWidth={false}
+              <Button key={s} type="button" variant="dark" fullWidth={false}
                 className="w-full px-5 py-2.5 text-sm sm:w-auto" onClick={() => { setTarget(s); setError(null); }}>
                 Chuyển sang: {CONTEST_STATUS_LABEL[s]}
               </Button>
@@ -100,7 +100,7 @@ export function ContestStatusPanel({ contest, events }: { contest: ContestRow; e
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-bold text-brand-ink">Chuyển sang “{CONTEST_STATUS_LABEL[target]}”?</h3>
             {TRANSITION_NOTES[target] && (
-              <Alert tone={target === "submission_closed" ? "error" : "info"} icon={<WarningCircleIcon size={18} />}>
+              <Alert tone="info" icon={<WarningCircleIcon size={18} />}>
                 {TRANSITION_NOTES[target]}
               </Alert>
             )}

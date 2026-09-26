@@ -917,6 +917,7 @@ Phase 1 chỉ **thêm** bảng/hàm/index/policy mới, không đổi cột hay 
 - Migration idempotent theo quy ước dự án; enum chữ thường; bỏ sửa `proxy.ts` không cần thiết.
 - 25/09/2026: ghi các quyết định D1–D10 — route `/cuoc-thi`; duyệt tự động; snapshot ở Phase 1; cờ `review_flags` cho admin; luật vote D5; `can_resubmit`; cấm thu phí chương/audio khi dự thi (trigger + RPC `submit_contest_entry()` + rule); Vitest.
 - 25/09/2026: xác minh nguồn chân lý độc quyền là `books.is_exclusive`; ghi D11 — rule `require_exclusive` kiểm cờ + thỏa thuận bản hiện hành, trigger trên `books` chặn cứng tắt độc quyền trong lúc thi (cả admin); `submit_contest_entry()` khoá thêm dòng sách; hai trigger dùng `hint` riêng để route phân biệt lỗi.
+- 26/09/2026: triển khai xong Phase 1 (Slice 1.1–1.7): DB core, domain layer + Vitest, admin, hub + microsite, gửi bài + khu vực tác giả, đóng nhận bài + snapshot-on-write (migration `20260926_add_contest_snapshots`), badge trên trang truyện + admin chi trả giải (`20260926_add_contest_award_payout`) + thống kê mùa thi lúc lưu trữ. Sửa kèm: policy đệ quy của `profiles` (`20260926_fix_profiles_policy_recursion`). Phase 2 (valid reader, trending, giám khảo, analytics) chưa bắt đầu.
 - 25/09/2026: đối chiếu thiết kế Claude Design (project "Thiết kế website Vịnh": `Vịnh Cuộc thi.dc.html`, `Vịnh Cuộc thi Tác giả.dc.html`, `Vịnh Cuộc thi Đặc tả.dc.html`) — thêm mục XIX; giữ D1 và D5; thêm D12; sửa D10 (VND → token, cột giải thưởng, thu hồi giải).
 
 ---
@@ -1022,3 +1023,82 @@ Nếu không có "Cần bổ sung", mọi thiếu sót chỉ có hai lựa chọ
 - Thay cho cặp cột `flags_resolved_at` / `flags_resolved_by` cấp bài ở III.1 (trạng thái xử lý nằm trong từng cờ).
 - Capability: `viewer_submission.needs_revision`, `viewer_submission.revision_deadline` (hạn sớm nhất trong các cờ đang mở).
 
+
+---
+
+## XX. PHASE 2 — FAIR COMPETITION: KHẢO SÁT & KẾ HOẠCH (26/09/2026)
+
+### 1. Khảo sát lại dữ liệu đọc (bắt buộc trước khi coi dữ liệu đọc là "đọc thật" — VII.4)
+
+| Nguồn | Hiện trạng thật | Hệ quả cho Phase 2 |
+|---|---|---|
+| `reading_history` (qua `record_chapter_read`) | Server kiểm quyền đọc (chương xuất bản, chưa gỡ, đúng truyện, chương trả phí đã mua) — route web đã sửa, không còn tin client. Nhưng "đọc hết chương" = reader gửi `isLastParagraph` khi dừng cuộn ~3 giây ở **đoạn cuối** — cuộn nhanh xuống cuối cũng tính | Dùng được cho **unique reader / return reader / completion** (đếm người, dedupe theo ngày). **Không** đủ cho "meaningful read" |
+| `reading_sessions` | Bảng có sẵn nhưng **không có code nào ghi** (achievement-service ghi rõ "chưa được ghi"). RLS `for all` cho chủ hàng → client tự ghi được qua PostgREST | Hiện **không có** dữ liệu thời gian đọc, drop-off, đọc tiếp chương sau. Nếu dùng phải: chỉ server ghi (bỏ quyền ghi của client) |
+| `anchored_comments` | Có `user_id`, `chapter_id` | Dùng được cho unique commenter |
+| `author_follows` | Có `created_at` | Dùng được cho followers trong khung cuộc thi |
+| Traffic source | Không có ở đâu | Phải ghi mới |
+
+### 2. Slice đề xuất (theo dependency)
+
+```
+2.1 Tầng ghi nhận đọc (server): phiên đọc có thời gian thật + nguồn truy cập
+      └─► 2.2 Tín hiệu hợp lệ (valid reader, meaningful read, return, completion) + bảng điểm cache
+             ├─► 2.3 Trending, "Đang được chú ý", "Viên ngọc ẩn" (feed + tab BXH)
+             ├─► 2.4 Tín hiệu gian lận + màn admin xem xét (không tự khoá tài khoản)
+             ├─► 2.5 Giám khảo + rubric + màn chấm (đọc BẢN CHỤP) → jury score
+             │      └─► 2.6 Final score theo scoring_config (khoá từ lúc mở bình chọn)
+             └─► 2.7 Analytics cho tác giả (/author/contests/[slug]/stats)
+```
+
+### 3. Câu hỏi cần chốt trước Slice 2.1
+
+| # | Câu hỏi | Đề xuất |
+|---|---|---|
+| P1 | Có thêm **tầng ghi nhận phiên đọc** ở reader không? (bắt buộc cho meaningful read, thời gian đọc, đọc tiếp chương sau, drop-off, nguồn truy cập, funnel giữ chân) | **Có.** Reader gửi nhịp 30 giây khi tab đang hiển thị; server cộng thời gian hoạt động thật (chặn nhịp dồn dập), ghi vào `reading_sessions` (thêm cột `active_seconds`, `max_paragraph`, `source`) và **bỏ quyền ghi của client**. Không đổi gì hành vi đọc hiện tại |
+| P2 | Ngưỡng **meaningful read** | Thời gian hoạt động ≥ **40%** thời gian đọc ước tính (số chữ ÷ 250 chữ/phút), tối thiểu 30 giây. Ngưỡng nằm trong `scoring_config`, chỉnh theo cuộc thi |
+| P3 | **Độc giả yêu thích** (popular-v2) | Vẫn là **phiếu hợp lệ** (đúng thể lệ mẫu). Phiếu chỉ được tính điểm nếu người bầu có meaningful read ở truyện đó và không bị admin xác nhận gian lận. Không chặn lúc bấm bình chọn (D5 giữ nguyên) — lọc lúc tính điểm |
+| P4 | **Trending** | Số **độc giả hợp lệ mới trong 7 ngày**, hiển thị kèm % tăng so với 7 ngày trước (thiết kế: "+212%"). Không dùng lượt xem trang |
+| P5 | **Viên ngọc ẩn** | Bài hợp lệ có số độc giả hợp lệ < ngưỡng (mặc định 100, cấu hình theo cuộc thi), xáo theo seed; tự rời hàng khi vượt ngưỡng. Ẩn cả hàng khi < 3 bài |
+| P6 | **Giám khảo** | Tài khoản Vịnh có sẵn, admin gán theo từng cuộc thi (không tạo role mới). Rubric: danh sách tiêu chí có trọng số, thang 0–10. Jury score = **trung bình cộng** các giám khảo (thiết kế: "Trung bình điểm 5 giám khảo, thang 10"). Chấm ẩn danh tác giả để Phase 3 |
+| P7 | **Chung cuộc** | `final = w_jury × jury + w_popular × popular_chuẩn_hoá`, trọng số đặt trong `scoring_config` trước khi mở bình chọn (đã khoá bằng trigger). Mặc định 70 / 30. popular chuẩn hoá về thang 10 theo bài nhiều phiếu nhất |
+| P8 | **Tần suất tính điểm** | Cron Vercel chỉ chạy 1 lần/ngày → tính lại **khi có người đọc bảng** nếu bảng điểm cũ hơn 15 phút (lưu vào `contest_submission_scores`), cron hằng ngày làm lưới an toàn |
+| P9 | **Analytics tác giả** trong lúc bình chọn | Hiện mọi chỉ số trừ **số phiếu** (ẩn đến khi hết khung bình chọn, nhất quán Q3). Nguồn truy cập chỉ để phân tích, không vào điểm |
+| P10 | **Gian lận** | Tín hiệu ≠ điểm: hệ thống chỉ gắn tín hiệu (vd nhiều phiếu từ tài khoản vừa đủ 7 ngày trong thời gian ngắn, phiếu không có meaningful read). Chỉ tín hiệu admin **xác nhận** mới loại phiếu khỏi điểm. Không tự khoá tài khoản |
+
+### 4. Kết quả chốt (26/09/2026)
+
+| # | Kết quả |
+|---|---|
+| P1 | **Chờ xác nhận** — đã giải thích: nhịp 30 giây chỉ khi tab hiển thị, server tự cộng (mỗi nhịp tối đa 30 giây, nhịp dồn dập không cộng thêm) để chặn "mở rồi cuộn xuống cuối"; bỏ policy cho client tự ghi `reading_sessions` qua PostgREST |
+| P2 | **Đồng ý**: meaningful read ≥ 40% thời gian đọc ước tính (250 chữ/phút), tối thiểu 30 giây; cấu hình theo cuộc thi |
+| P3 | **Đồng ý**: Độc giả yêu thích = phiếu hợp lệ, chỉ tính phiếu có meaningful read và không bị xác nhận gian lận; lọc lúc tính điểm |
+| P4 | **Đồng ý**: Trending = độc giả hợp lệ mới trong 7 ngày, kèm % tăng so với 7 ngày trước |
+| P5 | **Đổi**: "Viên ngọc ẩn" chọn theo xác suất — **80%** từ bài có < 100 độc giả hợp lệ, **20%** từ bài **ngoài top 10 theo lượt xem** (`books.view_count`). Nhóm nào trống thì lấy từ nhóm còn lại. `view_count` chỉ dùng để chọn bài hiển thị trong hàng khám phá, **không** vào điểm / hạng / giải (giữ nguyên VII.4) |
+| P6 | **Hoãn**: cơ chế chấm của Ban giám khảo do chủ dự án mô tả sau. Slice 2.5 (giám khảo, rubric, màn chấm) chưa làm |
+| P7 | **Đổi**: Chung cuộc = **50%** Ban giám khảo + **50%** điểm độc giả (mặc định trong `scoring_config`, khoá từ lúc mở bình chọn) |
+| P8 | **Đổi**: điểm / bảng xếp hạng dựa trên tín hiệu tính lại **mỗi ngày một lần, lúc sang ngày mới theo giờ Việt Nam** (cron 17:00 UTC = 00:00 giờ VN), lưu vào `contest_submission_scores` |
+| P9 | **Đồng ý**: analytics hiện mọi chỉ số trừ số phiếu trong lúc bình chọn |
+| P10 | **Đồng ý**: hệ thống chỉ gắn tín hiệu; chỉ tín hiệu admin xác nhận mới loại phiếu khỏi điểm; không tự khoá tài khoản |
+
+**Cập nhật 26/09/2026:**
+- **P1 — đồng ý**, nhịp **60 giây** (không phải 30). Server cộng khoảng thời gian thật giữa 2 nhịp, chặn trần; bỏ quyền ghi `reading_sessions` của client.
+- **P8 — thay bằng**: BXH Độc giả yêu thích hiển thị trong lúc bình chọn vẫn đếm phiếu hợp lệ **trực tiếp** (như Phase 1). Trending, Viên ngọc ẩn và bản phiếu đã lọc (P3) tính lại **tối đa mỗi 15 phút khi có người xem**, cộng 1 lần cố định lúc 0h giờ Việt Nam làm lưới an toàn. Khi công bố kết quả: giải Độc giả yêu thích và điểm Chung cuộc dùng bản phiếu đã lọc, tính 1 lần rồi chốt.
+
+### 5. Slice 2.1–2.2 — đã triển khai (26/09/2026)
+
+**2.1 — Phiên đọc ở server** (`migrations/20260926_add_reading_session_tracking.sql`): reader gửi nhịp 60 giây (`POST /api/reading/heartbeat`, mobile `/api/mobile/reading/heartbeat`) chỉ khi tab hiển thị và có tương tác trong 120 giây; server cộng khoảng thật giữa 2 nhịp (≤ 90 giây mới cộng). Client chỉ còn quyền SELECT phiên của mình. Nguồn truy cập: `?from=cuoc-thi` / `?from=goi-y` ở trang truyện, nhớ 30 phút theo sách (chỉ cho analytics).
+
+**2.2 — Tín hiệu hợp lệ + bảng điểm** (`migrations/20260926_add_contest_scores.sql`):
+
+| Khái niệm | Định nghĩa đã triển khai |
+|---|---|
+| Meaningful read | Tổng `active_seconds` của 1 người trên 1 chương ≥ max(`meaningful_read_min_seconds`, `meaningful_read_ratio` × số chữ ÷ `reading_words_per_minute`). Chỉ phiên từ `submission_start`, chương đang hiển thị, trừ tác giả |
+| Độc giả hợp lệ | Có ≥ 1 meaningful read trên sách; mốc "đạt" = lúc tổng thời gian vượt ngưỡng (dùng cho 7 ngày) |
+| Phiếu đã lọc (popular-v2) | Phiếu của độc giả hợp lệ của bài, trừ gian lận đã xác nhận |
+| Gian lận đã xác nhận | `contest_fraud_signals.status = 'confirmed'`: có `user_id` không có `submission_id` → loại người đó ở mọi bài; có cả hai → chỉ bài đó. Tín hiệu chỉ có `submission_id` không tự loại gì |
+| Làm mới | `refresh_contest_scores()`: tối đa mỗi 15 phút khi có người xem (khoá skip locked, không chờ nhau), cron 00:05 VN ép tính lại; công bố kết quả → tính lần cuối rồi chốt (`frozen_at`), không bao giờ tính lại |
+| BXH Độc giả yêu thích | Trong lúc bình chọn và cuộc thi popular-v1: đếm phiếu trực tiếp. popular-v2 sau công bố: phiếu đã lọc trên bảng đã chốt |
+
+- Cuộc thi mới mặc định popular-v2. Migration chuyển sang popular-v2 mọi cuộc thi **chưa mở bình chọn** (công thức chỉ khoá từ lúc mở bình chọn); cuộc thi đã mở bình chọn giữ popular-v1 đã khoá.
+- Admin (tab Bài dự thi) luôn thấy phiếu thô, phiếu đã lọc, độc giả hợp lệ, độc giả mới 7 ngày — để xét gian lận và trao giải.
+- Chưa làm ở 2.2: return reader / completion (Slice 2.7), phát hiện gian lận tự động + màn xét (Slice 2.4), hàng Trending / Viên ngọc ẩn công khai (Slice 2.3 — `get_contest_score_ranking('trending')` đã có sẵn).

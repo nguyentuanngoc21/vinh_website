@@ -9,6 +9,7 @@ import { validateTimeline, type AwardInput, type ContestPatch } from "@/lib/cont
 import { areResultsVisible } from "@/lib/contests/capabilities";
 import type { ContestRow } from "@/lib/contests/contest-service";
 import { ContestError, throwIfError } from "@/lib/contests/errors";
+import { getScoreState, getSubmissionScores, type SubmissionScores } from "@/lib/contests/scores-service";
 
 type Client = SupabaseClient<Database>;
 type SubmissionRow = Database["public"]["Tables"]["contest_submissions"]["Row"];
@@ -75,61 +76,9 @@ export async function deleteDraftContest(client: Client, contestId: string): Pro
   throwIfError(error, "deleteDraftContest");
 }
 
-export async function transitionContest(
-  client: Client,
-  input: { contestId: string; to: ContestStatus; adminId: string | null; reason: string | null }
-): Promise<ContestRow> {
-  const { data, error } = await client.rpc("transition_contest_status", {
-    p_contest_id: input.contestId,
-    p_to: input.to,
-    p_actor_id: input.adminId,
-    p_reason: input.reason,
-  });
-  throwIfError(error, "transition_contest_status");
-  const contest = data as ContestRow;
-  if (input.to === "submission_open") await notifyOpenReminders(client, contest);
-  return contest;
-}
-
-/**
- * Q4 "Nhắc tôi khi mở": gửi thông báo cho người đã bật nhắc, đánh dấu
- * notified_at để cron/admin chuyển trạng thái lần nữa không gửi lặp. Lỗi ở
- * đây không làm hỏng việc chuyển trạng thái (đã commit) — chỉ ghi log.
- */
-export async function notifyOpenReminders(client: Client, contest: Pick<ContestRow, "id" | "slug" | "title">): Promise<number> {
-  const { data: pending, error } = await client
-    .from("contest_reminders")
-    .select("user_id")
-    .eq("contest_id", contest.id)
-    .is("notified_at", null)
-    .limit(5000);
-  if (error) {
-    console.error("[contests] load reminders failed:", error);
-    return 0;
-  }
-  const userIds = (pending ?? []).map((r) => r.user_id);
-  if (userIds.length === 0) return 0;
-
-  const { error: notifError } = await client.from("notifications").insert(
-    userIds.map((user_id) => ({
-      user_id,
-      type: "contest_submission_open",
-      title: `${contest.title} đã mở nhận bài`,
-      link: `/cuoc-thi/${contest.slug}`,
-    }))
-  );
-  if (notifError) {
-    console.error("[contests] reminder notifications failed:", notifError);
-    return 0;
-  }
-  const { error: markError } = await client
-    .from("contest_reminders")
-    .update({ notified_at: new Date().toISOString() })
-    .eq("contest_id", contest.id)
-    .in("user_id", userIds);
-  if (markError) console.error("[contests] mark reminders failed:", markError);
-  return userIds.length;
-}
+// Chuyển trạng thái + việc đi kèm (nhắc khi mở, chụp bản dự thi khi đóng)
+// nằm ở lifecycle-service — dùng chung với cron.
+export { notifyOpenReminders, transitionContest } from "@/lib/contests/lifecycle-service";
 
 export async function getStatusEvents(client: Client, contestId: string) {
   const { data, error } = await client
@@ -147,12 +96,15 @@ export type AdminSubmission = SubmissionRow & {
   /** Suy ra từ books.deleted_at — không lưu thành cờ (XII.2). */
   book_removed: boolean;
   author_name: string;
+  /** Bảng điểm cache (Slice 2.2) — null khi chưa tính lần nào. Admin luôn
+   * thấy số phiếu (kể cả lúc đang ẩn với công chúng) để xét gian lận / trao giải. */
+  scores: SubmissionScores | null;
 };
 
 export async function listSubmissionsForAdmin(
   client: Client,
   input: { contestId: string; status?: ContestSubmissionStatus | null; flaggedOnly?: boolean; page?: number; pageSize?: number }
-): Promise<{ items: AdminSubmission[]; total: number }> {
+): Promise<{ items: AdminSubmission[]; total: number; scores_refreshed_at: string | null }> {
   const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 200);
   const page = Math.max(input.page ?? 1, 1);
   let query = client
@@ -170,9 +122,11 @@ export async function listSubmissionsForAdmin(
   const rows = data ?? [];
   const bookIds = [...new Set(rows.map((r) => r.book_id))];
   const authorIds = [...new Set(rows.map((r) => r.author_id))];
-  const [books, authors] = await Promise.all([
+  const [books, authors, scores, scoreState] = await Promise.all([
     bookIds.length ? client.from("books").select("id, title, slug, deleted_at").in("id", bookIds) : Promise.resolve({ data: [], error: null }),
     authorIds.length ? client.from("profiles").select("id, nickname, username").in("id", authorIds) : Promise.resolve({ data: [], error: null }),
+    getSubmissionScores(client, rows.map((r) => r.id)),
+    getScoreState(client, input.contestId),
   ]);
   throwIfError(books.error, "load books");
   throwIfError(authors.error, "load authors");
@@ -181,6 +135,7 @@ export async function listSubmissionsForAdmin(
 
   return {
     total: count ?? rows.length,
+    scores_refreshed_at: scoreState?.refreshed_at ?? null,
     items: rows.map((r) => {
       const b = bookById.get(r.book_id);
       const a = authorById.get(r.author_id);
@@ -190,6 +145,7 @@ export async function listSubmissionsForAdmin(
         book_slug: b?.slug ?? "",
         book_removed: Boolean(b?.deleted_at),
         author_name: a?.nickname ?? a?.username ?? "—",
+        scores: scores.get(r.id) ?? null,
       };
     }),
   };
@@ -335,4 +291,12 @@ export async function revokeAward(client: Client, input: { contest: ContestRow; 
     .single();
   throwIfError(error, "revokeAward");
   return data!;
+}
+
+/** D10 / Q6 — chi trả thủ công 1 giải vào ví tác giả qua grant_platform_bonus(). */
+export async function payAward(client: Client, input: { contestId: string; awardId: string; adminId: string }): Promise<AwardRow> {
+  await awardInContest(client, input.contestId, input.awardId);
+  const { data, error } = await client.rpc("pay_contest_award", { p_award_id: input.awardId, p_admin_id: input.adminId });
+  throwIfError(error, "pay_contest_award");
+  return data as AwardRow;
 }

@@ -26,7 +26,7 @@ export function EntryCard({
 }) {
   return (
     <div className="flex flex-col">
-      <Link href={`/truyen/${book.slug}`} className="group no-underline">
+      <Link href={`/truyen/${book.slug}?from=cuoc-thi`} className="group no-underline">
         <div className="relative aspect-[2/3] overflow-hidden rounded-xl shadow-[0_8px_20px_rgb(20_59_77/.14)] transition-transform duration-200 group-hover:-translate-y-1">
           <BookCover id={book.id} title={book.title} author={book.authorNickname} genre={book.genre} coverUrl={book.coverUrl} className="h-full w-full" />
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">

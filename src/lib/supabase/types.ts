@@ -193,6 +193,10 @@ export type QuestSource = "task_template" | "hidden_quest";
 // created before that migration is 'completed' by default (backfilled).
 export type TransactionStatus = "pending" | "processing" | "available" | "completed" | "failed" | "reversed";
 
+// Nguồn truy cập của phiên đọc — chỉ cho analytics, không vào điểm cuộc thi
+// (client tự khai được). Xem migrations/20260926_add_reading_session_tracking.sql.
+export type ReadingSource = "contest" | "trending" | "search" | "profile" | "recommendation" | "other";
+
 export type DepositStatus = "pending" | "success" | "failed";
 export type WithdrawalStatus = "pending" | "processing" | "success" | "failed";
 
@@ -218,6 +222,10 @@ export type ContestSubmissionStatus =
 // Một phần tử của contest_submissions.review_flags (Q2 "Cần bổ sung" — mục
 // XIX.6 của tài liệu thiết kế). "Cần bổ sung" = còn cờ visible_to_author
 // chưa resolved_at.
+// Tín hiệu gian lận (P10): chỉ "confirmed" mới loại phiếu/độc giả khỏi điểm.
+export type ContestFraudSeverity = "low" | "medium" | "high";
+export type ContestFraudStatus = "open" | "confirmed" | "dismissed";
+
 export type ContestReviewFlag = {
   id: string;
   code: string;
@@ -1477,6 +1485,8 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["highlights"]["Insert"]>;
         Relationships: [];
       };
+      // Ghi DUY NHẤT qua record_reading_heartbeat() (service-role) — client chỉ
+      // SELECT phiên của mình. Xem migrations/20260926_add_reading_session_tracking.sql.
       reading_sessions: {
         Row: {
           id: string;
@@ -1485,6 +1495,12 @@ export type Database = {
           start_time: string;
           end_time: string | null;
           drop_off_offset: number | null;
+          book_id: string | null;
+          /** Thời gian đọc thật do server cộng (giây). */
+          active_seconds: number;
+          last_heartbeat_at: string | null;
+          max_paragraph: number | null;
+          source: ReadingSource | null;
         };
         Insert: {
           id?: string;
@@ -1493,6 +1509,11 @@ export type Database = {
           start_time?: string;
           end_time?: string | null;
           drop_off_offset?: number | null;
+          book_id?: string | null;
+          active_seconds?: number;
+          last_heartbeat_at?: string | null;
+          max_paragraph?: number | null;
+          source?: ReadingSource | null;
         };
         Update: Partial<Database["public"]["Tables"]["reading_sessions"]["Insert"]>;
         Relationships: [];
@@ -2020,6 +2041,43 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Bản chụp bài dự thi lúc đóng nhận bài (migrations/20260926_add_contest_snapshots.sql).
+      // Chỉ service-role; ghi bởi trigger / snapshot_contest_submissions().
+      contest_submission_snapshots: {
+        Row: {
+          id: string;
+          submission_id: string;
+          contest_id: string;
+          reason: "submission_closed" | "manual";
+          taken_at: string;
+          book_title: string;
+          synopsis: string | null;
+          genre: string | null;
+          tags: string[];
+          chapter_count: number;
+          total_words: number;
+          content_purged_at: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_submission_snapshot_chapters: {
+        Row: {
+          id: string;
+          snapshot_id: string;
+          chapter_id: string | null;
+          order_index: number;
+          title: string;
+          content: string;
+          word_count: number;
+          content_hash: string;
+          content_purged_at: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       contest_reminders: {
         Row: {
           contest_id: string;
@@ -2034,6 +2092,73 @@ export type Database = {
           notified_at?: string | null;
         };
         Update: { notified_at?: string | null };
+        Relationships: [];
+      };
+      // Contest Engine Phase 2 (Slice 2.2) — chỉ service-role. Xem
+      // migrations/20260926_add_contest_scores.sql.
+      contest_fraud_signals: {
+        Row: {
+          id: string;
+          contest_id: string;
+          user_id: string | null;
+          submission_id: string | null;
+          signal_code: string;
+          severity: ContestFraudSeverity;
+          evidence: Record<string, unknown>;
+          status: ContestFraudStatus;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          review_note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          contest_id: string;
+          user_id?: string | null;
+          submission_id?: string | null;
+          signal_code: string;
+          severity?: ContestFraudSeverity;
+          evidence?: Record<string, unknown>;
+          status?: ContestFraudStatus;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          status?: ContestFraudStatus;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+        };
+        Relationships: [];
+      };
+      // Chỉ refresh_contest_scores() ghi.
+      contest_submission_scores: {
+        Row: {
+          submission_id: string;
+          contest_id: string;
+          raw_votes: number;
+          /** Phiếu của độc giả hợp lệ, trừ gian lận đã xác nhận (P3). */
+          filtered_votes: number;
+          valid_readers: number;
+          readers_7d: number;
+          readers_prev_7d: number;
+          computed_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_score_state: {
+        Row: {
+          contest_id: string;
+          refreshed_at: string | null;
+          frozen_at: string | null;
+          params: Record<string, unknown>;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
     };
@@ -2189,6 +2314,29 @@ export type Database = {
         Args: { p_user_id: string; p_submission_id: string };
         Returns: boolean;
       };
+      refresh_contest_scores: {
+        Args: { p_contest_id: string; p_force?: boolean; p_freeze?: boolean };
+        Returns: Database["public"]["Tables"]["contest_score_state"]["Row"];
+      };
+      get_contest_score_ranking: {
+        Args: {
+          p_contest_id: string;
+          p_kind: "popular" | "trending";
+          p_limit: number;
+          p_after_rank?: number | null;
+          p_after_submitted_at?: string | null;
+          p_after_id?: string | null;
+        };
+        Returns: {
+          submission_id: string;
+          book_id: string;
+          author_id: string;
+          value: number;
+          submitted_at: string;
+          rank: number;
+          tied: boolean;
+        }[];
+      };
       get_contest_ranking: {
         Args: {
           p_contest_id: string;
@@ -2233,6 +2381,28 @@ export type Database = {
       get_contest_summaries: {
         Args: { p_contest_ids: string[] };
         Returns: { contest_id: string; entry_count: number; author_count: number }[];
+      };
+      snapshot_contest_submissions: {
+        Args: { p_contest_id: string };
+        Returns: number;
+      };
+      purge_contest_snapshots: {
+        Args: { p_book_ids: string[]; p_chapter_ids: string[] };
+        Returns: number;
+      };
+      record_reading_heartbeat: {
+        Args: {
+          p_user_id: string;
+          p_session_id: string | null;
+          p_chapter_id: string;
+          p_paragraph: number;
+          p_source: ReadingSource | null;
+        };
+        Returns: { session_id: string; active_seconds: number }[];
+      };
+      pay_contest_award: {
+        Args: { p_award_id: string; p_admin_id: string };
+        Returns: Database["public"]["Tables"]["contest_awards"]["Row"];
       };
       add_contest_review_flag: {
         Args: {
