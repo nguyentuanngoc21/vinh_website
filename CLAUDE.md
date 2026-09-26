@@ -24,8 +24,8 @@ npm run dev              # start dev server
 npm run build             # production build
 npm run start             # run a production build
 npm run lint               # eslint (flat config, eslint-config-next)
-npx tsc --noEmit           # typecheck (no test runner in this repo — this + lint + a manual
-                            # build/route/UI check is the closest thing to CI; see docs/DEV_WORKFLOW.md)
+npx tsc --noEmit           # typecheck
+npm run test               # Vitest — unit tests for pure logic only (src/**/*.test.ts, no Supabase)
 npm run convert-legal-docs  # regenerate src/lib/legal/*.ts from the .docx sources in docs/ (mammoth)
 ```
 
@@ -38,8 +38,10 @@ cp .env.example .env        # SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY required
 uvicorn app.main:app --reload
 ```
 
-There is no automated test suite — verification is `npx tsc --noEmit`, `npm run lint`, a real
-`npm run build`, and exercising the actual route/UI (see docs/DEV_WORKFLOW.md).
+There is no CI. Verification is `npx tsc --noEmit`, `npm run lint`, `npm run test`, a real
+`npm run build`, and exercising the actual route/UI (see docs/DEV_WORKFLOW.md). Vitest covers
+pure logic only (e.g. `src/lib/contests/` eligibility, capabilities, ranking); anything that needs
+the database is tested with the SQL scripts in `docs/supabase/tests/`, run on dev/staging.
 
 ## Architecture
 
