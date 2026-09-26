@@ -2,6 +2,8 @@
 
 import { isCaptureShortcut, isEditableTarget } from "@/lib/reading/capture-detection";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { recallReadingSource } from "@/lib/reading/reading-source";
+import { HEARTBEAT_INTERVAL_MS } from "@/lib/reading/heartbeat-config";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -968,6 +970,74 @@ export function Reader({
     }, 3000);
   };
 
+  // Nhịp đọc 60 giây (Contest Engine Phase 2, P1) — POST /api/reading/heartbeat. Chỉ gửi khi
+  // tab đang hiển thị VÀ người đọc có tương tác (cuộn/chạm/phím) trong 120 giây gần nhất; server
+  // tự đo khoảng thời gian thật giữa 2 nhịp (≤ 90 giây mới được cộng), nên để tab mở rồi bỏ đi
+  // hay gửi dồn nhịp đều không tăng thời gian đọc. Nhịp đầu gửi ngay khi mở chương; quay lại
+  // tab hoặc tương tác lại sau khi ngừng thì gửi ngay để bắt đầu đo lại. Chỉ khi đọc được toàn
+  // bộ chương (accessGate "none") và đã đăng nhập. Nguồn truy cập lấy từ reading-source.ts.
+  // Xem migrations/20260926_add_reading_session_tracking.sql.
+  const currentParagraphRef = useRef(0);
+  useEffect(() => {
+    if (!isLoggedIn || accessGate !== "none" || !bookId || !chapterId) return;
+    const IDLE_MS = 120_000;
+    const source = recallReadingSource(bookId);
+    let sessionId: string | null = null;
+    let inFlight = false;
+    let stopped = false;
+    let lastInteraction = Date.now();
+
+    const send = () => {
+      if (stopped || inFlight || document.visibilityState !== "visible") return;
+      inFlight = true;
+      fetch("/api/reading/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chapterId, sessionId, paragraphIndex: currentParagraphRef.current, source }),
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = (await res.json()) as { sessionId?: string };
+            if (data.sessionId) sessionId = data.sessionId;
+          } else if (res.status === 401 || res.status === 403 || res.status === 404) {
+            stopped = true; // hết phiên đăng nhập / không còn quyền đọc — ngừng gửi
+          }
+        })
+        .catch(() => {
+          // best-effort — mất 1 nhịp chỉ làm mất ≤ 60 giây thời gian đọc
+        })
+        .finally(() => {
+          inFlight = false;
+        });
+    };
+
+    const onInteract = () => {
+      const wasIdle = Date.now() - lastInteraction > IDLE_MS;
+      lastInteraction = Date.now();
+      if (wasIdle) send();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        lastInteraction = Date.now();
+        send();
+      }
+    };
+
+    send();
+    const interval = setInterval(() => {
+      if (Date.now() - lastInteraction <= IDLE_MS) send();
+    }, HEARTBEAT_INTERVAL_MS);
+    const events = ["scroll", "pointerdown", "keydown", "wheel", "touchstart"] as const;
+    for (const e of events) window.addEventListener(e, onInteract, { passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+      for (const e of events) window.removeEventListener(e, onInteract);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [isLoggedIn, accessGate, bookId, chapterId]);
+
   // Theo dõi đoạn văn đang hiện giữa khung nhìn lúc cuộn — dùng cho nút
   // chia sẻ ở AuthorPanel ("chia sẻ đoạn đang đọc") VÀ ghi tiến độ đọc ở
   // trên. Effect RIÊNG, không chung với 3 effect chống chụp màn hình ở
@@ -992,6 +1062,7 @@ export function Reader({
         const idx = Number((best.target as HTMLElement).dataset.paragraphIndex);
         if (!Number.isNaN(idx) && paragraphs[idx]) {
           setVisibleParagraph(paragraphs[idx]);
+          currentParagraphRef.current = idx;
           scheduleProgressSave(idx);
         }
       },

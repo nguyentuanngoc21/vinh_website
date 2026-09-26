@@ -23,8 +23,9 @@ describe("parseContestPatch", () => {
     if (!r.ok) expect(r.errors.join("|")).toMatch(/slug.*submission_start.*submission_end/);
   });
 
-  it("slug sai định dạng", () => {
+  it("slug sai định dạng hoặc trùng đường dẫn hệ thống", () => {
     expect(parseContestPatch({ ...valid, slug: "Vịnh 2026" }, "create").ok).toBe(false);
+    expect(parseContestPatch({ ...valid, slug: "cron" }, "create").ok).toBe(false);
   });
 
   it("từ chối trường không được sửa (status, created_by…)", () => {

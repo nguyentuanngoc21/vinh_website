@@ -6,7 +6,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContestReviewFlag, Database } from "@/lib/supabase/types";
-import { areResultsVisible, type ContestCapabilities, type ContestViewer } from "@/lib/contests/capabilities";
+import { areResultsVisible, getEntryVoteState, type ContestCapabilities, type ContestViewer } from "@/lib/contests/capabilities";
+import { countdownFor, formatRemaining, PHASE_COPY } from "@/lib/contests/phase-copy";
 import { readContestConfig, type EligibilityRules, type VoteRules } from "@/lib/contests/config";
 import {
   capabilitiesFor,
@@ -290,4 +291,99 @@ export async function listArchiveWinners(
     });
   }
   return out;
+}
+
+export type StoryContestCard =
+  | { kind: "award"; contest: { slug: string; title: string }; award_name: string }
+  | {
+      kind: "entry";
+      contest: { slug: string; title: string; status: ContestRow["status"] };
+      submission_id: string;
+      phase_label: string;
+      vote: ReturnType<typeof getEntryVoteState> | null;
+    };
+
+/**
+ * Contest card trên trang truyện (/truyen/[slug]): giải đã công bố (lên đầu,
+ * dẫn về trang kết quả chính thức — provenance) và các bài đang dự thi (kèm
+ * nút bình chọn khi đang bình chọn). Không lưu gì trên books — suy ra từ
+ * contest_submissions / contest_awards. Số truy vấn cố định.
+ */
+export async function getStoryContestCards(
+  client: Client,
+  input: { bookId: string; viewerId: string | null; now?: Date }
+): Promise<StoryContestCard[]> {
+  const now = input.now ?? new Date();
+  const { data: subs, error } = await client
+    .from("contest_submissions")
+    .select("id, contest_id, author_id, status")
+    .eq("book_id", input.bookId)
+    .in("status", ["eligible", "shortlisted"]);
+  throwIfError(error, "story contest submissions");
+  if (!subs?.length) return [];
+
+  const [contests, awards, votes, reads, viewer] = await Promise.all([
+    client.from("contests").select("*").in("id", subs.map((s) => s.contest_id)).neq("status", "draft"),
+    client.from("contest_awards").select("contest_id, award_name, award_rank, revoked_at").in("submission_id", subs.map((s) => s.id)).is("revoked_at", null),
+    input.viewerId
+      ? client.from("contest_votes").select("submission_id").eq("user_id", input.viewerId).in("submission_id", subs.map((s) => s.id))
+      : Promise.resolve({ data: [] as { submission_id: string }[], error: null }),
+    input.viewerId
+      ? client.from("reading_history").select("chapter_id").eq("user_id", input.viewerId).eq("book_id", input.bookId).not("chapter_id", "is", null).limit(500)
+      : Promise.resolve({ data: [] as { chapter_id: string | null }[], error: null }),
+    getContestViewer(client, input.viewerId),
+  ]);
+  throwIfError(contests.error, "story contests");
+  throwIfError(awards.error, "story awards");
+  throwIfError(votes.error, "story votes");
+  throwIfError(reads.error, "story reads");
+
+  // "Đã đọc hết ≥ 1 chương đang hiển thị" — cùng điều kiện với cast_contest_vote().
+  const readIds = [...new Set((reads.data ?? []).map((r) => r.chapter_id).filter((x): x is string => x !== null))];
+  let completed = false;
+  if (readIds.length) {
+    const { data: visible, error: vError } = await client
+      .from("chapters")
+      .select("id")
+      .in("id", readIds)
+      .eq("book_id", input.bookId)
+      .eq("published", true)
+      .is("removed_at", null)
+      .limit(1);
+    throwIfError(vError, "story visible chapters");
+    completed = (visible ?? []).length > 0;
+  }
+
+  const voted = new Set((votes.data ?? []).map((v) => v.submission_id));
+  const contestById = new Map((contests.data ?? []).map((c) => [c.id, c]));
+  const cards: StoryContestCard[] = [];
+
+  for (const a of (awards.data ?? []).sort((x, y) => (x.award_rank ?? 99) - (y.award_rank ?? 99))) {
+    const c = contestById.get(a.contest_id);
+    if (c && areResultsVisible(c, now)) cards.push({ kind: "award", contest: { slug: c.slug, title: c.title }, award_name: a.award_name });
+  }
+  for (const s of subs) {
+    const c = contestById.get(s.contest_id);
+    if (!c || areResultsVisible(c, now)) continue;
+    const caps = capabilitiesFor(c, viewer, null, now);
+    const cd = countdownFor(c);
+    cards.push({
+      kind: "entry",
+      contest: { slug: c.slug, title: c.title, status: c.status },
+      submission_id: s.id,
+      phase_label: PHASE_COPY[c.status].label + (cd && cd.mode === "countdown" ? ` · ${cd.label} ${formatRemaining(Date.parse(cd.target) - now.getTime())}` : ""),
+      vote:
+        c.status === "community_voting"
+          ? getEntryVoteState({
+              capabilities: caps,
+              viewerId: input.viewerId,
+              entry: { author_id: s.author_id, status: s.status, book_visible: true },
+              hasVoted: voted.has(s.id),
+              hasCompletedChapter: completed,
+              requireCompletedChapter: readContestConfig(c).vote.require_completed_chapter,
+            })
+          : null,
+    });
+  }
+  return cards;
 }

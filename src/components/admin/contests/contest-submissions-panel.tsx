@@ -39,10 +39,11 @@ export function ContestSubmissionsPanel({
   initial,
 }: {
   contestId: string;
-  initial: { items: AdminSubmission[]; total: number };
+  initial: { items: AdminSubmission[]; total: number; scores_refreshed_at: string | null };
 }) {
   const [items, setItems] = useState(initial.items);
   const [total, setTotal] = useState(initial.total);
+  const [scoresAt, setScoresAt] = useState(initial.scores_refreshed_at);
   const [status, setStatus] = useState<ContestSubmissionStatus | "">("");
   const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [page, setPage] = useState(1);
@@ -66,6 +67,7 @@ export function ContestSubmissionsPanel({
       }
       setItems(data.items);
       setTotal(data.total);
+      setScoresAt(data.scores_refreshed_at ?? null);
     },
     [contestId]
   );
@@ -98,7 +100,13 @@ export function ContestSubmissionsPanel({
       </div>
 
       {error && <div className="mb-3"><Alert tone="error">{error}</Alert></div>}
-      <div className="mb-2 text-xs text-stone-alt">{loading ? "Đang tải…" : `${total} bài`}</div>
+      <div className="mb-2 flex flex-col gap-0.5 text-xs text-stone-alt sm:flex-row sm:justify-between">
+        <span>{loading ? "Đang tải…" : `${total} bài`}</span>
+        {/* Phiếu đã lọc = phiếu của người đã đọc đủ lâu, trừ gian lận đã xác nhận (P3). */}
+        <span>
+          {scoresAt ? `Số liệu phiếu/độc giả cập nhật ${formatVnDateTime(scoresAt)} · tự làm mới tối đa 15 phút/lần` : "Chưa có số liệu phiếu/độc giả"}
+        </span>
+      </div>
 
       {items.length === 0 && !loading ? (
         <Alert tone="info">Không có bài dự thi nào khớp bộ lọc.</Alert>
@@ -197,6 +205,14 @@ function SubmissionRow({
             {s.book_removed && <span className="shrink-0 rounded-full bg-error-bg px-2 py-0.5 text-[11px] font-semibold text-error">Sách đã bị gỡ</span>}
           </div>
           <div className="text-xs text-stone-alt">{s.author_name} · gửi {formatVnDateTime(s.submitted_at)}</div>
+          {s.scores && (
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-stone-dark">
+              <span>{s.scores.raw_votes} phiếu</span>
+              <span className="font-semibold text-ink">{s.scores.filtered_votes} phiếu đã lọc</span>
+              <span>{s.scores.valid_readers} độc giả hợp lệ</span>
+              <span>+{s.scores.readers_7d} độc giả / 7 ngày</span>
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {openFlags.length > 0 && (

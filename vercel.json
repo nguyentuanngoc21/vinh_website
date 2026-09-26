@@ -16,6 +16,10 @@
     {
       "path": "/api/auth/cron/purge-unconfirmed-registrations",
       "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/contests/cron/advance",
+      "schedule": "5 17 * * *"
     }
   ]
 }

@@ -21,6 +21,8 @@ export type ContestPatch = Omit<ContestInsert, "id" | "status" | "created_by" | 
 export type PrizeSummaryItem = { name: string; amount_vnd: number; extra: string };
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+/** Trùng thư mục tĩnh cạnh [slug] (src/app/api/contests/cron, src/app/cuoc-thi/[slug]/gui-bai…) — route tĩnh sẽ che mất cuộc thi. */
+const RESERVED_SLUGS = new Set(["cron"]);
 const TEXT_FIELDS = ["title", "short_description", "description", "rules_content", "rules_version"] as const;
 const URL_FIELDS = ["key_visual_url", "banner_url"] as const;
 const DATE_FIELDS = ["submission_start", "submission_end", "voting_start", "voting_end", "judging_start", "judging_end", "result_at"] as const;
@@ -68,6 +70,7 @@ export function parseContestPatch(body: unknown, mode: "create" | "update"): Par
   if ("slug" in body) {
     const slug = typeof body.slug === "string" ? body.slug.trim() : "";
     if (!SLUG_RE.test(slug) || slug.length > 80) errors.push("slug: chỉ gồm chữ thường không dấu, số và dấu gạch ngang");
+    else if (RESERVED_SLUGS.has(slug)) errors.push(`slug: "${slug}" là đường dẫn dành riêng của hệ thống`);
     else out.slug = slug;
   } else if (mode === "create") errors.push("slug: bắt buộc");
 

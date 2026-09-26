@@ -2724,10 +2724,14 @@ create index reading_sessions_user_id_idx on public.reading_sessions (user_id, s
 
 alter table public.reading_sessions enable row level security;
 
-create policy "users manage their own reading sessions"
-  on public.reading_sessions for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+-- Chỉ SELECT của chủ hàng — client KHÔNG tự ghi (trước đây policy "for all"
+-- cho tự khai thời gian đọc qua PostgREST). Ghi duy nhất qua
+-- record_reading_heartbeat() (service-role) ở cuối file — xem
+-- migrations/20260926_add_reading_session_tracking.sql.
+create policy "users view their own reading sessions"
+  on public.reading_sessions for select
+  using (auth.uid() = user_id);
+revoke insert, update, delete, truncate on public.reading_sessions from anon, authenticated;
 
 -- --- 10f. anchored_comments — comment neo vị trí, cơ chế trả lời DUY
 -- NHẤT cho quest cần "câu trả lời" (không trắc nghiệm/điền text tự do).
@@ -5621,3 +5625,698 @@ $$;
 
 revoke execute on function public.resolve_contest_review_flag(uuid, uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.resolve_contest_review_flag(uuid, uuid, uuid, text) to service_role;
+
+-- --- Contest Engine — bản chụp bài dự thi lúc đóng nhận bài (D3, Q1):
+-- snapshot-on-write (trigger BEFORE trên chapters/books chụp bản TRƯỚC khi
+-- sửa ở lần ghi đầu tiên sau hạn) + snapshot_contest_submissions() cho sách
+-- không bị sửa; purge_contest_snapshots() dọn theo nội dung đã gỡ. Chỉ
+-- service-role đọc. Xem migrations/20260926_add_contest_snapshots.sql. ---
+
+create table if not exists public.contest_submission_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  submission_id uuid not null,
+  contest_id uuid not null,
+  reason text not null check (reason in ('submission_closed', 'manual')),
+  taken_at timestamptz not null default now(),
+  book_title text not null,
+  synopsis text,
+  genre text,
+  tags text[] not null default '{}',
+  chapter_count integer not null default 0,
+  total_words integer not null default 0,
+  content_purged_at timestamptz,
+  constraint contest_submission_snapshots_submission_fk foreign key (submission_id, contest_id)
+    references public.contest_submissions (id, contest_id) on delete restrict,
+  constraint contest_submission_snapshots_once unique (submission_id, reason)
+);
+
+create index if not exists contest_submission_snapshots_contest_idx
+  on public.contest_submission_snapshots (contest_id);
+
+create table if not exists public.contest_submission_snapshot_chapters (
+  id uuid primary key default gen_random_uuid(),
+  snapshot_id uuid not null references public.contest_submission_snapshots (id) on delete cascade,
+  -- set null: chương nháp có thể bị xoá thật; bản chụp vẫn giữ nội dung đã chấm.
+  chapter_id uuid references public.chapters (id) on delete set null,
+  order_index integer not null,
+  title text not null,
+  content text not null,
+  word_count integer not null,
+  content_hash text not null,           -- sha256 hex của content lúc chụp
+  content_purged_at timestamptz
+);
+
+create index if not exists contest_submission_snapshot_chapters_snapshot_idx
+  on public.contest_submission_snapshot_chapters (snapshot_id, order_index);
+create index if not exists contest_submission_snapshot_chapters_chapter_idx
+  on public.contest_submission_snapshot_chapters (chapter_id);
+
+alter table public.contest_submission_snapshots enable row level security;
+alter table public.contest_submission_snapshot_chapters enable row level security;
+revoke all on public.contest_submission_snapshots, public.contest_submission_snapshot_chapters from anon, authenticated;
+
+-- Có bài dự thi nào của sách đang chờ chụp không (đường nóng của trigger).
+create or replace function public.contest_book_needs_snapshot(p_book_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.contest_submissions s
+    join public.contests c on c.id = s.contest_id
+    where s.book_id = p_book_id
+      and s.status in ('submitted', 'eligible', 'shortlisted')
+      and c.status in ('submission_open', 'submission_closed', 'community_voting', 'judging')
+      and (c.status <> 'submission_open' or now() >= c.submission_end)
+      and not exists (
+        select 1 from public.contest_submission_snapshots x
+        where x.submission_id = s.id and x.reason = 'submission_closed'
+      )
+  );
+$$;
+
+-- Chụp mọi bài đang chờ của 1 sách. p_old_chapter / p_old_book: giá trị
+-- TRƯỚC KHI SỬA của dòng đang được ghi (null = chụp đúng trạng thái hiện tại).
+-- p_submission_id: chỉ chụp 1 bài (cron); null = mọi bài đang chờ của sách.
+create or replace function public.take_contest_snapshots_for_book(
+  p_book_id uuid,
+  p_old_chapter public.chapters default null,
+  p_old_book public.books default null,
+  p_submission_id uuid default null
+) returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_book public.books;
+  v_sub record;
+  v_snap uuid;
+  v_count integer := 0;
+begin
+  if (p_old_book).id is not null then
+    v_book := p_old_book;
+  else
+    select * into v_book from public.books where id = p_book_id;
+  end if;
+  if v_book.id is null then
+    return 0;
+  end if;
+
+  for v_sub in
+    select s.id, s.contest_id
+    from public.contest_submissions s
+    join public.contests c on c.id = s.contest_id
+    where s.book_id = p_book_id
+      and (p_submission_id is null or s.id = p_submission_id)
+      and s.status in ('submitted', 'eligible', 'shortlisted')
+      and c.status in ('submission_open', 'submission_closed', 'community_voting', 'judging')
+      and (c.status <> 'submission_open' or now() >= c.submission_end)
+      and not exists (
+        select 1 from public.contest_submission_snapshots x
+        where x.submission_id = s.id and x.reason = 'submission_closed'
+      )
+  loop
+    v_snap := null;
+    insert into public.contest_submission_snapshots (submission_id, contest_id, reason, book_title, synopsis, genre, tags)
+    values (v_sub.id, v_sub.contest_id, 'submission_closed', v_book.title, v_book.synopsis, v_book.genre, coalesce(v_book.tags, '{}'))
+    on conflict (submission_id, reason) do nothing
+    returning id into v_snap;
+    continue when v_snap is null;
+
+    insert into public.contest_submission_snapshot_chapters (snapshot_id, chapter_id, order_index, title, content, word_count, content_hash)
+    select v_snap, ch.id, ch.order_index, ch.title, ch.content,
+           public.contest_word_count(ch.content),
+           encode(sha256(convert_to(ch.content, 'UTF8')), 'hex')
+    from (
+      select c.id, c.order_index, c.title, c.content
+      from public.chapters c
+      where c.book_id = p_book_id and c.published and c.removed_at is null
+        and ((p_old_chapter).id is null or c.id <> (p_old_chapter).id)
+      union all
+      select (p_old_chapter).id, (p_old_chapter).order_index, (p_old_chapter).title, (p_old_chapter).content
+      where (p_old_chapter).id is not null
+        and (p_old_chapter).book_id = p_book_id
+        and (p_old_chapter).published
+        and (p_old_chapter).removed_at is null
+    ) ch;
+
+    update public.contest_submission_snapshots s
+       set chapter_count = t.n, total_words = t.words
+      from (
+        select count(*)::integer as n, coalesce(sum(word_count), 0)::integer as words
+        from public.contest_submission_snapshot_chapters where snapshot_id = v_snap
+      ) t
+     where s.id = v_snap;
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end;
+$$;
+
+revoke execute on function public.contest_book_needs_snapshot(uuid) from public, anon, authenticated;
+grant execute on function public.contest_book_needs_snapshot(uuid) to service_role;
+revoke execute on function public.take_contest_snapshots_for_book(uuid, public.chapters, public.books, uuid) from public, anon, authenticated;
+grant execute on function public.take_contest_snapshots_for_book(uuid, public.chapters, public.books, uuid) to service_role;
+
+-- Trigger trên chapters: bắt sửa/xuất bản/gỡ chương, đổi thứ tự
+-- (reorder_book_chapters), thêm chương mới (chương mới không vào bản chụp).
+create or replace function public.chapters_snapshot_before_write()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Cron dọn nội dung đã gỡ/xoá: không phải chỉnh sửa của tác giả.
+  if tg_op = 'UPDATE' and new.content_purged_at is not null and old.content_purged_at is null then
+    return new;
+  end if;
+  if public.contest_book_needs_snapshot(new.book_id) then
+    if tg_op = 'UPDATE' then
+      perform public.take_contest_snapshots_for_book(new.book_id, old, null, null);
+    else
+      perform public.take_contest_snapshots_for_book(new.book_id, null, null, null);
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists chapters_snapshot_before_write on public.chapters;
+create trigger chapters_snapshot_before_write
+  before insert or update on public.chapters
+  for each row execute function public.chapters_snapshot_before_write();
+
+-- Trigger trên books: tựa / tóm tắt / thể loại / tag nằm trong bản chụp.
+create or replace function public.books_snapshot_before_write()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.content_purged_at is not null and old.content_purged_at is null then
+    return new;
+  end if;
+  if public.contest_book_needs_snapshot(new.id) then
+    perform public.take_contest_snapshots_for_book(new.id, null, old, null);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists books_snapshot_before_write on public.books;
+create trigger books_snapshot_before_write
+  before update of title, synopsis, genre, tags on public.books
+  for each row execute function public.books_snapshot_before_write();
+
+-- Cron / admin đóng nhận bài: chụp mọi bài của cuộc thi chưa có bản chụp
+-- (sách không bị sửa từ lúc hạn). Idempotent nhờ unique (submission_id, reason).
+create or replace function public.snapshot_contest_submissions(p_contest_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_sub record;
+  v_count integer := 0;
+begin
+  for v_sub in
+    select s.id, s.book_id
+    from public.contest_submissions s
+    where s.contest_id = p_contest_id
+      and s.status in ('submitted', 'eligible', 'shortlisted')
+      and not exists (
+        select 1 from public.contest_submission_snapshots x
+        where x.submission_id = s.id and x.reason = 'submission_closed'
+      )
+  loop
+    v_count := v_count + public.take_contest_snapshots_for_book(v_sub.book_id, null, null, v_sub.id);
+  end loop;
+  return v_count;
+end;
+$$;
+
+revoke execute on function public.snapshot_contest_submissions(uuid) from public, anon, authenticated;
+grant execute on function public.snapshot_contest_submissions(uuid) to service_role;
+
+-- Dọn bản chụp cùng nội dung đã gỡ/xoá quá hạn (gọi từ cron
+-- purge-deleted-content SAU khi dọn chương/sách) — không để bản chụp thành
+-- đường giữ lại nội dung vi phạm.
+create or replace function public.purge_contest_snapshots(p_book_ids uuid[], p_chapter_ids uuid[])
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  update public.contest_submission_snapshot_chapters sc
+     set content = '', content_purged_at = now()
+   where sc.content_purged_at is null
+     and (
+       sc.chapter_id = any (coalesce(p_chapter_ids, '{}'))
+       or sc.snapshot_id in (
+         select x.id from public.contest_submission_snapshots x
+         join public.contest_submissions s on s.id = x.submission_id
+         where s.book_id = any (coalesce(p_book_ids, '{}'))
+       )
+     );
+  get diagnostics v_count = row_count;
+
+  update public.contest_submission_snapshots x
+     set synopsis = null, content_purged_at = now()
+    from public.contest_submissions s
+   where s.id = x.submission_id
+     and s.book_id = any (coalesce(p_book_ids, '{}'))
+     and x.content_purged_at is null;
+  return v_count;
+end;
+$$;
+
+revoke execute on function public.purge_contest_snapshots(uuid[], uuid[]) from public, anon, authenticated;
+grant execute on function public.purge_contest_snapshots(uuid[], uuid[]) to service_role;
+
+-- --- Contest Engine — admin chi trả giải thủ công (D10, Q6): pay_contest_award()
+-- khoá dòng giải, kiểm đã công bố / chưa thu hồi / chưa chi, rồi gọi
+-- grant_platform_bonus() (sổ cái ví). Xem migrations/20260926_add_contest_award_payout.sql. ---
+
+do $$ begin
+  alter table public.contest_awards
+    add constraint contest_awards_payout_transaction_fk
+    foreign key (payout_transaction_id) references public.transactions (id);
+exception when duplicate_object then null; end $$;
+
+create or replace function public.pay_contest_award(p_award_id uuid, p_admin_id uuid)
+returns public.contest_awards
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_award public.contest_awards;
+  v_contest public.contests;
+  v_author uuid;
+  v_txn public.transactions;
+begin
+  if p_admin_id is null or not exists (
+    select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')
+  ) then
+    raise exception 'Actor is not an admin' using hint = 'not_admin';
+  end if;
+
+  select * into v_award from public.contest_awards where id = p_award_id for update;
+  if not found then
+    raise exception 'Award % not found', p_award_id using hint = 'award_not_found';
+  end if;
+  select * into v_contest from public.contests where id = v_award.contest_id;
+
+  if v_contest.status not in ('results', 'archived')
+     or v_contest.results_published_at is null or v_contest.results_published_at > now() then
+    raise exception 'Results are not published yet' using hint = 'results_not_published';
+  end if;
+  if v_award.revoked_at is not null then
+    raise exception 'Award was revoked' using hint = 'award_revoked';
+  end if;
+  if v_award.payout_transaction_id is not null then
+    raise exception 'Award already paid' using hint = 'award_already_paid';
+  end if;
+  if v_award.prize_tokens <= 0 then
+    raise exception 'Award has no token prize' using hint = 'award_no_tokens';
+  end if;
+
+  select author_id into v_author from public.contest_submissions where id = v_award.submission_id;
+
+  v_txn := public.grant_platform_bonus(
+    p_admin_id,
+    v_author,
+    v_award.prize_tokens,
+    format('Giải %s — %s', v_award.award_name, v_contest.title)
+  );
+
+  update public.contest_awards
+     set payout_transaction_id = v_txn.id, paid_at = now()
+   where id = p_award_id
+  returning * into v_award;
+  return v_award;
+end;
+$$;
+
+revoke execute on function public.pay_contest_award(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.pay_contest_award(uuid, uuid) to service_role;
+
+-- --- Phiên đọc ghi ở server (Contest Engine Phase 2, P1): cột thời gian đọc
+-- thật (active_seconds do server cộng theo khoảng thật giữa 2 nhịp 60 giây),
+-- nguồn truy cập, đoạn xa nhất; record_reading_heartbeat() là đường ghi duy
+-- nhất. Policy ở phần 10e chỉ còn SELECT. Xem
+-- migrations/20260926_add_reading_session_tracking.sql. ---
+
+alter table public.reading_sessions
+  add column if not exists book_id uuid references public.books (id) on delete cascade,
+  add column if not exists active_seconds integer not null default 0,
+  add column if not exists last_heartbeat_at timestamptz,
+  add column if not exists max_paragraph integer,
+  add column if not exists source text;
+
+do $$ begin
+  alter table public.reading_sessions add constraint reading_sessions_active_seconds_check check (active_seconds >= 0);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.reading_sessions add constraint reading_sessions_source_check
+    check (source is null or source in ('contest', 'trending', 'search', 'profile', 'recommendation', 'other'));
+exception when duplicate_object then null; end $$;
+
+create index if not exists reading_sessions_book_user_idx on public.reading_sessions (book_id, user_id, start_time);
+
+-- Trả id phiên (mới hoặc cũ) + active_seconds hiện tại.
+-- p_session_id null / không khớp (người khác, chương khác, đã nguội > 30 phút)
+-- → mở phiên mới.
+create or replace function public.record_reading_heartbeat(
+  p_user_id uuid,
+  p_session_id uuid,
+  p_chapter_id uuid,
+  p_paragraph integer,
+  p_source text
+) returns table (session_id uuid, active_seconds integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row public.reading_sessions;
+  v_book uuid;
+  v_elapsed numeric;
+  v_source text := case when p_source in ('contest', 'trending', 'search', 'profile', 'recommendation', 'other') then p_source else null end;
+begin
+  select book_id into v_book from public.chapters where id = p_chapter_id;
+  if v_book is null then
+    raise exception 'Chapter % not found', p_chapter_id using hint = 'chapter_not_found';
+  end if;
+
+  if p_session_id is not null then
+    select * into v_row from public.reading_sessions
+    where id = p_session_id and user_id = p_user_id and chapter_id = p_chapter_id
+      and last_heartbeat_at > now() - interval '30 minutes'
+    for update;
+  end if;
+
+  if v_row.id is null then
+    insert into public.reading_sessions (user_id, chapter_id, book_id, start_time, end_time, last_heartbeat_at, max_paragraph, source)
+    values (p_user_id, p_chapter_id, v_book, now(), now(), now(), greatest(coalesce(p_paragraph, 0), 0), v_source)
+    returning * into v_row;
+    return query select v_row.id, v_row.active_seconds;
+    return;
+  end if;
+
+  -- Khoảng thời gian THẬT từ nhịp trước. Quá 90 giây = đã bỏ đi / tab ẩn → không cộng.
+  v_elapsed := extract(epoch from (now() - v_row.last_heartbeat_at));
+  update public.reading_sessions s
+     set active_seconds = s.active_seconds + case when v_elapsed <= 90 then floor(v_elapsed)::integer else 0 end,
+         last_heartbeat_at = now(),
+         end_time = now(),
+         max_paragraph = greatest(coalesce(s.max_paragraph, 0), coalesce(p_paragraph, 0)),
+         drop_off_offset = greatest(coalesce(p_paragraph, 0), 0),
+         source = coalesce(s.source, v_source)
+   where s.id = v_row.id
+  returning * into v_row;
+  return query select v_row.id, v_row.active_seconds;
+end;
+$$;
+
+revoke execute on function public.record_reading_heartbeat(uuid, uuid, uuid, integer, text) from public, anon, authenticated;
+grant execute on function public.record_reading_heartbeat(uuid, uuid, uuid, integer, text) to service_role;
+
+-- --- Contest Engine Phase 2, Slice 2.2: tín hiệu hợp lệ (meaningful read,
+-- độc giả hợp lệ, phiếu đã lọc), tín hiệu gian lận, bảng điểm cache làm mới
+-- lười 15 phút + chốt khi công bố kết quả. Xem
+-- migrations/20260926_add_contest_scores.sql (mục 4 của migration — chuyển
+-- cuộc thi chưa mở bình chọn sang popular-v2 — là dữ liệu, không ở đây). ---
+
+-- ---------------------------------------------------------------------
+-- 1. Tín hiệu gian lận (P10)
+-- ---------------------------------------------------------------------
+create table if not exists public.contest_fraud_signals (
+  id uuid primary key default gen_random_uuid(),
+  contest_id uuid not null references public.contests (id) on delete cascade,
+  user_id uuid references auth.users (id) on delete cascade,
+  submission_id uuid,
+  signal_code text not null check (signal_code ~ '^[a-z0-9_]+$'),
+  severity text not null default 'medium' check (severity in ('low', 'medium', 'high')),
+  evidence jsonb not null default '{}'::jsonb check (jsonb_typeof(evidence) = 'object'),
+  -- 'open' = chờ admin; chỉ 'confirmed' mới loại phiếu / độc giả khỏi điểm.
+  status text not null default 'open' check (status in ('open', 'confirmed', 'dismissed')),
+  reviewed_by uuid references auth.users (id),
+  reviewed_at timestamptz,
+  review_note text,
+  created_at timestamptz not null default now(),
+  constraint contest_fraud_signals_submission_fk foreign key (submission_id, contest_id)
+    references public.contest_submissions (id, contest_id) on delete cascade,
+  constraint contest_fraud_signals_target check (user_id is not null or submission_id is not null),
+  constraint contest_fraud_signals_reviewed check ((status = 'open') = (reviewed_at is null))
+);
+
+create index if not exists contest_fraud_signals_contest_status_idx
+  on public.contest_fraud_signals (contest_id, status, created_at desc);
+create index if not exists contest_fraud_signals_confirmed_user_idx
+  on public.contest_fraud_signals (contest_id, user_id) where status = 'confirmed';
+
+-- ---------------------------------------------------------------------
+-- 2. Bảng điểm cache + trạng thái tính
+-- ---------------------------------------------------------------------
+create table if not exists public.contest_submission_scores (
+  submission_id uuid primary key,
+  contest_id uuid not null,
+  raw_votes integer not null default 0 check (raw_votes >= 0),
+  filtered_votes integer not null default 0 check (filtered_votes >= 0),
+  valid_readers integer not null default 0 check (valid_readers >= 0),
+  readers_7d integer not null default 0 check (readers_7d >= 0),
+  readers_prev_7d integer not null default 0 check (readers_prev_7d >= 0),
+  computed_at timestamptz not null default now(),
+  constraint contest_submission_scores_submission_fk foreign key (submission_id, contest_id)
+    references public.contest_submissions (id, contest_id) on delete cascade
+);
+
+create index if not exists contest_submission_scores_contest_idx on public.contest_submission_scores (contest_id);
+
+create table if not exists public.contest_score_state (
+  contest_id uuid primary key references public.contests (id) on delete cascade,
+  refreshed_at timestamptz,
+  -- Chốt lúc công bố kết quả — sau mốc này bảng điểm không bao giờ đổi.
+  frozen_at timestamptz,
+  -- Ngưỡng đã dùng ở lần tính gần nhất (bằng chứng khi xem lại kết quả).
+  params jsonb not null default '{}'::jsonb
+);
+
+-- Chỉ service-role (route/cron) đọc/ghi — không lộ số phiếu đang ẩn (Q3).
+alter table public.contest_fraud_signals enable row level security;
+alter table public.contest_submission_scores enable row level security;
+alter table public.contest_score_state enable row level security;
+revoke all on public.contest_fraud_signals, public.contest_submission_scores, public.contest_score_state
+  from anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- 3. Tính điểm
+-- ---------------------------------------------------------------------
+-- p_force: bỏ qua mốc 15 phút (cron 0h, chốt kết quả). p_freeze: chốt sau lần
+-- tính này — chỉ khi đã công bố kết quả. Trả trạng thái hiện tại; nếu một
+-- lần tính khác đang chạy thì trả ngay trạng thái cũ (không chờ).
+create or replace function public.refresh_contest_scores(
+  p_contest_id uuid,
+  p_force boolean default false,
+  p_freeze boolean default false
+) returns public.contest_score_state
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_contest public.contests;
+  v_state public.contest_score_state;
+  -- Mặc định giống DEFAULT_SCORING_CONFIG (config.ts): cuộc thi tạo trước
+  -- Slice 2.2 không có các khoá này trong scoring_config.
+  v_ratio numeric;
+  v_min_seconds integer;
+  v_wpm integer;
+begin
+  select * into v_contest from public.contests where id = p_contest_id;
+  if not found then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+  if p_freeze and not (v_contest.status in ('results', 'archived') and v_contest.results_published_at is not null) then
+    raise exception 'Scores can only be frozen after results are published' using hint = 'scores_not_final';
+  end if;
+
+  insert into public.contest_score_state (contest_id) values (p_contest_id) on conflict (contest_id) do nothing;
+  select * into v_state from public.contest_score_state where contest_id = p_contest_id for update skip locked;
+  if v_state.contest_id is null then
+    -- Lần tính khác đang giữ khoá.
+    select * into v_state from public.contest_score_state where contest_id = p_contest_id;
+    return v_state;
+  end if;
+  if v_state.frozen_at is not null then
+    return v_state;
+  end if;
+  if not p_force and v_state.refreshed_at is not null and v_state.refreshed_at > now() - interval '15 minutes' then
+    return v_state;
+  end if;
+
+  v_ratio := coalesce((v_contest.scoring_config ->> 'meaningful_read_ratio')::numeric, 0.4);
+  v_min_seconds := coalesce((v_contest.scoring_config ->> 'meaningful_read_min_seconds')::integer, 30);
+  v_wpm := coalesce((v_contest.scoring_config ->> 'reading_words_per_minute')::integer, 250);
+
+  with entries as (
+    select s.id, s.book_id, s.author_id
+    from public.contest_submissions s
+    where s.contest_id = p_contest_id
+  ),
+  sessions as (
+    select e.id as submission_id, rs.user_id, rs.chapter_id, rs.active_seconds, rs.start_time, rs.end_time, rs.id as session_id
+    from entries e
+    join public.reading_sessions rs on rs.book_id = e.book_id
+    where rs.start_time >= v_contest.submission_start
+      and rs.user_id <> e.author_id
+      and rs.active_seconds > 0
+  ),
+  -- Chỉ đếm chữ cho chương thật sự có người đọc — không quét cả cuộc thi.
+  chapter_need as (
+    select ch.id as chapter_id,
+           greatest(v_min_seconds, ceil(v_ratio * public.contest_word_count(ch.content) * 60.0 / v_wpm))::integer as need
+    from public.chapters ch
+    where ch.id in (select distinct chapter_id from sessions)
+      and ch.published and ch.removed_at is null
+  ),
+  running as (
+    select s.submission_id, s.user_id, s.end_time, n.need,
+           sum(s.active_seconds) over (
+             partition by s.submission_id, s.user_id, s.chapter_id
+             order by s.start_time, s.session_id
+             rows between unbounded preceding and current row
+           ) as acc
+    from sessions s
+    join chapter_need n on n.chapter_id = s.chapter_id
+  ),
+  readers as (
+    select r.submission_id, r.user_id, min(r.end_time) as reached_at
+    from running r
+    where r.acc >= r.need
+      and not exists (
+        select 1 from public.contest_fraud_signals f
+        where f.contest_id = p_contest_id and f.status = 'confirmed' and f.user_id = r.user_id
+          and (f.submission_id is null or f.submission_id = r.submission_id)
+      )
+    group by r.submission_id, r.user_id
+  ),
+  vote_counts as (
+    select v.submission_id,
+           count(*)::integer as raw,
+           count(*) filter (where exists (
+             select 1 from readers r where r.submission_id = v.submission_id and r.user_id = v.user_id
+           ))::integer as filtered
+    from public.contest_votes v
+    where v.contest_id = p_contest_id
+    group by v.submission_id
+  ),
+  reader_counts as (
+    select r.submission_id,
+           count(*)::integer as total,
+           count(*) filter (where r.reached_at >= now() - interval '7 days')::integer as d7,
+           count(*) filter (where r.reached_at >= now() - interval '14 days' and r.reached_at < now() - interval '7 days')::integer as prev
+    from readers r
+    group by r.submission_id
+  )
+  insert into public.contest_submission_scores
+    (submission_id, contest_id, raw_votes, filtered_votes, valid_readers, readers_7d, readers_prev_7d, computed_at)
+  select e.id, p_contest_id, coalesce(vc.raw, 0), coalesce(vc.filtered, 0),
+         coalesce(rc.total, 0), coalesce(rc.d7, 0), coalesce(rc.prev, 0), now()
+  from entries e
+  left join vote_counts vc on vc.submission_id = e.id
+  left join reader_counts rc on rc.submission_id = e.id
+  on conflict (submission_id) do update
+    set raw_votes = excluded.raw_votes,
+        filtered_votes = excluded.filtered_votes,
+        valid_readers = excluded.valid_readers,
+        readers_7d = excluded.readers_7d,
+        readers_prev_7d = excluded.readers_prev_7d,
+        computed_at = excluded.computed_at;
+
+  update public.contest_score_state
+     set refreshed_at = now(),
+         frozen_at = case when p_freeze then now() else null end,
+         params = jsonb_build_object(
+           'meaningful_read_ratio', v_ratio,
+           'meaningful_read_min_seconds', v_min_seconds,
+           'reading_words_per_minute', v_wpm)
+   where contest_id = p_contest_id
+  returning * into v_state;
+  return v_state;
+end;
+$$;
+
+revoke execute on function public.refresh_contest_scores(uuid, boolean, boolean) from public, anon, authenticated;
+grant execute on function public.refresh_contest_scores(uuid, boolean, boolean) to service_role;
+
+-- BXH đọc từ bảng điểm cache — cùng quy tắc với get_contest_ranking (rank()
+-- toàn cục, value desc / submitted_at asc / id asc, keyset theo hạng).
+--   'popular'  = phiếu đã lọc (popular-v2 — dùng khi đã chốt kết quả)
+--   'trending' = độc giả hợp lệ mới trong 7 ngày (P4 — Slice 2.3)
+create or replace function public.get_contest_score_ranking(
+  p_contest_id uuid,
+  p_kind text,
+  p_limit integer,
+  p_after_rank integer default null,
+  p_after_submitted_at timestamptz default null,
+  p_after_id uuid default null
+) returns table (
+  submission_id uuid,
+  book_id uuid,
+  author_id uuid,
+  value integer,
+  submitted_at timestamptz,
+  rank integer,
+  tied boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if p_kind not in ('popular', 'trending') then
+    raise exception 'Unknown ranking kind %', p_kind using hint = 'invalid_sort';
+  end if;
+
+  return query
+  with entries as (
+    select s.id, s.book_id, s.author_id, s.submitted_at,
+           coalesce(case p_kind when 'popular' then sc.filtered_votes else sc.readers_7d end, 0) as value
+    from public.contest_submissions s
+    join public.contests c on c.id = s.contest_id and c.status <> 'draft'
+    join public.books b on b.id = s.book_id and b.published and b.deleted_at is null
+    left join public.contest_submission_scores sc on sc.submission_id = s.id
+    where s.contest_id = p_contest_id
+      and s.status in ('eligible', 'shortlisted')
+  ),
+  ranked as (
+    select e.id, e.book_id, e.author_id, e.submitted_at, e.value,
+           (rank() over (order by e.value desc))::integer as rnk,
+           count(*) over (partition by e.value) > 1 as is_tied
+    from entries e
+  )
+  select r.id, r.book_id, r.author_id, r.value, r.submitted_at, r.rnk, r.is_tied
+  from ranked r
+  where p_after_id is null
+     or r.rnk > p_after_rank
+     or (r.rnk = p_after_rank and (r.submitted_at, r.id) > (p_after_submitted_at, p_after_id))
+  order by r.value desc, r.submitted_at asc, r.id asc
+  limit least(greatest(coalesce(p_limit, 20), 1), 100);
+end;
+$$;
+
+revoke execute on function public.get_contest_score_ranking(uuid, text, integer, integer, timestamptz, uuid) from public, anon, authenticated;
+grant execute on function public.get_contest_score_ranking(uuid, text, integer, integer, timestamptz, uuid) to service_role;

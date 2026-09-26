@@ -40,9 +40,17 @@ export type VoteRules = {
   require_completed_chapter: boolean;
 };
 
+export type PopularFormulaId = "popular-v1" | "popular-v2";
+
 export type ScoringConfig = {
   /** Mã công thức điểm Độc giả yêu thích — src/lib/contests/scoring/. */
-  popular_formula_id: "popular-v1";
+  popular_formula_id: PopularFormulaId;
+  /** Meaningful read (P2): thời gian đọc thật ≥ tỷ lệ này × thời gian đọc ước tính của chương. */
+  meaningful_read_ratio: number;
+  /** …và không dưới số giây này (chương rất ngắn). */
+  meaningful_read_min_seconds: number;
+  /** Tốc độ đọc dùng để ước tính thời gian đọc một chương. */
+  reading_words_per_minute: number;
 };
 
 export const DEFAULT_ELIGIBILITY_RULES: EligibilityRules = {
@@ -67,8 +75,13 @@ export const DEFAULT_VOTE_RULES: VoteRules = {
   require_completed_chapter: true,
 };
 
+// SQL refresh_contest_scores() dùng cùng các mặc định này cho cuộc thi tạo
+// trước Slice 2.2 (scoring_config chưa có khoá ngưỡng) — đổi ở đây phải đổi cả ở đó.
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
-  popular_formula_id: "popular-v1",
+  popular_formula_id: "popular-v2",
+  meaningful_read_ratio: 0.4,
+  meaningful_read_min_seconds: 30,
+  reading_words_per_minute: 250,
 };
 
 /** Số truyện ở khối "Top truyện" trên microsite (Q3). */
@@ -125,7 +138,13 @@ const VOTE_FIELDS: Record<keyof VoteRules, FieldCheck> = {
 };
 
 const SCORING_FIELDS: Record<keyof ScoringConfig, FieldCheck> = {
-  popular_formula_id: (v) => (v === "popular-v1" ? null : "chỉ hỗ trợ popular-v1"),
+  popular_formula_id: (v) => (v === "popular-v1" || v === "popular-v2" ? null : "chỉ hỗ trợ popular-v1, popular-v2"),
+  meaningful_read_ratio: (v) =>
+    typeof v === "number" && Number.isFinite(v) && v > 0 && v <= 1 ? null : "phải là số trong khoảng (0, 1]",
+  meaningful_read_min_seconds: (v) =>
+    Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 3600 ? null : "phải là số nguyên từ 0 đến 3600",
+  reading_words_per_minute: (v) =>
+    Number.isInteger(v) && (v as number) >= 50 && (v as number) <= 2000 ? null : "phải là số nguyên từ 50 đến 2000",
 };
 
 /** Gộp input (một phần) lên default, kiểm từng khoá. Khoá lạ → lỗi. */

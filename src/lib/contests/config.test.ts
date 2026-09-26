@@ -73,6 +73,30 @@ describe("normalizeVoteRules / normalizeScoringConfig", () => {
   it("chỉ nhận công thức đã có", () => {
     expect(normalizeScoringConfig({ popular_formula_id: "popular-v9" }).ok).toBe(false);
   });
+
+  it("mặc định popular-v2 + ngưỡng meaningful read P2 (40%, 30 giây, 250 chữ/phút)", () => {
+    expect(normalizeScoringConfig({})).toEqual({
+      ok: true,
+      value: { popular_formula_id: "popular-v2", meaningful_read_ratio: 0.4, meaningful_read_min_seconds: 30, reading_words_per_minute: 250 },
+    });
+  });
+
+  it("cuộc thi cũ chỉ lưu popular-v1 vẫn đọc được, giữ công thức đã khoá", () => {
+    const r = normalizeScoringConfig({ popular_formula_id: "popular-v1" });
+    expect(r.ok && r.value.popular_formula_id).toBe("popular-v1");
+    expect(r.ok && r.value.meaningful_read_ratio).toBe(0.4);
+  });
+
+  it.each([
+    { meaningful_read_ratio: 0 },
+    { meaningful_read_ratio: 1.5 },
+    { meaningful_read_min_seconds: -1 },
+    { meaningful_read_min_seconds: 2.5 },
+    { reading_words_per_minute: 0 },
+    { reading_words_per_minute: "250" },
+  ])("từ chối ngưỡng sai %j", (input) => {
+    expect(normalizeScoringConfig(input).ok).toBe(false);
+  });
 });
 
 describe("readContestConfig", () => {

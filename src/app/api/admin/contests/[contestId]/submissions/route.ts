@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedAdminId } from "@/lib/wallet/session";
 import { listSubmissionsForAdmin } from "@/lib/contests/admin-service";
+import { ensureFreshScores } from "@/lib/contests/scores-service";
 import { contestErrorResponse, parseSubmissionStatus } from "@/lib/contests/route-helpers";
 
 /** GET /api/admin/contests/:contestId/submissions?status=&flagged=1&page= */
@@ -13,6 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ cont
   try {
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
+    await ensureFreshScores(supabase, contestId);
     const result = await listSubmissionsForAdmin(supabase, {
       contestId,
       status: status ? parseSubmissionStatus(status) : null,

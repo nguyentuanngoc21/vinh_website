@@ -13,7 +13,7 @@ const vnd = (n: number) => `${n.toLocaleString("vi-VN")}đ`;
 
 /**
  * Trao giải (D10): nhập VND, server quy đổi token theo tỷ giá hiện hành và
- * lưu cả tỷ giá. Chi trả vào ví là bước thủ công riêng (Slice 1.7). Giải chỉ
+ * lưu cả tỷ giá. Chi trả vào ví là bước thủ công riêng (nút "Chi trả", sau khi công bố kết quả). Giải chỉ
  * công khai sau khi công bố kết quả; sau đó chỉ thu hồi được, không xoá.
  */
 export function ContestAwardsPanel({
@@ -104,6 +104,16 @@ export function ContestAwardsPanel({
                 </div>
                 {!a.revoked_at && (
                   <div className="flex shrink-0 gap-2">
+                    {resultsVisible && !a.paid_at && a.prize_tokens > 0 && (
+                      <Button type="button" variant="dark" fullWidth={false} className="px-4 py-2 text-xs" disabled={pending}
+                        onClick={() => {
+                          if (window.confirm(`Chi ${a.prize_tokens.toLocaleString("vi-VN")} token vào ví của ${a.author_name}? Không hoàn tác được.`)) {
+                            void request(`/api/admin/contests/${contestId}/awards/${a.id}/pay`, "POST");
+                          }
+                        }}>
+                        Chi trả
+                      </Button>
+                    )}
                     {!resultsVisible && !a.paid_at && status !== "archived" ? (
                       <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2 text-xs" disabled={pending}
                         onClick={() => request(`/api/admin/contests/${contestId}/awards/${a.id}`, "DELETE")}>Xoá</Button>
