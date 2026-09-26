@@ -2189,6 +2189,51 @@ export type Database = {
         Args: { p_user_id: string; p_submission_id: string };
         Returns: boolean;
       };
+      get_contest_ranking: {
+        Args: {
+          p_contest_id: string;
+          p_limit: number;
+          p_after_rank?: number | null;
+          p_after_submitted_at?: string | null;
+          p_after_id?: string | null;
+        };
+        Returns: {
+          submission_id: string;
+          book_id: string;
+          author_id: string;
+          value: number;
+          submitted_at: string;
+          rank: number;
+          tied: boolean;
+        }[];
+      };
+      get_contest_entries: {
+        Args: {
+          p_contest_id: string | null;
+          p_sort: "new" | "discover" | "az";
+          p_seed: string | null;
+          p_genre: string | null;
+          p_limit: number;
+          p_after_key?: string | null;
+          p_after_id?: string | null;
+          p_viewer_id?: string | null;
+        };
+        Returns: {
+          submission_id: string;
+          contest_id: string;
+          book_id: string;
+          author_id: string;
+          status: ContestSubmissionStatus;
+          submitted_at: string;
+          sort_key: string;
+          viewer_has_voted: boolean;
+          viewer_completed_chapter: boolean;
+        }[];
+      };
+      get_contest_summaries: {
+        Args: { p_contest_ids: string[] };
+        Returns: { contest_id: string; entry_count: number; author_count: number }[];
+      };
       // migrations/20260916_add_realtime_signup_checks.sql
       is_email_registered: {
         Args: { p_email: string };
