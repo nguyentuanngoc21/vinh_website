@@ -83,11 +83,30 @@ create table public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- Kiểm quyền admin cho policy của profiles. SECURITY DEFINER (bỏ qua RLS) —
+-- nếu policy tự subquery trên profiles, Postgres báo 42P17 "infinite
+-- recursion detected in policy for relation profiles" cho mọi role chịu RLS,
+-- kể cả gián tiếp qua policy bảng khác. Không nhận tham số: chỉ trả lời về
+-- chính người gọi. Xem migrations/20260926_fix_profiles_policy_recursion.sql.
+create or replace function public.current_user_is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role in ('admin', 'super_admin')
+  );
+$$;
+
+revoke execute on function public.current_user_is_admin() from public;
+grant execute on function public.current_user_is_admin() to anon, authenticated, service_role;
+
 create policy "profiles are readable by their owner and admins"
   on public.profiles for select
-  using (auth.uid() = id or exists (
-    select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')
-  ));
+  using (auth.uid() = id or public.current_user_is_admin());
 
 create policy "users can update their own profile (not their own role)"
   on public.profiles for update

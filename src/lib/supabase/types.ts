@@ -1873,6 +1873,12 @@ export type Database = {
       };
     };
     Functions: {
+      // migrations/20260926_fix_profiles_policy_recursion.sql — người gọi có
+      // phải admin/super_admin không (dùng trong policy của profiles).
+      current_user_is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
       // migrations/20260916_add_realtime_signup_checks.sql
       is_email_registered: {
         Args: { p_email: string };
