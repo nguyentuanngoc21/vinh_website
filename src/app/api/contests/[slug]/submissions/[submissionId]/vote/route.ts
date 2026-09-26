@@ -1,5 +1,6 @@
 import { getContestBySlug } from "@/lib/contests/contest-service";
 import { PRIVATE_NO_STORE, unauthorized, withContestContext } from "@/lib/contests/public-route";
+import { requireUuid } from "@/lib/contests/route-helpers";
 import { castVote, retractVote } from "@/lib/contests/vote-service";
 
 type Params = { params: Promise<{ slug: string; submissionId: string }> };
@@ -13,7 +14,7 @@ export async function POST(request: Request, { params }: Params) {
   return withContestContext(request, "cast vote", async ({ client, userId }) => {
     if (!userId) return unauthorized();
     const contest = await getContestBySlug(client, slug);
-    await castVote(client, { contest, viewerId: userId, submissionId });
+    await castVote(client, { contest, viewerId: userId, submissionId: requireUuid(submissionId, "submission_not_found") });
     return Response.json({ has_voted: true }, { status: 201, headers: PRIVATE_NO_STORE });
   });
 }
@@ -24,7 +25,7 @@ export async function DELETE(request: Request, { params }: Params) {
   return withContestContext(request, "retract vote", async ({ client, userId }) => {
     if (!userId) return unauthorized();
     const contest = await getContestBySlug(client, slug);
-    await retractVote(client, { contest, viewerId: userId, submissionId });
+    await retractVote(client, { contest, viewerId: userId, submissionId: requireUuid(submissionId, "submission_not_found") });
     return Response.json({ has_voted: false }, { headers: PRIVATE_NO_STORE });
   });
 }

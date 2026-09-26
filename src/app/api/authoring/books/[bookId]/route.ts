@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { contestLockResponse } from "@/lib/contests/trigger-errors";
 import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import { BOOK_GENRES } from "@/lib/covers/genre-styles";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
@@ -134,6 +135,9 @@ export async function PATCH(
     .maybeSingle();
 
   if (error) {
+    // D11 — đang dự thi cuộc thi yêu cầu độc quyền (trigger books_block_exclusive_off_during_contest).
+    const locked = contestLockResponse(error);
+    if (locked) return locked;
     console.error("[authoring] update book failed:", error);
     return NextResponse.json({ error: "Lưu thất bại. Vui lòng thử lại." }, { status: 500 });
   }

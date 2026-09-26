@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { contestLockResponse } from "@/lib/contests/trigger-errors";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedAdminId } from "@/lib/wallet/session";
 import {
@@ -141,6 +142,9 @@ export async function PATCH(
       })
       .eq("id", chapterId);
     if (updateError) {
+      // D8 — khôi phục chương còn giá của sách đang dự thi: đặt giá về 0 trước.
+      const locked = contestLockResponse(updateError);
+      if (locked) return locked;
       console.error("[admin/chapters] restore failed:", updateError);
       return NextResponse.json({ error: "Khôi phục chương thất bại." }, { status: 500 });
     }

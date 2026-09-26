@@ -22,6 +22,8 @@ type PublishPanelProps = {
   onExclusiveChange: (value: boolean) => void;
   exclusiveLocked: boolean;
   exclusiveError: string | null;
+  /** Truyện đang dự thi (lý do hiển thị, null = không khoá): giá chương (D8), tắt độc quyền (D11). */
+  contestLock?: { prices: string | null; exclusive: string | null };
   price: number;
   onPriceChange: (value: number) => void;
   audioUrl: string;
@@ -102,6 +104,7 @@ export function PublishPanel({
   onExclusiveChange,
   exclusiveLocked,
   exclusiveError,
+  contestLock,
   price,
   onPriceChange,
   audioUrl,
@@ -260,8 +263,9 @@ export function PublishPanel({
                     min="0"
                     step="1000"
                     value={price}
+                    disabled={Boolean(contestLock?.prices)}
                     onChange={(event) => onPriceChange(Math.max(0, Number(event.target.value) || 0))}
-                    className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                    className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none disabled:cursor-not-allowed disabled:text-stone-alt"
                   />
                   <span className="shrink-0 text-sm text-stone-alt">token</span>
                 </div>
@@ -274,11 +278,15 @@ export function PublishPanel({
                       min="0"
                       step="1000"
                       value={audioPrice}
+                      disabled={Boolean(contestLock?.prices)}
                       onChange={(event) => onAudioPriceChange(Math.max(0, Number(event.target.value) || 0))}
-                      className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                      className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none disabled:cursor-not-allowed disabled:text-stone-alt"
                     />
                     <span className="shrink-0 text-sm text-stone-alt">token</span>
                   </div>
+                )}
+                {contestLock?.prices && (
+                  <div className="rounded-lg bg-cream-card px-3 py-2 text-[12px] leading-normal text-cream-gold-text">{contestLock.prices}</div>
                 )}
               </div>
             </div>
@@ -298,8 +306,14 @@ export function PublishPanel({
                 <button
                   type="button"
                   onClick={() => onExclusiveChange(false)}
-                  disabled={exclusiveLocked}
-                  title={exclusiveLocked ? "Đã độc quyền quá 3 ngày kể từ lúc xuất bản - không đổi lại được." : undefined}
+                  disabled={exclusiveLocked || Boolean(contestLock?.exclusive)}
+                  title={
+                    contestLock?.exclusive
+                      ? contestLock.exclusive
+                      : exclusiveLocked
+                        ? "Đã độc quyền quá 3 ngày kể từ lúc xuất bản - không đổi lại được."
+                        : undefined
+                  }
                   className={`flex-1 cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
                     !isExclusive ? "bg-brand-ink text-white" : "border border-cream-border bg-white text-stone-alt"
                   }`}
@@ -308,7 +322,9 @@ export function PublishPanel({
                 </button>
               </div>
               <div className="mt-2 text-[12px] text-stone-alt">
-                {exclusiveLocked
+                {contestLock?.exclusive
+                  ? contestLock.exclusive
+                  : exclusiveLocked
                   ? "Đã xuất bản độc quyền quá 3 ngày - không thể chuyển về tự do nữa."
                   : isExclusive
                     ? "Truyện này chỉ được phân phối trên Vịnh. Tác giả giữ quyền tái bản."
