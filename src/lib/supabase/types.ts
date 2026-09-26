@@ -2234,6 +2234,26 @@ export type Database = {
         Args: { p_contest_ids: string[] };
         Returns: { contest_id: string; entry_count: number; author_count: number }[];
       };
+      add_contest_review_flag: {
+        Args: {
+          p_submission_id: string;
+          p_admin_id: string | null;
+          p_code: string;
+          p_message: string;
+          p_fix_by: string | null;
+          p_visible_to_author?: boolean;
+        };
+        Returns: Database["public"]["Tables"]["contest_submissions"]["Row"];
+      };
+      resolve_contest_review_flag: {
+        Args: {
+          p_submission_id: string;
+          p_flag_id: string;
+          p_admin_id: string | null;
+          p_resolution: "fixed" | "dismissed" | "escalated";
+        };
+        Returns: Database["public"]["Tables"]["contest_submissions"]["Row"];
+      };
       // migrations/20260916_add_realtime_signup_checks.sql
       is_email_registered: {
         Args: { p_email: string };

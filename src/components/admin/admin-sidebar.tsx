@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
   GearIcon,
   WarningOctagonIcon,
+  TrophyIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { VinhMark } from "@/components/ui";
 
@@ -20,6 +21,8 @@ const NAV_ITEMS = [
   { label: "Tổng quan", icon: ChartLineUpIcon, href: "/admin" },
   { label: "Giao dịch", icon: ReceiptIcon, href: null },
   { label: "Nội dung", icon: BooksIcon, href: "/admin/noi-dung" },
+  // Contest Engine — docs/CONTEST_ENGINE_AUDIT_AND_PLAN.md.
+  { label: "Cuộc thi", icon: TrophyIcon, href: "/admin/cuoc-thi" },
   // Mục 9 đặc tả (Hệ thống giao dịch commission) — xem
   // migrations/20260901_add_trust_and_disputes.sql.
   { label: "Tranh chấp", icon: WarningOctagonIcon, href: "/admin/tranh-chap" },
@@ -46,7 +49,9 @@ export function AdminSidebar() {
 
       <nav className="flex flex-col gap-[3px] p-3">
         {NAV_ITEMS.map(({ label, icon: Icon, href }) => {
-          const active = href !== null && pathname === href;
+          // "/admin" chỉ khớp đúng trang tổng quan; mục khác sáng cả ở trang con
+          // (vd /admin/cuoc-thi/[contestId]).
+          const active = href !== null && (href === "/admin" ? pathname === href : pathname.startsWith(href));
           const itemClass = `flex items-center gap-3 rounded-[9px] px-[14px] py-[11px] text-sm font-medium ${
             active
               ? "bg-brand-gold-light/14 text-white"
