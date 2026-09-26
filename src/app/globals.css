@@ -53,6 +53,14 @@
   --color-border-light: #dcd7d0;
   --color-neutral-bg: #f4f4f5;
 
+  /* Contest (Cuộc thi) — Vịnh Cuộc thi.dc.html. Gold-tinted callout surfaces
+     and the muted text used on the navy hero. */
+  --color-cream-gold: #f7efd8;
+  --color-cream-gold-border: #ebdcb4;
+  --color-cream-gold-text: #6b5f3a;
+  --color-hero-text: #dde6ea;
+  --color-hero-text-dim: #c7d6dd;
+
   /* Status */
   --color-success: #1f8a6b;
   --color-info: #2563a8;

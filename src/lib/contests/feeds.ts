@@ -36,6 +36,7 @@ export type EntryVote = ReturnType<typeof getEntryVoteState>;
 export type EntryCard = {
   submission_id: string;
   contest_id: string;
+  submitted_at: string;
   book: HomepageBook;
   /** null ở hub (gộp nhiều cuộc thi — mỗi cuộc thi một luật bình chọn). */
   vote: EntryVote | null;
@@ -103,6 +104,7 @@ export async function getContestEntries(
     items.push({
       submission_id: r.submission_id,
       contest_id: r.contest_id,
+      submitted_at: r.submitted_at,
       book,
       vote:
         input.contest && input.capabilities
