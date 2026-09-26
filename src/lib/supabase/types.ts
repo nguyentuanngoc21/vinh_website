@@ -196,6 +196,42 @@ export type TransactionStatus = "pending" | "processing" | "available" | "comple
 export type DepositStatus = "pending" | "success" | "failed";
 export type WithdrawalStatus = "pending" | "processing" | "success" | "failed";
 
+// Contest Engine — xem migrations/20260926_add_contest_engine_core.sql và
+// docs/CONTEST_ENGINE_AUDIT_AND_PLAN.md (ma trận trạng thái ở mục IV.4, VI.1).
+export type ContestStatus =
+  | "draft"
+  | "announced"
+  | "submission_open"
+  | "submission_closed"
+  | "community_voting"
+  | "judging"
+  | "results"
+  | "archived";
+export type ContestSubmissionStatus =
+  | "submitted"
+  | "eligible"
+  | "ineligible"
+  | "withdrawn"
+  | "disqualified"
+  | "shortlisted";
+
+// Một phần tử của contest_submissions.review_flags (Q2 "Cần bổ sung" — mục
+// XIX.6 của tài liệu thiết kế). "Cần bổ sung" = còn cờ visible_to_author
+// chưa resolved_at.
+export type ContestReviewFlag = {
+  id: string;
+  code: string;
+  source: "system" | "admin";
+  message: string;
+  visible_to_author: boolean;
+  fix_by: string | null;
+  created_at: string;
+  created_by: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution: "fixed" | "dismissed" | "escalated" | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -1791,8 +1827,227 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // --- Contest Engine (migrations/20260926_add_contest_engine_core.sql).
+      // Client KHÔNG ghi trực tiếp bảng nào dưới đây (quyền ghi bị REVOKE) —
+      // mọi ghi qua route service-role + RPC. Insert/Update dưới đây dành cho
+      // service-role.
+      contests: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          short_description: string;
+          description: string;
+          key_visual_url: string | null;
+          banner_url: string | null;
+          status: ContestStatus;
+          is_featured: boolean;
+          submission_start: string;
+          submission_end: string;
+          voting_start: string | null;
+          voting_end: string | null;
+          judging_start: string | null;
+          judging_end: string | null;
+          result_at: string | null;
+          results_published_at: string | null;
+          rules_content: string;
+          rules_version: string;
+          prizes_summary: Record<string, unknown>[];
+          // Chuẩn hoá bởi src/lib/contests/config.ts (luôn đủ khoá).
+          eligibility_rules: Record<string, unknown>;
+          vote_rules: Record<string, unknown>;
+          scoring_config: Record<string, unknown>;
+          legacy_stats: Record<string, unknown> | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          title: string;
+          short_description?: string;
+          description?: string;
+          key_visual_url?: string | null;
+          banner_url?: string | null;
+          // Luôn 'draft' khi tạo (trigger contests_guard_write).
+          status?: "draft";
+          is_featured?: boolean;
+          submission_start: string;
+          submission_end: string;
+          voting_start?: string | null;
+          voting_end?: string | null;
+          judging_start?: string | null;
+          judging_end?: string | null;
+          result_at?: string | null;
+          results_published_at?: string | null;
+          rules_content?: string;
+          rules_version?: string;
+          prizes_summary?: Record<string, unknown>[];
+          eligibility_rules?: Record<string, unknown>;
+          vote_rules?: Record<string, unknown>;
+          scoring_config?: Record<string, unknown>;
+          legacy_stats?: Record<string, unknown> | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+        };
+        // status đổi qua transition_contest_status(); thể lệ/slug khoá khi rời draft.
+        Update: Partial<Omit<Database["public"]["Tables"]["contests"]["Insert"], "status">>;
+        Relationships: [];
+      };
+      contest_status_events: {
+        Row: {
+          id: string;
+          contest_id: string;
+          from_status: ContestStatus | null;
+          to_status: ContestStatus;
+          actor_id: string | null;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_submissions: {
+        Row: {
+          id: string;
+          contest_id: string;
+          book_id: string;
+          // Trigger ghi từ books.author_id — không bao giờ lấy từ input.
+          author_id: string;
+          status: ContestSubmissionStatus;
+          status_reason: string | null;
+          review_flags: ContestReviewFlag[];
+          status_changed_by: string | null;
+          status_changed_at: string;
+          submitted_at: string;
+          rules_version_accepted: string;
+          rules_accepted_at: string;
+          eligibility_result: Record<string, unknown>[];
+          created_at: string;
+          updated_at: string;
+        };
+        // Tạo qua submit_contest_entry(); đổi trạng thái qua set_contest_submission_status().
+        Insert: never;
+        Update: {
+          review_flags?: ContestReviewFlag[];
+        };
+        Relationships: [];
+      };
+      contest_submission_events: {
+        Row: {
+          id: string;
+          submission_id: string;
+          from_status: ContestSubmissionStatus | null;
+          to_status: ContestSubmissionStatus;
+          actor_id: string | null;
+          actor_kind: "author" | "admin" | "system";
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_votes: {
+        Row: {
+          id: string;
+          contest_id: string;
+          submission_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        // Ghi qua cast_contest_vote() / retract_contest_vote().
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_awards: {
+        Row: {
+          id: string;
+          contest_id: string;
+          submission_id: string;
+          award_code: string;
+          award_name: string;
+          award_rank: number | null;
+          category: string | null;
+          prize_vnd: number;
+          token_vnd_rate: number | null;
+          prize_tokens: number;
+          prize_extras: string | null;
+          payout_transaction_id: string | null;
+          paid_at: string | null;
+          revoked_at: string | null;
+          revoked_by: string | null;
+          revoked_reason: string | null;
+          badge_icon_url: string | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          contest_id: string;
+          submission_id: string;
+          award_code: string;
+          award_name: string;
+          award_rank?: number | null;
+          category?: string | null;
+          prize_vnd?: number;
+          token_vnd_rate?: number | null;
+          prize_tokens?: number;
+          prize_extras?: string | null;
+          badge_icon_url?: string | null;
+          created_by: string;
+          created_at?: string;
+        };
+        // payout_* chỉ do pay_contest_award() ghi (Slice 1.7).
+        Update: {
+          award_name?: string;
+          award_rank?: number | null;
+          category?: string | null;
+          prize_vnd?: number;
+          token_vnd_rate?: number | null;
+          prize_tokens?: number;
+          prize_extras?: string | null;
+          badge_icon_url?: string | null;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          revoked_reason?: string | null;
+        };
+        Relationships: [];
+      };
+      contest_reminders: {
+        Row: {
+          contest_id: string;
+          user_id: string;
+          created_at: string;
+          notified_at: string | null;
+        };
+        Insert: {
+          contest_id: string;
+          user_id: string;
+          created_at?: string;
+          notified_at?: string | null;
+        };
+        Update: { notified_at?: string | null };
+        Relationships: [];
+      };
     };
     Views: {
+      // security_invoker: chỉ thấy giải của cuộc thi đã công bố kết quả.
+      contest_award_details: {
+        Row: Database["public"]["Tables"]["contest_awards"]["Row"] & {
+          book_id: string;
+          author_id: string;
+          contest_slug: string;
+          contest_title: string;
+        };
+        Relationships: [];
+      };
       author_public_profiles: {
         Row: {
           id: string;
@@ -1873,6 +2128,132 @@ export type Database = {
       };
     };
     Functions: {
+      // migrations/20260926_fix_profiles_policy_recursion.sql — người gọi có
+      // phải admin/super_admin không (dùng trong policy của profiles).
+      current_user_is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      // --- Contest Engine (migrations/20260926_add_contest_engine_core.sql).
+      // Lỗi nghiệp vụ trả qua `hint` của PostgrestError (vd 'already_submitted').
+      contest_word_count: {
+        Args: { p: string | null };
+        Returns: number;
+      };
+      get_books_contest_stats: {
+        Args: { p_book_ids: string[] };
+        Returns: {
+          book_id: string;
+          published_chapter_count: number;
+          total_words: number;
+          priced_chapter_count: number;
+        }[];
+      };
+      book_has_active_contest_entry: {
+        Args: { p_book_id: string };
+        Returns: boolean;
+      };
+      book_has_active_exclusive_contest_entry: {
+        Args: { p_book_id: string };
+        Returns: boolean;
+      };
+      transition_contest_status: {
+        Args: { p_contest_id: string; p_to: ContestStatus; p_actor_id: string | null; p_reason?: string | null };
+        Returns: Database["public"]["Tables"]["contests"]["Row"];
+      };
+      submit_contest_entry: {
+        Args: {
+          p_contest_id: string;
+          p_book_id: string;
+          p_user_id: string;
+          p_rules_version: string;
+          p_eligibility_result: Record<string, unknown>[];
+        };
+        Returns: Database["public"]["Tables"]["contest_submissions"]["Row"];
+      };
+      set_contest_submission_status: {
+        Args: {
+          p_submission_id: string;
+          p_to: ContestSubmissionStatus;
+          p_actor_id: string | null;
+          p_actor_kind: "author" | "admin" | "system";
+          p_reason?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["contest_submissions"]["Row"];
+      };
+      cast_contest_vote: {
+        Args: { p_user_id: string; p_submission_id: string };
+        Returns: Database["public"]["Tables"]["contest_votes"]["Row"];
+      };
+      retract_contest_vote: {
+        Args: { p_user_id: string; p_submission_id: string };
+        Returns: boolean;
+      };
+      get_contest_ranking: {
+        Args: {
+          p_contest_id: string;
+          p_limit: number;
+          p_after_rank?: number | null;
+          p_after_submitted_at?: string | null;
+          p_after_id?: string | null;
+        };
+        Returns: {
+          submission_id: string;
+          book_id: string;
+          author_id: string;
+          value: number;
+          submitted_at: string;
+          rank: number;
+          tied: boolean;
+        }[];
+      };
+      get_contest_entries: {
+        Args: {
+          p_contest_id: string | null;
+          p_sort: "new" | "discover" | "az";
+          p_seed: string | null;
+          p_genre: string | null;
+          p_limit: number;
+          p_after_key?: string | null;
+          p_after_id?: string | null;
+          p_viewer_id?: string | null;
+        };
+        Returns: {
+          submission_id: string;
+          contest_id: string;
+          book_id: string;
+          author_id: string;
+          status: ContestSubmissionStatus;
+          submitted_at: string;
+          sort_key: string;
+          viewer_has_voted: boolean;
+          viewer_completed_chapter: boolean;
+        }[];
+      };
+      get_contest_summaries: {
+        Args: { p_contest_ids: string[] };
+        Returns: { contest_id: string; entry_count: number; author_count: number }[];
+      };
+      add_contest_review_flag: {
+        Args: {
+          p_submission_id: string;
+          p_admin_id: string | null;
+          p_code: string;
+          p_message: string;
+          p_fix_by: string | null;
+          p_visible_to_author?: boolean;
+        };
+        Returns: Database["public"]["Tables"]["contest_submissions"]["Row"];
+      };
+      resolve_contest_review_flag: {
+        Args: {
+          p_submission_id: string;
+          p_flag_id: string;
+          p_admin_id: string | null;
+          p_resolution: "fixed" | "dismissed" | "escalated";
+        };
+        Returns: Database["public"]["Tables"]["contest_submissions"]["Row"];
+      };
       // migrations/20260916_add_realtime_signup_checks.sql
       is_email_registered: {
         Args: { p_email: string };

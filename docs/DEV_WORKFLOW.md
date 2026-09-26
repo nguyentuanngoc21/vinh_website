@@ -40,6 +40,7 @@ Có 2 luồng, tuỳ thay đổi có đụng tới schema Supabase hay không.
    - **Nhớ xoá `request.jwt.claims`** (`set_config('request.jwt.claims', '{}', true)`) trước khi đổi sang `anon` nếu trước đó vừa đóng vai 1 user khác — nếu không, `auth.uid()` vẫn mang danh tính cũ dù role đã đổi, cho kết quả test sai (đã gặp đúng lỗi này).
    - Nếu Supabase báo "This query creates a table without enabling RLS" cho bảng **tạm** dùng để in kết quả test — chọn "Run without RLS", vì bảng tạm không bao giờ lộ qua REST API (PostgREST không thấy bảng tạm của phiên khác).
 3. Test qua route API / UI thật (không chỉ test DB thuần) — gọi thử `curl` hoặc thao tác trên web xem luồng thật chạy đúng không.
+   Trước đó chạy `npx tsc --noEmit`, `npm run lint`, `npm run test` (Vitest — chỉ logic thuần, không gọi Supabase) và `npm run build`.
 4. Rà lại 1 lần: RLS chỉ chặn được **theo hàng** (ai được đụng), **không chặn được theo cột** (đụng được gì trên hàng đó). Nếu có cột nhạy cảm (điểm số, số dư, lượt xem...) mà không giới hạn qua `GRANT UPDATE (cột...)` cấp cột hoặc bắt đi qua 1 RPC riêng, bất kỳ ai đăng nhập cũng PATCH thẳng được qua REST API của Supabase (anon key vốn công khai trong bundle JS + JWT phiên của chính họ) — không cần vào Supabase dashboard, không cần đặc quyền gì.
 
 ### 3. `git status` → `add` → `commit`
@@ -62,7 +63,7 @@ Có 2 luồng, tuỳ thay đổi có đụng tới schema Supabase hay không.
 ```
 1. Code
    ↓
-2. Test (build / route / UI)
+2. Test (tsc / lint / npm run test / build / route / UI)
    ↓
 3. git status → add → commit → push
 ```
