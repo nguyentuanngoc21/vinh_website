@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { contestLockResponse } from "@/lib/contests/trigger-errors";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedAdminId } from "@/lib/wallet/session";
 import {
@@ -99,6 +100,9 @@ export async function PATCH(
     .maybeSingle();
 
   if (error) {
+    // D11 chặn cả admin: muốn tắt độc quyền thì loại bài dự thi trước (có lý do, có nhật ký).
+    const locked = contestLockResponse(error);
+    if (locked) return locked;
     console.error("[admin] update book failed:", error);
     return NextResponse.json({ error: "Cập nhật thất bại. Vui lòng thử lại." }, { status: 500 });
   }

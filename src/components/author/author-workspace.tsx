@@ -40,6 +40,8 @@ type AuthorWorkspaceProps = {
   linkedAudio: AudioTrack[];
   bookCharacters: ManagedCharacter[];
   initialTaggedCharacterIds: string[];
+  /** Truyện đang dự thi: khoá giá chương (D8) / tắt độc quyền (D11). */
+  contestLock?: { prices: string | null; exclusive: string | null };
 };
 
 /**
@@ -63,6 +65,7 @@ export function AuthorWorkspace({
   linkedAudio,
   bookCharacters,
   initialTaggedCharacterIds,
+  contestLock,
 }: AuthorWorkspaceProps) {
   const [taggedCount, setTaggedCount] = useState(initialTaggedCharacterIds.length);
   const [bookTitle, setBookTitle] = useState(initialBookTitle);
@@ -272,6 +275,7 @@ export function AuthorWorkspace({
         onExclusiveChange={handleExclusiveChange}
         exclusiveLocked={exclusiveLocked}
         exclusiveError={exclusiveError}
+        contestLock={contestLock}
         price={price}
         onPriceChange={setPrice}
         audioUrl={audioUrl}

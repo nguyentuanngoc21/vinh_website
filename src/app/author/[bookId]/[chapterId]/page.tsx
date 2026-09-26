@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { getBookContestLocks } from "@/lib/contests/author-service";
 import { AuthorWorkspace } from "@/components/author/author-workspace";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 
@@ -62,10 +63,12 @@ export default async function AuthorChapterPage({
     notFound();
   }
 
-  const [linkedAudio, { data: bookCharacters }, { data: taggedRows }] = await Promise.all([
+  const [linkedAudio, { data: bookCharacters }, { data: taggedRows }, contestLock] = await Promise.all([
     getChapterAudio(supabase, chapter.id),
     supabase.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
     supabase.from("chapter_characters").select("character_id").eq("chapter_id", chapterId),
+    // D8 / D11 — cùng điều kiện với 2 trigger trong DB (DB vẫn là chốt chặn thật).
+    getBookContestLocks(createServiceRoleClient(), bookId),
   ]);
 
   return (
@@ -83,6 +86,7 @@ export default async function AuthorChapterPage({
       linkedAudio={linkedAudio}
       bookCharacters={bookCharacters ?? []}
       initialTaggedCharacterIds={(taggedRows ?? []).map((r) => r.character_id)}
+      contestLock={contestLock}
     />
   );
 }

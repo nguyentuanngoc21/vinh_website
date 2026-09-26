@@ -64,6 +64,8 @@ type BookOverviewProps = {
   bookFinalized: boolean;
   initialManuscriptGrant: ManuscriptGrant | null;
   characters: ManagedCharacter[];
+  /** Section "Cuộc thi" (BookContestSection) — dựng ở page.tsx (server). */
+  contestSection?: React.ReactNode;
 };
 
 /**
@@ -84,6 +86,7 @@ export function BookOverview({
   bookFinalized,
   initialManuscriptGrant,
   characters,
+  contestSection,
 }: BookOverviewProps) {
   const router = useRouter();
   const [creatingChapter, setCreatingChapter] = useState(false);
@@ -347,6 +350,8 @@ export function BookOverview({
           <p className="text-[13.5px] italic text-stone-light">Bạn chưa cập nhật mô tả truyện</p>
         )}
       </div>
+
+      {contestSection}
 
       <ShareManuscriptPanel bookId={bookId} finalized={bookFinalized} initialGrant={initialManuscriptGrant} />
 

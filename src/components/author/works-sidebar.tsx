@@ -10,6 +10,7 @@ import {
   UploadSimpleIcon,
   ListIcon,
   XIcon,
+  TrophyIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { BookCover } from "@/components/covers/book-cover";
@@ -184,6 +185,17 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
       >
         <UploadSimpleIcon className="inline" /> Nhập bản thảo
       </button>
+
+      <Link
+        href="/author/contests"
+        className={`mx-4 mt-2 flex items-center justify-center gap-1.5 rounded-[9px] border p-[11px] text-center text-[13px] font-semibold no-underline ${
+          pathname.startsWith("/author/contests")
+            ? "border-brand-gold-light/60 text-brand-gold-light"
+            : "border-white/22 text-sidebar-text-dim"
+        }`}
+      >
+        <TrophyIcon /> Cuộc thi của tôi
+      </Link>
 
       <ImportManuscriptModal
         open={showImport}

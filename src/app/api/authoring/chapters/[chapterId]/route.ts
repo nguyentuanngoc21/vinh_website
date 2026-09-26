@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { contestLockResponse } from "@/lib/contests/trigger-errors";
 import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import {
   hasAcceptedExclusivityPolicy,
@@ -164,6 +165,9 @@ export async function PATCH(
     .maybeSingle();
 
   if (error) {
+    // D8 — sách đang dự thi: mọi chương phải miễn phí (trigger chapters_block_paid_during_contest).
+    const locked = contestLockResponse(error);
+    if (locked) return locked;
     if (error.code === "23505") {
       // chapters_one_last_chapter_per_book_idx — 1 chương khác trong cùng
       // sách đã được đánh dấu là chương cuối.

@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { BookOverview } from "@/components/author/book-overview";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { BookContestSection } from "@/components/contests/book-contest-section";
+import { getBookContestPanel } from "@/lib/contests/author-service";
 
 export async function generateMetadata({
   params,
@@ -46,7 +48,7 @@ export default async function AuthorBookOverviewPage({
     notFound();
   }
 
-  const [{ data: chapters }, coverUrl, { data: grantRow }, { data: characters }] = await Promise.all([
+  const [{ data: chapters }, coverUrl, { data: grantRow }, { data: characters }, contestPanel] = await Promise.all([
     supabase
       .from("chapters")
       .select("id, title, order_index, published, price, is_last_chapter, removed_at")
@@ -63,6 +65,9 @@ export default async function AuthorBookOverviewPage({
       .is("revoked_at", null)
       .maybeSingle(),
     supabase.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
+    // Service-role: bảng cuộc thi không cho client đọc trạng thái xử lý / cuộc
+    // thi khác. Quyền sở hữu đã kiểm ở trên (book.author_id === user).
+    getBookContestPanel(createServiceRoleClient(), { bookId, viewerId: userData.user.id }),
   ]);
 
   // Chương nháp đã có người mua (xuất bản rồi lưu nháp lại) không xoá được —
@@ -98,6 +103,7 @@ export default async function AuthorBookOverviewPage({
           : null
       }
       characters={characters ?? []}
+      contestSection={<BookContestSection bookId={book.id} panel={contestPanel} />}
     />
   );
 }

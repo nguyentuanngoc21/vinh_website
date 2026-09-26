@@ -7,7 +7,7 @@ import { BOOK_GENRES, GENRE_SLUGS } from "@/lib/covers/genre-styles";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { ART_STYLES } from "@/lib/design/art-styles";
 
-export type NavKey = "home" | "audio" | "blog" | "design" | "connect" | "rankings";
+export type NavKey = "home" | "contests" | "audio" | "blog" | "design" | "connect" | "rankings";
 
 export type NavItem = { key: NavKey; label: string; href: string };
 
@@ -16,6 +16,8 @@ export type NavItem = { key: NavKey; label: string; href: string };
 // chung 1 nguồn dữ liệu thay vì chép lại, tránh 2 nơi lệch nhau.
 export const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "Truyện chữ", href: "/" },
+  // Đứng thứ 2 để luôn hiện ở màn đầu trên mobile (đặc tả UX cuộc thi, mục 6).
+  { key: "contests", label: "Cuộc thi", href: "/cuoc-thi" },
   { key: "audio", label: "Audio", href: "/audio" },
   { key: "blog", label: "Blog", href: "/blog" },
   { key: "design", label: "Thiết kế", href: "/thiet-ke" },
