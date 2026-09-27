@@ -27,7 +27,7 @@ export function AuthorEntryCard({ entry, showBook }: { entry: AuthorEntry; showB
       ? "Bản dự thi đã được chốt; chỉnh sửa sau thời điểm này không tính vào bản chấm."
       : null;
   const rank = e.capabilities.rankings_visible.popular
-    ? e.popular_rank !== null ? `Độc giả yêu thích: hạng #${e.popular_rank}` : "Độc giả yêu thích: ngoài top 100"
+    ? e.popular_rank !== null ? `Bảng phiếu bình chọn: hạng #${e.popular_rank}` : "Bảng phiếu bình chọn: ngoài top 100"
     : e.contest.voting_start ? `Xếp hạng mở từ ${formatVnDateTime(e.contest.voting_start).split(" ").pop()}` : null;
   const warn = e.capabilities.needs_revision;
 
@@ -64,6 +64,9 @@ export function AuthorEntryCard({ entry, showBook }: { entry: AuthorEntry; showB
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-0.5">
         <Link href={`/cuoc-thi/${e.contest.slug}`} className="text-[13px] font-semibold text-brand-gold-dark no-underline">Xem cuộc thi →</Link>
+        <Link href={`/author/contests/${e.contest.slug}/stats?entry=${e.submission_id}`} className="text-[13px] font-semibold text-brand-ink no-underline">
+          Thống kê
+        </Link>
         {e.capabilities.results_visible && (
           <Link href={`/cuoc-thi/${e.contest.slug}?tab=ket-qua`} className="text-[13px] font-semibold text-brand-ink no-underline">Kết quả</Link>
         )}

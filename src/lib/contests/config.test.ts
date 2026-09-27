@@ -77,7 +77,13 @@ describe("normalizeVoteRules / normalizeScoringConfig", () => {
   it("mặc định popular-v2 + ngưỡng meaningful read P2 (40%, 30 giây, 250 chữ/phút)", () => {
     expect(normalizeScoringConfig({})).toEqual({
       ok: true,
-      value: { popular_formula_id: "popular-v2", meaningful_read_ratio: 0.4, meaningful_read_min_seconds: 30, reading_words_per_minute: 250 },
+      value: {
+        popular_formula_id: "popular-v2",
+        meaningful_read_ratio: 0.4,
+        meaningful_read_min_seconds: 30,
+        reading_words_per_minute: 250,
+        hidden_gem_max_readers: 100,
+      },
     });
   });
 
@@ -94,6 +100,7 @@ describe("normalizeVoteRules / normalizeScoringConfig", () => {
     { meaningful_read_min_seconds: 2.5 },
     { reading_words_per_minute: 0 },
     { reading_words_per_minute: "250" },
+    { hidden_gem_max_readers: 0 },
   ])("từ chối ngưỡng sai %j", (input) => {
     expect(normalizeScoringConfig(input).ok).toBe(false);
   });

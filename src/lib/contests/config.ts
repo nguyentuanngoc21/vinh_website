@@ -51,6 +51,8 @@ export type ScoringConfig = {
   meaningful_read_min_seconds: number;
   /** Tốc độ đọc dùng để ước tính thời gian đọc một chương. */
   reading_words_per_minute: number;
+  /** P5: nhóm 80% của "Viên ngọc ẩn" = bài có ít hơn số độc giả hợp lệ này. Chỉ để chọn bài hiển thị. */
+  hidden_gem_max_readers: number;
 };
 
 export const DEFAULT_ELIGIBILITY_RULES: EligibilityRules = {
@@ -82,6 +84,7 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   meaningful_read_ratio: 0.4,
   meaningful_read_min_seconds: 30,
   reading_words_per_minute: 250,
+  hidden_gem_max_readers: 100,
 };
 
 /** Số truyện ở khối "Top truyện" trên microsite (Q3). */
@@ -145,6 +148,8 @@ const SCORING_FIELDS: Record<keyof ScoringConfig, FieldCheck> = {
     Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 3600 ? null : "phải là số nguyên từ 0 đến 3600",
   reading_words_per_minute: (v) =>
     Number.isInteger(v) && (v as number) >= 50 && (v as number) <= 2000 ? null : "phải là số nguyên từ 50 đến 2000",
+  hidden_gem_max_readers: (v) =>
+    Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100000 ? null : "phải là số nguyên từ 1 đến 100000",
 };
 
 /** Gộp input (một phần) lên default, kiểm từng khoá. Khoá lạ → lỗi. */

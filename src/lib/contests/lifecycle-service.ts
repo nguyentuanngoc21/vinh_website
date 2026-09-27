@@ -16,7 +16,8 @@ import type { ContestStatus, Database } from "@/lib/supabase/types";
 import { readContestConfig } from "@/lib/contests/config";
 import type { ContestRow } from "@/lib/contests/contest-service";
 import { CLOSE_FLAG_CODE, evaluateCloseChecks } from "@/lib/contests/eligibility/close";
-import { throwIfError, toContestError } from "@/lib/contests/errors";
+import { ContestError, throwIfError, toContestError } from "@/lib/contests/errors";
+import { getPublishedRun } from "@/lib/contests/final-scoring-service";
 import { freezeScores } from "@/lib/contests/scores-service";
 
 type Client = SupabaseClient<Database>;
@@ -24,6 +25,7 @@ type Client = SupabaseClient<Database>;
 type TransitionInput = { contestId: string; to: ContestStatus; adminId: string | null; reason: string | null };
 
 async function transitionWithTasks(client: Client, input: TransitionInput): Promise<{ contest: ContestRow; close: CloseSummary | null }> {
+  if (input.to === "results") await requirePublishedRunIfScored(client, input.contestId);
   const { data, error } = await client.rpc("transition_contest_status", {
     p_contest_id: input.contestId,
     p_to: input.to,
@@ -50,6 +52,17 @@ async function freezeFinalScores(client: Client, contest: ContestRow) {
   } catch (error) {
     console.error("[contests] freeze scores at results failed:", error);
   }
+}
+
+/**
+ * Cuộc thi dùng chấm chung cuộc (đã lưu cấu hình chấm — Slice 2.5b) chỉ sang
+ * "Đã có kết quả" khi đã công bố một lượt tính chính thức (Slice 2.6b).
+ */
+async function requirePublishedRunIfScored(client: Client, contestId: string) {
+  const { data: contest, error } = await client.from("contests").select("scoring_config_version").eq("id", contestId).maybeSingle();
+  throwIfError(error, "load contest scoring version");
+  if (!contest || contest.scoring_config_version === null) return;
+  if (!(await getPublishedRun(client, contestId))) throw new ContestError("score_run_not_published");
 }
 
 export async function transitionContest(client: Client, input: TransitionInput): Promise<ContestRow> {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { advanceDueContests } from "@/lib/contests/lifecycle-service";
+import { detectAllActiveFraud } from "@/lib/contests/fraud-service";
 import { refreshAllActiveScores } from "@/lib/contests/scores-service";
 
 /**
@@ -11,7 +12,9 @@ import { refreshAllActiveScores } from "@/lib/contests/scores-service";
  *     thi và gắn cờ điều kiện lúc đóng cho admin (D3, D4);
  *   - tính lại bảng điểm (phiếu đã lọc, độc giả hợp lệ, trending) của mọi
  *     cuộc thi đang diễn ra — lưới an toàn 0h giờ VN cho làm mới lười 15 phút
- *     (P8) — và chốt bảng điểm của cuộc thi đã công bố mà chưa chốt.
+ *     (P8) — và chốt bảng điểm của cuộc thi đã công bố mà chưa chốt;
+ *   - quét tín hiệu gian lận của cuộc thi đang/đã bình chọn (chỉ gắn tín hiệu
+ *     cho admin xét — P10; không tự khoá tài khoản).
  * Quyền của người dùng không phụ thuộc cron: capability luôn kiểm thời gian
  * thật, và bài bị sửa sau hạn đã được trigger chụp bản trước khi sửa.
  *
@@ -32,10 +35,11 @@ export async function GET(request: Request) {
     const client = createServiceRoleClient();
     const advance = await advanceDueContests(client);
     // Sau advance: cuộc thi vừa đóng/mở trong lần chạy này cũng được tính.
+    const fraud = await detectAllActiveFraud(client);
     const scores = await refreshAllActiveScores(client);
-    const errors = [...advance.errors, ...scores.errors];
+    const errors = [...advance.errors, ...fraud.errors, ...scores.errors];
     if (errors.length) console.error("[contests] cron advance errors:", errors);
-    return NextResponse.json({ ...advance, scores, errors }, { status: errors.length ? 207 : 200 });
+    return NextResponse.json({ ...advance, fraud, scores, errors }, { status: errors.length ? 207 : 200 });
   } catch (error) {
     console.error("[contests] cron advance failed:", error);
     return NextResponse.json({ error: "Cron cuộc thi thất bại." }, { status: 500 });

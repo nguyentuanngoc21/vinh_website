@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: "Cuộc thi của tôi · Vịnh Tác
 
 /**
  * "Cuộc thi của tôi" — portfolio thi đấu của tác giả: ĐANG THAM GIA và ĐÃ KẾT
- * THÚC. /author/** đã được proxy.ts + layout gác đăng nhập. Analytics (độc
- * giả duy nhất, nguồn độc giả…) thuộc Phase 2.
+ * THÚC. /author/** đã được proxy.ts + layout gác đăng nhập. Thống kê từng bài
+ * (độc giả đọc thật, nguồn độc giả…) ở /author/contests/[slug]/stats.
  */
 export default async function AuthorContestsPage() {
   const supabase = createServiceRoleClient();

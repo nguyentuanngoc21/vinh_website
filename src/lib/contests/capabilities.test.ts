@@ -120,7 +120,15 @@ describe("xếp hạng & feed (Q3)", () => {
   it("trước bình chọn: chưa có Top truyện; có feed mới + đề xuất", () => {
     const c = caps();
     expect(c.rankings_visible.popular).toBe(false);
-    expect(c.available_feeds).toEqual(["new", "discover"]);
+    expect(c.available_feeds).toEqual(["new", "discover", "attention", "trending", "hidden_gems"]);
+    expect(c.rankings_visible.trending).toBe(true);
+  });
+
+  it("sau công bố kết quả: không còn hàng tín hiệu / Trending (bảng điểm đã chốt)", () => {
+    const c = caps({ status: "results", results_published_at: h(-1) });
+    expect(c.available_feeds).not.toContain("trending");
+    expect(c.available_feeds).not.toContain("hidden_gems");
+    expect(c.rankings_visible.trending).toBe(false);
   });
 
   it("đang bình chọn: hiện hạng nhưng ẩn số phiếu", () => {
@@ -144,6 +152,7 @@ describe("xếp hạng & feed (Q3)", () => {
 
   it("nháp / sắp mở: không có feed nào", () => {
     expect(caps({ status: "announced" }).available_feeds).toEqual([]);
+    expect(caps({ status: "announced" }).rankings_visible.trending).toBe(false);
   });
 });
 

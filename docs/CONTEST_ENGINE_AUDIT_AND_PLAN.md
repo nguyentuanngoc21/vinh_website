@@ -1102,3 +1102,200 @@ Nếu không có "Cần bổ sung", mọi thiếu sót chỉ có hai lựa chọ
 - Cuộc thi mới mặc định popular-v2. Migration chuyển sang popular-v2 mọi cuộc thi **chưa mở bình chọn** (công thức chỉ khoá từ lúc mở bình chọn); cuộc thi đã mở bình chọn giữ popular-v1 đã khoá.
 - Admin (tab Bài dự thi) luôn thấy phiếu thô, phiếu đã lọc, độc giả hợp lệ, độc giả mới 7 ngày — để xét gian lận và trao giải.
 - Chưa làm ở 2.2: return reader / completion (Slice 2.7), phát hiện gian lận tự động + màn xét (Slice 2.4), hàng Trending / Viên ngọc ẩn công khai (Slice 2.3 — `get_contest_score_ranking('trending')` đã có sẵn).
+
+**2.3 — Hàng khám phá dựa trên tín hiệu** (`migrations/20260926_add_contest_signal_feeds.sql`, `src/lib/contests/signals.ts`) — chỉ khi cuộc thi có bài và chưa công bố kết quả:
+
+| Hàng / bảng | Cách chọn |
+|---|---|
+| Đang được chú ý | Nhiều độc giả hợp lệ nhất từ đầu cuộc thi (khác "Đang tăng tốc" để 2 hàng không trùng); không hiện số |
+| Đang tăng tốc + BXH Trending | Độc giả hợp lệ mới trong 7 ngày (P4); chip "+X%" so với 7 ngày trước đó, "Mới" khi 7 ngày trước đó chưa có ai, không chip khi không tăng. Số độc giả hiện trên BXH (không phải số phiếu — P9) |
+| Viên ngọc ẩn | Mỗi ô: 80% từ bài < `hidden_gem_max_readers` (mặc định 100) độc giả hợp lệ, 20% từ bài ngoài top 10 `books.view_count` của cuộc thi; nhóm trống → lấy nhóm còn lại; không lặp bài; seed ngày + người xem. < 3 bài → ẩn cả hàng |
+
+Mỗi hàng lỗi riêng không làm hỏng tab Khám phá. Hub `/cuoc-thi` chưa có các hàng này.
+
+**2.4 — Tín hiệu gian lận + admin xét** (`migrations/20260926_add_contest_fraud_detection.sql`, `src/lib/contests/fraud-service.ts`, tab "Gian lận" ở `/admin/cuoc-thi/[id]`):
+
+| Tín hiệu | Điều kiện (ngưỡng ở `FRAUD_THRESHOLDS`) |
+|---|---|
+| Bình chọn dồn dập (`rapid_voting`) | Một tài khoản có ≥ 10 phiếu trong 10 phút ở cuộc thi; mức cao khi ≥ 20 |
+| Tài khoản vừa đủ tuổi bầu hàng loạt (`new_account_mass_voting`) | Phiếu đầu tiên trong 3 ngày sau khi tài khoản vừa đủ `min_account_age_days`, và bầu ≥ 5 tác phẩm |
+
+- Quét khi admin mở trang cuộc thi, khi bấm "Quét lại", và trong cron 00:05 VN — chỉ cuộc thi `community_voting` / `judging`. Mỗi (mã, tài khoản) gắn 1 lần; đã bỏ qua thì không gắn lại.
+- Admin: Xác nhận gian lận (loại mọi phiếu + lượt đọc của tài khoản khỏi điểm cuộc thi này, tính lại ngay), Bỏ qua, Mở lại; có ghi chú. Khoá sau khi công bố kết quả.
+- Không có tín hiệu "phiếu không đọc thật" (đã tự lọc ở 2.2) và chưa có tín hiệu theo bài (vd phiếu dồn về 1 bài) — cần thêm khi có dữ liệu thật để đặt ngưỡng.
+
+**2.7 — Thống kê bài dự thi cho tác giả** (`migrations/20260926_add_contest_entry_stats.sql`, `src/lib/contests/stats-view.ts`, `/author/contests/[slug]/stats`, link "Thống kê" trên thẻ bài dự thi):
+
+Tính từ `submission_start`, không tính tác giả, không dùng lượt xem trang. "Người đọc" = có phiên đọc với thời gian đọc thật > 0.
+
+| Ô | Định nghĩa |
+|---|---|
+| Độc giả đọc thật | `valid_readers` của bảng điểm (cùng số với xếp hạng), "+N trong 7 ngày" |
+| Độc giả quay lại | % người đọc ở ≥ 2 ngày khác nhau (giờ VN) |
+| Tỷ lệ đọc hết | % người đọc đã đọc hết chương cuối đang hiển thị |
+| Đọc tiếp chương sau | Trung bình qua các cặp chương liền nhau; "—" nếu truyện 1 chương |
+| Người theo dõi mới | Theo dõi **tác giả** từ khi cuộc thi mở (theo dõi không gắn với truyện) |
+| Phiếu bình chọn | Chưa mở: "—"; đang bình chọn: "Ẩn" + hạng (P9, Q3); hết bình chọn: số phiếu + hạng (cùng nguồn BXH công khai) |
+| Bình luận | Số bình luận và số người bình luận |
+| Thời gian đọc TB | Thời gian đọc thật trung bình mỗi phiên |
+
+Kèm "Nguồn độc giả" (nguồn của lần đọc đầu tiên mỗi người) và "Giữ chân theo chương" (% so với chương 1, tối đa 50 chương). Chưa có cột "Thay đổi" hạng theo ngày và chưa có API cho app mobile.
+
+## XXI. CHẤM ĐIỂM CHUNG CUỘC — AUDIT & ĐỀ XUẤT (Slice 2.5–2.6, 26/09/2026)
+
+Nguồn: đặc tả "CONTEST SCORING SYSTEM — BACKEND SPECIFICATION" do chủ dự án gửi ngày 26/09/2026 (thay P6, P7). Mục này làm bước 1–11 của mục 20 đặc tả. **Chưa code** — chờ chốt các câu hỏi ở XXI.9.
+
+### 1. Audit dữ liệu hiện có so với đặc tả
+
+| Đặc tả cần | Hiện có | Đủ chưa |
+|---|---|---|
+| Valid reader (unique / sách / khung chấm) | `reading_sessions` do server ghi (Slice 2.1): `active_seconds` đo thật, `max_paragraph`, `start_time`, `source`. Meaningful read ≥ 40% thời gian ước tính, tối thiểu 30 giây, cấu hình được (Slice 2.2) | **Đủ**, chỉ cần giới hạn theo khung chấm chính thức |
+| Reading Depth theo **% chữ** | Chỉ có `max_paragraph` (đoạn xa nhất trong khung nhìn) theo phiên. Chưa có số chữ đã đọc. Cuộn nhanh xuống cuối vẫn đạt đoạn cuối | **Chưa đủ** — cần bổ sung (XXI.2) |
+| Return Rate (khác phiên, có khoảng cách tối thiểu) | Phiên mới mở khi đổi chương hoặc nghỉ > 30 phút → đọc chương 1 rồi chương 2 ngay đã là 2 phiên. Có đủ `start_time` / `end_time` để gom thành "lượt ghé" | **Đủ dữ liệu**, cần định nghĩa "lượt ghé" (gom phiên cách nhau < N phút) |
+| Engagement: bình luận | `anchored_comments` (user, chương, `created_at`) | Đủ, nhưng client ghi thẳng được cả `created_at` |
+| Engagement: follow | `author_follows` — theo **tác giả**, không theo truyện | Dùng được có điều kiện (XXI.3) |
+| Engagement: lưu / bookmark | `reading_list_items` (`added_at`, không có `user_id` — suy từ `reading_lists`) | Đủ, nhưng client ghi thẳng được `added_at` |
+| Engagement: reaction | `chapter_votes` (bình chọn chương), `character_trope_votes` | Đủ, nhưng client ghi thẳng được `created_at` |
+| Engagement: share | `/api/books/[id]/share` chỉ cộng tiến trình nhiệm vụ, không lưu theo sách | **Không có** — không đưa vào điểm |
+| Vote hợp lệ | `contest_votes` (unique bài × tài khoản, ≥ 7 ngày tuổi, đã đọc hết ≥ 1 chương); phiếu đã lọc (Slice 2.2) | Đủ |
+| Chống gian lận VALID / SUSPICIOUS / INVALID | `contest_fraud_signals`: `open` / `confirmed` / `dismissed` (Slice 2.4) | Đủ — ánh xạ ở XXI.3 |
+| Judge per criterion, draft / finalized, audit | Không có | Làm mới |
+| Official Scoring Window | Chỉ có `submission_*`, `voting_*`, `judging_*` | Thêm 2 cột |
+| Config có version | `contests.scoring_config` jsonb, khoá khi mở bình chọn; không có version | Làm mới |
+| Score Snapshot | `contest_submission_scores` (cache, ghi đè) + `contest_score_state.frozen_at` | Làm mới (bảng lượt tính có version) |
+| Nội dung cố định để tính mẫu số | `contest_submission_snapshots` + `_chapters` (số chữ từng chương lúc đóng nhận bài) | **Đủ** — dùng làm mẫu số Reading Depth (tất định) |
+
+### 2. Tracking cần bổ sung (phải có TRƯỚC khung chấm đầu tiên)
+
+1. **Số chữ đã đọc theo phiên** — `reading_sessions.words_reached` (server tính lúc nhận nhịp: số chữ của các đoạn 0..`max_paragraph` trên nội dung chương tại thời điểm đó). Lưu số tại thời điểm ghi → tính lại sau vẫn ra đúng kết quả dù chương bị sửa. Lúc tính điểm mới áp `words_credited = min(words_reached, active_seconds / 60 × trần tốc độ đọc)` — trần tốc độ nằm trong config có version, chặn "cuộn nhanh xuống cuối".
+2. **Khoá thời gian của sự kiện engagement** — trigger ép `created_at` / `added_at` = `now()` khi insert (không đổi hành vi app, chỉ chặn ghi lùi / ghi trước ngày) cho `anchored_comments`, `chapter_votes`, `character_trope_votes`, `reading_list_items`.
+3. Dữ liệu chỉ có từ lúc deploy trở đi — mùa đầu cần deploy (1) và (2) trước `official_scoring_start`.
+
+### 3. Định nghĩa đề xuất (mọi ngưỡng nằm trong config có version)
+
+| Khái niệm | Đề xuất |
+|---|---|
+| Khung chấm | `official_scoring_start` ≤ t < `official_scoring_end`. Chỉ sự kiện trong khung vào điểm chung cuộc. Trending / Khám phá / Analytics giữ dữ liệu từ `submission_start` |
+| Valid reader | Không phải tác giả, không bị tín hiệu gian lận **đã xác nhận**, có meaningful read (rule Slice 2.2) tính chỉ trên phiên trong khung |
+| Reading Depth (1 người) | Σ theo chương của min(`words_reached` xa nhất trong khung, Σ `active_seconds` trong khung ÷ 60 × trần tốc độ, số chữ chương trong bản chụp) ÷ tổng chữ bản chụp. Chỉ chương có trong bản chụp. Chặn trần 100% |
+| Reading Depth (1 bài) | Trung vị depth của valid readers, co về trung vị toàn cuộc thi khi ít người đọc: `(n × median + C_depth × m) / (n + C_depth)` |
+| Lượt ghé | Gom phiên của 1 người trên 1 sách: phiên cách phiên trước ≥ `return_min_gap_minutes` mở lượt ghé mới; lượt ghé chỉ tính khi đạt `return_min_active_seconds` |
+| Return Rate | Valid readers có ≥ 2 lượt ghé **trong khung** ÷ valid readers. Người đọc trước khung rồi quay lại trong khung: chỉ tính phần trong khung (1 lượt ghé trong khung = chưa quay lại) |
+| Engaged reader | Valid reader có ≥ 1 hành động trong khung: bình luận, bình chọn chương, bình chọn nhân vật, lưu vào danh sách đọc, theo dõi tác giả. Follow chỉ tính khi người đó là valid reader của **chính bài này** và follow trong khung |
+| Valid vote | Phiếu trong khung **và** trong khung bình chọn, của valid reader, không bị gian lận đã xác nhận |
+| Gian lận | `open` = SUSPICIOUS (vẫn tính — P10), `confirmed` = INVALID (loại), `dismissed` = VALID |
+| Bayesian | `m` = tỷ lệ gộp toàn cuộc thi (Σ thành công ÷ Σ quan sát trên bài hợp lệ); `C` riêng cho vote / engagement / return. Mẫu số 0 → trả `m`; cả cuộc thi 0 → 0 |
+| Reader Score | Chiến lược `LOG`: `100 × ln(1+R) / ln(1+R_max)`; `R_max = 0` → 0 cho mọi bài. Có sẵn khung cho `PERCENTILE` / `MIN_MAX` / `CUSTOM` |
+| Judge Score | Trung bình tổng điểm của các phiếu chấm **đã chốt, chưa bị huỷ**; thang 100 theo rubric trong config |
+| Final | Theo trọng số config; bài không có Judge Score xử lý theo XXI.9 |
+
+### 4. Schema đề xuất
+
+- `contests`: thêm `official_scoring_start`, `official_scoring_end`, `scoring_config_version` (trỏ bản đang dùng).
+- `contest_scoring_configs (contest_id, version, config jsonb, created_by, created_at, reason, locked_at)` — mỗi lần sửa tạo version mới; version đã dùng cho lượt tính đã công bố không sửa được. `contests.scoring_config` hiện tại chuyển thành version 1.
+- `contest_judges (contest_id, user_id, assigned_by, assigned_at, removed_at)` — tài khoản Vịnh sẵn có, không thêm role.
+- `contest_judge_scorecards (id, contest_id, submission_id, judge_id, status draft | finalized | invalidated, total, finalized_at, invalidated_by, invalidated_reason)` + `contest_judge_criterion_scores (scorecard_id, criterion_code, score)` — tổng tính trong DB, không nhận từ client.
+- `contest_judge_score_events` — nhật ký mọi lần lưu nháp / chốt / huỷ / sửa (ai, lúc nào, trước → sau, lý do).
+- `contest_score_runs (id, contest_id, config_version, kind preview | final, window, input_digest, computed_at, computed_by, published_at)` + `contest_score_snapshots (run_id, submission_id, …mọi cột ở mục 14 đặc tả…, rank, tied, award_proposal)`.
+- Index: `reading_sessions (book_id, start_time)` đã có dạng (book_id, user_id, start_time); thêm `contest_votes (contest_id, created_at)`, `anchored_comments (chapter_id, created_at)`, `chapter_votes (chapter_id, created_at)`, `reading_list_items (book_id, added_at)`, `contest_judge_scorecards (contest_id, submission_id)`.
+
+### 5. Pipeline & phân lớp
+
+```
+SQL  get_contest_scoring_metrics(contest, window, config)   — Raw → Validation → Reader aggregation → Contest metrics
+       (1 dòng / bài: R, depth median, returning, engaged, valid votes, judge totals)
+TS   src/lib/contests/scoring-engine/ (thuần, unit test)      — Normalization strategy → Bayesian → Component → System → Final → Ranking → Award proposals
+SQL  save_contest_score_run(run jsonb)                         — ghi lượt tính + snapshot trong 1 giao dịch
+```
+
+- Engine thuần TS: cùng input metrics + cùng config version → cùng kết quả (không dùng thời gian thực, không random). `input_digest` (hash metrics) lưu cùng lượt tính để kiểm lại.
+- Chiến lược normalization, Bayesian, tie-break, luật giải đặc biệt đều là module chọn bằng id trong config.
+
+### 6. API đề xuất
+
+- Admin: `PUT /api/admin/contests/[id]/scoring-config` (tạo version mới, bắt buộc lý do sau khi khoá), `/judges` (gán / gỡ), `POST /score-runs` (tính thử), `POST /score-runs/[runId]/publish`, `GET /score-runs/[runId]` (bảng giải thích từng bài), `PATCH /judge-scorecards/[id]` (huỷ / sửa có lý do).
+- Giám khảo: `/giam-khao` (danh sách cuộc thi được gán), `/giam-khao/[slug]/[submissionId]` (đọc **bản chụp**, chấm theo rubric, lưu nháp / chốt). API `/api/judging/…`.
+- Công khai: sau công bố, tab Kết quả + BXH Chung cuộc / Ban giám khảo đọc lượt tính đã công bố.
+
+### 7. Job / tính lại
+
+- Tính lượt `preview` khi admin bấm (và tuỳ chọn trong cron 0h sau khi hết khung chấm). Không tính liên tục.
+- `final`: admin tính → xem → công bố. Sau công bố, lượt đó bất biến; sửa (phiếu bị huỷ, giám khảo sửa điểm) phải tạo lượt mới + công bố lại có lý do.
+
+### 8. Test
+
+- Unit (engine): 0 reader, 1 bài, `R_max = 0`, mẫu số 0, đồng điểm, thiếu giám khảo, truyện 1 chương vs 50 chương cùng depth, spam 20 bình luận = 1 engaged, 5/5 vs 400/1000 sau Bayesian, cùng input → cùng output, đổi config version → khác output.
+- SQL (DO block): chỉ sự kiện trong khung, đọc trước khung + quay lại trong khung, bài bị loại / rút / sách bị gỡ, phiếu gian lận đã xác nhận, `words_credited` chặn trần, trigger ép thời gian, phiếu chấm nháp không vào điểm, huỷ phiếu chấm có nhật ký.
+
+### 9. Câu hỏi cần chốt
+
+Kết quả chốt 26/09/2026:
+
+| # | Câu hỏi | Kết quả |
+|---|---|---|
+| J1 | Giải "Được yêu thích nhất" = VoteScore (tỷ lệ phiếu), khác bảng đếm phiếu công khai | **Đồng ý** — bảng công khai đổi tên "Bảng phiếu bình chọn", ghi rõ giải xét theo tỷ lệ phiếu |
+| J2 | Khung chấm và khung bình chọn | **Đồng ý** — trùng nhau; admin form kiểm khung bình chọn nằm trong khung chấm |
+| J3 | Rate → điểm (`× 100` hay "so với bài cao nhất") | **Chốt 27/09/2026 ("SCORING NORMALIZATION — BACKEND SPEC UPDATE")** — xem XXI.12 |
+| J4 | Giá trị khởi điểm | **Đồng ý** — C = 20 (phiếu, engagement, quay lại), C = 10 (depth), lượt ghé mới khi nghỉ ≥ 6 giờ và đọc ≥ 60 giây, trần 600 chữ/phút, meaningful read 40% / 30 giây |
+| J5 | Giám khảo thiếu điểm | **Mùa đầu chỉ 1 giám khảo: chủ hệ thống.** Hệ thống vẫn hỗ trợ nhiều giám khảo; công bố chỉ khi mọi giám khảo đang gán đã chốt mọi bài |
+| J6 | Chấm bài nào | **Đồng ý** — mọi bài hợp lệ |
+| J7 | Chấm ẩn danh | **Đồng ý** — màn chấm không hiện tên / ảnh tác giả |
+| J8 | Phá hoà | **Đồng ý** — JudgeScore → ReadingQuality → ReaderScore → nộp sớm hơn |
+| J9 | Giải đặc biệt | **Đồng ý** — loại Top 6; mỗi bài tối đa 1 giải đặc biệt; xét A (phiếu) → B (giữ chân) → C (tương tác), giải còn lại chuyển cho bài xếp kế tiếp |
+| J10 | Trao giải | **Đồng ý** — hệ thống đề xuất, admin xác nhận thành `contest_awards`, chi trả như cũ |
+| J11 | Khoá config | **Đồng ý** — khoá từ `official_scoring_start`; sau đó chỉ sửa bằng version mới kèm lý do; kết quả ghi version |
+| J12 | Hành động engagement | **Đồng ý** — bình luận, bình chọn chương, bình chọn nhân vật, lưu danh sách đọc, theo dõi tác giả (chỉ khi là valid reader của chính bài, trong khung); share không tính |
+
+### 10. Slice đề xuất
+
+```
+2.5a Tracking bổ sung (words_reached/credited, ép thời gian sự kiện)   ← nên deploy sớm nhất để có dữ liệu
+2.5b Config có version + khung chấm + giám khảo, rubric, phiếu chấm, màn chấm (đọc bản chụp), nhật ký
+2.6a Tổng hợp metrics trong khung (SQL) + scoring engine (TS) + lượt tính / snapshot
+2.6b Xếp hạng + tie-break + đề xuất giải → admin xác nhận thành contest_awards → công bố, trang kết quả
+```
+
+### 11. Đã triển khai (26/09/2026)
+
+- **2.5a** (`migrations/20260926_add_scoring_tracking.sql`): `reading_sessions.words_reached` (server tính theo đoạn xa nhất, chỉ tăng); trigger ép thời gian server cho `anchored_comments`, `chapter_votes`, `character_trope_votes`, `reading_list_items`.
+- **2.5b** (`migrations/20260926_add_contest_judging.sql`, `src/lib/contests/final-scoring/config.ts`, `src/lib/contests/judging-service.ts`):
+  - `contests.official_scoring_start/_end` (sau khi đóng nhận bài; khung bình chọn nằm trong khung chấm — J2; khoá khi bắt đầu) — nhập ở tab "Thông tin & thể lệ".
+  - `contest_scoring_configs` bất biến theo version; lý do bắt buộc từ lúc khung chấm bắt đầu (J11); rubric khoá khi đã có phiếu chấm. Tab admin "Chấm điểm" sửa trọng số, chuẩn hoá, J3 (chờ chốt — mặc định `absolute`), C Bayesian, ngưỡng đọc thật / trần tốc độ / lượt ghé, hành động tương tác, nhãn + điểm tối đa rubric; phá hoà và giải chỉ hiển thị (theo mặc định J8, J9).
+  - Giám khảo gán theo username; gỡ cần lý do. Phiếu chấm: nháp (thiếu tiêu chí được) → chốt (đủ tiêu chí, tổng do DB tính) → admin mở lại / huỷ (lý do bắt buộc), nhật ký trước → sau.
+  - Màn chấm `/giam-khao` → `/giam-khao/[slug]` → `/giam-khao/[slug]/[submissionId]?chuong=N`: đọc bản chụp theo chương, mã bài ẩn danh (#01…), không tên / ảnh tác giả (J7); không phải giám khảo → 404.
+
+### 12. J3 — Chuẩn hoá điểm (chốt 27/09/2026)
+
+Pipeline: RAW METRIC → điều chỉnh độ tin cậy (Bayesian cho tỷ lệ, log cho số độc giả) → chuẩn hoá → COMPONENT SCORE [0–100] → × trọng số. Điều chỉnh và chuẩn hoá là 2 bước tách biệt, mỗi thành phần cấu hình riêng.
+
+| Thành phần | Trọng số | Điều chỉnh | Chuẩn hoá mặc định mùa đầu |
+|---|---|---|---|
+| Judge | 0,50 | — | NONE (thang 100 tuyệt đối — không kéo điểm BGK cao nhất lên 100) |
+| Reader | 0,15 | biến đổi LOG | RELATIVE_MAX → `100 × ln(1+R) / ln(1+R_max)` |
+| Reading Quality — Depth | 0,70 × 0,15 | tổng hợp MEDIAN (+ co về trung vị cuộc thi, C = 10 — J4) | RELATIVE_MAX |
+| Reading Quality — Return | 0,30 × 0,15 | BAYESIAN (C = 20) | RELATIVE_MAX |
+| Engagement | 0,10 | BAYESIAN (C = 20) | RELATIVE_MAX |
+| Vote | 0,10 | BAYESIAN (C = 20) | RELATIVE_MAX |
+
+- Chiến lược chuẩn hoá có sẵn: ABSOLUTE (`v × 100`), RELATIVE_MAX, LOG_RELATIVE_MAX, PERCENTILE, REFERENCE_VALUE (`100 × min(v / ref, 1)` — dành cho các mùa sau khi có benchmark; mùa đầu **không** đặt reference).
+- Cohort chuẩn hoá = chỉ bài hợp lệ (eligible / shortlisted, sách còn hiển thị). Max = 0 → mọi bài 0 điểm (không chia 0, không NaN, không tự cho 100). Chỉ 1 bài hợp lệ → gắn cờ để admin xem xét.
+- **Quản trị cấu hình:** chọn chiến lược TRƯỚC khung chấm; từ `official_scoring_start` cấu hình khoá — chỉ đổi bằng version mới (lưu version trước, người đổi, lúc đổi, lý do) và bắt buộc tính lại toàn bộ cuộc thi. Không có luồng "thử công thức trên dữ liệu thật để chọn người thắng": lượt tính trên dữ liệu thật chỉ dùng version đang áp dụng; xem thử công thức chỉ bằng dữ liệu mẫu.
+- Snapshot lưu mọi tầng: raw / adjusted / normalized cho vote, engagement, return; depth tổng hợp + normalized; valid readers + giá trị log + normalized; reading quality; judge; system; final; version cấu hình; thời điểm tính.
+- Sau mỗi mùa lưu phân phối (valid readers, depth, return, engagement, vote) để các mùa sau backtest REFERENCE_VALUE.
+
+### 13. Slice 2.6a — đã triển khai (27/09/2026)
+
+- `migrations/20260926_add_final_scoring.sql`: `get_contest_scoring_metrics()` (số liệu thô trong khung chấm theo XXI.3, mẫu số = bản chụp), `contest_score_runs` + `contest_score_snapshots` (bất biến, lưu mọi tầng J3 mục 16 + đề xuất giải), `save_contest_score_run()` (chỉ version đang áp dụng; `final` chỉ sau khung chấm).
+- Engine `src/lib/contests/final-scoring/engine.ts` (thuần, tất định): điều chỉnh → chuẩn hoá trên cohort → điểm → xếp hạng (FinalScore + chuỗi J8; đồng hạng thật = cùng hạng) → đề xuất giải J9. Cờ: không có bài, 1 bài, chưa gán giám khảo, thiếu phiếu chốt, thiếu bản chụp, đồng hạng thật ở ranh giới giải, giải đặc biệt không trao được.
+- `input_digest` = sha256(version + cấu hình + số liệu thô) để kiểm lại tính tái lập.
+- Tab admin "Chấm điểm" → "Kết quả chấm": Tính thử / Tính chính thức, danh sách lượt tính + cảnh báo "Cần tính lại" (version mới, phiếu chấm hoặc tín hiệu gian lận đổi sau lượt tính), bảng điểm mở từng tầng.
+- Ghi nhận khi test: Bayesian co tỷ lệ của bài ít độc giả về mức chung nhưng không đảo thứ hạng khi bài nhiều độc giả nằm DƯỚI mức chung (vd 5/5 → ≈ 52% vs 400/1000 → ≈ 40% với m ≈ 40%) — đúng công thức, không phụ thuộc C.
+- Phiên đọc tính theo thời điểm BẮT ĐẦU trong khung (phiên bắt đầu trước khung không tính dù kéo dài vào khung).
+
+### 14. Slice 2.6b — đã triển khai (27/09/2026)
+
+- `migrations/20260926_add_score_run_publish.sql`: `publish_contest_score_run()` — chỉ lượt `final` dùng version cấu hình đang áp dụng; mỗi cuộc thi tối đa 1 lượt đang công bố; thay kết quả cần lý do, lượt cũ giữ lại (đánh dấu thay thế, không công bố lại được); nội dung lượt tính bất biến (trigger).
+- Admin: "Kết quả chấm" có nút "Công bố lượt này làm kết quả" + nhãn Đang công bố / Đã thay thế. Tab "Giải thưởng" có "Đề xuất từ kết quả chấm đã công bố" — tiền thưởng lấy theo tên giải trong `prizes_summary`, admin sửa rồi "Xác nhận" → `contest_awards` (luồng chi trả cũ giữ nguyên — J10).
+- Cuộc thi đã lưu cấu hình chấm chỉ chuyển sang "Đã có kết quả" khi đã có lượt công bố (`score_run_not_published`).
+- Microsite (sau công bố): BXH "Chung cuộc" (hạng đã lưu) và "Ban giám khảo" (điểm BGK, đồng điểm cùng hạng) từ lượt đang công bố; tab Kết quả mở sẵn Chung cuộc. Cuộc thi không chấm chung cuộc vẫn hiện "công bố qua danh sách giải".
+- J1: "Độc giả yêu thích" → "Bảng phiếu bình chọn" (BXH, thẻ bài của tác giả, thống kê tác giả); cuộc thi chấm chung cuộc có ghi chú giải "Tác phẩm được yêu thích nhất" xét theo tỷ lệ phiếu.

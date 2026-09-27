@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TrophyIcon } from "@phosphor-icons/react/dist/ssr";
+import { FireIcon, TrophyIcon } from "@phosphor-icons/react/dist/ssr";
 import { BookCover } from "@/components/covers/book-cover";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
@@ -13,6 +13,7 @@ export function EntryCard({
   meta,
   badge = true,
   rank,
+  trend,
   footer,
   compact = false,
 }: {
@@ -21,6 +22,8 @@ export function EntryCard({
   badge?: boolean;
   /** Hạng BXH (Top truyện) — hiện ở góc bìa. */
   rank?: number | null;
+  /** Chip "Đang tăng tốc" (vd "+212%", "Mới") — % tăng độc giả, không phải điểm. */
+  trend?: string | null;
   footer?: React.ReactNode;
   compact?: boolean;
 }) {
@@ -32,6 +35,11 @@ export function EntryCard({
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
             {rank != null && (
               <span className="rounded-full bg-brand-ink px-2 py-0.5 text-[11px] font-extrabold text-brand-gold-light">#{rank}</span>
+            )}
+            {trend && (
+              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-brand-ink/80 px-2 py-0.5 text-[10px] font-semibold text-white">
+                <FireIcon size={10} weight="fill" className="text-brand-gold-light" /> {trend}
+              </span>
             )}
             {badge && (
               <span className="inline-flex items-center gap-1 rounded-full bg-brand-gold-light px-2 py-0.5 text-[10px] font-bold tracking-[.5px] text-brand-ink">

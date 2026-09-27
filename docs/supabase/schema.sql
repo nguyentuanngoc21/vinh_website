@@ -5997,6 +5997,15 @@ create index if not exists reading_sessions_book_user_idx on public.reading_sess
 -- Trả id phiên (mới hoặc cũ) + active_seconds hiện tại.
 -- p_session_id null / không khớp (người khác, chương khác, đã nguội > 30 phút)
 -- → mở phiên mới.
+alter table public.reading_sessions
+  add column if not exists words_reached integer;
+
+do $$ begin
+  alter table public.reading_sessions add constraint reading_sessions_words_reached_check
+    check (words_reached is null or words_reached >= 0);
+exception when duplicate_object then null; end $$;
+
+-- Slice 2.5a (migrations/20260926_add_scoring_tracking.sql): thêm words_reached.
 create or replace function public.record_reading_heartbeat(
   p_user_id uuid,
   p_session_id uuid,
@@ -6011,10 +6020,16 @@ as $$
 declare
   v_row public.reading_sessions;
   v_book uuid;
+  v_words integer;
   v_elapsed numeric;
   v_source text := case when p_source in ('contest', 'trending', 'search', 'profile', 'recommendation', 'other') then p_source else null end;
 begin
-  select book_id into v_book from public.chapters where id = p_chapter_id;
+  -- Số chữ tới hết đoạn p_paragraph (mảng 1-based; vượt số đoạn thì lấy hết chương).
+  select ch.book_id,
+         public.contest_word_count(array_to_string(
+           (string_to_array(ch.content, E'\n\n'))[1 : greatest(coalesce(p_paragraph, 0), 0) + 1], E'\n'))
+    into v_book, v_words
+  from public.chapters ch where ch.id = p_chapter_id;
   if v_book is null then
     raise exception 'Chapter % not found', p_chapter_id using hint = 'chapter_not_found';
   end if;
@@ -6027,8 +6042,8 @@ begin
   end if;
 
   if v_row.id is null then
-    insert into public.reading_sessions (user_id, chapter_id, book_id, start_time, end_time, last_heartbeat_at, max_paragraph, source)
-    values (p_user_id, p_chapter_id, v_book, now(), now(), now(), greatest(coalesce(p_paragraph, 0), 0), v_source)
+    insert into public.reading_sessions (user_id, chapter_id, book_id, start_time, end_time, last_heartbeat_at, max_paragraph, words_reached, source)
+    values (p_user_id, p_chapter_id, v_book, now(), now(), now(), greatest(coalesce(p_paragraph, 0), 0), v_words, v_source)
     returning * into v_row;
     return query select v_row.id, v_row.active_seconds;
     return;
@@ -6041,6 +6056,7 @@ begin
          last_heartbeat_at = now(),
          end_time = now(),
          max_paragraph = greatest(coalesce(s.max_paragraph, 0), coalesce(p_paragraph, 0)),
+         words_reached = greatest(coalesce(s.words_reached, 0), v_words),
          drop_off_offset = greatest(coalesce(p_paragraph, 0), 0),
          source = coalesce(s.source, v_source)
    where s.id = v_row.id
@@ -6320,3 +6336,1216 @@ $$;
 
 revoke execute on function public.get_contest_score_ranking(uuid, text, integer, integer, timestamptz, uuid) from public, anon, authenticated;
 grant execute on function public.get_contest_score_ranking(uuid, text, integer, integer, timestamptz, uuid) to service_role;
+
+-- --- Contest Engine Phase 2, Slice 2.3: hàng "Đang được chú ý", "Đang tăng
+-- tốc" và 2 nhóm ứng viên "Viên ngọc ẩn" (80/20 chọn ở src/lib/contests/signals.ts).
+-- Xem migrations/20260926_add_contest_signal_feeds.sql. ---
+
+create or replace function public.get_contest_signal_feed(
+  p_contest_id uuid,
+  p_kind text,          -- 'attention' | 'trending'
+  p_limit integer
+) returns table (
+  submission_id uuid,
+  book_id uuid,
+  valid_readers integer,
+  readers_7d integer,
+  readers_prev_7d integer
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if p_kind not in ('attention', 'trending') then
+    raise exception 'Unknown feed kind %', p_kind using hint = 'invalid_sort';
+  end if;
+
+  return query
+  select s.id, s.book_id, sc.valid_readers, sc.readers_7d, sc.readers_prev_7d
+  from public.contest_submissions s
+  join public.contests c on c.id = s.contest_id and c.status <> 'draft'
+  join public.books b on b.id = s.book_id and b.published and b.deleted_at is null
+  join public.contest_submission_scores sc on sc.submission_id = s.id
+  where s.contest_id = p_contest_id
+    and s.status in ('eligible', 'shortlisted')
+    and (case when p_kind = 'attention' then sc.valid_readers else sc.readers_7d end) > 0
+  order by (case when p_kind = 'attention' then sc.valid_readers else sc.readers_7d end) desc,
+           s.submitted_at asc, s.id asc
+  limit least(greatest(coalesce(p_limit, 10), 1), 50);
+end;
+$$;
+
+revoke execute on function public.get_contest_signal_feed(uuid, text, integer) from public, anon, authenticated;
+grant execute on function public.get_contest_signal_feed(uuid, text, integer) to service_role;
+
+create or replace function public.get_contest_hidden_gem_pools(
+  p_contest_id uuid,
+  p_seed text,
+  p_max_readers integer,
+  p_pool_limit integer
+) returns table (
+  submission_id uuid,
+  book_id uuid,
+  pool text             -- 'low_readers' | 'low_views'
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with entries as (
+    select s.id, s.book_id, s.submitted_at, b.view_count,
+           coalesce(sc.valid_readers, 0) as readers
+    from public.contest_submissions s
+    join public.contests c on c.id = s.contest_id and c.status <> 'draft'
+    join public.books b on b.id = s.book_id and b.published and b.deleted_at is null
+    left join public.contest_submission_scores sc on sc.submission_id = s.id
+    where s.contest_id = p_contest_id
+      and s.status in ('eligible', 'shortlisted')
+  ),
+  top_views as (
+    select e.id from entries e
+    order by e.view_count desc, e.submitted_at asc, e.id asc
+    limit 10
+  ),
+  low_readers as (
+    select e.id, e.book_id, 'low_readers'::text as pool
+    from entries e
+    where e.readers < p_max_readers
+    order by md5(e.id::text || p_seed)
+    limit least(greatest(coalesce(p_pool_limit, 20), 1), 50)
+  ),
+  low_views as (
+    select e.id, e.book_id, 'low_views'::text as pool
+    from entries e
+    where e.id not in (select t.id from top_views t)
+    order by md5(e.id::text || p_seed)
+    limit least(greatest(coalesce(p_pool_limit, 20), 1), 50)
+  )
+  select id, book_id, pool from low_readers
+  union all
+  select id, book_id, pool from low_views;
+$$;
+
+revoke execute on function public.get_contest_hidden_gem_pools(uuid, text, integer, integer) from public, anon, authenticated;
+grant execute on function public.get_contest_hidden_gem_pools(uuid, text, integer, integer) to service_role;
+
+-- --- Contest Engine Phase 2, Slice 2.4: phát hiện tín hiệu gian lận (bình
+-- chọn dồn dập, tài khoản vừa đủ tuổi bầu hàng loạt) + admin xét. Hệ thống chỉ
+-- gắn tín hiệu; chỉ tín hiệu đã xác nhận mới loại khỏi điểm (P10). Xem
+-- migrations/20260926_add_contest_fraud_detection.sql. ---
+
+create unique index if not exists contest_fraud_signals_dedupe_idx
+  on public.contest_fraud_signals (
+    contest_id,
+    signal_code,
+    coalesce(user_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    coalesce(submission_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  );
+
+-- Trả số tín hiệu mới. Chỉ quét cuộc thi đang/đã bình chọn chưa công bố.
+create or replace function public.detect_contest_fraud_signals(
+  p_contest_id uuid,
+  p_rapid_votes integer,
+  p_rapid_minutes integer,
+  p_new_account_grace_days integer,
+  p_new_account_votes integer
+) returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_contest public.contests;
+  v_min_age integer;
+  v_created integer := 0;
+  v_rows integer;
+begin
+  select * into v_contest from public.contests where id = p_contest_id;
+  if not found then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+  if v_contest.status not in ('community_voting', 'judging') then
+    return 0;
+  end if;
+  -- Hai lần quét cùng lúc (admin + cron) không gắn trùng.
+  perform pg_advisory_xact_lock(hashtext('contest_fraud:' || p_contest_id::text));
+  v_min_age := coalesce((v_contest.vote_rules ->> 'min_account_age_days')::integer, 7);
+
+  -- rapid_voting: cửa sổ bắt đầu ở mỗi phiếu, lấy cửa sổ đông nhất của từng người.
+  with windows as (
+    select v1.user_id, v1.created_at as window_start,
+           (select count(*) from public.contest_votes v2
+             where v2.contest_id = p_contest_id and v2.user_id = v1.user_id
+               and v2.created_at >= v1.created_at
+               and v2.created_at < v1.created_at + make_interval(mins => p_rapid_minutes))::integer as n
+    from public.contest_votes v1
+    where v1.contest_id = p_contest_id
+  ),
+  best as (
+    select distinct on (w.user_id) w.user_id, w.window_start, w.n
+    from windows w
+    order by w.user_id, w.n desc, w.window_start
+  )
+  insert into public.contest_fraud_signals (contest_id, user_id, signal_code, severity, evidence)
+  select p_contest_id, b.user_id, 'rapid_voting',
+         case when b.n >= 2 * p_rapid_votes then 'high' else 'medium' end,
+         jsonb_build_object('votes_in_window', b.n, 'window_minutes', p_rapid_minutes, 'window_start', b.window_start)
+  from best b
+  where b.n >= p_rapid_votes
+    and not exists (
+      select 1 from public.contest_fraud_signals f
+      where f.contest_id = p_contest_id and f.signal_code = 'rapid_voting'
+        and f.user_id = b.user_id and f.submission_id is null
+    );
+  get diagnostics v_rows = row_count;
+  v_created := v_created + v_rows;
+
+  insert into public.contest_fraud_signals (contest_id, user_id, signal_code, severity, evidence)
+  select p_contest_id, s.user_id, 'new_account_mass_voting', 'medium',
+         jsonb_build_object(
+           'account_created_at', u.created_at,
+           'first_vote_at', s.first_vote,
+           'account_age_days_at_first_vote', round((extract(epoch from (s.first_vote - u.created_at)) / 86400.0)::numeric, 1),
+           'votes', s.votes)
+  from (
+    select v.user_id, min(v.created_at) as first_vote, count(*)::integer as votes
+    from public.contest_votes v
+    where v.contest_id = p_contest_id
+    group by v.user_id
+  ) s
+  join auth.users u on u.id = s.user_id
+  where s.votes >= p_new_account_votes
+    and s.first_vote < u.created_at + make_interval(days => v_min_age + p_new_account_grace_days)
+    and not exists (
+      select 1 from public.contest_fraud_signals f
+      where f.contest_id = p_contest_id and f.signal_code = 'new_account_mass_voting'
+        and f.user_id = s.user_id and f.submission_id is null
+    );
+  get diagnostics v_rows = row_count;
+  v_created := v_created + v_rows;
+
+  return v_created;
+end;
+$$;
+
+revoke execute on function public.detect_contest_fraud_signals(uuid, integer, integer, integer, integer) from public, anon, authenticated;
+grant execute on function public.detect_contest_fraud_signals(uuid, integer, integer, integer, integer) to service_role;
+
+-- Admin xác nhận / bỏ qua / mở lại một tín hiệu. Khoá khi bảng điểm đã chốt
+-- (đã công bố kết quả) — quyết định lúc đó không còn tác dụng lên điểm.
+create or replace function public.review_contest_fraud_signal(
+  p_signal_id uuid,
+  p_admin_id uuid,
+  p_status text,          -- 'confirmed' | 'dismissed' | 'open'
+  p_note text
+) returns public.contest_fraud_signals
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_signal public.contest_fraud_signals;
+  v_contest_status public.contest_status;
+begin
+  if not exists (select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')) then
+    raise exception 'Actor is not an admin' using hint = 'not_admin';
+  end if;
+  if p_status is null or p_status not in ('confirmed', 'dismissed', 'open') then
+    raise exception 'Invalid review status %', p_status using hint = 'invalid_input';
+  end if;
+
+  select * into v_signal from public.contest_fraud_signals where id = p_signal_id for update;
+  if not found then
+    raise exception 'Signal % not found', p_signal_id using hint = 'signal_not_found';
+  end if;
+  select status into v_contest_status from public.contests where id = v_signal.contest_id;
+  if v_contest_status in ('results', 'archived') or exists (
+    select 1 from public.contest_score_state st where st.contest_id = v_signal.contest_id and st.frozen_at is not null
+  ) then
+    raise exception 'Scores are frozen' using hint = 'signal_locked';
+  end if;
+
+  update public.contest_fraud_signals
+     set status = p_status,
+         reviewed_by = case when p_status = 'open' then null else p_admin_id end,
+         reviewed_at = case when p_status = 'open' then null else now() end,
+         review_note = nullif(btrim(coalesce(p_note, '')), '')
+   where id = p_signal_id
+  returning * into v_signal;
+  return v_signal;
+end;
+$$;
+
+revoke execute on function public.review_contest_fraud_signal(uuid, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.review_contest_fraud_signal(uuid, uuid, text, text) to service_role;
+
+-- --- Contest Engine Phase 2, Slice 2.7: thống kê bài dự thi cho tác giả
+-- (không dùng lượt xem trang; số phiếu do route ẩn/hiện theo P9). Xem
+-- migrations/20260926_add_contest_entry_stats.sql. ---
+
+create or replace function public.get_contest_entry_stats(p_submission_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_sub public.contest_submissions;
+  v_start timestamptz;
+  v_result jsonb;
+begin
+  select * into v_sub from public.contest_submissions where id = p_submission_id;
+  if not found then
+    raise exception 'Submission % not found', p_submission_id using hint = 'submission_not_found';
+  end if;
+  select submission_start into v_start from public.contests where id = v_sub.contest_id;
+
+  with chapters as (
+    select ch.id, ch.title, ch.order_index,
+           row_number() over (order by ch.order_index, ch.id) as pos
+    from public.chapters ch
+    where ch.book_id = v_sub.book_id and ch.published and ch.removed_at is null
+  ),
+  sessions as (
+    select rs.user_id, rs.chapter_id, rs.active_seconds, rs.start_time, rs.source
+    from public.reading_sessions rs
+    where rs.book_id = v_sub.book_id
+      and rs.start_time >= v_start
+      and rs.user_id <> v_sub.author_id
+      and rs.active_seconds > 0
+  ),
+  readers as (
+    select s.user_id,
+           count(distinct (s.start_time at time zone 'Asia/Ho_Chi_Minh')::date) as days
+    from sessions s
+    group by s.user_id
+  ),
+  chapter_readers as (
+    select distinct s.user_id, c.pos
+    from sessions s
+    join chapters c on c.id = s.chapter_id
+  ),
+  funnel as (
+    select c.id, c.title, c.pos, count(cr.user_id)::integer as readers
+    from chapters c
+    left join chapter_readers cr on cr.pos = c.pos
+    where c.pos <= 50
+    group by c.id, c.title, c.pos
+  ),
+  continuation as (
+    select a.pos,
+           count(*)::numeric as prev_readers,
+           count(b.user_id)::numeric as kept
+    from chapter_readers a
+    left join chapter_readers b on b.user_id = a.user_id and b.pos = a.pos + 1
+    where a.pos < (select max(pos) from chapters)
+    group by a.pos
+  ),
+  first_source as (
+    select distinct on (s.user_id) s.user_id, coalesce(s.source, 'other') as source
+    from sessions s
+    order by s.user_id, s.start_time
+  ),
+  last_chapter as (
+    select c.id from chapters c order by c.pos desc limit 1
+  ),
+  comments as (
+    select ac.user_id
+    from public.anchored_comments ac
+    join chapters c on c.id = ac.chapter_id
+    where ac.created_at >= v_start and ac.user_id <> v_sub.author_id
+  ),
+  follows as (
+    select f.created_at
+    from public.author_follows f
+    where f.author_id = v_sub.author_id and f.created_at >= v_start
+  )
+  select jsonb_build_object(
+    'since', v_start,
+    'chapter_count', (select count(*) from chapters),
+    'readers', (select count(*) from readers),
+    'return_readers', (select count(*) from readers where days >= 2),
+    'completed_readers', (
+      select count(distinct rh.user_id) from public.reading_history rh
+      where rh.chapter_id = (select id from last_chapter)
+        and rh.read_at >= v_start and rh.user_id <> v_sub.author_id),
+    'continue_rate', (
+      select case when (select count(*) from chapters) < 2 or count(*) = 0 then null
+                  else round(avg(kept / prev_readers), 4) end
+      from continuation),
+    'avg_session_seconds', (select round(avg(active_seconds))::integer from sessions),
+    'sources', coalesce((
+      select jsonb_agg(jsonb_build_object('source', x.source, 'readers', x.n) order by x.n desc, x.source)
+      from (select source, count(*)::integer as n from first_source group by source) x), '[]'::jsonb),
+    'funnel', coalesce((
+      select jsonb_agg(jsonb_build_object('chapter_id', f.id, 'title', f.title, 'position', f.pos, 'readers', f.readers) order by f.pos)
+      from funnel f), '[]'::jsonb),
+    'comments', (select count(*) from comments),
+    'commenters', (select count(distinct user_id) from comments),
+    'new_followers', (select count(*) from follows),
+    'new_followers_7d', (select count(*) from follows where created_at >= now() - interval '7 days'),
+    'valid_readers', (select sc.valid_readers from public.contest_submission_scores sc where sc.submission_id = p_submission_id),
+    'readers_7d', (select sc.readers_7d from public.contest_submission_scores sc where sc.submission_id = p_submission_id)
+  ) into v_result;
+  return v_result;
+end;
+$$;
+
+revoke execute on function public.get_contest_entry_stats(uuid) from public, anon, authenticated;
+grant execute on function public.get_contest_entry_stats(uuid) to service_role;
+
+-- --- Contest Engine Slice 2.5a: thời gian sự kiện engagement do server đặt
+-- (không ghi lùi / ghi trước để rơi vào khung chấm). Xem
+-- migrations/20260926_add_scoring_tracking.sql. ---
+
+-- Thời gian sự kiện do server đặt: insert → now(); update → giữ giá trị cũ.
+create or replace function public.force_server_created_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.created_at := now();
+  else
+    new.created_at := old.created_at;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.force_server_added_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.added_at := now();
+  else
+    new.added_at := old.added_at;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists anchored_comments_server_time on public.anchored_comments;
+create trigger anchored_comments_server_time
+  before insert or update on public.anchored_comments
+  for each row execute function public.force_server_created_at();
+
+drop trigger if exists chapter_votes_server_time on public.chapter_votes;
+create trigger chapter_votes_server_time
+  before insert or update on public.chapter_votes
+  for each row execute function public.force_server_created_at();
+
+drop trigger if exists character_trope_votes_server_time on public.character_trope_votes;
+create trigger character_trope_votes_server_time
+  before insert or update on public.character_trope_votes
+  for each row execute function public.force_server_created_at();
+
+drop trigger if exists reading_list_items_server_time on public.reading_list_items;
+create trigger reading_list_items_server_time
+  before insert or update on public.reading_list_items
+  for each row execute function public.force_server_added_at();
+
+-- --- Contest Engine Slice 2.5b: khung chấm chính thức, cấu hình chấm có
+-- version, giám khảo, phiếu chấm theo tiêu chí + nhật ký. Xem
+-- migrations/20260926_add_contest_judging.sql. ---
+
+-- ---------------------------------------------------------------------
+-- 1. Khung chấm chính thức + con trỏ version cấu hình
+-- ---------------------------------------------------------------------
+alter table public.contests
+  add column if not exists official_scoring_start timestamptz,
+  add column if not exists official_scoring_end timestamptz,
+  add column if not exists scoring_config_version integer;
+
+do $$ begin
+  alter table public.contests add constraint contests_official_scoring_window check (
+    (official_scoring_start is null) = (official_scoring_end is null)
+    and (official_scoring_start is null or official_scoring_start < official_scoring_end)
+    and (official_scoring_start is null or official_scoring_start >= submission_end));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  -- J2: khung bình chọn nằm trong khung chấm.
+  alter table public.contests add constraint contests_voting_within_scoring check (
+    official_scoring_start is null or voting_start is null or voting_end is null
+    or (voting_start >= official_scoring_start and voting_end <= official_scoring_end));
+exception when duplicate_object then null; end $$;
+
+create or replace function public.contests_guard_scoring_window()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if (new.official_scoring_start is distinct from old.official_scoring_start
+      or new.official_scoring_end is distinct from old.official_scoring_end)
+     and old.official_scoring_start is not null and now() >= old.official_scoring_start then
+    raise exception 'Official scoring window is locked once it has started' using hint = 'scoring_window_locked';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists contests_guard_scoring_window on public.contests;
+create trigger contests_guard_scoring_window
+  before update on public.contests
+  for each row execute function public.contests_guard_scoring_window();
+
+-- ---------------------------------------------------------------------
+-- 2. Cấu hình chấm có version
+-- ---------------------------------------------------------------------
+create table if not exists public.contest_scoring_configs (
+  contest_id uuid not null references public.contests (id) on delete cascade,
+  version integer not null check (version > 0),
+  config jsonb not null check (jsonb_typeof(config) = 'object' and jsonb_typeof(config -> 'rubric') = 'array'),
+  reason text,
+  created_by uuid not null references auth.users (id),
+  created_at timestamptz not null default now(),
+  primary key (contest_id, version)
+);
+
+-- Version trước đó (null = version đầu). Thêm riêng để chạy lại được trên DB
+-- đã có bảng từ bản migration trước (bản cập nhật J3, 27/09/2026 — mục 14).
+alter table public.contest_scoring_configs
+  add column if not exists previous_version integer;
+
+create or replace function public.contest_scoring_configs_immutable()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'Scoring config versions are immutable' using hint = 'scoring_config_immutable';
+end;
+$$;
+
+drop trigger if exists contest_scoring_configs_immutable on public.contest_scoring_configs;
+create trigger contest_scoring_configs_immutable
+  before update or delete on public.contest_scoring_configs
+  for each row execute function public.contest_scoring_configs_immutable();
+
+-- ---------------------------------------------------------------------
+-- 3. Giám khảo, phiếu chấm, nhật ký
+-- ---------------------------------------------------------------------
+create table if not exists public.contest_judges (
+  contest_id uuid not null references public.contests (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  assigned_by uuid not null references auth.users (id),
+  assigned_at timestamptz not null default now(),
+  removed_at timestamptz,
+  removed_by uuid references auth.users (id),
+  removed_reason text,
+  primary key (contest_id, user_id),
+  constraint contest_judges_removed_consistent check ((removed_at is null) = (removed_by is null))
+);
+
+create table if not exists public.contest_judge_scorecards (
+  id uuid primary key default gen_random_uuid(),
+  contest_id uuid not null,
+  submission_id uuid not null,
+  judge_id uuid not null references auth.users (id) on delete cascade,
+  status text not null default 'draft' check (status in ('draft', 'finalized', 'invalidated')),
+  total numeric(6, 2) not null default 0 check (total >= 0),
+  -- Version cấu hình (rubric) lúc lưu gần nhất.
+  config_version integer not null,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  finalized_at timestamptz,
+  invalidated_at timestamptz,
+  invalidated_by uuid references auth.users (id),
+  invalidated_reason text,
+  constraint contest_judge_scorecards_submission_fk foreign key (submission_id, contest_id)
+    references public.contest_submissions (id, contest_id) on delete cascade,
+  constraint contest_judge_scorecards_finalized check ((status = 'finalized') = (finalized_at is not null)),
+  constraint contest_judge_scorecards_invalidated check ((status = 'invalidated') = (invalidated_at is not null))
+);
+
+-- Mỗi giám khảo 1 phiếu còn hiệu lực / bài; phiếu đã huỷ giữ lại làm lịch sử.
+create unique index if not exists contest_judge_scorecards_active_key
+  on public.contest_judge_scorecards (contest_id, submission_id, judge_id) where status <> 'invalidated';
+create index if not exists contest_judge_scorecards_contest_idx
+  on public.contest_judge_scorecards (contest_id, submission_id);
+
+create table if not exists public.contest_judge_criterion_scores (
+  scorecard_id uuid not null references public.contest_judge_scorecards (id) on delete cascade,
+  criterion_code text not null check (criterion_code ~ '^[a-z0-9_]+$'),
+  score numeric(6, 2) not null check (score >= 0),
+  primary key (scorecard_id, criterion_code)
+);
+
+create table if not exists public.contest_judge_score_events (
+  id uuid primary key default gen_random_uuid(),
+  scorecard_id uuid not null references public.contest_judge_scorecards (id) on delete cascade,
+  contest_id uuid not null references public.contests (id) on delete cascade,
+  actor_id uuid not null references auth.users (id),
+  action text not null check (action in ('save_draft', 'finalize', 'reopen', 'invalidate')),
+  before jsonb,
+  after jsonb,
+  reason text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists contest_judge_score_events_scorecard_idx
+  on public.contest_judge_score_events (scorecard_id, created_at);
+
+alter table public.contest_scoring_configs enable row level security;
+alter table public.contest_judges enable row level security;
+alter table public.contest_judge_scorecards enable row level security;
+alter table public.contest_judge_criterion_scores enable row level security;
+alter table public.contest_judge_score_events enable row level security;
+revoke all on public.contest_scoring_configs, public.contest_judges, public.contest_judge_scorecards,
+  public.contest_judge_criterion_scores, public.contest_judge_score_events from anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- 4. RPC
+-- ---------------------------------------------------------------------
+-- Lưu version cấu hình mới (nội dung đã được TS kiểm). Trả version mới.
+create or replace function public.set_contest_scoring_config(
+  p_contest_id uuid,
+  p_admin_id uuid,
+  p_config jsonb,
+  p_reason text
+) returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_contest public.contests;
+  v_current jsonb;
+  v_version integer;
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+begin
+  if not exists (select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')) then
+    raise exception 'Actor is not an admin' using hint = 'not_admin';
+  end if;
+  select * into v_contest from public.contests where id = p_contest_id for update;
+  if not found then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+  if p_config is null or jsonb_typeof(p_config) <> 'object' or jsonb_typeof(p_config -> 'rubric') <> 'array' then
+    raise exception 'Invalid scoring config' using hint = 'invalid_input';
+  end if;
+  -- J11: từ lúc khung chấm bắt đầu, mỗi thay đổi phải có lý do.
+  if v_contest.official_scoring_start is not null and now() >= v_contest.official_scoring_start and v_reason is null then
+    raise exception 'A reason is required once scoring has started' using hint = 'reason_required';
+  end if;
+
+  select config into v_current from public.contest_scoring_configs
+  where contest_id = p_contest_id and version = v_contest.scoring_config_version;
+  if v_current is not null and (v_current -> 'rubric') is distinct from (p_config -> 'rubric') and exists (
+    select 1 from public.contest_judge_scorecards
+    where contest_id = p_contest_id and status <> 'invalidated'
+  ) then
+    raise exception 'Rubric cannot change after scoring has begun' using hint = 'rubric_locked';
+  end if;
+
+  select coalesce(max(version), 0) + 1 into v_version from public.contest_scoring_configs where contest_id = p_contest_id;
+  insert into public.contest_scoring_configs (contest_id, version, previous_version, config, reason, created_by)
+  values (p_contest_id, v_version, v_contest.scoring_config_version, p_config, v_reason, p_admin_id);
+  update public.contests set scoring_config_version = v_version where id = p_contest_id;
+  return v_version;
+end;
+$$;
+
+revoke execute on function public.set_contest_scoring_config(uuid, uuid, jsonb, text) from public, anon, authenticated;
+grant execute on function public.set_contest_scoring_config(uuid, uuid, jsonb, text) to service_role;
+
+-- Giám khảo lưu nháp / chốt phiếu. p_scores = {"criterion_code": điểm, ...}.
+create or replace function public.save_judge_scorecard(
+  p_contest_id uuid,
+  p_submission_id uuid,
+  p_judge_id uuid,
+  p_scores jsonb,
+  p_note text,
+  p_finalize boolean
+) returns public.contest_judge_scorecards
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_contest public.contests;
+  v_rubric jsonb;
+  v_card public.contest_judge_scorecards;
+  v_before jsonb;
+  v_key text;
+  v_value jsonb;
+  v_max numeric;
+  v_total numeric := 0;
+begin
+  select * into v_contest from public.contests where id = p_contest_id;
+  if not found then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+  if not exists (
+    select 1 from public.contest_judges where contest_id = p_contest_id and user_id = p_judge_id and removed_at is null
+  ) then
+    raise exception 'Not a judge of this contest' using hint = 'not_judge';
+  end if;
+  if v_contest.status not in ('submission_closed', 'community_voting', 'judging') then
+    raise exception 'Judging is not open' using hint = 'judging_closed';
+  end if;
+  if not exists (
+    select 1 from public.contest_submissions
+    where id = p_submission_id and contest_id = p_contest_id and status in ('eligible', 'shortlisted')
+  ) then
+    raise exception 'Entry cannot be judged' using hint = 'entry_not_judgeable';
+  end if;
+  select config -> 'rubric' into v_rubric from public.contest_scoring_configs
+  where contest_id = p_contest_id and version = v_contest.scoring_config_version;
+  if v_rubric is null then
+    raise exception 'Scoring config is missing' using hint = 'scoring_config_missing';
+  end if;
+
+  if p_scores is null or jsonb_typeof(p_scores) <> 'object' then
+    raise exception 'Scores must be an object' using hint = 'invalid_scores';
+  end if;
+  for v_key, v_value in select key, value from jsonb_each(p_scores) loop
+    select (r ->> 'max')::numeric into v_max from jsonb_array_elements(v_rubric) r where r ->> 'code' = v_key;
+    if v_max is null or jsonb_typeof(v_value) <> 'number' or (v_value #>> '{}')::numeric < 0 or (v_value #>> '{}')::numeric > v_max then
+      raise exception 'Invalid score for %', v_key using hint = 'invalid_scores';
+    end if;
+    v_total := v_total + round((v_value #>> '{}')::numeric, 2);
+  end loop;
+  if p_finalize and exists (
+    select 1 from jsonb_array_elements(v_rubric) r where not (p_scores ? (r ->> 'code'))
+  ) then
+    raise exception 'Every criterion needs a score before finalizing' using hint = 'invalid_scores';
+  end if;
+
+  select * into v_card from public.contest_judge_scorecards
+  where contest_id = p_contest_id and submission_id = p_submission_id and judge_id = p_judge_id and status <> 'invalidated'
+  for update;
+  if v_card.id is not null and v_card.status = 'finalized' then
+    raise exception 'Scorecard is finalized' using hint = 'scorecard_finalized';
+  end if;
+
+  if v_card.id is null then
+    insert into public.contest_judge_scorecards (contest_id, submission_id, judge_id, config_version)
+    values (p_contest_id, p_submission_id, p_judge_id, v_contest.scoring_config_version)
+    returning * into v_card;
+  else
+    select jsonb_build_object('status', v_card.status, 'total', v_card.total, 'note', v_card.note,
+             'scores', coalesce((select jsonb_object_agg(criterion_code, score) from public.contest_judge_criterion_scores where scorecard_id = v_card.id), '{}'::jsonb))
+      into v_before;
+  end if;
+
+  delete from public.contest_judge_criterion_scores where scorecard_id = v_card.id;
+  insert into public.contest_judge_criterion_scores (scorecard_id, criterion_code, score)
+  select v_card.id, key, round((value #>> '{}')::numeric, 2) from jsonb_each(p_scores);
+
+  update public.contest_judge_scorecards
+     set total = v_total,
+         status = case when p_finalize then 'finalized' else 'draft' end,
+         finalized_at = case when p_finalize then now() else null end,
+         config_version = v_contest.scoring_config_version,
+         note = nullif(btrim(coalesce(p_note, '')), ''),
+         updated_at = now()
+   where id = v_card.id
+  returning * into v_card;
+
+  insert into public.contest_judge_score_events (scorecard_id, contest_id, actor_id, action, before, after)
+  values (v_card.id, p_contest_id, p_judge_id, case when p_finalize then 'finalize' else 'save_draft' end, v_before,
+          jsonb_build_object('status', v_card.status, 'total', v_card.total, 'note', v_card.note, 'scores', p_scores));
+  return v_card;
+end;
+$$;
+
+revoke execute on function public.save_judge_scorecard(uuid, uuid, uuid, jsonb, text, boolean) from public, anon, authenticated;
+grant execute on function public.save_judge_scorecard(uuid, uuid, uuid, jsonb, text, boolean) to service_role;
+
+-- Admin mở lại (finalized → draft, giám khảo sửa tiếp) hoặc huỷ phiếu. Luôn kèm lý do.
+create or replace function public.review_judge_scorecard(
+  p_scorecard_id uuid,
+  p_admin_id uuid,
+  p_action text,          -- 'reopen' | 'invalidate'
+  p_reason text
+) returns public.contest_judge_scorecards
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_card public.contest_judge_scorecards;
+  v_before jsonb;
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+begin
+  if not exists (select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')) then
+    raise exception 'Actor is not an admin' using hint = 'not_admin';
+  end if;
+  if p_action is null or p_action not in ('reopen', 'invalidate') then
+    raise exception 'Invalid action %', p_action using hint = 'invalid_input';
+  end if;
+  if v_reason is null then
+    raise exception 'A reason is required' using hint = 'reason_required';
+  end if;
+  select * into v_card from public.contest_judge_scorecards where id = p_scorecard_id for update;
+  if not found then
+    raise exception 'Scorecard % not found', p_scorecard_id using hint = 'scorecard_not_found';
+  end if;
+  if (p_action = 'reopen' and v_card.status <> 'finalized') or (p_action = 'invalidate' and v_card.status = 'invalidated') then
+    raise exception 'Scorecard cannot % from %', p_action, v_card.status using hint = 'invalid_status_transition';
+  end if;
+  v_before := jsonb_build_object('status', v_card.status, 'total', v_card.total);
+
+  update public.contest_judge_scorecards
+     set status = case when p_action = 'reopen' then 'draft' else 'invalidated' end,
+         finalized_at = null,
+         invalidated_at = case when p_action = 'invalidate' then now() else null end,
+         invalidated_by = case when p_action = 'invalidate' then p_admin_id else null end,
+         invalidated_reason = case when p_action = 'invalidate' then v_reason else null end,
+         updated_at = now()
+   where id = p_scorecard_id
+  returning * into v_card;
+
+  insert into public.contest_judge_score_events (scorecard_id, contest_id, actor_id, action, before, after, reason)
+  values (v_card.id, v_card.contest_id, p_admin_id, p_action, v_before,
+          jsonb_build_object('status', v_card.status, 'total', v_card.total), v_reason);
+  return v_card;
+end;
+$$;
+
+revoke execute on function public.review_judge_scorecard(uuid, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.review_judge_scorecard(uuid, uuid, text, text) to service_role;
+
+-- --- Contest Engine Slice 2.6a: số liệu chấm chung cuộc trong khung chấm +
+-- lượt tính / snapshot mọi tầng. Engine tính điểm ở
+-- src/lib/contests/final-scoring/engine.ts. Xem migrations/20260926_add_final_scoring.sql. ---
+
+create or replace function public.get_contest_scoring_metrics(p_contest_id uuid)
+returns table (
+  submission_id uuid,
+  submitted_at timestamptz,
+  has_snapshot boolean,
+  valid_readers integer,
+  reader_depths double precision[],
+  returning_readers integer,
+  engaged_readers integer,
+  valid_votes integer,
+  judge_totals numeric[],
+  active_judges integer
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+declare
+  v_contest public.contests;
+  v_cfg jsonb;
+  v_start timestamptz;
+  v_end timestamptz;
+  v_ratio numeric;
+  v_min_seconds numeric;
+  v_wpm numeric;
+  v_max_wpm numeric;
+  v_gap interval;
+  v_min_active numeric;
+  v_actions text[];
+begin
+  select * into v_contest from public.contests where id = p_contest_id;
+  if not found then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+  if v_contest.official_scoring_start is null then
+    raise exception 'Official scoring window is not set' using hint = 'scoring_window_missing';
+  end if;
+  select config into v_cfg from public.contest_scoring_configs
+  where contest_id = p_contest_id and version = v_contest.scoring_config_version;
+  if v_cfg is null then
+    raise exception 'Scoring config is missing' using hint = 'scoring_config_missing';
+  end if;
+
+  v_start := v_contest.official_scoring_start;
+  v_end := v_contest.official_scoring_end;
+  v_ratio := (v_cfg #>> '{valid_reader,meaningful_read_ratio}')::numeric;
+  v_min_seconds := (v_cfg #>> '{valid_reader,meaningful_read_min_seconds}')::numeric;
+  v_wpm := (v_cfg #>> '{valid_reader,reading_words_per_minute}')::numeric;
+  v_max_wpm := (v_cfg #>> '{reading_depth,max_words_per_minute}')::numeric;
+  v_gap := make_interval(mins => (v_cfg #>> '{return_visit,min_gap_minutes}')::integer);
+  v_min_active := (v_cfg #>> '{return_visit,min_active_seconds}')::numeric;
+  v_actions := array(select jsonb_array_elements_text(v_cfg -> 'engagement_actions'));
+
+  return query
+  with entries as (
+    select s.id as sub_id, s.book_id, s.author_id, s.submitted_at as sub_at,
+           snap.id as snap_id, snap.total_words
+    from public.contest_submissions s
+    join public.books b on b.id = s.book_id and b.published and b.deleted_at is null
+    left join public.contest_submission_snapshots snap on snap.submission_id = s.id and snap.reason = 'submission_closed'
+    where s.contest_id = p_contest_id and s.status in ('eligible', 'shortlisted')
+  ),
+  snap_ch as (
+    select e.sub_id, sc.chapter_id, sc.word_count
+    from entries e
+    join public.contest_submission_snapshot_chapters sc on sc.snapshot_id = e.snap_id
+    where sc.chapter_id is not null
+  ),
+  fraud as (
+    select f.user_id as f_user, f.submission_id as f_sub
+    from public.contest_fraud_signals f
+    where f.contest_id = p_contest_id and f.status = 'confirmed' and f.user_id is not null
+  ),
+  sess as (
+    select e.sub_id, rs.user_id as uid, rs.chapter_id as ch_id, rs.active_seconds as act,
+           rs.start_time as st, rs.end_time as en, coalesce(rs.words_reached, 0) as reached, rs.id as sid
+    from entries e
+    join public.reading_sessions rs on rs.book_id = e.book_id
+    where rs.start_time >= v_start and rs.start_time < v_end
+      and rs.user_id <> e.author_id
+      and rs.active_seconds > 0
+      and not exists (select 1 from fraud f where f.f_user = rs.user_id and (f.f_sub is null or f.f_sub = e.sub_id))
+  ),
+  per_chapter as (
+    select s.sub_id, s.uid, s.ch_id, sum(s.act) as act, max(s.reached) as reached, sc.word_count as words
+    from sess s
+    join snap_ch sc on sc.sub_id = s.sub_id and sc.chapter_id = s.ch_id
+    group by s.sub_id, s.uid, s.ch_id, sc.word_count
+  ),
+  valid as (
+    select distinct pc.sub_id, pc.uid
+    from per_chapter pc
+    where pc.act >= greatest(v_min_seconds, ceil(v_ratio * pc.words * 60.0 / v_wpm))
+  ),
+  depth as (
+    select v.sub_id, v.uid,
+           least(1.0, coalesce(
+             sum(least(pc.reached::numeric, pc.act * v_max_wpm / 60.0, pc.words::numeric)) / nullif(max(e.total_words), 0),
+             0)) as d
+    from valid v
+    join per_chapter pc on pc.sub_id = v.sub_id and pc.uid = v.uid
+    join entries e on e.sub_id = v.sub_id
+    group by v.sub_id, v.uid
+  ),
+  ordered as (
+    select s.sub_id, s.uid, s.act, s.st, s.sid,
+           case when lag(s.en) over w is null or s.st - lag(s.en) over w >= v_gap then 1 else 0 end as new_visit
+    from sess s
+    join valid v on v.sub_id = s.sub_id and v.uid = s.uid
+    window w as (partition by s.sub_id, s.uid order by s.st, s.sid)
+  ),
+  visits as (
+    select o.sub_id, o.uid, o.act,
+           sum(o.new_visit) over (partition by o.sub_id, o.uid order by o.st, o.sid rows between unbounded preceding and current row) as visit_no
+    from ordered o
+  ),
+  returners as (
+    select x.sub_id, x.uid
+    from (select vi.sub_id, vi.uid, vi.visit_no, sum(vi.act) as act from visits vi group by vi.sub_id, vi.uid, vi.visit_no) x
+    where x.act >= v_min_active
+    group by x.sub_id, x.uid
+    having count(*) >= 2
+  ),
+  book_chapters as (
+    select e.sub_id, ch.id as ch_id from entries e join public.chapters ch on ch.book_id = e.book_id
+  ),
+  actions as (
+    select bc.sub_id, ac.user_id as uid
+    from public.anchored_comments ac join book_chapters bc on bc.ch_id = ac.chapter_id
+    where 'comment' = any(v_actions) and ac.created_at >= v_start and ac.created_at < v_end
+    union
+    select bc.sub_id, cv.user_id
+    from public.chapter_votes cv join book_chapters bc on bc.ch_id = cv.chapter_id
+    where 'chapter_vote' = any(v_actions) and cv.created_at >= v_start and cv.created_at < v_end
+    union
+    select bc.sub_id, tv.user_id
+    from public.character_trope_votes tv join book_chapters bc on bc.ch_id = tv.chapter_id
+    where 'character_vote' = any(v_actions) and tv.created_at >= v_start and tv.created_at < v_end
+    union
+    select e.sub_id, rl.user_id
+    from public.reading_list_items li
+    join public.reading_lists rl on rl.id = li.list_id
+    join entries e on e.book_id = li.book_id
+    where 'reading_list' = any(v_actions) and li.added_at >= v_start and li.added_at < v_end
+    union
+    select e.sub_id, fo.follower_id
+    from public.author_follows fo join entries e on e.author_id = fo.author_id
+    where 'author_follow' = any(v_actions) and fo.created_at >= v_start and fo.created_at < v_end
+  ),
+  engaged as (
+    select distinct a.sub_id, a.uid from actions a join valid v on v.sub_id = a.sub_id and v.uid = a.uid
+  ),
+  votes as (
+    select cv.submission_id as sub_id, count(*)::integer as n
+    from public.contest_votes cv
+    join valid v on v.sub_id = cv.submission_id and v.uid = cv.user_id
+    where cv.contest_id = p_contest_id and cv.created_at >= v_start and cv.created_at < v_end
+    group by cv.submission_id
+  ),
+  judges as (
+    select j.user_id as jid from public.contest_judges j where j.contest_id = p_contest_id and j.removed_at is null
+  ),
+  judge_cards as (
+    select c.submission_id as sub_id, array_agg(c.total order by c.judge_id) as totals
+    from public.contest_judge_scorecards c
+    join judges j on j.jid = c.judge_id
+    where c.contest_id = p_contest_id and c.status = 'finalized'
+    group by c.submission_id
+  )
+  select e.sub_id,
+         e.sub_at,
+         e.snap_id is not null,
+         (select count(*) from valid v where v.sub_id = e.sub_id)::integer,
+         coalesce((select array_agg(d.d::double precision order by d.uid) from depth d where d.sub_id = e.sub_id), '{}'::double precision[]),
+         (select count(*) from returners r where r.sub_id = e.sub_id)::integer,
+         (select count(*) from engaged g where g.sub_id = e.sub_id)::integer,
+         coalesce((select vo.n from votes vo where vo.sub_id = e.sub_id), 0),
+         coalesce(jc.totals, '{}'::numeric[]),
+         (select count(*) from judges)::integer
+  from entries e
+  left join judge_cards jc on jc.sub_id = e.sub_id
+  order by e.sub_at, e.sub_id;
+end;
+$$;
+
+revoke execute on function public.get_contest_scoring_metrics(uuid) from public, anon, authenticated;
+grant execute on function public.get_contest_scoring_metrics(uuid) to service_role;
+
+-- ---------------------------------------------------------------------
+-- Lượt tính + snapshot (mọi tầng — J3 mục 16)
+-- ---------------------------------------------------------------------
+create table if not exists public.contest_score_runs (
+  id uuid primary key default gen_random_uuid(),
+  contest_id uuid not null references public.contests (id) on delete cascade,
+  config_version integer not null,
+  kind text not null check (kind in ('preview', 'final')),
+  window_start timestamptz not null,
+  window_end timestamptz not null,
+  -- sha256 của (config + số liệu thô): cùng digest + cùng version → cùng kết quả.
+  input_digest text not null,
+  flags jsonb not null default '[]'::jsonb check (jsonb_typeof(flags) = 'array'),
+  computed_by uuid not null references auth.users (id),
+  computed_at timestamptz not null default now(),
+  -- Slice 2.6b: công bố / thay thế.
+  published_at timestamptz,
+  published_by uuid references auth.users (id),
+  superseded_at timestamptz,
+  publish_reason text,
+  constraint contest_score_runs_config_fk foreign key (contest_id, config_version)
+    references public.contest_scoring_configs (contest_id, version)
+);
+
+create index if not exists contest_score_runs_contest_idx on public.contest_score_runs (contest_id, computed_at desc);
+
+create table if not exists public.contest_score_snapshots (
+  run_id uuid not null references public.contest_score_runs (id) on delete cascade,
+  submission_id uuid not null,
+  rank integer not null check (rank > 0),
+  tied boolean not null default false,
+  submitted_at timestamptz not null,
+  -- Reader
+  valid_readers integer not null,
+  reader_transformed numeric not null,
+  reader_score numeric not null,
+  -- Reading quality
+  reader_depth_count integer not null,
+  aggregated_depth numeric not null,
+  adjusted_depth numeric not null,
+  depth_score numeric not null,
+  returning_readers integer not null,
+  raw_return_rate numeric not null,
+  adjusted_return_rate numeric not null,
+  return_score numeric not null,
+  reading_quality_score numeric not null,
+  -- Engagement
+  engaged_readers integer not null,
+  raw_engagement_rate numeric not null,
+  adjusted_engagement_rate numeric not null,
+  engagement_score numeric not null,
+  -- Vote
+  valid_votes integer not null,
+  raw_vote_rate numeric not null,
+  adjusted_vote_rate numeric not null,
+  vote_score numeric not null,
+  -- Judge + tổng
+  judge_count integer not null,
+  judge_score numeric,
+  system_score numeric not null,
+  final_score numeric not null,
+  -- Đề xuất giải [{code, name, kind: main | special}] — admin xác nhận ở Slice 2.6b.
+  awards jsonb not null default '[]'::jsonb check (jsonb_typeof(awards) = 'array'),
+  primary key (run_id, submission_id)
+);
+
+alter table public.contest_score_runs enable row level security;
+alter table public.contest_score_snapshots enable row level security;
+revoke all on public.contest_score_runs, public.contest_score_snapshots from anon, authenticated;
+
+-- Lượt tính / snapshot bất biến (chỉ cột công bố của run được đổi — Slice 2.6b).
+create or replace function public.contest_score_snapshots_immutable()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'Score snapshots are immutable' using hint = 'score_run_immutable';
+end;
+$$;
+
+drop trigger if exists contest_score_snapshots_immutable on public.contest_score_snapshots;
+create trigger contest_score_snapshots_immutable
+  before update or delete on public.contest_score_snapshots
+  for each row execute function public.contest_score_snapshots_immutable();
+
+-- p_run: { kind, config_version, input_digest, flags: [...], rows: [ {...cột snapshot} ] }
+create or replace function public.save_contest_score_run(
+  p_contest_id uuid,
+  p_admin_id uuid,
+  p_run jsonb
+) returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_contest public.contests;
+  v_kind text := p_run ->> 'kind';
+  v_version integer := (p_run ->> 'config_version')::integer;
+  v_run uuid;
+begin
+  if not exists (select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')) then
+    raise exception 'Actor is not an admin' using hint = 'not_admin';
+  end if;
+  select * into v_contest from public.contests where id = p_contest_id for update;
+  if not found then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+  if v_contest.official_scoring_start is null then
+    raise exception 'Official scoring window is not set' using hint = 'scoring_window_missing';
+  end if;
+  if v_kind is null or v_kind not in ('preview', 'final') then
+    raise exception 'Invalid run kind' using hint = 'invalid_input';
+  end if;
+  -- J3 mục 15: dữ liệu thật chỉ tính bằng version đang áp dụng.
+  if v_version is distinct from v_contest.scoring_config_version then
+    raise exception 'Runs must use the active scoring config version' using hint = 'score_run_stale';
+  end if;
+  if now() < v_contest.official_scoring_start then
+    raise exception 'Scoring window has not started' using hint = 'scoring_not_started';
+  end if;
+  if v_kind = 'final' and now() < v_contest.official_scoring_end then
+    raise exception 'Final runs need the scoring window to be over' using hint = 'scoring_not_finished';
+  end if;
+
+  insert into public.contest_score_runs (contest_id, config_version, kind, window_start, window_end, input_digest, flags, computed_by)
+  values (p_contest_id, v_version, v_kind, v_contest.official_scoring_start, v_contest.official_scoring_end,
+          p_run ->> 'input_digest', coalesce(p_run -> 'flags', '[]'::jsonb), p_admin_id)
+  returning id into v_run;
+
+  insert into public.contest_score_snapshots
+  select v_run, r.*
+  from jsonb_to_recordset(coalesce(p_run -> 'rows', '[]'::jsonb)) as r (
+    submission_id uuid, rank integer, tied boolean, submitted_at timestamptz,
+    valid_readers integer, reader_transformed numeric, reader_score numeric,
+    reader_depth_count integer, aggregated_depth numeric, adjusted_depth numeric, depth_score numeric,
+    returning_readers integer, raw_return_rate numeric, adjusted_return_rate numeric, return_score numeric,
+    reading_quality_score numeric,
+    engaged_readers integer, raw_engagement_rate numeric, adjusted_engagement_rate numeric, engagement_score numeric,
+    valid_votes integer, raw_vote_rate numeric, adjusted_vote_rate numeric, vote_score numeric,
+    judge_count integer, judge_score numeric, system_score numeric, final_score numeric,
+    awards jsonb
+  );
+  -- Mọi dòng phải thuộc cuộc thi này.
+  if exists (
+    select 1 from public.contest_score_snapshots ss
+    where ss.run_id = v_run and not exists (
+      select 1 from public.contest_submissions s where s.id = ss.submission_id and s.contest_id = p_contest_id)
+  ) then
+    raise exception 'Snapshot rows must belong to the contest' using hint = 'invalid_input';
+  end if;
+  return v_run;
+end;
+$$;
+
+revoke execute on function public.save_contest_score_run(uuid, uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.save_contest_score_run(uuid, uuid, jsonb) to service_role;
+
+-- --- Contest Engine Slice 2.6b: công bố lượt tính chung cuộc (1 lượt đang công
+-- bố / cuộc thi; thay thế cần lý do, lượt cũ giữ lại). Xem
+-- migrations/20260926_add_score_run_publish.sql. ---
+
+create unique index if not exists contest_score_runs_one_published
+  on public.contest_score_runs (contest_id) where published_at is not null and superseded_at is null;
+
+create or replace function public.contest_score_runs_guard_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.contest_id is distinct from old.contest_id or new.config_version is distinct from old.config_version
+     or new.kind is distinct from old.kind or new.window_start is distinct from old.window_start
+     or new.window_end is distinct from old.window_end or new.input_digest is distinct from old.input_digest
+     or new.flags is distinct from old.flags or new.computed_by is distinct from old.computed_by
+     or new.computed_at is distinct from old.computed_at then
+    raise exception 'Score runs are immutable' using hint = 'score_run_immutable';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists contest_score_runs_guard_update on public.contest_score_runs;
+create trigger contest_score_runs_guard_update
+  before update on public.contest_score_runs
+  for each row execute function public.contest_score_runs_guard_update();
+
+create or replace function public.publish_contest_score_run(
+  p_run_id uuid,
+  p_admin_id uuid,
+  p_reason text
+) returns public.contest_score_runs
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_run public.contest_score_runs;
+  v_contest public.contests;
+  v_current uuid;
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+begin
+  if not exists (select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')) then
+    raise exception 'Actor is not an admin' using hint = 'not_admin';
+  end if;
+  select * into v_run from public.contest_score_runs where id = p_run_id for update;
+  if not found then
+    raise exception 'Score run % not found', p_run_id using hint = 'score_run_not_found';
+  end if;
+  select * into v_contest from public.contests where id = v_run.contest_id for update;
+  if v_run.kind <> 'final' then
+    raise exception 'Only final runs can be published' using hint = 'score_run_not_final';
+  end if;
+  if v_run.superseded_at is not null or v_run.published_at is not null then
+    raise exception 'Run was already published' using hint = 'invalid_status_transition';
+  end if;
+  if v_run.config_version is distinct from v_contest.scoring_config_version then
+    raise exception 'Run uses an old scoring config version' using hint = 'score_run_stale';
+  end if;
+
+  select id into v_current from public.contest_score_runs
+  where contest_id = v_run.contest_id and published_at is not null and superseded_at is null
+  for update;
+  if v_current is not null then
+    if v_reason is null then
+      raise exception 'A reason is required to replace published results' using hint = 'reason_required';
+    end if;
+    update public.contest_score_runs set superseded_at = now() where id = v_current;
+  end if;
+
+  update public.contest_score_runs
+     set published_at = now(), published_by = p_admin_id, publish_reason = v_reason
+   where id = p_run_id
+  returning * into v_run;
+  return v_run;
+end;
+$$;
+
+revoke execute on function public.publish_contest_score_run(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.publish_contest_score_run(uuid, uuid, text) to service_role;

@@ -4,9 +4,14 @@ import { useState } from "react";
 import { Tabs } from "@/components/ui";
 import { ContestAwardsPanel } from "@/components/admin/contests/contest-awards-panel";
 import { ContestForm } from "@/components/admin/contests/contest-form";
+import { ContestFraudPanel } from "@/components/admin/contests/contest-fraud-panel";
+import { ContestJudgingPanel } from "@/components/admin/contests/contest-judging-panel";
 import { ContestStatusPanel } from "@/components/admin/contests/contest-status-panel";
 import { ContestSubmissionsPanel } from "@/components/admin/contests/contest-submissions-panel";
 import type { AdminAward, AdminSubmission } from "@/lib/contests/admin-service";
+import type { AdminFraudSignal, FraudCounts } from "@/lib/contests/fraud-service";
+import type { AdminJudge, JudgingOverview, ScoringConfigState } from "@/lib/contests/judging-service";
+import type { AwardProposal, ScoreRunSummary } from "@/lib/contests/final-scoring-service";
 import type { Database } from "@/lib/supabase/types";
 
 type ContestRow = Database["public"]["Tables"]["contests"]["Row"];
@@ -17,6 +22,8 @@ const TABS = [
   ["info", "Thông tin & thể lệ"],
   ["submissions", "Bài dự thi"],
   ["awards", "Giải thưởng"],
+  ["fraud", "Gian lận"],
+  ["judging", "Chấm điểm"],
 ] as const;
 type TabKey = (typeof TABS)[number][0];
 
@@ -27,6 +34,9 @@ export function ContestAdminDetail(props: {
   awards: AdminAward[];
   candidates: Pick<AdminSubmission, "id" | "book_title" | "author_name">[];
   resultsVisible: boolean;
+  fraud: { items: AdminFraudSignal[]; counts: FraudCounts; canScan: boolean; locked: boolean };
+  judging: { config: ScoringConfigState; judges: AdminJudge[]; overview: JudgingOverview; runs: ScoreRunSummary[] };
+  proposals: AwardProposal[];
 }) {
   const [tab, setTab] = useState<TabKey>("status");
 
@@ -44,6 +54,9 @@ export function ContestAdminDetail(props: {
           >
             {label}
             {key === "submissions" && <span className="ml-1.5 text-xs font-normal text-stone-alt">{props.submissions.total}</span>}
+            {key === "fraud" && props.fraud.counts.open > 0 && (
+              <span className="ml-1.5 rounded-full bg-error px-1.5 py-0.5 text-[11px] font-semibold text-white">{props.fraud.counts.open}</span>
+            )}
           </Tabs.Tab>
         ))}
       </Tabs.List>
@@ -58,7 +71,17 @@ export function ContestAdminDetail(props: {
           resultsVisible={props.resultsVisible}
           awards={props.awards}
           candidates={props.candidates}
+          proposals={props.proposals}
         />
+      )}
+      {tab === "judging" && (
+        <ContestJudgingPanel contestId={props.contest.id} contestSlug={props.contest.slug}
+          officialWindow={{ start: props.contest.official_scoring_start, end: props.contest.official_scoring_end }}
+          initial={props.judging} />
+      )}
+      {tab === "fraud" && (
+        <ContestFraudPanel contestId={props.contest.id} canScan={props.fraud.canScan} locked={props.fraud.locked}
+          initial={{ items: props.fraud.items, counts: props.fraud.counts }} />
       )}
     </div>
   );

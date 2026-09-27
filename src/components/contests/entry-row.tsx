@@ -2,7 +2,7 @@ import Link from "next/link";
 import { EntryCard } from "@/components/contests/entry-card";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
-export type RowItem = { key: string; book: HomepageBook; meta?: string | null; rank?: number | null };
+export type RowItem = { key: string; book: HomepageBook; meta?: string | null; rank?: number | null; trend?: string | null };
 
 /**
  * Hàng truyện cuộn ngang (thẻ 164px, mobile 128px, snap theo thẻ — đặc tả
@@ -44,7 +44,7 @@ export function EntryRow({
         <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1.5 sm:mx-0 sm:gap-[18px] sm:px-0 [scrollbar-width:none]">
           {items.map((it) => (
             <div key={it.key} className="w-[128px] shrink-0 snap-start sm:w-[164px]">
-              <EntryCard book={it.book} meta={it.meta} rank={it.rank} />
+              <EntryCard book={it.book} meta={it.meta} rank={it.rank} trend={it.trend} />
             </div>
           ))}
         </div>

@@ -28,7 +28,9 @@ const ADMIN_PREFIX = "/admin";
 const AUTHOR_PREFIX = "/author";
 // Nhiệm vụ/Thành tựu tách khỏi /ca-nhan thành 2 trang riêng (không còn là
 // tab con) — cùng mức bảo vệ: bất kỳ ai đã đăng nhập đều vào được.
-const READER_ONLY_PREFIXES = ["/ca-nhan", "/nhiem-vu", "/thanh-tuu"];
+// /giam-khao (màn chấm cuộc thi): chỉ cần đăng nhập ở đây; trang tự kiểm
+// người xem là giám khảo được gán (contest_judges) — lớp phân quyền thật.
+const READER_ONLY_PREFIXES = ["/ca-nhan", "/nhiem-vu", "/thanh-tuu", "/giam-khao"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -62,5 +64,5 @@ function redirectToLogin(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/author/:path*", "/ca-nhan/:path*", "/nhiem-vu/:path*", "/thanh-tuu/:path*"],
+  matcher: ["/admin/:path*", "/author/:path*", "/ca-nhan/:path*", "/nhiem-vu/:path*", "/thanh-tuu/:path*", "/giam-khao/:path*"],
 };
