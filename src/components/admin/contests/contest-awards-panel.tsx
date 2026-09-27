@@ -6,6 +6,7 @@ import { TrophyIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert, Button, Field } from "@/components/ui";
 import { vndToTokens } from "@/lib/contests/admin-input";
 import type { AdminAward, AdminSubmission } from "@/lib/contests/admin-service";
+import type { AwardProposal } from "@/lib/contests/final-scoring-service";
 import type { ContestStatus } from "@/lib/supabase/types";
 
 const AWARDABLE: ContestStatus[] = ["submission_closed", "community_voting", "judging", "results"];
@@ -22,6 +23,7 @@ export function ContestAwardsPanel({
   resultsVisible,
   awards,
   candidates,
+  proposals = [],
 }: {
   contestId: string;
   status: ContestStatus;
@@ -29,6 +31,8 @@ export function ContestAwardsPanel({
   awards: AdminAward[];
   /** Bài hợp lệ / vào vòng trong — bài được trao giải. */
   candidates: Pick<AdminSubmission, "id" | "book_title" | "author_name">[];
+  /** J10: giải đề xuất từ lượt tính đang công bố — admin xác nhận từng giải. */
+  proposals?: AwardProposal[];
 }) {
   const router = useRouter();
   const [submissionId, setSubmissionId] = useState(candidates[0]?.id ?? "");
@@ -75,6 +79,21 @@ export function ContestAwardsPanel({
 
   return (
     <div className="flex flex-col gap-5">
+      {proposals.length > 0 && (
+        <ProposalsSection proposals={proposals} canAward={canAward} pending={pending}
+          onConfirm={(p, prize) =>
+            request(`/api/admin/contests/${contestId}/awards`, "POST", {
+              submission_id: p.submission_id,
+              award_code: p.code,
+              award_name: p.name,
+              award_rank: p.kind === "main" ? p.rank : null,
+              category: p.kind === "main" ? "Giải chính" : "Giải đặc biệt",
+              prize_vnd: prize,
+              prize_extras: p.prize_extras,
+            })
+          } />
+      )}
+      {error && proposals.length > 0 && <Alert tone="error">{error}</Alert>}
       <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
         <h2 className="mb-3 text-base font-bold text-brand-ink">Giải đã trao</h2>
         {!resultsVisible && awards.length > 0 && (
@@ -175,5 +194,57 @@ export function ContestAwardsPanel({
 
       {error && <Alert tone="error">{error}</Alert>}
     </div>
+  );
+}
+
+function ProposalsSection({
+  proposals,
+  canAward,
+  pending,
+  onConfirm,
+}: {
+  proposals: AwardProposal[];
+  canAward: boolean;
+  pending: boolean;
+  onConfirm: (p: AwardProposal, prizeVnd: number) => Promise<boolean>;
+}) {
+  const [prizes, setPrizes] = useState<Record<string, string>>(() =>
+    Object.fromEntries(proposals.map((p) => [`${p.code}:${p.submission_id}`, String(p.prize_vnd)]))
+  );
+  return (
+    <section className="rounded-[14px] border border-cream-gold-border bg-cream-card p-4 sm:p-[22px]">
+      <h2 className="text-base font-bold text-brand-ink">Đề xuất từ kết quả chấm đã công bố</h2>
+      <p className="mt-1 text-xs leading-relaxed text-stone-dark">
+        Hệ thống xếp giải theo lượt tính đang công bố (J9). Kiểm tra số tiền (lấy theo tên giải trong thể lệ) rồi xác nhận từng giải —
+        giải chỉ thành thật sau khi xác nhận; chi trả vẫn là bước riêng.
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
+        {proposals.map((p) => {
+          const key = `${p.code}:${p.submission_id}`;
+          return (
+            <div key={key} className="flex flex-col gap-2 rounded-[12px] border border-cream-border bg-white p-3.5 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-ink">
+                  {p.name} <span className="text-xs font-normal text-stone-alt">· hạng chung cuộc {p.rank}</span>
+                </div>
+                <div className="truncate text-xs text-stone-alt">{p.book_title} · {p.author_name}{p.prize_extras ? ` · ${p.prize_extras}` : ""}</div>
+              </div>
+              {p.confirmed ? (
+                <span className="self-start rounded-full bg-success-form-bg px-2.5 py-1 text-[11px] font-semibold text-success-form sm:self-auto">Đã xác nhận</span>
+              ) : (
+                <div className="flex items-end gap-2">
+                  <Field label="Tiền thưởng (VND)" type="number" min={0} step={1000} wrapperClassName="w-[150px]" value={prizes[key] ?? "0"}
+                    disabled={!canAward} onChange={(e) => setPrizes((prev) => ({ ...prev, [key]: e.target.value }))} />
+                  <Button type="button" variant="dark" fullWidth={false} className="px-4 py-3 text-xs" disabled={pending || !canAward}
+                    onClick={() => void onConfirm(p, Math.max(0, Math.trunc(Number(prizes[key]) || 0)))}>
+                    Xác nhận
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

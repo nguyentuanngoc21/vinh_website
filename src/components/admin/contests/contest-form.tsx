@@ -25,6 +25,8 @@ const DATE_FIELDS = [
   ["judging_start", "Bắt đầu chấm", false],
   ["judging_end", "Kết thúc chấm", false],
   ["result_at", "Dự kiến công bố", false],
+  ["official_scoring_start", "Bắt đầu khung chấm chính thức", false],
+  ["official_scoring_end", "Kết thúc khung chấm chính thức", false],
 ] as const;
 type DateKey = (typeof DATE_FIELDS)[number][0];
 

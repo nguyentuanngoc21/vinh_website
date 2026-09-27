@@ -226,6 +226,9 @@ export type ContestSubmissionStatus =
 export type ContestFraudSeverity = "low" | "medium" | "high";
 export type ContestFraudStatus = "open" | "confirmed" | "dismissed";
 
+// Phiếu chấm của giám khảo (Slice 2.5b).
+export type JudgeScorecardStatus = "draft" | "finalized" | "invalidated";
+
 export type ContestReviewFlag = {
   id: string;
   code: string;
@@ -1501,6 +1504,8 @@ export type Database = {
           last_heartbeat_at: string | null;
           max_paragraph: number | null;
           source: ReadingSource | null;
+          /** Số chữ từ đầu chương tới hết đoạn xa nhất đã tới (server tính lúc nhận nhịp — Slice 2.5a). */
+          words_reached: number | null;
         };
         Insert: {
           id?: string;
@@ -1514,6 +1519,7 @@ export type Database = {
           last_heartbeat_at?: string | null;
           max_paragraph?: number | null;
           source?: ReadingSource | null;
+          words_reached?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["reading_sessions"]["Insert"]>;
         Relationships: [];
@@ -1879,6 +1885,11 @@ export type Database = {
           vote_rules: Record<string, unknown>;
           scoring_config: Record<string, unknown>;
           legacy_stats: Record<string, unknown> | null;
+          /** Khung chấm chính thức (Slice 2.5b) — chỉ sự kiện trong khung vào điểm chung cuộc. */
+          official_scoring_start: string | null;
+          official_scoring_end: string | null;
+          /** Version đang dùng trong contest_scoring_configs — chỉ set_contest_scoring_config() ghi. */
+          scoring_config_version: number | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -1910,6 +1921,9 @@ export type Database = {
           vote_rules?: Record<string, unknown>;
           scoring_config?: Record<string, unknown>;
           legacy_stats?: Record<string, unknown> | null;
+          official_scoring_start?: string | null;
+          official_scoring_end?: string | null;
+          scoring_config_version?: number | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -2092,6 +2106,156 @@ export type Database = {
           notified_at?: string | null;
         };
         Update: { notified_at?: string | null };
+        Relationships: [];
+      };
+      // Slice 2.5b — chỉ service-role; ghi phiếu chấm qua RPC. Xem
+      // migrations/20260926_add_contest_judging.sql.
+      contest_scoring_configs: {
+        Row: {
+          contest_id: string;
+          version: number;
+          /** Version bị thay thế (null = version đầu). */
+          previous_version: number | null;
+          /** Hình dạng: FinalScoringConfig (src/lib/contests/final-scoring/config.ts). */
+          config: Record<string, unknown>;
+          reason: string | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_judges: {
+        Row: {
+          contest_id: string;
+          user_id: string;
+          assigned_by: string;
+          assigned_at: string;
+          removed_at: string | null;
+          removed_by: string | null;
+          removed_reason: string | null;
+        };
+        Insert: {
+          contest_id: string;
+          user_id: string;
+          assigned_by: string;
+          assigned_at?: string;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          removed_reason?: string | null;
+        };
+        Update: {
+          assigned_by?: string;
+          assigned_at?: string;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          removed_reason?: string | null;
+        };
+        Relationships: [];
+      };
+      contest_judge_scorecards: {
+        Row: {
+          id: string;
+          contest_id: string;
+          submission_id: string;
+          judge_id: string;
+          status: JudgeScorecardStatus;
+          /** numeric(6,2) — PostgREST trả số. */
+          total: number;
+          config_version: number;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+          finalized_at: string | null;
+          invalidated_at: string | null;
+          invalidated_by: string | null;
+          invalidated_reason: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_judge_criterion_scores: {
+        Row: { scorecard_id: string; criterion_code: string; score: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Slice 2.6a — chỉ service-role; ghi qua save_contest_score_run(). Xem
+      // migrations/20260926_add_final_scoring.sql.
+      contest_score_runs: {
+        Row: {
+          id: string;
+          contest_id: string;
+          config_version: number;
+          kind: "preview" | "final";
+          window_start: string;
+          window_end: string;
+          input_digest: string;
+          flags: Record<string, unknown>[];
+          computed_by: string;
+          computed_at: string;
+          published_at: string | null;
+          published_by: string | null;
+          superseded_at: string | null;
+          publish_reason: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_score_snapshots: {
+        Row: {
+          run_id: string;
+          submission_id: string;
+          rank: number;
+          tied: boolean;
+          submitted_at: string;
+          valid_readers: number;
+          reader_transformed: number;
+          reader_score: number;
+          reader_depth_count: number;
+          aggregated_depth: number;
+          adjusted_depth: number;
+          depth_score: number;
+          returning_readers: number;
+          raw_return_rate: number;
+          adjusted_return_rate: number;
+          return_score: number;
+          reading_quality_score: number;
+          engaged_readers: number;
+          raw_engagement_rate: number;
+          adjusted_engagement_rate: number;
+          engagement_score: number;
+          valid_votes: number;
+          raw_vote_rate: number;
+          adjusted_vote_rate: number;
+          vote_score: number;
+          judge_count: number;
+          judge_score: number | null;
+          system_score: number;
+          final_score: number;
+          awards: { code: string; name: string; kind: "main" | "special" }[];
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_judge_score_events: {
+        Row: {
+          id: string;
+          scorecard_id: string;
+          contest_id: string;
+          actor_id: string;
+          action: "save_draft" | "finalize" | "reopen" | "invalidate";
+          before: Record<string, unknown> | null;
+          after: Record<string, unknown> | null;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       // Contest Engine Phase 2 (Slice 2.2) — chỉ service-role. Xem
@@ -2336,6 +2500,82 @@ export type Database = {
           rank: number;
           tied: boolean;
         }[];
+      };
+      get_contest_signal_feed: {
+        Args: { p_contest_id: string; p_kind: "attention" | "trending"; p_limit: number };
+        Returns: {
+          submission_id: string;
+          book_id: string;
+          valid_readers: number;
+          readers_7d: number;
+          readers_prev_7d: number;
+        }[];
+      };
+      get_contest_hidden_gem_pools: {
+        Args: { p_contest_id: string; p_seed: string; p_max_readers: number; p_pool_limit: number };
+        Returns: { submission_id: string; book_id: string; pool: "low_readers" | "low_views" }[];
+      };
+      detect_contest_fraud_signals: {
+        Args: {
+          p_contest_id: string;
+          p_rapid_votes: number;
+          p_rapid_minutes: number;
+          p_new_account_grace_days: number;
+          p_new_account_votes: number;
+        };
+        Returns: number;
+      };
+      review_contest_fraud_signal: {
+        Args: { p_signal_id: string; p_admin_id: string; p_status: ContestFraudStatus; p_note: string | null };
+        Returns: Database["public"]["Tables"]["contest_fraud_signals"]["Row"];
+      };
+      // jsonb — hình dạng ở ContestEntryStatsRaw (src/lib/contests/stats-service.ts).
+      get_contest_entry_stats: {
+        Args: { p_submission_id: string };
+        Returns: unknown;
+      };
+      set_contest_scoring_config: {
+        Args: { p_contest_id: string; p_admin_id: string; p_config: Record<string, unknown>; p_reason: string | null };
+        Returns: number;
+      };
+      save_judge_scorecard: {
+        Args: {
+          p_contest_id: string;
+          p_submission_id: string;
+          p_judge_id: string;
+          p_scores: Record<string, number>;
+          p_note: string | null;
+          p_finalize: boolean;
+        };
+        Returns: Database["public"]["Tables"]["contest_judge_scorecards"]["Row"];
+      };
+      review_judge_scorecard: {
+        Args: { p_scorecard_id: string; p_admin_id: string; p_action: "reopen" | "invalidate"; p_reason: string };
+        Returns: Database["public"]["Tables"]["contest_judge_scorecards"]["Row"];
+      };
+      get_contest_scoring_metrics: {
+        Args: { p_contest_id: string };
+        Returns: {
+          submission_id: string;
+          submitted_at: string;
+          has_snapshot: boolean;
+          valid_readers: number;
+          reader_depths: number[];
+          returning_readers: number;
+          engaged_readers: number;
+          valid_votes: number;
+          /** numeric[] — PostgREST có thể trả chuỗi; engine service ép Number. */
+          judge_totals: (number | string)[];
+          active_judges: number;
+        }[];
+      };
+      save_contest_score_run: {
+        Args: { p_contest_id: string; p_admin_id: string; p_run: Record<string, unknown> };
+        Returns: string;
+      };
+      publish_contest_score_run: {
+        Args: { p_run_id: string; p_admin_id: string; p_reason: string | null };
+        Returns: Database["public"]["Tables"]["contest_score_runs"]["Row"];
       };
       get_contest_ranking: {
         Args: {

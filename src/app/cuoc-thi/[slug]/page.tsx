@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DiamondIcon, EyeSlashIcon, InfoIcon, SparkleIcon, TrophyIcon } from "@phosphor-icons/react/dist/ssr";
+import { DiamondIcon, EyeIcon, EyeSlashIcon, FireIcon, InfoIcon, SparkleIcon, TrophyIcon } from "@phosphor-icons/react/dist/ssr";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BookCover } from "@/components/covers/book-cover";
@@ -15,7 +15,20 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedAdminId, getAuthedUserId } from "@/lib/wallet/session";
 import { formatVnDateTime } from "@/lib/contests/datetime";
 import { ContestError } from "@/lib/contests/errors";
-import { getContestEntries, getPopularRanking, getTopEntries, type EntrySort } from "@/lib/contests/feeds";
+import {
+  getContestEntries,
+  getHiddenGems,
+  getPopularRanking,
+  getScoredRanking,
+  getSignalRow,
+  getTopEntries,
+  getTrendingRanking,
+  type EntrySort,
+  type SignalCard,
+} from "@/lib/contests/feeds";
+import { readContestConfig } from "@/lib/contests/config";
+import { ensureFreshScores } from "@/lib/contests/scores-service";
+import { growthLabel, HIDDEN_GEM_MIN } from "@/lib/contests/signals";
 import { CONTEST_STATUS_LABEL } from "@/lib/contests/labels";
 import { isFinished, PHASE_COPY, resolveTab, tabsFor, type TabKey } from "@/lib/contests/phase-copy";
 import type { LegacyStats } from "@/lib/contests/lifecycle-service";
@@ -23,12 +36,20 @@ import { listPublicAwards, loadContestPage, type ContestPageData, type PublicAwa
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string; sort?: string; genre?: string }>;
+  searchParams: Promise<{ tab?: string; sort?: string; genre?: string; kind?: string }>;
 };
 
 const GENRE_LABELS = genres.map((g) => g.label);
 const SORTS: EntrySort[] = ["discover", "new", "az"];
 const vnd = (n: number) => `${n.toLocaleString("vi-VN")}đ`;
+
+/** Lỗi một hàng tín hiệu không làm hỏng cả tab (đặc tả UX: lỗi từng hàng). */
+function rowOrEmpty(label: string, p: Promise<SignalCard[]>): Promise<SignalCard[]> {
+  return p.catch((error) => {
+    console.error(`[contests] ${label} row failed:`, error);
+    return [];
+  });
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -126,7 +147,7 @@ async function TabContent({
 }: {
   tab: TabKey;
   data: ContestPageData;
-  query: { sort?: string; genre?: string };
+  query: { sort?: string; genre?: string; kind?: string };
   finished: boolean;
   viewerId: string | null;
   now: Date;
@@ -153,10 +174,17 @@ async function TabContent({
         </div>
       );
     }
-    const [top, newest, discover] = await Promise.all([
-      capabilities.available_feeds.includes("top") ? getTopEntries(supabase, { contest: row, capabilities }) : Promise.resolve(null),
+    const feeds = capabilities.available_feeds;
+    // Hàng tín hiệu đọc bảng điểm cache — làm mới trước (SQL bỏ qua nếu chưa quá 15 phút).
+    if (feeds.includes("attention")) await ensureFreshScores(supabase, row.id);
+    const none = Promise.resolve([] as SignalCard[]);
+    const [top, newest, discover, attention, trending, gems] = await Promise.all([
+      feeds.includes("top") ? getTopEntries(supabase, { contest: row, capabilities }) : Promise.resolve(null),
       getContestEntries(supabase, { contest: row, capabilities, sort: "new", limit: 10, viewerId, now }),
       getContestEntries(supabase, { contest: row, capabilities, sort: "discover", limit: 20, viewerId, now }),
+      feeds.includes("attention") ? rowOrEmpty("attention", getSignalRow(supabase, { contest: row, kind: "attention" })) : none,
+      feeds.includes("trending") ? rowOrEmpty("trending", getSignalRow(supabase, { contest: row, kind: "trending" })) : none,
+      feeds.includes("hidden_gems") ? rowOrEmpty("hidden gems", getHiddenGems(supabase, { contest: row, viewerId, now })) : none,
     ]);
     return (
       <div className="flex flex-col gap-9">
@@ -165,10 +193,23 @@ async function TabContent({
             title="Top truyện"
             subtitle={capabilities.popular_values_visible ? "Xếp theo phiếu bình chọn hợp lệ." : "Xếp theo phiếu bình chọn hợp lệ — số phiếu được ẩn đến khi kết thúc bình chọn."}
             icon={<TrophyIcon size={18} weight="fill" className="text-brand-gold-dark" />}
-            items={top.items.map((r) => ({ key: r.submission_id, book: r.book, rank: r.rank, meta: r.votes === null ? null : `${r.votes.toLocaleString("vi-VN")} phiếu` }))}
+            items={top.items.map((r) => ({ key: r.submission_id, book: r.book, rank: r.rank, meta: r.value === null ? null : `${r.value.toLocaleString("vi-VN")} phiếu` }))}
             moreHref={`${baseHref}?tab=bxh`}
           />
         )}
+        <EntryRow
+          title="Đang được chú ý"
+          subtitle="Nhiều độc giả đọc thật nhất từ đầu cuộc thi — không hiển thị điểm."
+          icon={<EyeIcon size={18} weight="fill" className="text-brand-gold-dark" />}
+          items={attention.map((e) => ({ key: e.submission_id, book: e.book }))}
+        />
+        <EntryRow
+          title="Đang tăng tốc"
+          subtitle="Độc giả mới tăng nhanh trong 7 ngày."
+          icon={<FireIcon size={18} weight="fill" className="text-brand-gold-dark" />}
+          items={trending.map((e) => ({ key: e.submission_id, book: e.book, trend: growthLabel(e.growth) }))}
+          moreHref={`${baseHref}?tab=bxh&kind=trending`}
+        />
         <EntryRow
           title="Mới tham gia"
           subtitle="Vừa gửi dự thi."
@@ -177,6 +218,14 @@ async function TabContent({
           moreHref={`${baseHref}?tab=${finished ? "tac-pham" : "bai"}&sort=new`}
           empty="Chưa có tác phẩm dự thi."
         />
+        {gems.length >= HIDDEN_GEM_MIN && (
+          <EntryRow
+            title="Viên ngọc ẩn"
+            subtitle={`Phần lớn là truyện dưới ${readContestConfig(row).scoring.hidden_gem_max_readers.toLocaleString("vi-VN")} độc giả — đổi mỗi ngày.`}
+            icon={<DiamondIcon size={18} weight="fill" className="text-brand-gold-dark" />}
+            items={gems.map((e) => ({ key: e.submission_id, book: e.book }))}
+          />
+        )}
         <EntryRow
           title="Truyện đề xuất"
           subtitle="Xáo ngẫu nhiên mỗi ngày — không dựa trên lượt đọc."
@@ -212,14 +261,35 @@ async function TabContent({
 
   if (tab === "bxh" || tab === "ket-qua") {
     const popularVisible = capabilities.rankings_visible.popular;
-    const [ranking, awards] = await Promise.all([
+    const trendingVisible = capabilities.rankings_visible.trending;
+    if (trendingVisible) await ensureFreshScores(supabase, row.id);
+    const resultsVisible = capabilities.results_visible;
+    const scored = (kind: "final" | "jury") =>
+      resultsVisible
+        ? getScoredRanking(supabase, { contest: row, capabilities, kind }).catch((error) => {
+            console.error(`[contests] ${kind} ranking failed:`, error);
+            return null;
+          })
+        : Promise.resolve(null);
+    const [ranking, trendingRanking, awards, finalRanking, juryRanking] = await Promise.all([
       popularVisible ? getPopularRanking(supabase, { contest: row, capabilities }) : Promise.resolve(null),
+      trendingVisible
+        ? getTrendingRanking(supabase, { contest: row, capabilities }).catch((error) => {
+            console.error("[contests] trending ranking failed:", error);
+            return null;
+          })
+        : Promise.resolve(null),
       tab === "ket-qua" ? listPublicAwards(supabase, rowForAwards, now) : Promise.resolve([] as PublicAward[]),
+      scored("final"),
+      scored("jury"),
     ]);
+    // Cuộc thi không chấm chung cuộc (chưa có lượt công bố) → kết quả qua danh sách giải.
+    const noScoredResults = "Cuộc thi này công bố kết quả qua danh sách giải thưởng.";
     const kinds: RankingKindTab[] = [
       {
         key: "popular",
-        label: "Độc giả yêu thích",
+        // J1: bảng đếm phiếu; giải "được yêu thích nhất" xét theo tỷ lệ phiếu (chấm chung cuộc).
+        label: "Bảng phiếu bình chọn",
         locked: popularVisible
           ? null
           : !capabilities.available_feeds.includes("new")
@@ -231,23 +301,34 @@ async function TabContent({
       {
         key: "final",
         label: "Chung cuộc",
-        locked: capabilities.results_visible
-          ? "Cuộc thi này công bố kết quả qua danh sách giải thưởng."
+        locked: resultsVisible
+          ? finalRanking ? null : noScoredResults
           : `Điểm Ban giám khảo và Chung cuộc được giữ kín đến ngày công bố${contest.result_at ? ` ${formatVnDateTime(contest.result_at)}` : ""} để việc chấm diễn ra độc lập.`,
       },
       {
         key: "jury",
         label: "Ban giám khảo",
-        locked: capabilities.results_visible
-          ? "Cuộc thi này công bố kết quả qua danh sách giải thưởng."
+        locked: resultsVisible
+          ? juryRanking ? null : noScoredResults
           : "Điểm Ban giám khảo được giữ kín đến ngày công bố kết quả.",
       },
-      { key: "trending", label: "Trending", locked: "Bảng Trending (tốc độ tăng độc giả duy nhất) sẽ sớm có." },
+      {
+        key: "trending",
+        label: "Trending",
+        locked: trendingVisible
+          ? null
+          : isFinished(contest.status)
+            ? "Bảng Trending chỉ hiển thị khi cuộc thi đang diễn ra."
+            : "Bảng Trending xuất hiện khi cuộc thi có tác phẩm dự thi.",
+      },
     ];
     return (
       <div className="flex flex-col gap-9">
         {tab === "ket-qua" && <Results awards={awards} publishedAt={contest.results_published_at} visible={capabilities.results_visible} />}
-        <RankingBoard slug={contest.slug} kinds={kinds} initial={ranking} />
+        <RankingBoard slug={contest.slug} kinds={kinds}
+          initial={{ popular: ranking, trending: trendingRanking, final: finalRanking, jury: juryRanking }}
+          initialKind={query.kind === "trending" && trendingVisible ? "trending" : finalRanking && tab === "ket-qua" ? "final" : "popular"}
+          voteRateNote={row.scoring_config_version !== null} />
       </div>
     );
   }

@@ -16,7 +16,10 @@ import {
 import { TOKEN_TO_VND_RATE } from "@/lib/wallet/config";
 
 type ContestInsert = Database["public"]["Tables"]["contests"]["Insert"];
-export type ContestPatch = Omit<ContestInsert, "id" | "status" | "created_by" | "created_at" | "updated_at" | "archived_at" | "legacy_stats" | "results_published_at">;
+export type ContestPatch = Omit<
+  ContestInsert,
+  "id" | "status" | "created_by" | "created_at" | "updated_at" | "archived_at" | "legacy_stats" | "results_published_at" | "scoring_config_version"
+>;
 
 export type PrizeSummaryItem = { name: string; amount_vnd: number; extra: string };
 
@@ -25,7 +28,10 @@ const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const RESERVED_SLUGS = new Set(["cron"]);
 const TEXT_FIELDS = ["title", "short_description", "description", "rules_content", "rules_version"] as const;
 const URL_FIELDS = ["key_visual_url", "banner_url"] as const;
-const DATE_FIELDS = ["submission_start", "submission_end", "voting_start", "voting_end", "judging_start", "judging_end", "result_at"] as const;
+const DATE_FIELDS = [
+  "submission_start", "submission_end", "voting_start", "voting_end", "judging_start", "judging_end", "result_at",
+  "official_scoring_start", "official_scoring_end",
+] as const;
 const REQUIRED_DATES = new Set(["submission_start", "submission_end"]);
 const KNOWN = new Set<string>([
   "slug", "is_featured", "prizes_summary", "eligibility_rules", "vote_rules", "scoring_config",
@@ -151,6 +157,15 @@ export function validateTimeline(t: Timeline): string[] {
   if (j0 !== null && lastBeforeJudging !== null && j0 < lastBeforeJudging) errors.push("Chấm giải phải bắt đầu sau khi kết thúc bình chọn / nhận bài");
   const lastBeforeResult = j1 ?? v1 ?? s1;
   if (r !== null && lastBeforeResult !== null && r < lastBeforeResult) errors.push("Ngày công bố phải sau các giai đoạn trước");
+
+  // Khung chấm chính thức (Slice 2.5b, J2) — DB kiểm lại bằng constraint.
+  const o0 = ms(t.official_scoring_start), o1 = ms(t.official_scoring_end);
+  if ((o0 === null) !== (o1 === null)) errors.push("Khung chấm chính thức cần đủ thời gian bắt đầu và kết thúc");
+  if (o0 !== null && o1 !== null) {
+    if (o0 >= o1) errors.push("Khung chấm chính thức phải kết thúc sau khi bắt đầu");
+    if (s1 !== null && o0 < s1) errors.push("Khung chấm chính thức phải bắt đầu sau khi đóng nhận bài");
+    if (v0 !== null && v1 !== null && (v0 < o0 || v1 > o1)) errors.push("Khung bình chọn phải nằm trong khung chấm chính thức");
+  }
   return errors;
 }
 

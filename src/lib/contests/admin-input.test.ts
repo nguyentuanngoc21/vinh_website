@@ -70,6 +70,27 @@ describe("validateTimeline", () => {
     expect(validateTimeline({ ...base, voting_start: "2026-10-23T00:00:00Z", voting_end: null })).toHaveLength(1);
   });
 
+  describe("khung chấm chính thức (Slice 2.5b, J2)", () => {
+    const voting = { voting_start: "2026-11-01T00:00:00Z", voting_end: "2026-11-14T16:59:00Z" };
+    const window = { official_scoring_start: "2026-11-01T00:00:00Z", official_scoring_end: "2026-11-14T16:59:00Z" };
+
+    it("khung chấm trùng khung bình chọn → hợp lệ", () => {
+      expect(validateTimeline({ ...base, ...voting, ...window })).toEqual([]);
+    });
+
+    it("thiếu một đầu", () => {
+      expect(validateTimeline({ ...base, official_scoring_start: window.official_scoring_start, official_scoring_end: null })).toHaveLength(1);
+    });
+
+    it("bắt đầu trước khi đóng nhận bài", () => {
+      expect(validateTimeline({ ...base, official_scoring_start: "2026-10-15T00:00:00Z", official_scoring_end: "2026-11-14T16:59:00Z" })).toHaveLength(1);
+    });
+
+    it("bình chọn vượt ra ngoài khung chấm", () => {
+      expect(validateTimeline({ ...base, ...window, voting_start: "2026-11-01T00:00:00Z", voting_end: "2026-11-20T00:00:00Z" })).toHaveLength(1);
+    });
+  });
+
   it("đóng trước mở", () => {
     expect(validateTimeline({ submission_start: base.submission_end, submission_end: base.submission_start })).toHaveLength(1);
   });

@@ -9,6 +9,15 @@ import { getContestById, getStatusEvents, listAwards, listSubmissionsForAdmin } 
 import { areResultsVisible } from "@/lib/contests/capabilities";
 import { ContestError } from "@/lib/contests/errors";
 import { ensureFreshScores } from "@/lib/contests/scores-service";
+import { getJudgingOverview, getScoringConfigState, listJudges } from "@/lib/contests/judging-service";
+import { getAwardProposals, listScoreRuns } from "@/lib/contests/final-scoring-service";
+import {
+  detectFraudSignals,
+  FRAUD_LOCKED_STATUSES,
+  FRAUD_SCAN_STATUSES,
+  getFraudCounts,
+  listFraudSignals,
+} from "@/lib/contests/fraud-service";
 import { CONTEST_STATUS_LABEL } from "@/lib/contests/labels";
 
 export const metadata: Metadata = { title: "Cuộc thi · Vịnh Admin" };
@@ -25,14 +34,27 @@ export default async function AdminContestDetailPage({ params }: { params: Promi
     throw error;
   }
 
-  // Làm mới bảng điểm (bỏ qua nếu chưa quá 15 phút) trước khi đọc số liệu.
+  // Quét tín hiệu gian lận (chỉ gắn tín hiệu, không loại gì) rồi làm mới bảng
+  // điểm (bỏ qua nếu chưa quá 15 phút) trước khi đọc số liệu. Quét lỗi không
+  // làm hỏng trang — admin bấm "Quét lại" ở tab Gian lận.
+  const canScan = FRAUD_SCAN_STATUSES.includes(contest.status);
+  if (canScan) {
+    await detectFraudSignals(supabase, contestId).catch((error) => console.error("[contests] fraud scan on admin view failed:", error));
+  }
   if (contest.status !== "draft") await ensureFreshScores(supabase, contestId);
-  const [events, submissions, awards, eligible, shortlisted] = await Promise.all([
+  const [events, submissions, awards, eligible, shortlisted, fraudItems, fraudCounts, scoringConfig, judges, judging, scoreRuns, awardProposals] = await Promise.all([
     getStatusEvents(supabase, contestId),
     listSubmissionsForAdmin(supabase, { contestId }),
     listAwards(supabase, contestId),
     listSubmissionsForAdmin(supabase, { contestId, status: "eligible", pageSize: 200 }),
     listSubmissionsForAdmin(supabase, { contestId, status: "shortlisted", pageSize: 200 }),
+    listFraudSignals(supabase, { contestId, status: "open" }),
+    getFraudCounts(supabase, contestId),
+    getScoringConfigState(supabase, contest),
+    listJudges(supabase, contestId),
+    getJudgingOverview(supabase, contestId),
+    listScoreRuns(supabase, contest),
+    getAwardProposals(supabase, contest),
   ]);
   const candidates = [...shortlisted.items, ...eligible.items]
     .filter((s) => !s.book_removed)
@@ -60,6 +82,9 @@ export default async function AdminContestDetailPage({ params }: { params: Promi
         awards={awards}
         candidates={candidates}
         resultsVisible={areResultsVisible(contest, new Date())}
+        fraud={{ items: fraudItems, counts: fraudCounts, canScan, locked: FRAUD_LOCKED_STATUSES.includes(contest.status) }}
+        judging={{ config: scoringConfig, judges, overview: judging, runs: scoreRuns }}
+        proposals={awardProposals.proposals}
       />
     </>
   );

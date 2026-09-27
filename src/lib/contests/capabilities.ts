@@ -9,7 +9,8 @@
 import type { ContestReviewFlag, ContestStatus, ContestSubmissionStatus } from "@/lib/supabase/types";
 import { CLOSING_SOON_HOURS, type EligibilityRules, type VoteRules } from "@/lib/contests/config";
 
-export type FeedKind = "top" | "new" | "discover";
+/** Hàng tín hiệu (attention / trending / hidden_gems — Phase 2) chỉ có khi cuộc thi còn diễn ra. */
+export type FeedKind = "top" | "new" | "discover" | "attention" | "trending" | "hidden_gems";
 
 export type ContestTimeline = {
   status: ContestStatus;
@@ -156,6 +157,9 @@ export function getContestCapabilities(input: {
   const available_feeds: FeedKind[] = [];
   if (popularVisible) available_feeds.push("top");
   if (hasEntries) available_feeds.push("new", "discover");
+  // Tín hiệu đọc chỉ có nghĩa khi cuộc thi còn diễn ra; sau công bố bảng điểm đã chốt.
+  const signalsLive = hasEntries && !isOrAfter(contest.status, "results", "archived");
+  if (signalsLive) available_feeds.push("attention", "trending", "hidden_gems");
 
   // Hạn của giai đoạn đang diễn ra — cho countdown / chip "Sắp đóng".
   const phaseDeadline =
@@ -187,7 +191,7 @@ export function getContestCapabilities(input: {
     can_edit_submission: hasActiveEntry && beforeDeadline && (contest.status === "submission_open" || contest.status === "announced"),
     can_vote,
     results_visible,
-    rankings_visible: { popular: popularVisible, trending: false, jury: results_visible, final: results_visible },
+    rankings_visible: { popular: popularVisible, trending: signalsLive, jury: results_visible, final: results_visible },
     popular_values_visible,
     available_feeds,
     closing_soon,
