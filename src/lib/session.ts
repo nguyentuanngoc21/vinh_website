@@ -72,6 +72,14 @@ export async function encodeSession(session: Session, maxAgeSeconds: number): Pr
 
 /** Verifies signature + expiry, returns the session or null if invalid/expired/tampered. */
 export async function decodeSession(token: string | undefined): Promise<Session | null> {
+  return (await decodeSessionPayload(token))?.session ?? null;
+}
+
+/** Same as decodeSession(), but also returns the cookie's expiry — for
+ * reissueSessionCookie(), which must keep the original lifetime. */
+export async function decodeSessionPayload(
+  token: string | undefined
+): Promise<{ session: Session; expiresAt: number } | null> {
   if (!token) return null;
   const [payloadB64, sigB64] = token.split(".");
   if (!payloadB64 || !sigB64) return null;
@@ -91,7 +99,7 @@ export async function decodeSession(token: string | undefined): Promise<Session 
     ) as { session: Session; expiresAt: number };
 
     if (Date.now() > expiresAt) return null;
-    return session;
+    return { session, expiresAt };
   } catch {
     return null;
   }
@@ -123,6 +131,27 @@ export async function setSessionCookie(
   return response;
 }
 
+/**
+ * Re-signs the cookie with updated fields (e.g. a role changed by a
+ * super_admin — see /api/auth/session) while keeping its original expiry,
+ * so a refresh never extends a "don't remember me" session.
+ */
+export async function reissueSessionCookie(
+  response: import("next/server").NextResponse,
+  session: Session,
+  expiresAt: number
+) {
+  const maxAge = Math.max(1, Math.floor((expiresAt - Date.now()) / 1000));
+  response.cookies.set(SESSION_COOKIE, await encodeSession(session, maxAge), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge,
+  });
+  return response;
+}
+
 /** Clears the session cookie — call from /api/auth/logout. */
 export function clearSessionCookie(response: import("next/server").NextResponse) {
   response.cookies.set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
@@ -135,8 +164,15 @@ export function clearSessionCookie(response: import("next/server").NextResponse)
  * no DB hit); call this from the actual protected layout so a forged,
  * stale, or edge-cache-served cookie can't slip a non-admin into /admin.
  * Usage in an async Server Component: `const session = await requireAdmin();`
- * — redirects to /dang-nhap itself, so callers can treat the return value
- * as a guaranteed admin Session.
+ * — redirects itself, so callers can treat the return value as a
+ * guaranteed admin Session.
+ *
+ * The role is re-read from `profiles`, not trusted from the cookie: the
+ * cookie's role is only as fresh as the last login/refresh, so an admin
+ * demoted by a super_admin would otherwise keep /admin until it expired.
+ * On a mismatch it redirects through /api/auth/session, which rewrites the
+ * cookie with the real role (Server Components can't set cookies) and
+ * sends them home.
  */
 export async function requireAdmin(): Promise<Session> {
   const { cookies } = await import("next/headers");
@@ -149,5 +185,16 @@ export async function requireAdmin(): Promise<Session> {
     redirect("/dang-nhap");
     throw new Error("unreachable"); // `redirect()` throws; this satisfies TS's control-flow analysis
   }
-  return session;
+
+  const { createServiceRoleClient } = await import("@/lib/supabase/server");
+  const { data: profile } = await createServiceRoleClient()
+    .from("profiles")
+    .select("role")
+    .eq("username", session.handle)
+    .maybeSingle();
+  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
+    redirect("/api/auth/session?next=/");
+    throw new Error("unreachable");
+  }
+  return { ...session, role: profile.role };
 }

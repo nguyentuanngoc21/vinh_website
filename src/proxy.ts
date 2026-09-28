@@ -46,7 +46,15 @@ export async function proxy(request: NextRequest) {
   // khỏi /admin hoàn toàn. getAuthedAdminId() (src/lib/wallet/session.ts)
   // đã chấp nhận cả 2 role đúng cách; sửa lại đây cho khớp.
   if (needsAdmin && session?.role !== "admin" && session?.role !== "super_admin") {
-    return redirectToLogin(request);
+    if (!session) return redirectToLogin(request);
+    // Đã đăng nhập nhưng cookie ghi role 'user' — có thể vừa được super_admin
+    // nâng quyền (cookie chỉ mới bằng lần đăng nhập gần nhất). Cho qua
+    // /api/auth/session đọc lại role thật + ký lại cookie rồi quay lại đây;
+    // vẫn không phải admin thì route đó đưa về "/" (không lặp lại).
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/auth/session";
+    url.search = `?next=${encodeURIComponent(pathname + request.nextUrl.search)}`;
+    return NextResponse.redirect(url);
   }
 
   if (needsAnyLogin && !session) {

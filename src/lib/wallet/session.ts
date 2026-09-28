@@ -40,3 +40,19 @@ export async function getAuthedAdminId(
   if (!data || (data.role !== "admin" && data.role !== "super_admin")) return null;
   return userId;
 }
+
+/** Resolves the caller's id and fresh role (from `profiles`, not the
+ * signed cookie — the cookie's role is only refreshed on login). Returns
+ * null if unauthenticated OR not admin/super_admin. Use when a route or
+ * page needs to tell admin apart from super_admin, e.g. role reassignment
+ * (super_admin only — see src/app/api/admin/users/[userId]/route.ts). */
+export async function getAuthedAdmin(
+  serviceClient: SupabaseClient<Database> = createServiceRoleClient()
+): Promise<{ id: string; role: "admin" | "super_admin" } | null> {
+  const userId = await getAuthedUserId(serviceClient);
+  if (!userId) return null;
+
+  const { data } = await serviceClient.from("profiles").select("role").eq("id", userId).single();
+  if (!data || (data.role !== "admin" && data.role !== "super_admin")) return null;
+  return { id: userId, role: data.role };
+}
