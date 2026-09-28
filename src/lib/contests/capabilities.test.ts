@@ -73,6 +73,12 @@ describe("rút / nộp lại / sửa", () => {
     expect(after.can_edit_submission).toBe(false);
   });
 
+  it("admin đóng nhận bài sớm (chưa tới hạn) → không rút được nữa (Slice 3.5)", () => {
+    const early = caps({ status: "submission_closed" }, { sub: eligible });
+    expect(early.can_withdraw).toBe(false);
+    expect(early.reasons.can_withdraw).toBe("withdraw_closed");
+  });
+
   it("nộp lại chỉ khi cuộc thi cho phép", () => {
     const withdrawn: ViewerSubmission = { status: "withdrawn", review_flags: [] };
     expect(caps({}, { sub: withdrawn }).can_resubmit).toBe(false);

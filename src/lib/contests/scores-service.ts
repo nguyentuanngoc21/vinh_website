@@ -9,8 +9,10 @@
  *   - refreshAllActiveScores(): cron 0h giờ VN ép tính lại (lưới an toàn).
  *   - freezeScores(): lần tính cuối khi công bố kết quả, rồi chốt vĩnh viễn.
  *
- * BXH Độc giả yêu thích TRONG LÚC bình chọn không đọc bảng này — vẫn đếm
- * phiếu trực tiếp (get_contest_ranking).
+ * Bảng phiếu bình chọn (popular-v2) đọc filtered_votes của bảng này (Slice
+ * 3.5) — trễ tối đa 15 phút như mọi số liệu điểm (P8); trong lúc bình chọn
+ * số phiếu đang ẩn nên chỉ hạng bị trễ. Cuộc thi popular-v1 vẫn đếm phiếu
+ * thô trực tiếp.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContestStatus, Database } from "@/lib/supabase/types";
@@ -40,6 +42,16 @@ export async function ensureFreshScores(client: Client, contestId: string): Prom
     return await refresh(client, contestId, { force: false, freeze: false });
   } catch (error) {
     console.error("[contests] refresh scores failed:", error);
+    return null;
+  }
+}
+
+/** Ép tính lại ngay (bỏ qua 15 phút) — khi chuyển giai đoạn. Lỗi chỉ ghi log. */
+export async function forceRefreshScores(client: Client, contestId: string): Promise<ScoreState | null> {
+  try {
+    return await refresh(client, contestId, { force: true, freeze: false });
+  } catch (error) {
+    console.error("[contests] forced score refresh failed:", error);
     return null;
   }
 }

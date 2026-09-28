@@ -141,6 +141,15 @@ export function ContestAwardsPanel({
                     )}
                   </div>
                 )}
+                {revokeId === a.id && a.paid_at && (
+                  // Quyết định sau chạy thử (28/09): thu hồi không tự trừ token đã chi trả.
+                  <div className="w-full">
+                    <Alert tone="error">
+                      Giải này đã chi trả {a.prize_tokens.toLocaleString("vi-VN")} token. Thu hồi không tự trừ lại token — nếu cần,
+                      admin điều chỉnh ví của tác giả bằng tay.
+                    </Alert>
+                  </div>
+                )}
                 {revokeId === a.id && (
                   <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end">
                     <Field label="Lý do thu hồi (hiển thị ở trang lưu trữ)" wrapperClassName="flex-1" value={revokeReason}

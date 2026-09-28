@@ -119,8 +119,9 @@ export const ELIGIBILITY_RULES: EligibilityRule[] = [
       const max = ctx.rules.max_words;
       if (max === null) return null;
       const actual = ctx.stats.total_words;
+      // Có cả min_words thì dòng đó đã ghi "Hiện có … chữ" — không lặp lại.
       return check("max_words", actual <= max, actual <= max
-        ? `Hiện có ${num(actual)} chữ`
+        ? ctx.rules.min_words !== null ? `Không vượt quá ${num(max)} chữ` : `Hiện có ${num(actual)} chữ`
         : `Tối đa ${num(max)} chữ — hiện có ${num(actual)}, vượt ${num(actual - max)} chữ`, { required: max, actual });
     },
   },

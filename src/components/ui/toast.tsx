@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 type ToastTone = "success" | "error" | "info";
@@ -28,8 +28,14 @@ const TOAST_DURATION_MS = 2500;
  * form vẫn nên dùng `Alert` (banner cố định, không tự biến mất), không
  * phải Toast.
  */
+const noopSubscribe = () => () => {};
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  // Portal chỉ gắn sau hydrate: server và lần render đầu ở client đều không
+  // có portal → không lệch HTML (trước đây `typeof document` khác nhau giữa
+  // server / client gây "Hydration failed" ở mọi trang — chạy thử 28/09).
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const nextId = useRef(0);
 
   const show = useCallback((message: string, tone: ToastTone = "info") => {
@@ -43,7 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
-      {typeof document !== "undefined" &&
+      {mounted &&
         createPortal(
           // z-[250]: dưới LoadingScreen (z-[300], xem loading-screen.tsx) và
           // NavigationOverlay, trên mọi Modal (z-[95]/z-[90], xem modal.tsx).

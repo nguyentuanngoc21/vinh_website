@@ -85,6 +85,8 @@ export function SubmitEntryFlow({
         <div className="flex flex-col gap-2.5">
           {sorted.map((b) => {
             const failed = b.result.checks.filter((c) => !c.passed && c.blocking);
+            // Truyện đang dự thi cuộc thi này: ghi rõ, không gọi là "chưa đủ điều kiện".
+            const entered = failed.length === 1 && failed[0].code === "not_already_entered" && failed[0].details?.status !== undefined;
             return (
               <button key={b.bookId} type="button" onClick={() => { setSelected(b.bookId); setAgree(false); setError(null); setStep(2); }}
                 className={`flex items-center gap-3 rounded-[14px] border p-4 text-left transition-colors ${
@@ -94,7 +96,7 @@ export function SubmitEntryFlow({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold text-ink">{b.title}</span>
                   <span className={`mt-0.5 block text-xs ${b.result.eligible ? "text-success-form" : "text-stone-alt"}`}>
-                    {b.result.eligible ? "Đủ điều kiện" : `Chưa đủ điều kiện · ${failed[0]?.message ?? ""}`}
+                    {b.result.eligible ? "Đủ điều kiện" : entered ? "Đã gửi vào cuộc thi này" : `Chưa đủ điều kiện · ${failed[0]?.message ?? ""}`}
                   </span>
                 </span>
               </button>

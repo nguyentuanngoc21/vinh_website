@@ -1368,3 +1368,19 @@ Kết quả chốt 27/09/2026:
 - BXH so hạng hiện tại với bản chụp mới nhất của hôm nay (cron chưa chạy thì dùng hôm qua): ▲ n / ▼ n / — / "Mới" (bài chưa có trong bản chụp). Chưa có bản chụp → ẩn cột. Chỉ so hạng, không lộ số phiếu (K9, Q3).
 - API `/api/contests/:slug/rankings` thêm `changes_visible` và `change` cho từng dòng. Web mobile bỏ cột này theo đặc tả UX mục 6.
 - Thống kê tác giả (Slice 2.4) chưa hiện thay đổi hạng — làm sau nếu cần.
+
+### 8. Slice 3.5 — sửa sau chạy thử toàn trình (28/09/2026)
+
+Chạy thử tự động trên dev theo `docs/CONTEST_DRY_RUN.md` (7 tài khoản thử, mùa thi rút gọn 35 phút): không có lỗi chặn. Quyết định của chủ dự án:
+
+| # | Câu hỏi | Kết quả |
+|---|---|---|
+| L1 | Giải bị thu hồi trên trang kết quả | **Giữ, gạch ngang** "Đã thu hồi" (như hiện tại) |
+| L2 | Bảng phiếu bình chọn hiện số nào | **Phiếu đã lọc** — chỉ người đọc thật |
+| L3 | Thu hồi giải đã chi trả | **Admin xử lý tay**; trang admin cảnh báo khi thu hồi |
+| L4 | Admin đóng nhận bài sớm | **Chặn rút bài ngay** từ lúc đóng |
+
+- `migrations/20260928_contest_dry_run_fixes.sql`: `snapshot_contest_ranks` chụp bảng phiếu theo phiếu đã lọc; `set_contest_submission_status` chỉ cho tác giả rút khi `submission_open`.
+- Bảng phiếu, "Top truyện", "Cuộc thi của tôi", thống kê tác giả dùng chung `popularRankingRows` → phiếu đã lọc từ bảng điểm (popular-v2; popular-v1 vẫn phiếu thô). **Giữ P8:** bảng điểm tính lại khi có người xem, tối đa 1 lần / 15 phút, cộng cron 0h — không đếm theo từng phiếu (đã thử trigger đếm ngay rồi bỏ: dễ nghẽn khi nhiều người bầu cùng 1 bài; lúc bình chọn số phiếu đang ẩn nên chỉ hạng trễ tối đa 15 phút). Admin chuyển sang đóng nhận bài / bình chọn / chấm → ép tính lại 1 lần. Tab Dấu ấn đếm phiếu đã lọc.
+- Sửa nhỏ: ô đếm ngược vỡ dòng trên điện thoại; "0 ngày tuổi"; ghi chú số phiếu ẩn sau kết quả; truyện đã dự thi ghi "Đã gửi vào cuộc thi này"; dòng số chữ lặp; `legacy_stats` trả về khi lưu trữ; lỗi hydration của Toast trên mọi trang.
+- Để sau: giao dịch chi trả giải chỉ ghi "Thưởng từ Vịnh" (lý do đã lưu ở `platform_bonus_grants.reason`, lịch sử ví chưa hiện).

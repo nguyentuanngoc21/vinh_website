@@ -18,7 +18,7 @@ import type { ContestRow } from "@/lib/contests/contest-service";
 import { CLOSE_FLAG_CODE, evaluateCloseChecks } from "@/lib/contests/eligibility/close";
 import { ContestError, throwIfError, toContestError } from "@/lib/contests/errors";
 import { getPublishedRun } from "@/lib/contests/final-scoring-service";
-import { freezeScores } from "@/lib/contests/scores-service";
+import { forceRefreshScores, freezeScores } from "@/lib/contests/scores-service";
 
 type Client = SupabaseClient<Database>;
 
@@ -36,8 +36,15 @@ async function transitionWithTasks(client: Client, input: TransitionInput): Prom
   const contest = data as ContestRow;
   if (input.to === "submission_open") await notifyOpenReminders(client, contest);
   const close = input.to === "submission_closed" ? await runCloseTasks(client, contest) : null;
+  // Số liệu điểm không trễ tới 15 phút ngay sau khi chuyển giai đoạn (chạy thử 28/09).
+  if (input.to === "submission_closed" || input.to === "community_voting" || input.to === "judging") {
+    await forceRefreshScores(client, contest.id);
+  }
   if (input.to === "results") await freezeFinalScores(client, contest);
-  if (input.to === "archived") await captureLegacyStats(client, contest);
+  if (input.to === "archived") {
+    const stats = await captureLegacyStats(client, contest);
+    if (stats) contest.legacy_stats = stats;
+  }
   return { contest, close };
 }
 
@@ -219,10 +226,24 @@ export type LegacyStats = {
  * không tính lại mỗi lần xem. Lỗi chỉ ghi log: chuyển trạng thái đã xong và
  * tab Dấu ấn vẫn hiển thị số đếm trực tiếp khi chưa có bản chụp thống kê.
  */
+/**
+ * "Phiếu bình chọn hợp lệ" của tab Dấu ấn: phiếu đã lọc (người đọc thật) của
+ * bảng điểm đã chốt lúc công bố — cùng số với Bảng phiếu (Slice 3.5).
+ * Cuộc thi popular-v1 đếm phiếu thô.
+ */
+async function countValidVotes(client: Client, contest: ContestRow): Promise<{ count: number; error: unknown }> {
+  if (readContestConfig(contest).scoring.popular_formula_id !== "popular-v2") {
+    const { count, error } = await client.from("contest_votes").select("id", { count: "exact", head: true }).eq("contest_id", contest.id);
+    return { count: count ?? 0, error };
+  }
+  const { data, error } = await client.from("contest_submission_scores").select("filtered_votes").eq("contest_id", contest.id);
+  return { count: (data ?? []).reduce((n, r) => n + r.filtered_votes, 0), error };
+}
+
 export async function captureLegacyStats(client: Client, contest: ContestRow): Promise<LegacyStats | null> {
   const [summary, votes, snaps, awards] = await Promise.all([
     client.rpc("get_contest_summaries", { p_contest_ids: [contest.id] }),
-    client.from("contest_votes").select("id", { count: "exact", head: true }).eq("contest_id", contest.id),
+    countValidVotes(client, contest),
     client.from("contest_submission_snapshots").select("total_words").eq("contest_id", contest.id).eq("reason", "submission_closed"),
     client.from("contest_awards").select("id", { count: "exact", head: true }).eq("contest_id", contest.id).is("revoked_at", null),
   ]);
@@ -234,7 +255,7 @@ export async function captureLegacyStats(client: Client, contest: ContestRow): P
   const stats: LegacyStats = {
     entries: summary.data?.[0]?.entry_count ?? 0,
     authors: summary.data?.[0]?.author_count ?? 0,
-    valid_votes: votes.count ?? 0,
+    valid_votes: votes.count,
     words: (snaps.data ?? []).reduce((n, x) => n + x.total_words, 0),
     awards: awards.count ?? 0,
     captured_at: new Date().toISOString(),

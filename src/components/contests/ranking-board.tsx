@@ -122,8 +122,8 @@ export function RankingBoard({
       : kind.key !== "popular"
         ? null
         : page?.valuesVisible
-          ? "Chỉ tính phiếu hợp lệ: tài khoản đủ ngày tuổi, đã đọc hết ít nhất 1 chương của tác phẩm."
-          : "Số phiếu được ẩn đến khi kết thúc bình chọn để hạn chế hiệu ứng đám đông. Chỉ tính phiếu hợp lệ.";
+          ? "Chỉ tính phiếu hợp lệ: phiếu của độc giả đã đọc thật tác phẩm (đọc đủ lâu ít nhất 1 chương)."
+          : "Số phiếu được ẩn đến khi kết thúc bình chọn để hạn chế hiệu ứng đám đông. Chỉ tính phiếu của độc giả đã đọc thật tác phẩm.";
   // J1: giải "Tác phẩm được yêu thích nhất" xét theo TỶ LỆ phiếu, không theo tổng phiếu của bảng này.
   const popularAwardNote = kind.key === "popular" && voteRateNote;
 

@@ -112,7 +112,8 @@ export function ContestHero({
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-2.5 lg:flex">
+        {/* Điện thoại: 2 ô đếm cạnh nhau, đồng hồ cả hàng dưới (không vỡ chữ). */}
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:flex">
           <div className="rounded-[14px] border border-white/15 bg-white/10 px-4 py-3.5 lg:min-w-[110px]">
             <div className="text-2xl font-bold">{counts.entries}</div><div className="text-xs text-sidebar-text-dim-2">tác phẩm</div>
           </div>
@@ -121,7 +122,7 @@ export function ContestHero({
           </div>
           {cd && (
             <Countdown data={cd} refreshAt={capabilities.next_change_at}
-              className="rounded-[14px] border border-brand-gold-light/35 bg-brand-gold/15 px-4 py-3.5 text-brand-gold-light lg:min-w-[150px]"
+              className="col-span-2 rounded-[14px] border border-brand-gold-light/35 bg-brand-gold/15 px-4 py-3.5 text-brand-gold-light sm:col-span-1 lg:min-w-[150px]"
               labelClassName="opacity-85" />
           )}
         </div>

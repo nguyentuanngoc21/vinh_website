@@ -39,11 +39,13 @@ export function HubHero({ contests }: { contests: ContestSummary[] }) {
           <h2 className="text-[30px] font-bold leading-[1.08] tracking-[-1px] sm:text-[44px]">{c.title}</h2>
           {c.short_description && <p className="mt-3 max-w-[480px] text-base leading-relaxed text-hero-text-dim">{c.short_description}</p>}
         </div>
-        <div className="grid grid-cols-3 gap-4 sm:flex sm:gap-7">
+        <div className="grid grid-cols-2 gap-4 sm:flex sm:gap-7">
           <div><div className="text-2xl font-bold">{c.entry_count}</div><div className="text-xs text-sidebar-text-dim-2">tác phẩm</div></div>
           <div><div className="text-2xl font-bold">{c.author_count}</div><div className="text-xs text-sidebar-text-dim-2">tác giả</div></div>
           {cd && (
-            <Countdown data={cd} refreshAt={null} className="border-l border-white/20 pl-4 text-brand-gold-light sm:pl-7" labelClassName="text-sidebar-text-dim-2" />
+            <Countdown data={cd} refreshAt={null}
+              className="col-span-2 border-t border-white/20 pt-3 text-brand-gold-light sm:border-l sm:border-t-0 sm:pl-7 sm:pt-0"
+              labelClassName="text-sidebar-text-dim-2" />
           )}
         </div>
         <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

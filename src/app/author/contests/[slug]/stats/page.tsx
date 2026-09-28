@@ -139,7 +139,7 @@ export default async function AuthorContestStatsPage({
         <span>
           Số liệu từ {formatVnDateTime(stats.since)} (lúc cuộc thi mở nhận bài), không tính lượt bạn tự đọc và không dùng lượt xem trang.
           &ldquo;Độc giả đọc thật&rdquo; là người đọc đủ lâu so với độ dài chương — cùng số dùng cho xếp hạng.
-          Số phiếu được ẩn đến khi kết thúc bình chọn.
+          {data.votes.state === "hidden" ? " Số phiếu được ẩn đến khi kết thúc bình chọn." : ""}
           {data.scoresRefreshedAt ? ` Cập nhật ${formatVnDateTime(data.scoresRefreshedAt)}; tự làm mới tối đa 15 phút/lần.` : ""}
         </span>
       </div>
