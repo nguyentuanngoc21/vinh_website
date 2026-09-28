@@ -17,6 +17,7 @@ import {
   PlusIcon,
   XIcon,
   CaretDownIcon,
+  GavelIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRole } from "@/lib/role";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -26,6 +27,10 @@ export function AuthCluster() {
   const pathname = usePathname();
   const { session, isGuest, isAdmin, isLogged, logout } = useRole();
   const [menuOpen, setMenuOpen] = useState(false);
+  // Mục "Chấm giải" chỉ cho giám khảo — hỏi server 1 lần khi mở menu lần đầu
+  // (không thêm request mỗi lần tải trang). null = chưa hỏi.
+  const [isJudge, setIsJudge] = useState<boolean | null>(null);
+  const judgeCheckedFor = useRef<string | null>(null);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   // Desktop/tablet: cùng danh sách quickActions bên dưới, hiện trong 1
   // dropdown dưới nút pill "Đăng tải" thay vì FAB nổi — trước đây mỗi trang
@@ -255,7 +260,17 @@ export function AuthCluster() {
         <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={() => {
+              setMenuOpen((v) => !v);
+              const handle = session?.handle ?? "";
+              if (judgeCheckedFor.current !== handle) {
+                judgeCheckedFor.current = handle;
+                fetch("/api/judging/me")
+                  .then((res) => (res.ok ? res.json() : null))
+                  .then((data: { is_judge?: boolean } | null) => setIsJudge(Boolean(data?.is_judge)))
+                  .catch(() => setIsJudge(false));
+              }
+            }}
             title="Trang cá nhân"
             data-tour="tour-avatar"
             className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-brand-ink text-sm font-bold text-brand-gold-light"
@@ -296,6 +311,15 @@ export function AuthCluster() {
               >
                 <TrophyIcon size={18} color="var(--color-stone)" /> Thành tựu
               </Link>
+              {isJudge && (
+                <Link
+                  href="/giam-khao"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-[11px] px-[18px] py-3 text-sm font-medium text-ink no-underline transition-colors hover:bg-cream-card"
+                >
+                  <GavelIcon size={18} color="var(--color-stone)" /> Chấm giải
+                </Link>
+              )}
               <Link
                 href="/author"
                 onClick={() => setMenuOpen(false)}

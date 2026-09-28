@@ -272,6 +272,21 @@ async function requireJudge(client: Client, contestId: string, judgeId: string) 
 
 export type JudgeContestSummary = { slug: string; title: string; status: ContestStatus; entries: number; finalized: number };
 
+/** Đang được gán chấm ít nhất 1 cuộc thi đã ra khỏi bản nháp — cho mục "Chấm giải" ở menu avatar. */
+export async function isActiveJudge(client: Client, userId: string): Promise<boolean> {
+  const { data: rows, error } = await client.from("contest_judges").select("contest_id").eq("user_id", userId).is("removed_at", null);
+  throwIfError(error, "load judge assignments");
+  const ids = (rows ?? []).map((r) => r.contest_id);
+  if (ids.length === 0) return false;
+  const { count, error: contestError } = await client
+    .from("contests")
+    .select("id", { count: "exact", head: true })
+    .in("id", ids)
+    .neq("status", "draft");
+  throwIfError(contestError, "load judge contests");
+  return (count ?? 0) > 0;
+}
+
 export async function listJudgeContests(client: Client, judgeId: string): Promise<JudgeContestSummary[]> {
   const { data: rows, error } = await client.from("contest_judges").select("contest_id").eq("user_id", judgeId).is("removed_at", null);
   throwIfError(error, "list judge contests");

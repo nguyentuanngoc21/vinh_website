@@ -21,7 +21,8 @@ export const AVATAR_TONES = ["#2F5D6E", "#7A5C3E", "#4A5D3A", "#6B4356", "#3D4B7
 // Bảng nhãn hiển thị cho type giao dịch thật (transactions.type) — thay
 // cho TOKEN_LOGS mock trước đây. Không join sang chapters/books nên nhãn
 // chỉ chung chung theo loại giao dịch, không nêu tên truyện/tác giả cụ
-// thể (getTransactions() hiện chỉ select("*") trên transactions).
+// thể. Ngoại lệ: chi trả giải cuộc thi có `description` riêng (tên giải +
+// cuộc thi) từ WalletService.getTransactions() — UI ưu tiên description.
 const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   signup_bonus: "Thưởng đăng ký",
   daily_task_reward: "Nhiệm vụ ngày",
