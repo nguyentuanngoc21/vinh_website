@@ -4,6 +4,7 @@ import { checkChapterAccess } from "@/lib/reading/chapter-access";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { recordContestActivity } from "@/lib/contests/activity-service";
 
 const BODY_MAX = 2000;
 // Không mang ý nghĩa thật — app chưa có cơ chế chọn văn bản (bôi đen)
@@ -159,6 +160,8 @@ export async function POST(
   }
 
   await trackCommentQuests(supabase, { userId, chapterId, parentCommentId, parentAuthorId });
+  // Nhiệm vụ sự kiện cuộc thi (Slice 3.1) — chỉ tính khi chương thuộc bài dự thi của cuộc thi hôm nay.
+  await recordContestActivity({ userId, event: "comment", bookId: access.chapter.book_id });
 
   return NextResponse.json({
     comment: {

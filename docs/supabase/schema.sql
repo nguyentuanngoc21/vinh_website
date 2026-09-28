@@ -3197,6 +3197,7 @@ grant execute on function public.create_quest_pool_for_today to service_role;
 -- ngày đó). Ngân sách reset CHUNG 3 lần/ngày cho cả pool (không phải mỗi
 -- quest riêng) — đếm trực tiếp quest_reset_events, không cột counter
 -- riêng nào (tránh lệch nguồn sự thật).
+-- Slice 3.1 (migrations/20260927_add_contest_quests.sql): từ chối ô / mẫu sự kiện.
 create function public.reset_quest_pool_slot(
   p_user_id uuid,
   p_pool_date date,
@@ -3216,6 +3217,14 @@ begin
     for update;
   if v_pool_row is null then
     raise exception 'Quest % not found in % pool for user %', p_task_template_id, p_pool_date, p_user_id;
+  end if;
+
+  -- Slice 3.1: ô sự kiện đổi qua reset_event_quest_slot(); nhiệm vụ thường chỉ đổi sang nhiệm vụ thường.
+  if v_pool_row.slot_kind <> 'general' then
+    raise exception 'Event quest slots are reset separately' using hint = 'event_slot';
+  end if;
+  if not exists (select 1 from public.task_templates where id = p_replacement_template_id and quest_pool = 'general') then
+    raise exception 'Replacement must be a general quest' using hint = 'event_slot';
   end if;
 
   if p_task_template_id = p_replacement_template_id then
@@ -7549,3 +7558,499 @@ $$;
 
 revoke execute on function public.publish_contest_score_run(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.publish_contest_score_run(uuid, uuid, text) to service_role;
+
+-- --- Contest Engine Phase 3, Slice 3.1: nhiệm vụ sự kiện cuộc thi (1 ô sự kiện
+-- / ngày, ghi tiến độ nhận biết cuộc thi, mẫu seed). reset_quest_pool_slot đã
+-- sửa tại chỗ ở phần 10 (từ chối ô / mẫu sự kiện). Xem
+-- migrations/20260927_add_contest_quests.sql. ---
+
+-- ---------------------------------------------------------------------
+-- 1. Cột mới
+-- ---------------------------------------------------------------------
+alter table public.task_templates
+  add column if not exists quest_pool text not null default 'general',
+  add column if not exists contest_action text;
+
+do $$ begin
+  alter table public.task_templates add constraint task_templates_quest_pool_check
+    check (quest_pool in ('general', 'contest'));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.task_templates add constraint task_templates_contest_action_check
+    check (contest_action is null or contest_action in ('read_entry_chapter', 'read_hidden_gem', 'comment_entry', 'save_entry', 'vote_entry'));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.task_templates add constraint task_templates_contest_action_consistent
+    check ((quest_pool = 'contest') = (contest_action is not null));
+exception when duplicate_object then null; end $$;
+
+alter table public.user_quest_pool
+  add column if not exists slot_kind text not null default 'general',
+  add column if not exists contest_id uuid references public.contests (id) on delete cascade,
+  add column if not exists reroll_count integer not null default 0;
+
+do $$ begin
+  alter table public.user_quest_pool add constraint user_quest_pool_slot_kind_check
+    check (slot_kind in ('general', 'event') and reroll_count >= 0);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.user_quest_pool add constraint user_quest_pool_event_contest
+    check ((slot_kind = 'event') = (contest_id is not null));
+exception when duplicate_object then null; end $$;
+
+create unique index if not exists user_quest_pool_one_event_per_day
+  on public.user_quest_pool (user_id, pool_date) where slot_kind = 'event';
+
+-- ---------------------------------------------------------------------
+-- 3. Ô sự kiện
+-- ---------------------------------------------------------------------
+-- Mẫu sự kiện có dùng được cho cuộc thi lúc này không (bình chọn chỉ trong khung bình chọn).
+create or replace function public.contest_quest_available(p_template public.task_templates, p_contest public.contests)
+returns boolean
+language sql
+stable
+as $$
+  select p_template.active and p_template.quest_pool = 'contest'
+     and p_contest.status in ('submission_open', 'community_voting')
+     and (p_template.contest_action <> 'vote_entry' or (
+           p_contest.status = 'community_voting' and p_contest.voting_start is not null and p_contest.voting_end is not null
+           and now() >= p_contest.voting_start and now() < p_contest.voting_end));
+$$;
+
+-- Thêm ô sự kiện cho ngày (idempotent: đã có thì trả ô đang có). TS chọn cuộc thi (K4) + mẫu.
+create or replace function public.add_event_quest_slot(
+  p_user_id uuid,
+  p_pool_date date,
+  p_template_id uuid,
+  p_contest_id uuid
+) returns public.user_quest_pool
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row public.user_quest_pool;
+  v_template public.task_templates;
+  v_contest public.contests;
+  v_index integer;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || p_pool_date::text, 0));
+  select * into v_row from public.user_quest_pool where user_id = p_user_id and pool_date = p_pool_date and slot_kind = 'event';
+  if v_row.id is not null then
+    return v_row;
+  end if;
+
+  select * into v_template from public.task_templates where id = p_template_id;
+  select * into v_contest from public.contests where id = p_contest_id;
+  if v_template.id is null or v_contest.id is null or not public.contest_quest_available(v_template, v_contest) then
+    raise exception 'Event quest is not available' using hint = 'quest_not_available';
+  end if;
+
+  select coalesce(max(slot_index), -1) + 1 into v_index from public.user_quest_pool where user_id = p_user_id and pool_date = p_pool_date;
+  insert into public.user_quest_pool (user_id, pool_date, task_template_id, slot_index, slot_kind, contest_id)
+  values (p_user_id, p_pool_date, p_template_id, v_index, 'event', p_contest_id)
+  returning * into v_row;
+  insert into public.user_daily_tasks (user_id, template_id, task_date)
+  values (p_user_id, p_template_id, p_pool_date)
+  on conflict (user_id, template_id, task_date) do nothing;
+  return v_row;
+end;
+$$;
+
+revoke execute on function public.add_event_quest_slot(uuid, date, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.add_event_quest_slot(uuid, date, uuid, uuid) to service_role;
+
+-- Đổi nhiệm vụ sự kiện (K3: tối đa p_max_rerolls lần/ngày, tách khỏi ngân sách chung). Giữ nguyên cuộc thi.
+create or replace function public.reset_event_quest_slot(
+  p_user_id uuid,
+  p_pool_date date,
+  p_replacement_template_id uuid,
+  p_max_rerolls integer
+) returns public.user_quest_pool
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row public.user_quest_pool;
+  v_template public.task_templates;
+  v_contest public.contests;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || p_pool_date::text, 0));
+  select * into v_row from public.user_quest_pool
+  where user_id = p_user_id and pool_date = p_pool_date and slot_kind = 'event' for update;
+  if v_row.id is null then
+    raise exception 'No event quest today' using hint = 'quest_not_available';
+  end if;
+  if v_row.reroll_count >= p_max_rerolls then
+    raise exception 'Event quest reroll limit reached' using hint = 'event_reroll_limit';
+  end if;
+  if exists (
+    select 1 from public.user_daily_tasks
+    where user_id = p_user_id and template_id = v_row.task_template_id and task_date = p_pool_date and completed
+  ) then
+    raise exception 'Cannot reset a completed quest' using hint = 'event_reroll_limit';
+  end if;
+  select * into v_template from public.task_templates where id = p_replacement_template_id;
+  select * into v_contest from public.contests where id = v_row.contest_id;
+  if v_template.id is null or v_template.id = v_row.task_template_id or not public.contest_quest_available(v_template, v_contest) then
+    raise exception 'Replacement event quest is not available' using hint = 'quest_not_available';
+  end if;
+
+  update public.user_quest_pool
+     set task_template_id = p_replacement_template_id, reroll_count = reroll_count + 1
+   where id = v_row.id
+  returning * into v_row;
+  insert into public.user_daily_tasks (user_id, template_id, task_date)
+  values (p_user_id, p_replacement_template_id, p_pool_date)
+  on conflict (user_id, template_id, task_date) do nothing;
+  return v_row;
+end;
+$$;
+
+revoke execute on function public.reset_event_quest_slot(uuid, date, uuid, integer) from public, anon, authenticated;
+grant execute on function public.reset_event_quest_slot(uuid, date, uuid, integer) to service_role;
+
+-- ---------------------------------------------------------------------
+-- 4. Ghi tiến độ nhiệm vụ sự kiện
+-- ---------------------------------------------------------------------
+-- p_event: 'chapter_completed' | 'comment' | 'reading_list_add' | 'vote'.
+-- Trả true nếu tiến độ nhiệm vụ sự kiện hôm nay tăng.
+-- Slice 3.2 (migrations/20260927_add_contest_passport.sql): ghi Passport trước nhiệm vụ sự kiện.
+create or replace function public.record_contest_activity(
+  p_user_id uuid,
+  p_event text,
+  p_book_id uuid,
+  p_chapter_id uuid default null
+) returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_slot public.user_quest_pool;
+  v_template public.task_templates;
+  v_contest public.contests;
+  v_entry record;
+  v_sub uuid;
+  v_author uuid;
+  v_words integer;
+  v_active integer;
+  v_updated integer;
+  v_meaningful boolean;
+begin
+  -- Thời gian đọc thật của chương (dùng chung cho Passport + nhiệm vụ).
+  if p_event = 'chapter_completed' then
+    select public.contest_word_count(ch.content) into v_words
+    from public.chapters ch
+    where ch.id = p_chapter_id and ch.book_id = p_book_id and ch.published and ch.removed_at is null;
+    if v_words is null then
+      return false;
+    end if;
+    select coalesce(sum(rs.active_seconds), 0)::integer into v_active
+    from public.reading_sessions rs where rs.user_id = p_user_id and rs.chapter_id = p_chapter_id;
+  end if;
+
+  -- ===== Passport (Slice 3.2): mọi cuộc thi trong mùa có bài này =====
+  for v_entry in
+    select s.id as sub_id, s.author_id, c.*
+    from public.contest_submissions s
+    join public.contests c on c.id = s.contest_id
+    join public.books b on b.id = s.book_id and b.published and b.deleted_at is null
+    where s.book_id = p_book_id and s.status in ('eligible', 'shortlisted')
+      and c.status in ('submission_open', 'submission_closed', 'community_voting', 'judging')
+      and s.author_id <> p_user_id
+  loop
+    if p_event = 'chapter_completed' then
+      v_meaningful := v_active >= greatest(
+        coalesce((v_entry.scoring_config ->> 'meaningful_read_min_seconds')::numeric, 30),
+        ceil(coalesce((v_entry.scoring_config ->> 'meaningful_read_ratio')::numeric, 0.4) * v_words * 60.0
+             / coalesce((v_entry.scoring_config ->> 'reading_words_per_minute')::numeric, 250)));
+      if v_meaningful then
+        insert into public.contest_passport_reads (user_id, contest_id, submission_id, chapter_id, read_day, hidden_gem)
+        values (p_user_id, v_entry.id, v_entry.sub_id, p_chapter_id, (now() at time zone 'Asia/Ho_Chi_Minh')::date,
+          coalesce((select sc.valid_readers from public.contest_submission_scores sc where sc.submission_id = v_entry.sub_id), 0)
+            < coalesce((v_entry.scoring_config ->> 'hidden_gem_max_readers')::integer, 100)
+          or p_book_id not in (
+            select s2.book_id from public.contest_submissions s2
+            join public.books b2 on b2.id = s2.book_id and b2.published and b2.deleted_at is null
+            where s2.contest_id = v_entry.id and s2.status in ('eligible', 'shortlisted')
+            order by b2.view_count desc, s2.submitted_at asc, s2.id asc
+            limit 10))
+        on conflict (user_id, contest_id, chapter_id, read_day) do nothing;
+      end if;
+    end if;
+    perform public.contest_passport_state(p_user_id, v_entry.id, true);
+  end loop;
+
+  -- ===== Nhiệm vụ sự kiện (Slice 3.1) =====
+  select * into v_slot from public.user_quest_pool
+  where user_id = p_user_id and pool_date = current_date and slot_kind = 'event';
+  if v_slot.id is null then
+    return false;
+  end if;
+  select * into v_template from public.task_templates where id = v_slot.task_template_id;
+  if not (
+    (p_event = 'chapter_completed' and v_template.contest_action in ('read_entry_chapter', 'read_hidden_gem'))
+    or (p_event = 'comment' and v_template.contest_action = 'comment_entry')
+    or (p_event = 'reading_list_add' and v_template.contest_action = 'save_entry')
+    or (p_event = 'vote' and v_template.contest_action = 'vote_entry')
+  ) then
+    return false;
+  end if;
+
+  select * into v_contest from public.contests where id = v_slot.contest_id;
+  select s.id, s.author_id into v_sub, v_author
+  from public.contest_submissions s
+  join public.books b on b.id = s.book_id and b.published and b.deleted_at is null
+  where s.contest_id = v_slot.contest_id and s.book_id = p_book_id and s.status in ('eligible', 'shortlisted');
+  if v_sub is null or v_author = p_user_id then
+    return false;
+  end if;
+
+  if p_event = 'chapter_completed' then
+    -- K7: tới cuối chương VÀ thời gian đọc thật ≥ ngưỡng đọc thật của cuộc thi.
+    if v_active < greatest(
+      coalesce((v_contest.scoring_config ->> 'meaningful_read_min_seconds')::numeric, 30),
+      ceil(coalesce((v_contest.scoring_config ->> 'meaningful_read_ratio')::numeric, 0.4) * v_words * 60.0
+           / coalesce((v_contest.scoring_config ->> 'reading_words_per_minute')::numeric, 250))) then
+      return false;
+    end if;
+    if v_template.contest_action = 'read_hidden_gem' and not (
+      coalesce((select sc.valid_readers from public.contest_submission_scores sc where sc.submission_id = v_sub), 0)
+        < coalesce((v_contest.scoring_config ->> 'hidden_gem_max_readers')::integer, 100)
+      or p_book_id not in (
+        select s.book_id from public.contest_submissions s
+        join public.books b on b.id = s.book_id and b.published and b.deleted_at is null
+        where s.contest_id = v_slot.contest_id and s.status in ('eligible', 'shortlisted')
+        order by b.view_count desc, s.submitted_at asc, s.id asc
+        limit 10)
+    ) then
+      return false;
+    end if;
+  end if;
+
+  insert into public.user_daily_tasks (user_id, template_id, task_date)
+  values (p_user_id, v_template.id, v_slot.pool_date)
+  on conflict (user_id, template_id, task_date) do nothing;
+  update public.user_daily_tasks
+     set progress = least(progress + 1, v_template.target_count),
+         completed = (progress + 1) >= v_template.target_count
+   where user_id = p_user_id and template_id = v_template.id and task_date = v_slot.pool_date and not completed;
+  get diagnostics v_updated = row_count;
+  return v_updated > 0;
+end;
+$$;
+
+revoke execute on function public.record_contest_activity(uuid, text, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.record_contest_activity(uuid, text, uuid, uuid) to service_role;
+
+-- ---------------------------------------------------------------------
+-- 5. Mẫu nhiệm vụ sự kiện (K1, K2 — admin chỉnh thưởng / thêm mẫu sau)
+-- ---------------------------------------------------------------------
+insert into public.task_templates (code, title, description, for_role, quest_type, target_count, reward_tokens, active, quest_pool, contest_action)
+values
+  ('contest_read_entry_chapter', 'Đọc 1 chương bài dự thi', 'Đọc hết 1 chương của một tác phẩm đang dự thi — đọc thật, không lướt.', null, null, 1, 10, true, 'contest', 'read_entry_chapter'),
+  ('contest_read_hidden_gem', 'Tìm viên ngọc ẩn', 'Đọc hết 1 chương của một tác phẩm dự thi còn ít người đọc (hàng "Viên ngọc ẩn").', null, null, 1, 12, true, 'contest', 'read_hidden_gem'),
+  ('contest_comment_entry', 'Góp ý cho bài dự thi', 'Để lại 1 bình luận ở một tác phẩm đang dự thi.', null, null, 1, 8, true, 'contest', 'comment_entry'),
+  ('contest_save_entry', 'Lưu bài dự thi', 'Thêm 1 tác phẩm dự thi vào danh sách đọc của bạn.', null, null, 1, 6, true, 'contest', 'save_entry'),
+  ('contest_vote_entry', 'Bình chọn cho bài đã đọc', 'Bình chọn cho 1 tác phẩm dự thi bạn đã đọc hết ít nhất 1 chương.', null, null, 1, 8, true, 'contest', 'vote_entry')
+on conflict (code) do nothing;
+
+-- --- Contest Engine Phase 3, Slice 3.2: Contest Passport (7 cột mốc / cuộc
+-- thi, huy hiệu "Người đi hết mùa thi"). record_contest_activity đã sửa tại
+-- chỗ ở khối Slice 3.1. Xem migrations/20260927_add_contest_passport.sql. ---
+
+create table if not exists public.contest_passport_reads (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  contest_id uuid not null,
+  submission_id uuid not null,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  read_day date not null,           -- ngày theo giờ Việt Nam
+  hidden_gem boolean not null default false,
+  created_at timestamptz not null default now(),
+  primary key (user_id, contest_id, chapter_id, read_day),
+  constraint contest_passport_reads_submission_fk foreign key (submission_id, contest_id)
+    references public.contest_submissions (id, contest_id) on delete cascade
+);
+
+create index if not exists contest_passport_reads_contest_user_idx on public.contest_passport_reads (contest_id, user_id);
+
+create table if not exists public.contest_passports (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  contest_id uuid not null references public.contests (id) on delete cascade,
+  completed_at timestamptz not null default now(),
+  primary key (user_id, contest_id)
+);
+
+alter table public.contest_passport_reads enable row level security;
+alter table public.contest_passports enable row level security;
+revoke all on public.contest_passport_reads, public.contest_passports from anon, authenticated;
+
+-- Trạng thái Passport của 1 người ở 1 cuộc thi: { milestones: [{code, progress, target}], completed_at }.
+-- p_record_completion = true: đủ mốc thì ghi huy hiệu (chỉ trong mùa thi).
+create or replace function public.contest_passport_state(p_user_id uuid, p_contest_id uuid, p_record_completion boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_contest public.contests;
+  v_read_entries integer;
+  v_authors integer;
+  v_finished integer;
+  v_gems integer;
+  v_comments integer;
+  v_votes integer;
+  v_days integer;
+  v_milestones jsonb;
+  v_done boolean;
+  v_completed timestamptz;
+begin
+  select * into v_contest from public.contests where id = p_contest_id;
+  if not found then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+
+  select count(distinct r.submission_id), count(distinct s.author_id), count(distinct r.read_day),
+         count(distinct r.submission_id) filter (where r.hidden_gem)
+    into v_read_entries, v_authors, v_days, v_gems
+  from public.contest_passport_reads r
+  join public.contest_submissions s on s.id = r.submission_id
+  where r.user_id = p_user_id and r.contest_id = p_contest_id;
+
+  select count(*) into v_finished
+  from (
+    select r.submission_id
+    from public.contest_passport_reads r
+    join public.contest_submissions s on s.id = r.submission_id
+    join public.chapters ch on ch.id = r.chapter_id and ch.book_id = s.book_id and ch.published and ch.removed_at is null
+    where r.user_id = p_user_id and r.contest_id = p_contest_id
+    group by r.submission_id, s.book_id
+    having count(distinct r.chapter_id) >= (
+      select count(*) from public.chapters c2 where c2.book_id = s.book_id and c2.published and c2.removed_at is null)
+  ) x;
+
+  select count(*) into v_comments
+  from public.anchored_comments ac
+  join public.chapters ch on ch.id = ac.chapter_id
+  join public.contest_submissions s on s.book_id = ch.book_id and s.contest_id = p_contest_id and s.status in ('eligible', 'shortlisted')
+  where ac.user_id = p_user_id and ac.user_id <> s.author_id and ac.created_at >= v_contest.submission_start;
+
+  select count(*) into v_votes
+  from public.contest_votes v
+  join public.contest_submissions s on s.id = v.submission_id and s.status in ('eligible', 'shortlisted')
+  where v.user_id = p_user_id and v.contest_id = p_contest_id;
+
+  v_milestones := jsonb_build_array(
+    jsonb_build_object('code', 'read_entry', 'progress', least(v_read_entries, 1), 'target', 1),
+    jsonb_build_object('code', 'read_3_authors', 'progress', least(v_authors, 3), 'target', 3),
+    jsonb_build_object('code', 'finish_entry', 'progress', least(v_finished, 1), 'target', 1),
+    jsonb_build_object('code', 'hidden_gem', 'progress', least(v_gems, 1), 'target', 1),
+    jsonb_build_object('code', 'comment_entry', 'progress', least(v_comments, 1), 'target', 1),
+    jsonb_build_object('code', 'vote_3', 'progress', least(v_votes, 3), 'target', 3),
+    jsonb_build_object('code', 'return_3_days', 'progress', least(v_days, 3), 'target', 3)
+  );
+  v_done := not exists (
+    select 1 from jsonb_array_elements(v_milestones) m where (m ->> 'progress')::integer < (m ->> 'target')::integer);
+
+  if v_done and p_record_completion
+     and v_contest.status in ('submission_open', 'submission_closed', 'community_voting', 'judging') then
+    insert into public.contest_passports (user_id, contest_id) values (p_user_id, p_contest_id)
+    on conflict (user_id, contest_id) do nothing;
+  end if;
+  select completed_at into v_completed from public.contest_passports where user_id = p_user_id and contest_id = p_contest_id;
+
+  return jsonb_build_object('milestones', v_milestones, 'completed_at', v_completed);
+end;
+$$;
+
+revoke execute on function public.contest_passport_state(uuid, uuid, boolean) from public, anon, authenticated;
+grant execute on function public.contest_passport_state(uuid, uuid, boolean) to service_role;
+
+-- --- Contest Engine Phase 3, Slice 3.4: chụp hạng BXH mỗi ngày (cột "Thay
+-- đổi" ▲▼, K9). Xem migrations/20260928_add_contest_rank_snapshots.sql. ---
+
+create table if not exists public.contest_rank_snapshots (
+  contest_id uuid not null references public.contests (id) on delete cascade,
+  kind text not null check (kind in ('popular', 'trending')),
+  snapshot_day date not null,       -- ngày theo giờ Việt Nam
+  submission_id uuid not null,
+  rank integer not null check (rank > 0),
+  created_at timestamptz not null default now(),
+  primary key (contest_id, kind, snapshot_day, submission_id),
+  constraint contest_rank_snapshots_submission_fk foreign key (submission_id, contest_id)
+    references public.contest_submissions (id, contest_id) on delete cascade
+);
+
+alter table public.contest_rank_snapshots enable row level security;
+revoke all on public.contest_rank_snapshots from anon, authenticated;
+
+-- Chụp hạng của 1 cuộc thi cho ngày p_day (mặc định: hôm nay giờ VN).
+-- Trả số dòng đã ghi (0 nếu ngoài giai đoạn hoặc đã chụp).
+create or replace function public.snapshot_contest_ranks(p_contest_id uuid, p_day date default null)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status public.contest_status;
+  v_day date := coalesce(p_day, (now() at time zone 'Asia/Ho_Chi_Minh')::date);
+  v_total integer := 0;
+  v_page integer;
+  v_rank integer;
+  v_at timestamptz;
+  v_id uuid;
+  r record;
+begin
+  select c.status into v_status from public.contests c where c.id = p_contest_id;
+  if v_status is null then
+    raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
+  end if;
+
+  -- Bảng phiếu bình chọn: chỉ biến động trong khung bình chọn.
+  if v_status = 'community_voting' and not exists (
+    select 1 from public.contest_rank_snapshots s
+     where s.contest_id = p_contest_id and s.kind = 'popular' and s.snapshot_day = v_day
+  ) then
+    v_rank := null; v_at := null; v_id := null;
+    loop
+      v_page := 0;
+      for r in select * from public.get_contest_ranking(p_contest_id, 100, v_rank, v_at, v_id) loop
+        insert into public.contest_rank_snapshots (contest_id, kind, snapshot_day, submission_id, rank)
+        values (p_contest_id, 'popular', v_day, r.submission_id, r.rank);
+        v_page := v_page + 1;
+        v_rank := r.rank; v_at := r.submitted_at; v_id := r.submission_id;
+      end loop;
+      v_total := v_total + v_page;
+      exit when v_page < 100;
+    end loop;
+  end if;
+
+  -- Trending: từ lúc nhận bài đến hết chấm (cùng tập cuộc thi được cron tính lại điểm).
+  if v_status in ('submission_open', 'submission_closed', 'community_voting', 'judging') and not exists (
+    select 1 from public.contest_rank_snapshots s
+     where s.contest_id = p_contest_id and s.kind = 'trending' and s.snapshot_day = v_day
+  ) then
+    v_rank := null; v_at := null; v_id := null;
+    loop
+      v_page := 0;
+      for r in select * from public.get_contest_score_ranking(p_contest_id, 'trending', 100, v_rank, v_at, v_id) loop
+        insert into public.contest_rank_snapshots (contest_id, kind, snapshot_day, submission_id, rank)
+        values (p_contest_id, 'trending', v_day, r.submission_id, r.rank);
+        v_page := v_page + 1;
+        v_rank := r.rank; v_at := r.submitted_at; v_id := r.submission_id;
+      end loop;
+      v_total := v_total + v_page;
+      exit when v_page < 100;
+    end loop;
+  end if;
+
+  return v_total;
+end;
+$$;
+
+revoke execute on function public.snapshot_contest_ranks(uuid, date) from public, anon, authenticated;
+grant execute on function public.snapshot_contest_ranks(uuid, date) to service_role;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   FlameIcon,
   BookOpenIcon,
@@ -11,6 +12,7 @@ import {
   CoinsIcon,
   TargetIcon,
   ArrowsCounterClockwiseIcon,
+  TrophyIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Alert, Skeleton } from "@/components/ui";
 
@@ -27,6 +29,10 @@ type QuestSlot = {
   completed: boolean;
   claimed: boolean;
   resetCount: number;
+  /** Contest Quest (Slice 3.1): ô nhiệm vụ sự kiện cuộc thi — tối đa 1/ngày, đổi riêng. */
+  slotKind?: "general" | "event";
+  contest?: { slug: string; title: string } | null;
+  eventRerollsLeft?: number | null;
 };
 
 type PoolResponse = {
@@ -197,17 +203,19 @@ export function DailyTasksTab() {
           {slots.map((slot) => {
             const done = slot.completed;
             const fraction = slot.targetCount > 0 ? Math.min(1, slot.progress / slot.targetCount) : 0;
-            const Icon = (slot.questType && QUEST_TYPE_ICONS[slot.questType]) || TargetIcon;
-            const typeLabel = (slot.questType && QUEST_TYPE_LABELS[slot.questType]) || "Nhiệm vụ";
+            const isEvent = slot.slotKind === "event";
+            const Icon = isEvent ? TrophyIcon : (slot.questType && QUEST_TYPE_ICONS[slot.questType]) || TargetIcon;
+            const typeLabel = isEvent ? "Sự kiện" : (slot.questType && QUEST_TYPE_LABELS[slot.questType]) || "Nhiệm vụ";
             const claimPending = pendingId === slot.userDailyTaskId;
             const resetPending = pendingId === slot.taskTemplateId;
-            const canReset = !done && resetsRemaining > 0 && !resetPending;
+            // Ô sự kiện đổi bằng lượt riêng (1/ngày), không trừ lượt đổi chung.
+            const canReset = !done && !resetPending && (isEvent ? (slot.eventRerollsLeft ?? 0) > 0 : resetsRemaining > 0);
 
             return (
               <div
                 key={slot.taskTemplateId}
                 style={{ background: done && !slot.claimed ? "#FCFAF4" : "#fff" }}
-                className="flex items-center gap-4 rounded-2xl border border-cream px-5 py-[18px]"
+                className={`flex items-center gap-4 rounded-2xl border px-5 py-[18px] ${isEvent ? "border-cream-gold-border" : "border-cream"}`}
               >
                 <div
                   style={{
@@ -219,12 +227,17 @@ export function DailyTasksTab() {
                   <Icon size={19} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <div className="text-[15px] font-semibold text-ink">{slot.title}</div>
-                    <span className="rounded-full bg-[#f2f1ee] px-2 py-0.5 text-[10.5px] font-medium text-stone-dark">
+                    <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${isEvent ? "bg-cream-gold text-cream-gold-text" : "bg-[#f2f1ee] text-stone-dark"}`}>
                       {typeLabel}
                     </span>
                   </div>
+                  {isEvent && slot.contest && (
+                    <Link href={`/cuoc-thi/${slot.contest.slug}`} className="mt-0.5 inline-block text-[12px] font-semibold text-brand-gold-dark no-underline">
+                      {slot.contest.title} →
+                    </Link>
+                  )}
                   <div className="mt-1 text-[12.5px] text-stone">
                     {slot.description ?? `Đã ${slot.progress}/${slot.targetCount}`}
                   </div>
@@ -243,7 +256,7 @@ export function DailyTasksTab() {
                         type="button"
                         onClick={() => handleReset(slot)}
                         disabled={resetPending}
-                        title="Đổi quest này"
+                        title={isEvent ? "Đổi nhiệm vụ sự kiện (1 lần/ngày)" : "Đổi quest này"}
                         className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-cream text-stone-dark disabled:cursor-default disabled:opacity-55"
                       >
                         <ArrowsCounterClockwiseIcon size={15} />

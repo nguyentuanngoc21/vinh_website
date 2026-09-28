@@ -31,6 +31,8 @@ import { toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-book
 import { freezeScores, getScoreState, getSubmissionScores } from "@/lib/contests/scores-service";
 import { getPublishedRun } from "@/lib/contests/final-scoring-service";
 import { HIDDEN_GEM_COUNT, pickHiddenGems, trendingGrowth, type TrendingGrowth } from "@/lib/contests/signals";
+import type { RankChange } from "@/lib/contests/rank-change";
+import { loadRankChanges } from "@/lib/contests/rank-snapshot-service";
 
 type Client = SupabaseClient<Database>;
 type BookRow = Database["public"]["Tables"]["books"]["Row"];
@@ -57,10 +59,18 @@ export type RankingEntry = {
   value: number | null;
   /** Chỉ BXH Trending: % tăng so với 7 ngày trước đó (P4). */
   growth: TrendingGrowth | null;
+  /** Cột "Thay đổi" (Slice 3.4): so với bản chụp 0h giờ VN. null khi bảng không có bản chụp. */
+  change: RankChange | null;
   book: HomepageBook;
 };
 
-export type RankingPage = { items: RankingEntry[]; next_cursor: string | null; values_visible: boolean };
+export type RankingPage = {
+  items: RankingEntry[];
+  next_cursor: string | null;
+  values_visible: boolean;
+  /** Bảng có cột "Thay đổi": Bảng phiếu trong lúc bình chọn, Trending — khi đã có bản chụp. */
+  changes_visible: boolean;
+};
 
 export type SignalCard = { submission_id: string; book: HomepageBook; growth: TrendingGrowth | null };
 
@@ -160,8 +170,13 @@ export async function getPopularRanking(
     p_after_id: cursor?.id ?? null,
   };
 
-  const { rows } = await popularRankingRows(client, input.contest, input.capabilities, page);
-  return toRankingPage(client, rows, { limit, valuesVisible: input.capabilities.popular_values_visible, growth: null });
+  const { rows, finalScores } = await popularRankingRows(client, input.contest, input.capabilities, page);
+  // Hạng bảng phiếu chỉ biến động trong khung bình chọn (K9).
+  const changes =
+    input.contest.status === "community_voting" && !finalScores
+      ? await loadRankChanges(client, { contestId: input.contest.id, kind: "popular", rows })
+      : null;
+  return toRankingPage(client, rows, { limit, valuesVisible: input.capabilities.popular_values_visible, growth: null, changes });
 }
 
 /**
@@ -188,7 +203,12 @@ type RankedRpcRow = { submission_id: string; book_id: string; value: number; sub
 async function toRankingPage(
   client: Client,
   rows: RankedRpcRow[],
-  input: { limit: number; valuesVisible: boolean; growth: Map<string, TrendingGrowth | null> | null }
+  input: {
+    limit: number;
+    valuesVisible: boolean;
+    growth: Map<string, TrendingGrowth | null> | null;
+    changes?: Map<string, RankChange> | null;
+  }
 ): Promise<RankingPage> {
   const cards = await cardsFor(client, rows.map((r) => r.book_id));
   const items: RankingEntry[] = [];
@@ -201,6 +221,7 @@ async function toRankingPage(
       tied: r.tied,
       value: input.valuesVisible ? r.value : null,
       growth: input.growth?.get(r.submission_id) ?? null,
+      change: input.changes?.get(r.submission_id) ?? null,
       book,
     });
   }
@@ -213,6 +234,7 @@ async function toRankingPage(
         ? encodeRankingCursor({ rank: last.rank, submitted_at: last.submitted_at, id: last.submission_id })
         : null,
     values_visible: input.valuesVisible,
+    changes_visible: Boolean(input.changes),
   };
 }
 
@@ -245,7 +267,8 @@ export async function getTrendingRanking(
       return [r.submission_id, s ? trendingGrowth(s.readers_7d, s.readers_prev_7d) : null] as const;
     })
   );
-  return toRankingPage(client, rows, { limit, valuesVisible: true, growth });
+  const changes = await loadRankChanges(client, { contestId: input.contest.id, kind: "trending", rows });
+  return toRankingPage(client, rows, { limit, valuesVisible: true, growth, changes });
 }
 
 /** Hàng "Đang được chú ý" (attention) / "Đang tăng tốc" (trending) — không hiển thị điểm. */

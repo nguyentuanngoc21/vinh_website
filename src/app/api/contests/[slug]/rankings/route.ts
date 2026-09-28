@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     };
     if (kind === "final" || kind === "jury") {
       const page = await getScoredRanking(client, { contest, capabilities, kind });
-      return Response.json(page ?? { items: [], next_cursor: null, values_visible: true }, { headers: PRIVATE_NO_STORE });
+      return Response.json(page ?? { items: [], next_cursor: null, values_visible: true, changes_visible: false }, { headers: PRIVATE_NO_STORE });
     }
     if (kind === "trending") {
       // Chỉ trang đầu gọi làm mới bảng điểm (SQL tự bỏ qua nếu chưa quá 15 phút).

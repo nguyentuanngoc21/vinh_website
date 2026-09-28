@@ -1299,3 +1299,72 @@ Pipeline: RAW METRIC → điều chỉnh độ tin cậy (Bayesian cho tỷ lệ
 - Cuộc thi đã lưu cấu hình chấm chỉ chuyển sang "Đã có kết quả" khi đã có lượt công bố (`score_run_not_published`).
 - Microsite (sau công bố): BXH "Chung cuộc" (hạng đã lưu) và "Ban giám khảo" (điểm BGK, đồng điểm cùng hạng) từ lượt đang công bố; tab Kết quả mở sẵn Chung cuộc. Cuộc thi không chấm chung cuộc vẫn hiện "công bố qua danh sách giải".
 - J1: "Độc giả yêu thích" → "Bảng phiếu bình chọn" (BXH, thẻ bài của tác giả, thống kê tác giả); cuộc thi chấm chung cuộc có ghi chú giải "Tác phẩm được yêu thích nhất" xét theo tỷ lệ phiếu.
+
+## XXII. PHASE 3 — KHẢO SÁT & KẾ HOẠCH (27/09/2026)
+
+### 1. Khảo sát engine nhiệm vụ hiện có
+
+| Thành phần | Hiện trạng | Hệ quả cho Contest Quest |
+|---|---|---|
+| `task_templates` | `code` unique toàn cục, `target_count`, `reward_tokens`, `quest_type`, `for_role` | Cần thêm `quest_pool` + `contest_id` + `contest_action` (VIII.1) |
+| `increment_task_progress(user, code)` | Cộng tiến độ theo **mã toàn cục**, không kiểm nhiệm vụ có trong pool hôm nay, không biết sách / cuộc thi | Không dùng được cho nhiệm vụ cuộc thi — cần đường ghi mới nhận biết cuộc thi (chỉ tính hành động trên bài của đúng cuộc thi) |
+| `user_quest_pool` | 3–5 ô/ngày, ngày theo UTC, tạo lười khi mở `/nhiem-vu` | Thêm `slot_kind` + unique 1 ô sự kiện/ngày |
+| `reset_quest_pool_slot` | Ngân sách 3 lần/ngày chung, thay cùng `quest_type`, cooldown 3 ngày | Thêm: ô sự kiện chỉ đổi sang nhiệm vụ sự kiện (DB enforce) |
+| Điểm ghi tiến độ | ~12 route gọi `incrementTaskProgress` (đọc hết chương qua `reading-event-service`, bình luận, lưu danh sách, theo dõi, bình chọn nhân vật, chia sẻ…) | Móc thêm 1 lời gọi "hành động cuộc thi" ở các điểm tương ứng |
+| "Đọc hết chương" | `record_chapter_read` khi tới đoạn cuối — cuộn nhanh vẫn tính | Nhiệm vụ / Passport có thưởng nên kiểm thêm thời gian đọc thật (reading_sessions, Slice 2.1) |
+| Thành tựu | `achievement_templates` (metric + threshold + reward) | Huy hiệu "Người đi hết mùa thi" đi qua engine này |
+
+### 2. Slice đề xuất
+
+```
+3.1 Contest Quest — ô sự kiện 1/ngày, nhiệm vụ theo cuộc thi, ghi tiến độ nhận biết cuộc thi
+3.2 Contest Passport — cột mốc theo cuộc thi, sự kiện idempotent, "Hành trình của bạn" (microsite + hub), huy hiệu
+3.3 Mục "Cuộc thi" trong hồ sơ Kết nối (K8) — cuộc thi đã tham gia, thứ hạng, giải
+3.4 Cột "Thay đổi" ▲▼ ở BXH — chụp hạng mỗi ngày 0h VN
+(để sau) Vòng loại / shortlist — mùa đầu chấm mọi bài (J6)
+```
+
+### 3. Câu hỏi cần chốt
+
+Kết quả chốt 27/09/2026:
+
+| # | Câu hỏi | Kết quả |
+|---|---|---|
+| K1 | Hành động nhiệm vụ sự kiện | **Đồng ý**: đọc 1 chương bài dự thi; đọc 1 truyện "Viên ngọc ẩn"; bình luận 1 bài; lưu 1 bài vào danh sách đọc; bình chọn 1 bài đã đọc (trong khung bình chọn). Không nhiệm vụ nào chỉ định 1 bài cụ thể. Chủ dự án có thể bổ sung nhiệm vụ sau |
+| K2 | Thưởng | **Đồng ý**: token, cùng mức nhiệm vụ thường, admin đặt theo từng mẫu |
+| K3 | Đổi nhiệm vụ sự kiện | **Đồng ý**: 1 lần/ngày, tách khỏi 3 lượt đổi chung |
+| K4 | Nhiều cuộc thi cùng mở | **Đồng ý**: bốc 1 cuộc thi/ngày, cuộc thi nổi bật trọng số ×2 |
+| K5 | Cột mốc Passport | **Đồng ý**: đọc 1 bài; đọc bài của 3 tác giả; đọc hết 1 tác phẩm; đọc 1 Viên ngọc ẩn; bình luận 1 bài; bình chọn 3 bài; quay lại 3 ngày khác nhau |
+| K6 | Thưởng Passport | **Tạm thời chỉ huy hiệu** (không token) |
+| K7 | Chương "đã đọc" cho nhiệm vụ / Passport | **Đồng ý**: tới cuối chương **và** thời gian đọc thật đạt ngưỡng đọc thật |
+| K8 | Chứng nhận | **Chưa cần giấy chứng nhận.** Thay bằng mục **"Cuộc thi"** trong hồ sơ ở Kết nối, cùng cấp Truyện chữ / Audio / Design: mỗi hồ sơ có danh sách cuộc thi đã tham gia + thứ hạng (+ giải) |
+| K9 | Cột "Thay đổi" hạng | **Đồng ý**: chụp hạng mỗi ngày 0h VN, ▲▼ so với hôm qua; lúc bình chọn vẫn chỉ hiện hạng |
+
+### 4. Slice 3.1 — đã triển khai (27/09/2026)
+
+- `migrations/20260927_add_contest_quests.sql`: `task_templates.quest_pool` / `contest_action`; `user_quest_pool.slot_kind` / `contest_id` / `reroll_count` + unique 1 ô sự kiện/ngày; `reset_quest_pool_slot` định nghĩa lại (từ chối ô / mẫu sự kiện); `add_event_quest_slot`, `reset_event_quest_slot` (K3: 1 lần/ngày), `record_contest_activity`; 5 mẫu seed (thưởng 6–12 token — admin chỉnh).
+- Mẫu nhiệm vụ sự kiện là mẫu chung; cuộc thi của ngày nằm trên ô pool (bốc theo K4). Mẫu seed có `quest_type` NULL → code cũ không bốc nhầm vào pool thường.
+- Ghi tiến độ: đọc hết chương (`reading-event-service`), bình luận, thêm vào danh sách đọc, bình chọn → `src/lib/contests/activity-service.ts`. Chỉ tính bài hợp lệ của đúng cuộc thi, không phải tác giả; đọc cần đạt ngưỡng đọc thật (K7); "Viên ngọc ẩn" cùng tiêu chí với hàng khám phá.
+- `/nhiem-vu`: ô sự kiện có nhãn "Sự kiện" + tên cuộc thi (link), đổi bằng lượt riêng. API `/api/quests/pool` thêm `slotKind`, `contest`, `eventRerollsLeft` (app mobile cũ bỏ qua được).
+- Đã biết: bình chọn rồi bỏ phiếu vẫn giữ tiến độ nhiệm vụ bình chọn trong ngày (không cộng lại được lần 2). Khối "Nhiệm vụ sự kiện" trên microsite làm cùng Passport (Slice 3.2).
+
+### 5. Slice 3.2 — đã triển khai (27/09/2026)
+
+- `migrations/20260927_add_contest_passport.sql`: `contest_passport_reads` (đọc thật, idempotent theo người × cuộc thi × chương × ngày VN, ghi cờ "Viên ngọc ẩn" lúc đọc), `contest_passports` (huy hiệu "Người đi hết mùa thi" — chỉ huy hiệu, K6), `contest_passport_state()` (nguồn duy nhất của 7 mốc K5 + mục tiêu). `record_contest_activity()` định nghĩa lại: ghi Passport cho mọi cuộc thi trong mùa có bài đó, rồi nhiệm vụ sự kiện như 3.1.
+- Bình luận / bình chọn đếm thẳng từ dữ liệu (rút phiếu → mốc tự trừ; huy hiệu đã đạt vẫn giữ). Mùa thi = `submission_open` → `judging`.
+- Microsite tab Khám phá: khối "Hành trình của bạn" (7 mốc + nhiệm vụ sự kiện hôm nay nếu thuộc cuộc thi này). Hub `/cuoc-thi`: tóm tắt x/7 mốc hoặc huy hiệu theo từng cuộc thi trong mùa.
+
+### 6. Slice 3.3 — đã triển khai (28/09/2026)
+
+- Không có migration: đọc bảng sẵn có (`contest_submissions`, `contest_awards`, `contest_score_runs`/`contest_score_snapshots` — Slice 2.6, `contest_passports` — Slice 3.2).
+- `src/lib/contests/profile-contests.ts` → mục "Cuộc thi" trong hồ sơ Kết nối, cùng cấp Truyện chữ / Audio / Design (K8). Mỗi dòng: bài dự thi hợp lệ (đang diễn ra → "Đang dự thi"; đã công bố kết quả → tên giải chưa thu hồi + "Hạng #N chung cuộc" từ lượt tính đang công bố, hoặc "Đã tham gia") và huy hiệu Passport. Bỏ cuộc thi nháp, truyện chưa đăng / đã xóa; không lộ số phiếu, điểm thành phần.
+- `loadConnectDirectory` dùng chung cho `/ket-noi` và `/api/mobile/connect` → phản hồi mobile có thêm `works.cuoc_thi` (app cũ bỏ qua được). Lỗi truy vấn chỉ ghi log, mục rỗng.
+- Lưới thống kê: 2 cột trên điện thoại, 4 cột từ `sm`.
+
+### 7. Slice 3.4 — đã triển khai (28/09/2026)
+
+- `migrations/20260928_add_contest_rank_snapshots.sql`: `contest_rank_snapshots` (hạng theo ngày giờ VN, chỉ service-role) + `snapshot_contest_ranks(contest, day)`. Hạng lấy từ đúng RPC của BXH công khai, phân trang theo cursor → khớp hạng người xem thấy. Mỗi ngày / bảng chụp 1 lần; đã có thì bỏ qua. Bảng phiếu chỉ chụp lúc `community_voting`; Trending chụp từ `submission_open` đến `judging`. Chung cuộc / Ban giám khảo đã chốt nên không có cột này.
+- Cron `api/contests/cron/advance` (00:05 giờ VN) gọi `snapshotAllRanks()` sau khi tính lại điểm.
+- BXH so hạng hiện tại với bản chụp mới nhất của hôm nay (cron chưa chạy thì dùng hôm qua): ▲ n / ▼ n / — / "Mới" (bài chưa có trong bản chụp). Chưa có bản chụp → ẩn cột. Chỉ so hạng, không lộ số phiếu (K9, Q3).
+- API `/api/contests/:slug/rankings` thêm `changes_visible` và `change` cho từng dòng. Web mobile bỏ cột này theo đặc tả UX mục 6.
+- Thống kê tác giả (Slice 2.4) chưa hiện thay đổi hạng — làm sau nếu cần.

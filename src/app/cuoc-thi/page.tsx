@@ -10,6 +10,7 @@ import { HubHero } from "@/components/contests/hub-hero";
 import { RandomPick } from "@/components/contests/random-pick";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
+import { getPassport, PASSPORT_BADGE_NAME, PASSPORT_SEASON_STATUSES } from "@/lib/contests/passport-service";
 import { listContestsForHub } from "@/lib/contests/contest-service";
 import { getContestEntries } from "@/lib/contests/feeds";
 import { listArchiveWinners } from "@/lib/contests/public-view";
@@ -42,6 +43,20 @@ export default async function ContestHubPage() {
   ]);
   const winners = await listArchiveWinners(supabase, hub.finished, now);
   const titleByContest = new Map(hub.running.map((c) => [c.id, c.title]));
+  // "Hành trình của bạn" (Slice 3.2): tóm tắt Passport các cuộc thi đang trong mùa.
+  const seasonContests = viewerId ? hub.running.filter((c) => PASSPORT_SEASON_STATUSES.includes(c.status)) : [];
+  const journeys = viewerId
+    ? await Promise.all(
+        seasonContests.map((c) =>
+          getPassport(supabase, { userId: viewerId, contestId: c.id })
+            .then((p) => ({ contest: c, passport: p }))
+            .catch((error) => {
+              console.error("[contests] hub passport failed:", error);
+              return null;
+            })
+        )
+      ).then((list) => list.filter((x): x is NonNullable<typeof x> => x !== null))
+    : [];
 
   const byYear = new Map<string, typeof hub.finished>();
   for (const c of hub.finished) {
@@ -67,6 +82,23 @@ export default async function ContestHubPage() {
               <div className="text-lg font-bold text-ink">Chưa có cuộc thi nào đang diễn ra</div>
               <div className="text-sm text-stone-alt">Cuộc thi mới sẽ được công bố tại đây.</div>
             </div>
+          )}
+
+          {journeys.length > 0 && (
+            <section className="rounded-[18px] border border-cream-gold-border bg-cream-card p-4 sm:p-5">
+              <h2 className="text-lg font-bold text-brand-ink">Hành trình của bạn</h2>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                {journeys.map(({ contest: c, passport: p }) => (
+                  <Link key={c.id} href={`/cuoc-thi/${c.slug}`}
+                    className="flex items-center justify-between gap-3 rounded-[12px] bg-white px-3.5 py-2.5 no-underline sm:min-w-[260px]">
+                    <span className="min-w-0 truncate text-sm font-semibold text-ink">{c.title}</span>
+                    <span className="shrink-0 text-[12.5px] font-semibold text-cream-gold-text">
+                      {p.completedAt ? PASSPORT_BADGE_NAME : `${p.doneCount}/${p.milestones.length} mốc`}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
           )}
 
           <EntryRow

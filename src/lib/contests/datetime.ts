@@ -38,3 +38,8 @@ export function formatVnDateTime(iso: string | null): string {
     year: "numeric",
   });
 }
+
+/** Ngày theo giờ VN, "2026-10-20" — khớp (now() at time zone 'Asia/Ho_Chi_Minh')::date của SQL. */
+export function vnDateKey(at: Date, offsetDays = 0): string {
+  return new Date(at.getTime() + VN_OFFSET_MS + offsetDays * 86_400_000).toISOString().slice(0, 10);
+}

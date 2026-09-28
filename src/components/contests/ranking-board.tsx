@@ -7,10 +7,11 @@ import { Button } from "@/components/ui";
 import { BookCover } from "@/components/covers/book-cover";
 import type { RankingEntry, RankingPage } from "@/lib/contests/feeds";
 import { growthLabel } from "@/lib/contests/signals";
+import { rankChangeAria, rankChangeText, type RankChange } from "@/lib/contests/rank-change";
 
 export type RankingKindTab = { key: "popular" | "final" | "jury" | "trending"; label: string; locked: string | null };
 type LoadableKind = "popular" | "trending" | "final" | "jury";
-type KindState = { items: RankingEntry[]; cursor: string | null; valuesVisible: boolean };
+type KindState = { items: RankingEntry[]; cursor: string | null; valuesVisible: boolean; changesVisible: boolean };
 
 const COLUMN: Record<LoadableKind, string> = {
   popular: "PHIẾU HỢP LỆ",
@@ -30,15 +31,20 @@ function metricText(kind: LoadableKind, r: RankingEntry, short: boolean): string
 }
 
 const fromPage = (p: RankingPage | null): KindState | null =>
-  p ? { items: p.items, cursor: p.next_cursor, valuesVisible: p.values_visible } : null;
+  p ? { items: p.items, cursor: p.next_cursor, valuesVisible: p.values_visible, changesVisible: p.changes_visible } : null;
+
+// Desktop: thêm cột "Thay đổi" khi bảng có bản chụp hạng (Slice 3.4). Mobile bỏ cột này (đặc tả UX mục 6).
+const DESKTOP_COLS = "sm:grid-cols-[64px_48px_minmax(0,1fr)_140px]";
+const DESKTOP_COLS_CHANGE = "sm:grid-cols-[64px_48px_minmax(0,1fr)_140px_76px]";
 
 /**
  * RankingBoard — 4 loại xếp hạng, nhãn metric và trạng thái khoá tách khỏi
  * công thức. "Bảng phiếu bình chọn" (phiếu hợp lệ; lúc đang bình chọn hiện hạng
  * nhưng ẩn số phiếu — Q3), "Trending" (độc giả hợp lệ mới 7 ngày + % tăng, P4),
  * "Chung cuộc" / "Ban giám khảo" (lượt tính đang công bố — Slice 2.6b); mỗi
- * loại giữ trang dữ liệu riêng. Mobile: chip cuộn ngang,
- * metric nằm dưới tên, bỏ cột thay đổi (đặc tả UX mục 6).
+ * loại giữ trang dữ liệu riêng. Cột "Thay đổi" ▲▼ so với bản chụp 0h giờ VN
+ * (Slice 3.4, K9) cho Bảng phiếu lúc bình chọn và Trending. Mobile: chip cuộn
+ * ngang, metric nằm dưới tên, bỏ cột thay đổi (đặc tả UX mục 6).
  */
 export function RankingBoard({
   slug,
@@ -69,6 +75,8 @@ export function RankingBoard({
   const page = loadable ? pages[loadable] : null;
   const items = page?.items ?? [];
   const cursor = page?.cursor ?? null;
+  const showChange = page?.changesVisible ?? false;
+  const cols = showChange ? DESKTOP_COLS_CHANGE : DESKTOP_COLS;
 
   const load = async (target: LoadableKind, after: string | null) => {
     setLoading(true);
@@ -86,7 +94,12 @@ export function RankingBoard({
       const before = after ? prev[target] : null;
       return {
         ...prev,
-        [target]: { items: [...(before?.items ?? []), ...data.items], cursor: data.next_cursor, valuesVisible: data.values_visible },
+        [target]: {
+          items: [...(before?.items ?? []), ...data.items],
+          cursor: data.next_cursor,
+          valuesVisible: data.values_visible,
+          changesVisible: data.changes_visible ?? false,
+        },
       };
     });
   };
@@ -155,12 +168,13 @@ export function RankingBoard({
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border-light">
-          <div className="hidden grid-cols-[64px_48px_minmax(0,1fr)_140px] gap-3.5 bg-neutral-bg px-5 py-3 text-xs font-semibold tracking-[.4px] text-stone-alt sm:grid">
+          <div className={`hidden gap-3.5 bg-neutral-bg px-5 py-3 text-xs font-semibold tracking-[.4px] text-stone-alt sm:grid ${cols}`}>
             <span>HẠNG</span><span /><span>TÁC PHẨM</span><span className="text-right">{COLUMN[loadable]}</span>
+            {showChange && <span className="text-right">THAY ĐỔI</span>}
           </div>
           {items.map((r) => (
             <Link key={r.submission_id} href={`/truyen/${r.book.slug}?from=cuoc-thi`}
-              className="grid grid-cols-[44px_44px_minmax(0,1fr)] items-center gap-3 border-t border-neutral-bg px-4 py-3 no-underline first:border-t-0 sm:grid-cols-[64px_48px_minmax(0,1fr)_140px] sm:gap-3.5 sm:px-5 sm:first:border-t">
+              className={`grid grid-cols-[44px_44px_minmax(0,1fr)] items-center gap-3 border-t border-neutral-bg px-4 py-3 no-underline first:border-t-0 sm:gap-3.5 sm:px-5 sm:first:border-t ${cols}`}>
               <span className={`text-lg font-extrabold sm:text-xl ${r.rank === 1 ? "text-brand-gold" : r.rank <= 3 ? "text-brand-gold-light" : "text-stone-light"}`}>
                 {r.rank}
                 {r.tied && <span className="block text-[10px] font-semibold text-stone-alt">đồng hạng</span>}
@@ -180,6 +194,7 @@ export function RankingBoard({
                 {metricText(loadable, r, true)}
                 <GrowthChip entry={r} />
               </span>
+              {showChange && <ChangeCell change={r.change} />}
             </Link>
           ))}
         </div>
@@ -194,6 +209,23 @@ export function RankingBoard({
         </div>
       )}
     </div>
+  );
+}
+
+const CHANGE_TONE: Record<RankChange["direction"], string> = {
+  up: "text-success-form",
+  down: "text-error",
+  same: "text-stone-light",
+  new: "text-brand-gold-dark",
+};
+
+function ChangeCell({ change }: { change: RankChange | null }) {
+  if (!change) return <span className="hidden text-right text-sm text-stone-light sm:block">—</span>;
+  return (
+    <span aria-label={rankChangeAria(change)} title={rankChangeAria(change)}
+      className={`hidden text-right text-sm font-bold sm:block ${CHANGE_TONE[change.direction]}`}>
+      {rankChangeText(change)}
+    </span>
   );
 }
 

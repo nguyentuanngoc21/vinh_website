@@ -229,6 +229,10 @@ export type ContestFraudStatus = "open" | "confirmed" | "dismissed";
 // Phiếu chấm của giám khảo (Slice 2.5b).
 export type JudgeScorecardStatus = "draft" | "finalized" | "invalidated";
 
+// Nhiệm vụ sự kiện cuộc thi (Slice 3.1).
+export type ContestQuestAction = "read_entry_chapter" | "read_hidden_gem" | "comment_entry" | "save_entry" | "vote_entry";
+export type ContestActivityEvent = "chapter_completed" | "comment" | "reading_list_add" | "vote";
+
 export type ContestReviewFlag = {
   id: string;
   code: string;
@@ -1296,6 +1300,9 @@ export type Database = {
           // giả. Xem migrations/20260908_add_task_template_role_gating.sql
           // và src/lib/quests/creator-roles.ts.
           for_role: CreatorRole | null;
+          /** 'contest' = nhiệm vụ sự kiện cuộc thi (Slice 3.1) — chỉ vào ô sự kiện, quest_type NULL. */
+          quest_pool: "general" | "contest";
+          contest_action: ContestQuestAction | null;
         };
         Insert: {
           id?: string;
@@ -1440,6 +1447,10 @@ export type Database = {
           task_template_id: string;
           slot_index: number;
           created_at: string;
+          /** 'event' = ô nhiệm vụ sự kiện cuộc thi (tối đa 1/ngày, Slice 3.1). */
+          slot_kind: "general" | "event";
+          contest_id: string | null;
+          reroll_count: number;
         };
         // Rows are only created/updated via create_quest_pool_for_today()
         // and reset_quest_pool_slot() — not a direct insert/update. See
@@ -2242,6 +2253,34 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Slice 3.2 — chỉ service-role. Xem migrations/20260927_add_contest_passport.sql.
+      contest_passport_reads: {
+        Row: {
+          user_id: string;
+          contest_id: string;
+          submission_id: string;
+          chapter_id: string;
+          read_day: string;
+          hidden_gem: boolean;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      contest_passports: {
+        Row: { user_id: string; contest_id: string; completed_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Contest Engine Phase 3 (Slice 3.4) — chỉ service-role; ghi qua snapshot_contest_ranks().
+      contest_rank_snapshots: {
+        Row: { contest_id: string; kind: "popular" | "trending"; snapshot_day: string; submission_id: string; rank: number; created_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       contest_judge_score_events: {
         Row: {
           id: string;
@@ -2576,6 +2615,28 @@ export type Database = {
       publish_contest_score_run: {
         Args: { p_run_id: string; p_admin_id: string; p_reason: string | null };
         Returns: Database["public"]["Tables"]["contest_score_runs"]["Row"];
+      };
+      add_event_quest_slot: {
+        Args: { p_user_id: string; p_pool_date: string; p_template_id: string; p_contest_id: string };
+        Returns: Database["public"]["Tables"]["user_quest_pool"]["Row"];
+      };
+      reset_event_quest_slot: {
+        Args: { p_user_id: string; p_pool_date: string; p_replacement_template_id: string; p_max_rerolls: number };
+        Returns: Database["public"]["Tables"]["user_quest_pool"]["Row"];
+      };
+      record_contest_activity: {
+        Args: { p_user_id: string; p_event: ContestActivityEvent; p_book_id: string; p_chapter_id?: string | null };
+        Returns: boolean;
+      };
+      snapshot_contest_ranks: {
+        Args: { p_contest_id: string; p_day?: string | null };
+        /** Số dòng đã chụp (0 nếu ngoài giai đoạn hoặc ngày đó đã chụp). */
+        Returns: number;
+      };
+      contest_passport_state: {
+        Args: { p_user_id: string; p_contest_id: string; p_record_completion?: boolean };
+        /** { milestones: [{ code, progress, target }], completed_at } — src/lib/contests/passport-service.ts. */
+        Returns: unknown;
       };
       get_contest_ranking: {
         Args: {

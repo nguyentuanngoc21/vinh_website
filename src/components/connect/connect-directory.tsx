@@ -11,6 +11,7 @@ import {
   BookOpenTextIcon,
   WaveformIcon,
   PaletteIcon,
+  TrophyIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Field, Alert } from "@/components/ui";
 import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
@@ -59,22 +60,31 @@ export type ConnectPerson = {
     truyen: ConnectWorkItem[];
     audio: ConnectWorkItem[];
     design: ConnectWorkItem[];
+    /** Cuộc thi đã tham gia + thứ hạng / giải + huy hiệu Passport (Contest Engine Slice 3.3). */
+    cuoc_thi: ConnectWorkItem[];
   };
 };
 
-const SECTION_KEYS = ["truyen", "audio", "design"] as const;
+const SECTION_KEYS = ["truyen", "audio", "design", "cuoc_thi"] as const;
 type SectionKey = (typeof SECTION_KEYS)[number];
 
 const SECTION_META: Record<SectionKey, { label: string; sub: string; color: string; bg: string }> = {
   truyen: { label: "Truyện chữ", sub: "Tác phẩm văn bản đã xuất bản trên Vịnh", color: "#2C5870", bg: "var(--color-info-bg)" },
   audio: { label: "Audio", sub: "Bản thu và chương audio", color: "#2C7453", bg: "#DBF3E8" },
   design: { label: "Design", sub: "Ảnh bìa, minh họa đã đăng", color: "#6B21A8", bg: "#F3E8FF" },
+  cuoc_thi: {
+    label: "Cuộc thi",
+    sub: "Cuộc thi đã tham gia, thứ hạng, giải và huy hiệu",
+    color: "var(--color-brand-gold-dark)",
+    bg: "var(--color-cream-card)",
+  },
 };
 
 const SECTION_ICONS: Record<SectionKey, typeof BookOpenTextIcon> = {
   truyen: BookOpenTextIcon,
   audio: WaveformIcon,
   design: PaletteIcon,
+  cuoc_thi: TrophyIcon,
 };
 
 const CREATOR_TAG_LABELS: Record<CreatorTag, string> = {
@@ -146,7 +156,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
   const [selectedId, setSelectedId] = useState(initialId);
   const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
-  const [open, setOpen] = useState<Record<SectionKey, boolean>>({ truyen: true, audio: false, design: false });
+  const [open, setOpen] = useState<Record<SectionKey, boolean>>({ truyen: true, audio: false, design: false, cuoc_thi: false });
   const [orderingId, setOrderingId] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
   const navigate = usePendingNavigate();
@@ -187,7 +197,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
 
   const toggleAll = () => {
     const next = openCount !== SECTION_KEYS.length;
-    setOpen({ truyen: next, audio: next, design: next });
+    setOpen({ truyen: next, audio: next, design: next, cuoc_thi: next });
   };
 
   // "Đặt dịch vụ" — tạo Order thật (POST /api/orders, xem
@@ -354,12 +364,14 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 border-b border-[#f1efec]">
+              <div className="grid grid-cols-2 border-b border-[#f1efec] sm:grid-cols-4">
                 {SECTION_KEYS.map((key, i) => (
                   <div
                     key={key}
-                    style={{ borderRight: i < SECTION_KEYS.length - 1 ? "1px solid #f1efec" : "none" }}
-                    className="px-5 py-4"
+                    // 2 cột trên điện thoại, 4 cột từ sm: viền phải chỉ giữa các cột thật.
+                    className={`border-[#f1efec] px-5 py-4 ${i < 2 ? "border-b sm:border-b-0" : ""} ${
+                      i % 2 === 0 ? "border-r" : ""
+                    } ${i < SECTION_KEYS.length - 1 ? "sm:border-r" : "sm:border-r-0"}`}
                   >
                     <div className="text-[22px] font-extrabold text-brand-ink">{selected.works[key].length}</div>
                     <div className="mt-0.5 text-[12.5px] text-stone">{SECTION_META[key].label}</div>
@@ -517,7 +529,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                           })}
                           {its.length === 0 && (
                             <div className="border-t border-[#f4f2ef] px-[18px] py-5 text-[13px] text-stone-light">
-                              Chưa có tác phẩm nào trong mục này.
+                              {key === "cuoc_thi" ? "Chưa tham gia cuộc thi nào." : "Chưa có tác phẩm nào trong mục này."}
                             </div>
                           )}
                         </div>
