@@ -22,10 +22,25 @@ import { truncateWords } from "@/lib/story/truncate-words";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
 // Thiết kế "Vịnh Trang chủ" (Claude Design): 1 thẻ lớn cho tác phẩm đang
-// chọn + dải bìa các tác phẩm kế tiếp bên dưới, tự chuyển sau mỗi 15 giây.
+// chọn + dải bìa MỌI tác phẩm bên dưới (tác phẩm đang chọn ở giữa), tự
+// chuyển sau mỗi 15 giây.
 const AUTO_ADVANCE_MS = 15_000;
 const DESC_MAX_WORDS = 60;
+const MAX_ITEMS = 7;
 const STRIP_GAP = 20;
+// Chiều cao phần chữ (tên + tác giả) dưới mỗi bìa trong dải.
+const STRIP_TEXT_HEIGHT = 78;
+// Chừa chỗ cho viền vàng (ring + offset) của bìa đang chọn, không bị mép
+// trên của dải (overflow-hidden) cắt mất.
+const STRIP_RING_SPACE = 6;
+
+// Số "ô" ngang của dải theo bề rộng — phần lẻ (.5) chia đôi thành phần bìa
+// lộ ra ở 2 mép, để người đọc biết còn truyện ở trước/sau.
+function stripSlotsAcross(width: number) {
+  if (width < 640) return 3.5;
+  if (width < 1024) return 4.5;
+  return 5.5;
+}
 
 function mod(i: number, n: number) {
   return ((i % n) + n) % n;
@@ -51,18 +66,20 @@ const STATUS_CHIP: Record<BookStatus, { className: string; Icon: typeof CheckCir
 const CHIP =
   "flex items-center gap-[5px] whitespace-nowrap rounded-full border px-2.5 py-[5px] text-xs font-medium";
 
-// Vị trí trong dải bìa: 0..visible-1 là các tác phẩm KẾ TIẾP (trái → phải),
-// -1 là tác phẩm đang chọn (đã trượt ra bên trái, ẩn).
-function stripSlot(i: number, active: number, n: number) {
-  const slot = mod(i - active - 1, n);
-  return slot === n - 1 ? -1 : slot;
+// Độ lệch (số ô) của tác phẩm `i` so với tác phẩm đang chọn (ô giữa), quay
+// vòng: âm = bên trái, dương = bên phải.
+function stripOffset(i: number, active: number, n: number) {
+  let d = mod(i - active, n);
+  if (d > (n - 1) / 2) d -= n;
+  return d;
 }
 
-export function BookCoverflow({ books }: { books: HomepageBook[] }) {
+export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
+  const books = allBooks.slice(0, MAX_ITEMS);
   const n = books.length;
   const [{ active, prev }, setIndex] = useState({ active: 0, prev: 0 });
   const [paused, setPaused] = useState(false);
-  const [visible, setVisible] = useState(5);
+  const [stripWidth, setStripWidth] = useState(1180);
   const stripRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -80,8 +97,7 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
     const el = stripRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 1000;
-      setVisible(width < 640 ? 3 : 5);
+      setStripWidth(entries[0]?.contentRect.width ?? 1180);
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -105,6 +121,9 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
   const current = n > 0 ? books[active] : null;
   const forward = mod(active - prev, n) <= n / 2;
   const status = current ? STATUS_CHIP[current.status] : null;
+  const slotsAcross = stripSlotsAcross(stripWidth);
+  const cardWidth = (stripWidth - STRIP_GAP * (Math.ceil(slotsAcross) - 1)) / slotsAcross;
+  const coverHeight = cardWidth * 1.5;
 
   return (
     <section className="bg-gradient-to-b from-[#fafaf9] to-white px-4 pb-2.5 sm:px-8 lg:px-11">
@@ -120,26 +139,6 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
           <div className="text-xs font-semibold tracking-[1.2px] text-brand-gold-dark">ĐỀ XUẤT CHO BẠN</div>
           <h2 className="mt-1.5 text-2xl font-bold tracking-tight text-ink">Tác phẩm nổi bật tuần này</h2>
         </div>
-        {n > 1 && (
-          <div className="flex shrink-0 gap-2.5">
-            <button
-              type="button"
-              onClick={() => go(active - 1)}
-              aria-label="Tác phẩm trước"
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#e7e5e4] bg-white text-[#57534e] transition-colors hover:border-brand-gold hover:text-brand-gold-dark"
-            >
-              <CaretLeftIcon size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => go(active + 1)}
-              aria-label="Tác phẩm tiếp theo"
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#e7e5e4] bg-white text-[#57534e] transition-colors hover:border-brand-gold hover:text-brand-gold-dark"
-            >
-              <CaretRightIcon size={18} />
-            </button>
-          </div>
-        )}
       </div>
 
       {n === 0 || !current || !status ? (
@@ -240,47 +239,37 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
             </div>
           </div>
 
-          {/* Dải bìa các tác phẩm kế tiếp — trượt 1 ô mỗi lần chuyển */}
+          {/* Dải bìa mọi tác phẩm — tác phẩm đang chọn ở ô giữa, trượt 1 ô
+              mỗi lần chuyển; không đủ chỗ thì 2 mép lộ 1 phần bìa trước/sau. */}
           {n > 1 && (
-            <div ref={stripRef} className="relative mt-[22px] overflow-hidden">
-              {/* Giữ chiều cao cho dải (các thẻ bên dưới đều absolute) */}
-              <div
-                aria-hidden
-                className="invisible"
-                style={{ width: `calc((100% - ${STRIP_GAP * (visible - 1)}px) / ${visible})` }}
-              >
-                <div className="aspect-[2/3]" />
-                <div className="h-[70px] sm:h-[78px]" />
-              </div>
+            <div
+              ref={stripRef}
+              className="relative mt-[22px] touch-pan-y overflow-hidden"
+              style={{ height: coverHeight + STRIP_TEXT_HEIGHT + STRIP_RING_SPACE * 2 }}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
               {books.map((book, i) => {
-                const p = stripSlot(i, active, n);
-                const prevP = stripSlot(i, prev, n);
-                const isVisible = p >= 0 && p < visible;
-                // Thẻ quay vòng (từ đầu dải về cuối hoặc ngược lại) thì
-                // không animate transform — tránh cảnh nó lướt ngang qua
-                // các thẻ khác.
-                const wraps = forward ? p > prevP : p < prevP;
+                const d = stripOffset(i, active, n);
+                const prevD = stripOffset(i, prev, n);
+                const isActive = d === 0;
+                const left = stripWidth / 2 - cardWidth / 2 + d * (cardWidth + STRIP_GAP);
+                const inView = left + cardWidth > 0 && left < stripWidth;
+                // Thẻ quay vòng (từ mép này sang mép kia) thì không animate
+                // transform — tránh cảnh nó lướt ngang qua các thẻ khác.
+                const wraps = forward ? d > prevD : d < prevD;
                 const style: CSSProperties = {
-                  width: `calc((100% - ${STRIP_GAP * (visible - 1)}px) / ${visible})`,
-                  transform: `translateX(calc(${p} * (100% + ${STRIP_GAP}px)))`,
-                  opacity: isVisible ? 1 : 0,
-                  pointerEvents: isVisible ? "auto" : "none",
-                  transition: wraps
-                    ? "opacity .4s ease"
-                    : "transform .55s cubic-bezier(.25,.8,.3,1), opacity .4s ease",
+                  width: cardWidth,
+                  transform: `translate(${left}px, ${STRIP_RING_SPACE}px)`,
+                  transition: wraps ? "none" : "transform .55s cubic-bezier(.25,.8,.3,1)",
                 };
-                return (
-                  <button
-                    key={book.id}
-                    type="button"
-                    onClick={() => go(i)}
-                    tabIndex={isVisible ? 0 : -1}
-                    aria-hidden={!isVisible}
-                    aria-label={`Xem ${book.title}`}
-                    className="absolute top-0 left-0 cursor-pointer border-0 bg-transparent p-0 text-left"
-                    style={style}
-                  >
-                    <div className="relative aspect-[2/3] overflow-hidden rounded-2xl shadow-[0_10px_24px_rgba(0,0,0,.14)]">
+                const inner = (
+                  <>
+                    <div
+                      className={`relative aspect-[2/3] overflow-hidden rounded-2xl shadow-[0_10px_24px_rgba(0,0,0,.14)] transition-[box-shadow,filter] duration-300 ${
+                        isActive ? "ring-3 ring-brand-gold ring-offset-2" : "brightness-[.92]"
+                      }`}
+                    >
                       <BookCover
                         id={book.id}
                         title={book.title}
@@ -294,15 +283,51 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
                         </div>
                       )}
                     </div>
-                    <div className="mt-3 line-clamp-2 text-sm leading-[1.4] font-semibold text-ink sm:text-[15px]">
+                    <div
+                      className={`mt-3 line-clamp-2 text-sm leading-[1.4] font-semibold sm:text-[15px] ${
+                        isActive ? "text-brand-gold-dark" : "text-ink"
+                      }`}
+                    >
                       {book.title}
                     </div>
                     <div className="mt-1 truncate text-xs text-[#8a8580] sm:text-[13px]">
                       {book.authorNickname ?? "Ẩn danh"}
                     </div>
+                  </>
+                );
+                const common = {
+                  "aria-hidden": !inView,
+                  tabIndex: inView ? 0 : -1,
+                  className: "absolute top-0 left-0 block cursor-pointer border-0 bg-transparent p-0 text-left no-underline",
+                  style,
+                };
+                return isActive ? (
+                  <Link key={book.id} href={`/truyen/${book.slug}`} aria-label={`Đọc ${book.title}`} {...common}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <button key={book.id} type="button" onClick={() => go(i)} aria-label={`Xem ${book.title}`} {...common}>
+                    {inner}
                   </button>
                 );
               })}
+
+              {/* Mũi tên 2 bên dải — căn giữa theo chiều cao bìa */}
+              {[
+                { dir: -1, label: "Tác phẩm trước", Icon: CaretLeftIcon, side: "left-1 sm:left-2" },
+                { dir: 1, label: "Tác phẩm tiếp theo", Icon: CaretRightIcon, side: "right-1 sm:right-2" },
+              ].map(({ dir, label, Icon, side }) => (
+                <button
+                  key={dir}
+                  type="button"
+                  onClick={() => go(active + dir)}
+                  aria-label={label}
+                  className={`absolute z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[#e7e5e4] bg-white/95 text-[#57534e] shadow-[0_6px_16px_rgba(0,0,0,.14)] transition-colors hover:border-brand-gold hover:text-brand-gold-dark sm:h-11 sm:w-11 ${side}`}
+                  style={{ top: STRIP_RING_SPACE + coverHeight / 2 }}
+                >
+                  <Icon size={18} weight="bold" />
+                </button>
+              ))}
             </div>
           )}
 
