@@ -15,10 +15,9 @@ import { PASSPORT_BADGE_NAME } from "@/lib/contests/passport-service";
 
 type Client = SupabaseClient<Database>;
 
-const shortDate = (iso: string) => {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-};
+// Theo giờ Việt Nam, không theo múi giờ server (Vercel chạy UTC).
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" });
 
 export async function loadProfileContests(client: Client, userIds: string[], now: Date = new Date()): Promise<Map<string, ConnectWorkItem[]>> {
   const result = new Map<string, ConnectWorkItem[]>();

@@ -53,7 +53,7 @@ export function Countdown({
 
   return (
     <div className={className}>
-      <div className="text-2xl font-bold">{value}</div>
+      <div className="whitespace-nowrap text-2xl font-bold">{value}</div>
       <div className={`text-xs ${labelClassName}`}>{data.label}</div>
     </div>
   );

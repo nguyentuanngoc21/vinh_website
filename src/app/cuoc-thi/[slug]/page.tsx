@@ -262,8 +262,8 @@ async function TabContent({
           <div className="flex items-start gap-3 rounded-[14px] bg-brand-ink px-4 py-3.5 text-sm text-white sm:items-center">
             <TrophyIcon size={20} weight="fill" className="shrink-0 text-brand-gold-light" />
             <span>
-              Mỗi tài khoản bình chọn được <b className="text-brand-gold-light">1 phiếu cho mỗi tác phẩm</b>. Phiếu chỉ hợp lệ khi bạn đã đọc hết ít nhất 1 chương
-              của tác phẩm và tài khoản đủ {contest.vote.min_account_age_days} ngày tuổi.
+              Mỗi tài khoản bình chọn được <b className="text-brand-gold-light">1 phiếu cho mỗi tác phẩm</b>. Phiếu chỉ hợp lệ khi bạn đã đọc thật ít nhất 1 chương
+              của tác phẩm{contest.vote.min_account_age_days > 0 ? ` và tài khoản đủ ${contest.vote.min_account_age_days} ngày tuổi` : ""}.
             </span>
           </div>
         )}
@@ -364,7 +364,7 @@ async function TabContent({
       r.no_prior_entries ? "Chưa từng dự cuộc thi nào" : null,
       r.no_prior_awards ? "Chưa từng đạt giải ở cuộc thi khác" : null,
       "Mọi chương miễn phí (cả giá đọc và giá audio) đến khi công bố kết quả",
-      `Bình chọn: 1 phiếu / tác phẩm / tài khoản; tài khoản từ ${contest.vote.min_account_age_days} ngày tuổi${contest.vote.require_completed_chapter ? ", đã đọc hết ít nhất 1 chương của tác phẩm" : ""}`,
+      `Bình chọn: 1 phiếu / tác phẩm / tài khoản${contest.vote.min_account_age_days > 0 ? `; tài khoản từ ${contest.vote.min_account_age_days} ngày tuổi` : ""}${contest.vote.require_completed_chapter ? ", đã đọc hết ít nhất 1 chương của tác phẩm" : ""}`,
     ].filter((x): x is string => x !== null);
     const timeline: [string, string | null][] = [
       ["Nhận bài", `${formatVnDateTime(contest.submission_start)} – ${formatVnDateTime(contest.submission_end)}`],

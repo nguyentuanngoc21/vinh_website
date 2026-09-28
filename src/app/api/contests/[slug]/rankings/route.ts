@@ -35,6 +35,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       if (!input.cursor && capabilities.rankings_visible.trending) await ensureFreshScores(client, contest.id);
       return Response.json(await getTrendingRanking(client, input), { headers: PRIVATE_NO_STORE });
     }
+    // Bảng phiếu đọc phiếu đã lọc từ bảng điểm (Slice 3.5) — làm mới độc giả hợp lệ ở trang đầu.
+    if (!input.cursor && capabilities.rankings_visible.popular && !capabilities.results_visible) await ensureFreshScores(client, contest.id);
     return Response.json(await getPopularRanking(client, input), { headers: PRIVATE_NO_STORE });
   });
 }

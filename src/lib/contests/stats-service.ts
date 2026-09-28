@@ -90,11 +90,11 @@ async function voteKpi(
   submissionId: string
 ): Promise<VoteKpi> {
   if (!capabilities.rankings_visible.popular) return { state: "not_open", opensAt: contest.voting_start };
-  const { rows, finalScores } = await popularRankingRows(client, contest, capabilities, { p_contest_id: contest.id, p_limit: 100 });
+  const { rows, filtered } = await popularRankingRows(client, contest, capabilities, { p_contest_id: contest.id, p_limit: 100 });
   const rank = rows.find((r) => r.submission_id === submissionId)?.rank ?? null;
   if (!capabilities.popular_values_visible) return { state: "hidden", rank };
 
-  if (finalScores) {
+  if (filtered) {
     const scores = await getSubmissionScores(client, [submissionId]);
     return { state: "visible", votes: scores.get(submissionId)?.filtered_votes ?? 0, rank };
   }

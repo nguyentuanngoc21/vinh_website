@@ -170,32 +170,35 @@ export async function getPopularRanking(
     p_after_id: cursor?.id ?? null,
   };
 
-  const { rows, finalScores } = await popularRankingRows(client, input.contest, input.capabilities, page);
+  const { rows } = await popularRankingRows(client, input.contest, input.capabilities, page);
   // Hạng bảng phiếu chỉ biến động trong khung bình chọn (K9).
   const changes =
-    input.contest.status === "community_voting" && !finalScores
+    input.contest.status === "community_voting"
       ? await loadRankChanges(client, { contestId: input.contest.id, kind: "popular", rows })
       : null;
   return toRankingPage(client, rows, { limit, valuesVisible: input.capabilities.popular_values_visible, growth: null, changes });
 }
 
 /**
- * Dòng BXH Độc giả yêu thích (chưa kèm thẻ truyện) — chọn nguồn giống bảng
- * công khai: phiếu trực tiếp, hoặc bảng điểm đã chốt với popular-v2 sau công
- * bố. Dùng chung với thống kê tác giả để hạng luôn khớp.
+ * Dòng Bảng phiếu bình chọn (chưa kèm thẻ truyện). popular-v2: phiếu ĐÃ LỌC
+ * (chỉ người đọc thật — Slice 3.5, quyết định sau chạy thử) từ bảng điểm
+ * (trễ tối đa 15 phút, P8), sau công bố thì chốt. popular-v1: phiếu thô
+ * trực tiếp. Dùng chung với thống kê tác giả / "Cuộc thi của tôi" để hạng
+ * luôn khớp.
  */
 export async function popularRankingRows(
   client: Client,
   contest: ContestRow,
   capabilities: ContestCapabilities,
   page: { p_contest_id: string; p_limit: number; p_after_rank?: number | null; p_after_submitted_at?: string | null; p_after_id?: string | null }
-): Promise<{ rows: RankedRpcRow[]; finalScores: boolean }> {
-  const finalScores = await ensureFinalScores(client, contest, capabilities);
-  const { data, error } = finalScores
+): Promise<{ rows: RankedRpcRow[]; filtered: boolean }> {
+  const filtered = readContestConfig(contest).scoring.popular_formula_id === "popular-v2";
+  if (filtered) await ensureFinalScores(client, contest, capabilities);
+  const { data, error } = filtered
     ? await client.rpc("get_contest_score_ranking", { ...page, p_kind: "popular" })
     : await client.rpc("get_contest_ranking", page);
-  throwIfError(error, finalScores ? "get_contest_score_ranking" : "get_contest_ranking");
-  return { rows: data ?? [], finalScores };
+  throwIfError(error, filtered ? "get_contest_score_ranking" : "get_contest_ranking");
+  return { rows: data ?? [], filtered };
 }
 
 type RankedRpcRow = { submission_id: string; book_id: string; value: number; submitted_at: string; rank: number; tied: boolean };

@@ -10,6 +10,7 @@ import { areResultsVisible, isSubmissionOpen, type ContestCapabilities } from "@
 import { readContestConfig } from "@/lib/contests/config";
 import { capabilitiesFor, getContestViewer, type ContestRow } from "@/lib/contests/contest-service";
 import { evaluateEligibility } from "@/lib/contests/eligibility/engine";
+import { popularRankingRows } from "@/lib/contests/feeds";
 import type { EligibilityResult } from "@/lib/contests/eligibility/types";
 import { throwIfError } from "@/lib/contests/errors";
 import { loadEligibilityContexts } from "@/lib/contests/submission-service";
@@ -77,15 +78,14 @@ async function loadAuthorEntries(client: Client, input: { viewerId: string; book
   const contestById = new Map((contests.data ?? []).map((c) => [c.id, c]));
   const titleByBook = new Map((books.data ?? []).map((b) => [b.id, b.title]));
 
-  // Hạng: 1 lần get_contest_ranking (top 100) cho mỗi cuộc thi có BXH đang mở.
+  // Hạng: 1 lần đọc Bảng phiếu (top 100, cùng nguồn BXH công khai) cho mỗi cuộc thi có BXH đang mở.
   const rankBySubmission = new Map<string, number>();
   await Promise.all(
     (contests.data ?? []).map(async (c) => {
       const caps = capabilitiesFor(c, viewer, null, input.now);
       if (!caps.rankings_visible.popular) return;
-      const { data, error: rankError } = await client.rpc("get_contest_ranking", { p_contest_id: c.id, p_limit: 100 });
-      throwIfError(rankError, "get_contest_ranking");
-      for (const r of data ?? []) rankBySubmission.set(r.submission_id, r.rank);
+      const { rows } = await popularRankingRows(client, c, caps, { p_contest_id: c.id, p_limit: 100 });
+      for (const r of rows) rankBySubmission.set(r.submission_id, r.rank);
     })
   );
 

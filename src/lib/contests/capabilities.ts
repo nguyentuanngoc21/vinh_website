@@ -116,11 +116,13 @@ export function getContestCapabilities(input: {
   if (!loggedIn) reasons.can_submit = "not_logged_in";
   else if (!submissionOpen) reasons.can_submit = beforeDeadline ? "submission_not_open" : "submission_closed";
 
+  // Admin đóng nhận bài sớm → bản chụp đã chốt, tác giả không rút được nữa (Slice 3.5).
+  const withdrawWindowOpen = beforeDeadline && contest.status === "submission_open";
   const can_withdraw =
     viewerSubmission !== null &&
     (viewerSubmission.status === "submitted" || viewerSubmission.status === "eligible") &&
-    beforeDeadline;
-  if (viewerSubmission && !can_withdraw && !beforeDeadline) reasons.can_withdraw = "withdraw_closed";
+    withdrawWindowOpen;
+  if (viewerSubmission && !can_withdraw && !withdrawWindowOpen) reasons.can_withdraw = "withdraw_closed";
 
   const can_resubmit =
     viewerSubmission?.status === "withdrawn" && eligibility.allow_resubmit_after_withdraw && can_submit;

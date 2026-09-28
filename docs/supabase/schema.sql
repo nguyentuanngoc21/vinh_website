@@ -5070,7 +5070,8 @@ grant execute on function public.submit_contest_entry(uuid, uuid, uuid, text, js
 
 -- Đổi trạng thái bài dự thi — ai được làm gì (IV.4, D6):
 --   author: chỉ rút (→ withdrawn) bài của chính mình, từ submitted/eligible,
---           trước submission_end;
+--           khi cuộc thi còn submission_open và trước submission_end (admin
+--           đóng nhận bài sớm → bản chụp đã chốt, không rút được nữa);
 --   admin:  mọi chuyển hợp lệ trong ma trận trừ withdrawn; ineligible/
 --           disqualified bắt buộc lý do (hiển thị cho tác giả);
 --   system: submitted → eligible/ineligible (duyệt tự động).
@@ -5107,7 +5108,9 @@ begin
     if v_sub.author_id is distinct from p_actor_id then
       raise exception 'Submission is not owned by caller' using hint = 'not_owner';
     end if;
-    if v_sub.status not in ('submitted', 'eligible') or now() >= v_contest.submission_end then
+    if v_sub.status not in ('submitted', 'eligible')
+       or v_contest.status <> 'submission_open'
+       or now() >= v_contest.submission_end then
       raise exception 'Submission can no longer be withdrawn' using hint = 'withdraw_closed';
     end if;
   elsif p_actor_kind = 'admin' then
@@ -7997,6 +8000,7 @@ set search_path = public
 as $$
 declare
   v_status public.contest_status;
+  v_filtered boolean;
   v_day date := coalesce(p_day, (now() at time zone 'Asia/Ho_Chi_Minh')::date);
   v_total integer := 0;
   v_page integer;
@@ -8005,12 +8009,15 @@ declare
   v_id uuid;
   r record;
 begin
-  select c.status into v_status from public.contests c where c.id = p_contest_id;
+  select c.status, coalesce(c.scoring_config ->> 'popular_formula_id', 'popular-v2') = 'popular-v2'
+    into v_status, v_filtered
+    from public.contests c where c.id = p_contest_id;
   if v_status is null then
     raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
   end if;
 
-  -- Bảng phiếu bình chọn: chỉ biến động trong khung bình chọn.
+  -- Bảng phiếu bình chọn: chỉ biến động trong khung bình chọn. Cùng nguồn với
+  -- BXH công khai: phiếu đã lọc (popular-v2) hoặc phiếu thô (popular-v1).
   if v_status = 'community_voting' and not exists (
     select 1 from public.contest_rank_snapshots s
      where s.contest_id = p_contest_id and s.kind = 'popular' and s.snapshot_day = v_day
@@ -8018,7 +8025,11 @@ begin
     v_rank := null; v_at := null; v_id := null;
     loop
       v_page := 0;
-      for r in select * from public.get_contest_ranking(p_contest_id, 100, v_rank, v_at, v_id) loop
+      for r in
+        select * from public.get_contest_score_ranking(p_contest_id, 'popular', 100, v_rank, v_at, v_id) where v_filtered
+        union all
+        select * from public.get_contest_ranking(p_contest_id, 100, v_rank, v_at, v_id) where not v_filtered
+      loop
         insert into public.contest_rank_snapshots (contest_id, kind, snapshot_day, submission_id, rank)
         values (p_contest_id, 'popular', v_day, r.submission_id, r.rank);
         v_page := v_page + 1;
