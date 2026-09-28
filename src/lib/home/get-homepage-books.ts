@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { computeBookStatus, type BookStatus } from "@/lib/story/status";
 
 /**
  * Real, DB-backed shape for the homepage sections (BookCoverflow,
@@ -18,6 +19,9 @@ export type HomepageBook = {
   authorNickname: string | null;
   chapterCount: number;
   coverUrl: string | null;
+  synopsis: string | null;
+  // Cùng quy tắc với trang /truyen/[slug] (src/lib/story/status.ts).
+  status: BookStatus;
 };
 
 type BookRow = Database["public"]["Tables"]["books"]["Row"];
@@ -35,7 +39,11 @@ export async function toHomepageBooks(
 
   const [{ data: authors }, { data: chapters }, coverUrls] = await Promise.all([
     supabase.from("author_public_profiles").select("id, nickname").in("id", authorIds),
-    supabase.from("chapters").select("book_id").eq("published", true).in("book_id", bookIds),
+    supabase
+      .from("chapters")
+      .select("book_id, is_last_chapter, created_at")
+      .eq("published", true)
+      .in("book_id", bookIds),
     // 1 request/sách, tái dùng đúng logic resolve bìa thật đang chạy ở
     // /truyen/[slug] (src/lib/covers/resolve-book-cover.ts) — số sách lên
     // trang chủ nhỏ (top vài chục), không cần gộp thành 1 query IN() riêng.
@@ -44,8 +52,13 @@ export async function toHomepageBooks(
 
   const nicknameById = new Map((authors ?? []).map((a) => [a.id, a.nickname]));
   const chapterCountByBook = new Map<string, number>();
+  const hasLastChapterByBook = new Set<string>();
+  const latestChapterAtByBook = new Map<string, string>();
   for (const c of chapters ?? []) {
     chapterCountByBook.set(c.book_id, (chapterCountByBook.get(c.book_id) ?? 0) + 1);
+    if (c.is_last_chapter) hasLastChapterByBook.add(c.book_id);
+    const latest = latestChapterAtByBook.get(c.book_id);
+    if (!latest || c.created_at > latest) latestChapterAtByBook.set(c.book_id, c.created_at);
   }
 
   return rows.map((r, i) => ({
@@ -57,6 +70,11 @@ export async function toHomepageBooks(
     authorNickname: nicknameById.get(r.author_id) ?? null,
     chapterCount: chapterCountByBook.get(r.id) ?? 0,
     coverUrl: coverUrls[i],
+    synopsis: r.synopsis,
+    status: computeBookStatus({
+      hasPublishedLastChapter: hasLastChapterByBook.has(r.id),
+      latestPublishedChapterCreatedAt: latestChapterAtByBook.get(r.id) ?? null,
+    }),
   }));
 }
 
