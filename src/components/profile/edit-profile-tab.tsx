@@ -13,7 +13,7 @@ import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
 import { getAgreement } from "@/lib/legal/registry";
 import type { TransactionType } from "@/lib/supabase/types";
 
-type TransactionEntry = { id: string; type: TransactionType; amount: number; created_at: string };
+type TransactionEntry = { id: string; type: TransactionType; amount: number; created_at: string; description?: string | null };
 
 type LoadState = "loading" | "ready";
 
@@ -418,8 +418,8 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
                 key={txn.id}
                 className="flex justify-between gap-3 border-t border-[#f5f4f2] py-2.5"
               >
-                <div className="text-[13px] text-stone-dark">
-                  {transactionTypeLabel(txn.type)} · {formatShortDate(txn.created_at)}
+                <div className="min-w-0 text-[13px] text-stone-dark">
+                  {txn.description ?? transactionTypeLabel(txn.type)} · {formatShortDate(txn.created_at)}
                 </div>
                 <div
                   style={{ color: txn.amount >= 0 ? "#2F7A4F" : "#B02A37" }}
