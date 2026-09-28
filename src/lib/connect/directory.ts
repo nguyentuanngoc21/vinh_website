@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import type { ConnectPerson } from "@/components/connect/connect-directory";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
 import { computeCommissionStatus } from "@/lib/orders/service-listing-service";
+import { loadProfileContests } from "@/lib/contests/profile-contests";
 
 type Client = SupabaseClient<Database>;
 
@@ -136,6 +137,8 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
   }
 
   const bookCoverUrls = await Promise.all((bookRows ?? []).map((b) => resolveBookCoverUrl(supabase, b)));
+  // Mục "Cuộc thi" (Contest Engine Slice 3.3) — lỗi chỉ ghi log, mục rỗng.
+  const contestsByPerson = await loadProfileContests(supabase, people.map((p) => p.id));
   const nameAgreementByBook = new Map((nameAgreementRows ?? []).map((r) => [r.book_id, r]));
   const booksByAuthor = new Map<string, ConnectPerson["works"]["truyen"]>();
   const pushBook = (personId: string, item: ConnectPerson["works"]["truyen"][number]) => {
@@ -244,6 +247,7 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
       truyen: booksByAuthor.get(p.id) ?? [],
       audio: audioByAuthor.get(p.id) ?? [],
       design: designByAuthor.get(p.id) ?? [],
+      cuoc_thi: contestsByPerson.get(p.id) ?? [],
     },
   }));
 

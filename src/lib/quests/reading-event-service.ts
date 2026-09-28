@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
 import { StreakService } from "@/lib/quests/streak-service";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { recordContestActivity } from "@/lib/contests/activity-service";
 
 type Client = SupabaseClient<Database>;
 
@@ -133,6 +134,9 @@ export const ReadingEventService = {
     } catch (err) {
       console.error("[reading-event] recordReadingActivity failed:", err);
     }
+
+    // Nhiệm vụ sự kiện cuộc thi (Slice 3.1) — SQL tự kiểm bài dự thi + thời gian đọc thật (K7).
+    await recordContestActivity({ userId: params.userId, event: "chapter_completed", bookId: params.bookId, chapterId: params.chapterId });
 
     // Tiến trình từng nhiệm vụ — best-effort từng mã, 1 mã lỗi/chưa active
     // không được làm hỏng các mã còn lại hoặc cả request.

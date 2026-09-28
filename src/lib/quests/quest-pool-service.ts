@@ -3,6 +3,8 @@ import type { Database, QuestType } from "@/lib/supabase/types";
 import {
   DAILY_POOL_MAX_SIZE,
   DAILY_POOL_MIN_SIZE,
+  EVENT_QUEST_FEATURED_WEIGHT,
+  EVENT_QUEST_REROLLS_PER_DAY,
   MAX_QUEST_RESETS_PER_DAY,
   QUEST_RESET_COOLDOWN_DAYS,
   QUEST_TYPE_WEIGHTS,
@@ -131,10 +133,12 @@ export const QuestPoolService = {
     const existing = await this.getPool(supabase, { userId: params.userId, poolDate });
     if (existing.length > 0) return { ok: true, data: existing };
 
+    // quest_pool = general: nhiệm vụ sự kiện cuộc thi chỉ vào ô sự kiện (ensureEventSlot).
     const { data: templates, error: templatesError } = await supabase
       .from("task_templates")
       .select("*")
       .eq("active", true)
+      .eq("quest_pool", "general")
       .not("quest_type", "is", null);
     if (templatesError) return { ok: false, error: templatesError.message };
     if (!templates || templates.length === 0) {
@@ -197,6 +201,7 @@ export const QuestPoolService = {
     const currentPool = await this.getPool(supabase, { userId: params.userId, poolDate });
     const target = currentPool.find((p) => p.task_template_id === params.taskTemplateId);
     if (!target) return { ok: false, error: "Quest này không nằm trong pool hôm nay." };
+    if (target.slot_kind === "event") return this.resetEventSlot(supabase, { userId: params.userId, poolDate });
 
     const { data: targetTemplate, error: templateError } = await supabase
       .from("task_templates")
@@ -215,6 +220,7 @@ export const QuestPoolService = {
       .from("task_templates")
       .select("*")
       .eq("active", true)
+      .eq("quest_pool", "general")
       .eq("quest_type", targetTemplate.quest_type);
     if (candidatesError) return { ok: false, error: candidatesError.message };
 
@@ -243,4 +249,79 @@ export const QuestPoolService = {
     if (error) return { ok: false, error: error.message || "Không thể đổi quest." };
     return { ok: true, data };
   },
+
+  /**
+   * Contest Quest (Slice 3.1): thêm 1 ô nhiệm vụ sự kiện cho hôm nay nếu có
+   * cuộc thi đang nhận bài / bình chọn. K4: bốc 1 cuộc thi (nổi bật nặng gấp
+   * EVENT_QUEST_FEATURED_WEIGHT), rồi 1 mẫu sự kiện dùng được lúc đó (bình
+   * chọn chỉ trong khung bình chọn). DB bảo đảm tối đa 1 ô / ngày. Không bao
+   * giờ làm hỏng pool thường — lỗi chỉ ghi log.
+   */
+  async ensureEventSlot(supabase: Client, params: { userId: string; poolDate?: string }): Promise<boolean> {
+    const poolDate = params.poolDate ?? todayIsoDate();
+    const pool = await this.getPool(supabase, { userId: params.userId, poolDate });
+    if (pool.length === 0 || pool.some((p) => p.slot_kind === "event")) return false;
+
+    const [{ data: contests }, { data: templates }] = await Promise.all([
+      supabase
+        .from("contests")
+        .select("id, is_featured, status, voting_start, voting_end")
+        .in("status", ["submission_open", "community_voting"]),
+      supabase.from("task_templates").select("*").eq("active", true).eq("quest_pool", "contest"),
+    ]);
+    const contest = weightedPick(contests ?? [], (c) => (c.is_featured ? EVENT_QUEST_FEATURED_WEIGHT : 1));
+    if (!contest) return false;
+    const template = weightedPick(
+      (templates ?? []).filter((t) => t.contest_action !== "vote_entry" || isVotingOpen(contest)),
+      () => 1
+    );
+    if (!template) return false;
+
+    const { error } = await supabase.rpc("add_event_quest_slot", {
+      p_user_id: params.userId,
+      p_pool_date: poolDate,
+      p_template_id: template.id,
+      p_contest_id: contest.id,
+    });
+    if (error) {
+      console.error("[quest-pool] add_event_quest_slot failed:", error);
+      return false;
+    }
+    return true;
+  },
+
+  /** K3: đổi nhiệm vụ sự kiện (giữ cuộc thi), tối đa EVENT_QUEST_REROLLS_PER_DAY lần/ngày — tách khỏi 3 lượt đổi chung. */
+  async resetEventSlot(supabase: Client, params: { userId: string; poolDate?: string }): Promise<QuestResult<UserQuestPoolRow>> {
+    const poolDate = params.poolDate ?? todayIsoDate();
+    const pool = await this.getPool(supabase, { userId: params.userId, poolDate });
+    const slot = pool.find((p) => p.slot_kind === "event");
+    if (!slot || !slot.contest_id) return { ok: false, error: "Hôm nay không có nhiệm vụ sự kiện." };
+    if (slot.reroll_count >= EVENT_QUEST_REROLLS_PER_DAY) return { ok: false, error: "Đã dùng hết lượt đổi nhiệm vụ sự kiện hôm nay." };
+
+    const [{ data: contest }, { data: templates }] = await Promise.all([
+      supabase.from("contests").select("status, voting_start, voting_end").eq("id", slot.contest_id).maybeSingle(),
+      supabase.from("task_templates").select("*").eq("active", true).eq("quest_pool", "contest"),
+    ]);
+    const replacement = weightedPick(
+      (templates ?? []).filter((t) => t.id !== slot.task_template_id && (t.contest_action !== "vote_entry" || (contest !== null && isVotingOpen(contest)))),
+      () => 1
+    );
+    if (!replacement) return { ok: false, error: "Không còn nhiệm vụ sự kiện khác để đổi." };
+
+    const { data, error } = await supabase.rpc("reset_event_quest_slot", {
+      p_user_id: params.userId,
+      p_pool_date: poolDate,
+      p_replacement_template_id: replacement.id,
+      p_max_rerolls: EVENT_QUEST_REROLLS_PER_DAY,
+    });
+    if (error) return { ok: false, error: error.message || "Không thể đổi nhiệm vụ sự kiện." };
+    return { ok: true, data };
+  },
 };
+
+/** Cùng điều kiện với contest_quest_available() trong SQL (nhiệm vụ bình chọn). */
+function isVotingOpen(c: { status: string; voting_start: string | null; voting_end: string | null }): boolean {
+  const now = Date.now();
+  return c.status === "community_voting" && c.voting_start !== null && c.voting_end !== null
+    && now >= Date.parse(c.voting_start) && now < Date.parse(c.voting_end);
+}

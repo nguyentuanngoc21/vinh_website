@@ -9,6 +9,7 @@ import type { Database } from "@/lib/supabase/types";
 import type { ContestRow } from "@/lib/contests/contest-service";
 import { throwIfError } from "@/lib/contests/errors";
 import { assertSubmissionInContest } from "@/lib/contests/submission-service";
+import { recordContestActivity } from "@/lib/contests/activity-service";
 
 type Client = SupabaseClient<Database>;
 
@@ -19,6 +20,9 @@ export async function castVote(client: Client, input: { contest: ContestRow; vie
     p_submission_id: input.submissionId,
   });
   throwIfError(error, "cast_contest_vote");
+  // Nhiệm vụ sự kiện "bình chọn cho bài đã đọc" (Slice 3.1).
+  const { data: sub } = await client.from("contest_submissions").select("book_id").eq("id", input.submissionId).maybeSingle();
+  if (sub) await recordContestActivity({ userId: input.viewerId, event: "vote", bookId: sub.book_id });
   return data as Database["public"]["Tables"]["contest_votes"]["Row"];
 }
 

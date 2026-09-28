@@ -58,3 +58,9 @@ export const MAX_QUEST_RESETS_PER_DAY = 3;
  * của user đó trong N ngày kế tiếp — tính ở TS layer khi build danh sách
  * ứng viên (query quest_reset_events), không có logic này trong SQL. */
 export const QUEST_RESET_COOLDOWN_DAYS = 3;
+
+/** Contest Quest (Slice 3.1, K3): đổi nhiệm vụ sự kiện tối đa N lần/ngày —
+ * tách khỏi MAX_QUEST_RESETS_PER_DAY; enforce ở reset_event_quest_slot(). */
+export const EVENT_QUEST_REROLLS_PER_DAY = 1;
+/** K4: nhiều cuộc thi cùng mở → bốc 1 cuộc thi/ngày, cuộc thi nổi bật nặng gấp N. */
+export const EVENT_QUEST_FEATURED_WEIGHT = 2;

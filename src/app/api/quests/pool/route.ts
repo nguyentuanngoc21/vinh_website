@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { QuestPoolService } from "@/lib/quests/quest-pool-service";
-import { MAX_QUEST_RESETS_PER_DAY } from "@/lib/quests/config";
+import { EVENT_QUEST_REROLLS_PER_DAY, MAX_QUEST_RESETS_PER_DAY } from "@/lib/quests/config";
 
 /**
  * Pool hôm nay của user — tự tạo (idempotent) nếu chưa có, join với
@@ -21,18 +21,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: generated.error }, { status: 400 });
   }
 
-  const pool = generated.data;
+  let pool = generated.data;
   if (pool.length === 0) {
     return NextResponse.json({ poolDate: null, slots: [], resetsUsedToday: 0, maxResetsPerDay: MAX_QUEST_RESETS_PER_DAY });
+  }
+  // Contest Quest (Slice 3.1): thêm ô sự kiện nếu có cuộc thi đang diễn ra — không làm hỏng pool thường.
+  if (await QuestPoolService.ensureEventSlot(supabase, { userId, poolDate: pool[0].pool_date })) {
+    pool = await QuestPoolService.getPool(supabase, { userId, poolDate: pool[0].pool_date });
   }
 
   const poolDate = pool[0].pool_date;
   const templateIds = pool.map((p) => p.task_template_id);
 
-  const [{ data: templates, error: templatesError }, { data: dailyTasks, error: dailyTasksError }] = await Promise.all([
+  const contestIds = [...new Set(pool.map((p) => p.contest_id).filter((x): x is string => x !== null))];
+  const [{ data: templates, error: templatesError }, { data: dailyTasks, error: dailyTasksError }, { data: contests }] = await Promise.all([
     supabase.from("task_templates").select("*").in("id", templateIds),
     supabase.from("user_daily_tasks").select("*").eq("user_id", userId).eq("task_date", poolDate).in("template_id", templateIds),
+    contestIds.length
+      ? supabase.from("contests").select("id, slug, title").in("id", contestIds)
+      : Promise.resolve({ data: [] as { id: string; slug: string; title: string }[] }),
   ]);
+  const contestById = new Map((contests ?? []).map((c) => [c.id, { slug: c.slug, title: c.title }]));
   if (templatesError) return NextResponse.json({ error: templatesError.message }, { status: 500 });
   if (dailyTasksError) return NextResponse.json({ error: dailyTasksError.message }, { status: 500 });
 
@@ -60,6 +69,10 @@ export async function GET(request: Request) {
         completed: dailyTask.completed,
         claimed: dailyTask.claimed,
         resetCount: dailyTask.reset_count,
+        // Contest Quest (Slice 3.1) — trường mới, app mobile cũ bỏ qua được.
+        slotKind: p.slot_kind,
+        contest: p.contest_id ? (contestById.get(p.contest_id) ?? null) : null,
+        eventRerollsLeft: p.slot_kind === "event" ? Math.max(0, EVENT_QUEST_REROLLS_PER_DAY - p.reroll_count) : null,
       };
     })
     .filter((s): s is NonNullable<typeof s> => s !== null)

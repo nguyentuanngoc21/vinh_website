@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { recordContestActivity } from "@/lib/contests/activity-service";
 
 async function assertOwnList(
   supabase: ReturnType<typeof createServiceRoleClient>,
@@ -53,6 +54,8 @@ export async function POST(
   if (!error) {
     const result = await RewardEngine.incrementTaskProgress(supabase, { userId, taskCode: "reader_add_wishlist" });
     if (!result.ok) console.error("[reading-lists] incrementTaskProgress failed:", result.error);
+    // Nhiệm vụ sự kiện cuộc thi (Slice 3.1) — chỉ tính khi sách là bài dự thi của cuộc thi hôm nay.
+    await recordContestActivity({ userId, event: "reading_list_add", bookId });
   }
 
   return NextResponse.json({ ok: true });

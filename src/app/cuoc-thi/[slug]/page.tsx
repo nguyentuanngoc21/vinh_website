@@ -28,6 +28,8 @@ import {
 } from "@/lib/contests/feeds";
 import { readContestConfig } from "@/lib/contests/config";
 import { ensureFreshScores } from "@/lib/contests/scores-service";
+import { getPassport, getTodayEventQuest, PASSPORT_SEASON_STATUSES } from "@/lib/contests/passport-service";
+import { PassportCard } from "@/components/contests/passport-card";
 import { growthLabel, HIDDEN_GEM_MIN } from "@/lib/contests/signals";
 import { CONTEST_STATUS_LABEL } from "@/lib/contests/labels";
 import { isFinished, PHASE_COPY, resolveTab, tabsFor, type TabKey } from "@/lib/contests/phase-copy";
@@ -175,6 +177,17 @@ async function TabContent({
       );
     }
     const feeds = capabilities.available_feeds;
+    // "Hành trình của bạn" (Slice 3.2) — lỗi không làm hỏng tab.
+    const journey =
+      viewerId && PASSPORT_SEASON_STATUSES.includes(contest.status)
+        ? await Promise.all([
+            getPassport(supabase, { userId: viewerId, contestId: row.id }),
+            getTodayEventQuest(supabase, { userId: viewerId, contestId: row.id }),
+          ]).catch((error) => {
+            console.error("[contests] passport block failed:", error);
+            return null;
+          })
+        : null;
     // Hàng tín hiệu đọc bảng điểm cache — làm mới trước (SQL bỏ qua nếu chưa quá 15 phút).
     if (feeds.includes("attention")) await ensureFreshScores(supabase, row.id);
     const none = Promise.resolve([] as SignalCard[]);
@@ -188,6 +201,7 @@ async function TabContent({
     ]);
     return (
       <div className="flex flex-col gap-9">
+        {journey && <PassportCard passport={journey[0]} eventQuest={journey[1]} />}
         {top && (
           <EntryRow
             title="Top truyện"
