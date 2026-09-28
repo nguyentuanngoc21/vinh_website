@@ -140,3 +140,26 @@ body {
     transform: translate(0, 0);
   }
 }
+
+/* Bìa tác phẩm đang chọn ở carousel trang chủ (book-coverflow.tsx) — chỉ
+   render 1 bìa, remount theo key mỗi lần đổi truyện nên chạy lại hiệu ứng. */
+@keyframes vn-cover-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.vn-cover-in {
+  animation: vn-cover-in 0.45s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vn-cover-in {
+    animation: none;
+  }
+}

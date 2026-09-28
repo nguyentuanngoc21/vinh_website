@@ -16,7 +16,6 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { NavBarContent } from "@/components/nav-bar-content";
 import { BookCover } from "@/components/covers/book-cover";
-import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import { formatCount } from "@/lib/design/get-design-gallery";
 import { BOOK_STATUS_LABEL, type BookStatus } from "@/lib/story/status";
 import { truncateWords } from "@/lib/story/truncate-words";
@@ -162,47 +161,25 @@ export function BookCoverflow({ books }: { books: HomepageBook[] }) {
             onTouchEnd={handleTouchEnd}
             aria-roledescription="carousel"
           >
-            <div className="relative h-[240px] shrink-0 sm:h-auto sm:w-[320px]">
-              {books.map((book, i) => {
-                const palette = buildCoverSpec({
-                  id: book.id,
-                  title: book.title,
-                  author: book.authorNickname,
-                  genre: book.genre,
-                }).palette;
-                return (
-                  <div
-                    key={book.id}
-                    aria-hidden={i !== active}
-                    className="pointer-events-none absolute inset-y-0 left-0 w-[230px] transition-opacity duration-[600ms] ease-out sm:w-[320px]"
-                    style={{ opacity: i === active ? 1 : 0 }}
-                  >
-                    <div className="absolute inset-y-0 left-0 w-[160px] sm:w-[240px]">
-                      <BookCover
-                        id={book.id}
-                        title={book.title}
-                        author={book.authorNickname}
-                        genre={book.genre}
-                        coverUrl={book.coverUrl}
-                      />
-                    </div>
-                    <div
-                      className="absolute inset-y-0 left-[160px] w-[70px] sm:left-[240px]"
-                      style={{
-                        background: `linear-gradient(160deg, ${palette.from}, ${palette.to})`,
-                        WebkitMaskImage: "linear-gradient(90deg,#000,transparent)",
-                        maskImage: "linear-gradient(90deg,#000,transparent)",
-                      }}
-                    />
-                  </div>
-                );
-              })}
-              {/* Bìa đang chọn bấm được → trang truyện */}
+            {/* Chỉ 1 bìa — của tác phẩm đang chọn (theo `active`). key đổi
+                theo truyện nên mỗi lần chuyển bìa mới remount + fade-in, không
+                chồng sẵn mọi bìa rồi đổi opacity. Giữ tỉ lệ 2:3 để không cắt
+                mất tên truyện/tác giả trên bìa thật. */}
+            <div className="flex shrink-0 justify-center px-5 pt-6 sm:items-center sm:py-6 sm:pr-2 sm:pl-6">
               <Link
+                key={current.id}
                 href={`/truyen/${current.slug}`}
                 aria-label={`Đọc ${current.title}`}
-                className="absolute inset-y-0 left-0 w-[160px] sm:w-[240px]"
-              />
+                className="vn-cover-in relative block aspect-[2/3] w-[160px] overflow-hidden rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,.22)] sm:w-[260px]"
+              >
+                <BookCover
+                  id={current.id}
+                  title={current.title}
+                  author={current.authorNickname}
+                  genre={current.genre}
+                  coverUrl={current.coverUrl}
+                />
+              </Link>
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-6 sm:py-9 sm:pr-8 sm:pl-4" aria-live="polite">
