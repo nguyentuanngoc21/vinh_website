@@ -66,32 +66,38 @@ const STATUS_CHIP: Record<BookStatus, { className: string; Icon: typeof CheckCir
 const CHIP =
   "flex items-center gap-[5px] whitespace-nowrap rounded-full border px-2.5 py-[5px] text-xs font-medium";
 
-// Độ lệch (số ô) của tác phẩm `i` so với tác phẩm đang chọn (ô giữa), quay
-// vòng: âm = bên trái, dương = bên phải.
-function stripOffset(i: number, active: number, n: number) {
-  let d = mod(i - active, n);
-  if (d > (n - 1) / 2) d -= n;
+// Bước ngắn nhất (có dấu) để đi từ tác phẩm `from` tới `to` trên vòng n.
+function shortestStep(from: number, to: number, n: number) {
+  let d = mod(to - from, n);
+  if (d > n / 2) d -= n;
   return d;
 }
 
 export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
   const books = allBooks.slice(0, MAX_ITEMS);
   const n = books.length;
-  const [{ active, prev }, setIndex] = useState({ active: 0, prev: 0 });
+  // `pos` là vị trí LIÊN TỤC (không quay về 0) trên dải lặp vô hạn — mỗi
+  // ô j của dải hiện sách books[j mod n], key theo j. Chuyển tiếp = pos+1:
+  // mọi ô đang hiện giữ nguyên key và chỉ trượt sang trái 1 ô, ô mới được
+  // mount sẵn NGOÀI mép khung rồi trượt vào — không ô nào nhảy chỗ.
+  const [{ pos, dir }, setNav] = useState({ pos: 0, dir: 1 });
+  const active = n > 0 ? mod(pos, n) : 0;
   const [paused, setPaused] = useState(false);
   const [stripWidth, setStripWidth] = useState(1180);
   const stripRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  const go = (i: number) => setIndex((s) => ({ active: mod(i, n), prev: s.active }));
+  const step = (delta: number) =>
+    setNav((s) => (delta === 0 ? s : { pos: s.pos + delta, dir: Math.sign(delta) }));
+  const goTo = (i: number) => step(shortestStep(active, i, n));
 
   // Hẹn giờ đặt lại mỗi khi `active` đổi — bấm tay (nút/dot/bìa) cũng tính
   // lại đủ 15 giây cho tác phẩm mới, không bị nhảy tiếp ngay sau khi chọn.
   useEffect(() => {
     if (n <= 1 || paused) return;
-    const t = setTimeout(() => setIndex((s) => ({ active: mod(s.active + 1, n), prev: s.active })), AUTO_ADVANCE_MS);
+    const t = setTimeout(() => setNav((s) => ({ pos: s.pos + 1, dir: 1 })), AUTO_ADVANCE_MS);
     return () => clearTimeout(t);
-  }, [active, n, paused]);
+  }, [pos, n, paused]);
 
   useEffect(() => {
     const el = stripRef.current;
@@ -114,16 +120,18 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
     const deltaX = e.changedTouches[0].clientX - start.x;
     const deltaY = e.changedTouches[0].clientY - start.y;
     if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
-      go(deltaX > 0 ? active - 1 : active + 1);
+      step(deltaX > 0 ? -1 : 1);
     }
   };
 
   const current = n > 0 ? books[active] : null;
-  const forward = mod(active - prev, n) <= n / 2;
+  const slideFrom = { "--vn-slide-from": `${dir * 28}px` } as CSSProperties;
   const status = current ? STATUS_CHIP[current.status] : null;
   const slotsAcross = stripSlotsAcross(stripWidth);
   const cardWidth = (stripWidth - STRIP_GAP * (Math.ceil(slotsAcross) - 1)) / slotsAcross;
   const coverHeight = cardWidth * 1.5;
+  // Số ô mỗi bên cần render: đủ phủ phần nhìn thấy + 1 ô chờ ngoài mép.
+  const reach = Math.ceil(slotsAcross / 2) + 1;
 
   return (
     <section className="bg-gradient-to-b from-[#fafaf9] to-white px-4 pb-2.5 sm:px-8 lg:px-11">
@@ -166,10 +174,11 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                 mất tên truyện/tác giả trên bìa thật. */}
             <div className="flex shrink-0 justify-center px-5 pt-6 sm:items-center sm:py-6 sm:pr-2 sm:pl-6">
               <Link
-                key={current.id}
+                key={pos}
                 href={`/truyen/${current.slug}`}
                 aria-label={`Đọc ${current.title}`}
-                className="vn-cover-in relative block aspect-[2/3] w-[160px] overflow-hidden rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,.22)] sm:w-[260px]"
+                style={slideFrom}
+                className="vn-slide-in relative block aspect-[2/3] w-[160px] overflow-hidden rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,.22)] sm:w-[260px]"
               >
                 <BookCover
                   id={current.id}
@@ -181,7 +190,12 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
               </Link>
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-6 sm:py-9 sm:pr-8 sm:pl-4" aria-live="polite">
+            <div
+              key={pos}
+              style={slideFrom}
+              className="vn-slide-in flex min-w-0 flex-1 flex-col justify-center px-5 py-6 sm:py-9 sm:pr-8 sm:pl-4"
+              aria-live="polite"
+            >
               <div className="text-xs font-semibold tracking-[1.2px] text-brand-gold-dark">
                 {pad(active + 1)} / {pad(n)}
               </div>
@@ -249,19 +263,17 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
-              {books.map((book, i) => {
-                const d = stripOffset(i, active, n);
-                const prevD = stripOffset(i, prev, n);
+              {Array.from({ length: reach * 2 + 1 }, (_, k) => pos - reach + k).map((j) => {
+                const i = mod(j, n);
+                const book = books[i];
+                const d = j - pos;
                 const isActive = d === 0;
                 const left = stripWidth / 2 - cardWidth / 2 + d * (cardWidth + STRIP_GAP);
                 const inView = left + cardWidth > 0 && left < stripWidth;
-                // Thẻ quay vòng (từ mép này sang mép kia) thì không animate
-                // transform — tránh cảnh nó lướt ngang qua các thẻ khác.
-                const wraps = forward ? d > prevD : d < prevD;
                 const style: CSSProperties = {
                   width: cardWidth,
                   transform: `translate(${left}px, ${STRIP_RING_SPACE}px)`,
-                  transition: wraps ? "none" : "transform .55s cubic-bezier(.25,.8,.3,1)",
+                  transition: "transform .6s cubic-bezier(.22,.8,.3,1)",
                 };
                 const inner = (
                   <>
@@ -295,20 +307,26 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                     </div>
                   </>
                 );
-                const common = {
-                  "aria-hidden": !inView,
-                  tabIndex: inView ? 0 : -1,
-                  className: "absolute top-0 left-0 block cursor-pointer border-0 bg-transparent p-0 text-left no-underline",
-                  style,
-                };
-                return isActive ? (
-                  <Link key={book.id} href={`/truyen/${book.slug}`} aria-label={`Đọc ${book.title}`} {...common}>
+                // Mọi thẻ đều là <Link> (cùng loại phần tử) — nếu thẻ đổi
+                // loại khi thành "đang chọn", React tạo lại nó và thẻ nhảy
+                // thẳng vào chỗ thay vì trượt. Thẻ chưa chọn: bấm = chuyển tới.
+                return (
+                  <Link
+                    key={j}
+                    href={`/truyen/${book.slug}`}
+                    aria-label={isActive ? `Đọc ${book.title}` : `Xem ${book.title}`}
+                    aria-hidden={!inView}
+                    tabIndex={inView ? 0 : -1}
+                    onClick={(e) => {
+                      if (isActive) return;
+                      e.preventDefault();
+                      step(d);
+                    }}
+                    className="absolute top-0 left-0 block cursor-pointer no-underline"
+                    style={style}
+                  >
                     {inner}
                   </Link>
-                ) : (
-                  <button key={book.id} type="button" onClick={() => go(i)} aria-label={`Xem ${book.title}`} {...common}>
-                    {inner}
-                  </button>
                 );
               })}
 
@@ -320,7 +338,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                 <button
                   key={dir}
                   type="button"
-                  onClick={() => go(active + dir)}
+                  onClick={() => step(dir)}
                   aria-label={label}
                   className={`absolute z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[#e7e5e4] bg-white/95 text-[#57534e] shadow-[0_6px_16px_rgba(0,0,0,.14)] transition-colors hover:border-brand-gold hover:text-brand-gold-dark sm:h-11 sm:w-11 ${side}`}
                   style={{ top: STRIP_RING_SPACE + coverHeight / 2 }}
@@ -339,7 +357,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                   type="button"
                   aria-label={`Chuyển đến ${book.title}`}
                   aria-current={i === active}
-                  onClick={() => go(i)}
+                  onClick={() => goTo(i)}
                   className="flex cursor-pointer items-center justify-center p-2"
                 >
                   <span
