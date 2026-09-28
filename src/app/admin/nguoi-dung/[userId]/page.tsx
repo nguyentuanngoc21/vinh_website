@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { CaretLeftIcon } from "@phosphor-icons/react/dist/ssr";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { UserDetailPanel, type UserDetail } from "@/components/admin/user-detail-panel";
+import { getAuthedAdmin } from "@/lib/wallet/session";
+import { UserDetailPanel, type RoleChangeEntry, type UserDetail } from "@/components/admin/user-detail-panel";
 
 export const metadata: Metadata = { title: "Chi tiết người dùng · Vịnh Admin" };
 
@@ -24,11 +25,31 @@ export default async function AdminUserDetailPage({
     .maybeSingle();
   if (!profile) notFound();
 
-  const [{ count: bookCount }, { count: audioCount }, { count: designCount }] = await Promise.all([
+  const [viewer, { data: roleLogs }, { count: bookCount }, { count: audioCount }, { count: designCount }] = await Promise.all([
+    getAuthedAdmin(supabase),
+    supabase
+      .from("role_change_logs")
+      .select("id, actor_id, old_role, new_role, created_at")
+      .eq("target_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20),
     supabase.from("books").select("id", { count: "exact", head: true }).eq("author_id", userId),
     supabase.from("audio_narrations").select("id", { count: "exact", head: true }).eq("narrator_id", userId),
     supabase.from("design_items").select("id", { count: "exact", head: true }).eq("illustrator_id", userId),
   ]);
+
+  const actorIds = [...new Set((roleLogs ?? []).flatMap((l) => (l.actor_id ? [l.actor_id] : [])))];
+  const { data: actors } = actorIds.length
+    ? await supabase.from("profiles").select("id, username").in("id", actorIds)
+    : { data: [] };
+  const actorName = new Map((actors ?? []).map((a) => [a.id, a.username]));
+  const roleHistory: RoleChangeEntry[] = (roleLogs ?? []).map((l) => ({
+    id: l.id,
+    actorUsername: l.actor_id ? (actorName.get(l.actor_id) ?? null) : null,
+    oldRole: l.old_role,
+    newRole: l.new_role,
+    createdAt: l.created_at,
+  }));
 
   const detail: UserDetail = {
     id: profile.id,
@@ -59,7 +80,10 @@ export default async function AdminUserDetailPage({
       >
         <CaretLeftIcon size={14} /> Người dùng
       </Link>
-      <UserDetailPanel user={detail} />
+      {/* Chỉ super_admin đổi được role — API cũng chặn (403), đây chỉ là ẩn UI. */}
+      <UserDetailPanel user={detail} canEditRole={viewer?.role === "super_admin"}
+        roleHistory={roleHistory}
+      />
     </>
   );
 }

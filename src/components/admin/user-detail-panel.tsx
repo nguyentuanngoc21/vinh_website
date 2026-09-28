@@ -1,8 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircleIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import type { Role } from "@/lib/supabase/types";
+
+export type RoleChangeEntry = {
+  id: string;
+  actorUsername: string | null;
+  oldRole: Role;
+  newRole: Role;
+  createdAt: string;
+};
 
 export type UserDetail = {
   id: string;
@@ -31,6 +40,10 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "super_admin", label: "Super Admin" },
 ];
 
+function roleLabel(role: Role) {
+  return ROLE_OPTIONS.find((o) => o.value === role)?.label ?? role;
+}
+
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-[10px] border border-cream-border px-4 py-3">
@@ -45,7 +58,16 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
  * từng có UI nào gọi tới cho đến bản này). KHÔNG có khoá/tạm ngưng tài
  * khoản — chưa có cột "banned" chung trong profiles, cần migration riêng
  * nếu muốn thêm (xem comment ở admin/nguoi-dung/page.tsx). */
-export function UserDetailPanel({ user }: { user: UserDetail }) {
+export function UserDetailPanel({
+  user,
+  canEditRole,
+  roleHistory,
+}: {
+  user: UserDetail;
+  canEditRole: boolean;
+  roleHistory: RoleChangeEntry[];
+}) {
+  const router = useRouter();
   const [role, setRole] = useState(user.role);
   const [rolePending, setRolePending] = useState(false);
   const [roleError, setRoleError] = useState<string | null>(null);
@@ -74,6 +96,8 @@ export function UserDetailPanel({ user }: { user: UserDetail }) {
       }
       setRole(newRole);
       setRoleSaved(true);
+      // Tải lại dữ liệu server để lịch sử đổi quyền có dòng mới.
+      router.refresh();
     } catch {
       setRoleError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
     } finally {
@@ -131,23 +155,49 @@ export function UserDetailPanel({ user }: { user: UserDetail }) {
           @{user.username} · Tham gia {new Date(user.createdAt).toLocaleDateString("vi-VN")}
         </div>
 
-        <div className="mb-4 flex items-center gap-3">
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <label className="text-[13px] font-semibold text-stone-dark">Quyền</label>
-          <select
-            value={role}
-            disabled={rolePending}
-            onChange={(e) => handleRoleChange(e.target.value as Role)}
-            className="rounded-lg border border-cream-border px-3 py-1.5 text-sm disabled:opacity-50"
-          >
-            {ROLE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          {canEditRole ? (
+            <select
+              value={role}
+              disabled={rolePending}
+              onChange={(e) => handleRoleChange(e.target.value as Role)}
+              className="rounded-lg border border-cream-border px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              {ROLE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <span className="text-sm text-brand-ink">
+                {roleLabel(role)}
+              </span>
+              <span className="text-[12.5px] text-stone-alt">Chỉ Super Admin được đổi quyền</span>
+            </>
+          )}
           {roleSaved && <span className="text-[12.5px] font-medium text-[#2C7453]">Đã lưu</span>}
           {roleError && <span className="text-[12.5px] font-medium text-[#B02A37]">{roleError}</span>}
         </div>
+
+        {roleHistory.length > 0 && (
+          <div className="mb-4">
+            <div className="mb-1.5 text-[13px] font-semibold text-stone-dark">Lịch sử đổi quyền</div>
+            <ul className="space-y-1">
+              {roleHistory.map((h) => (
+                <li key={h.id} className="text-[12.5px] text-stone-alt">
+                  {new Date(h.createdAt).toLocaleString("vi-VN")} ·{" "}
+                  {h.actorUsername ? `@${h.actorUsername}` : "Tài khoản đã xoá"}:{" "}
+                  <span className="text-brand-ink">
+                    {roleLabel(h.oldRole)} → {roleLabel(h.newRole)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Token khả dụng" value={user.tokenBalance.toLocaleString("vi-VN")} />

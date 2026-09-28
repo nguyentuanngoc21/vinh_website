@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from "react";
 import {
   login as loginRequest,
   logout as logoutRequest,
@@ -89,12 +89,13 @@ function writeSession(session: Session | null, remember: boolean) {
   listeners.forEach((listener) => listener());
 }
 
-// Same storage-preserving idea as writeSession(), but only patches `name`
-// in place — re-uses whichever storage (local vs session) already holds
-// the session instead of needing the caller to know/pass `remember` again.
-function patchSessionName(name: string) {
+// Same storage-preserving idea as writeSession(), but only patches the
+// given fields in place — re-uses whichever storage (local vs session)
+// already holds the session instead of needing the caller to know/pass
+// `remember` again.
+function patchSession(patch: Partial<Pick<Session, "name" | "role">>) {
   if (!cachedSession) return;
-  const updated: Session = { ...cachedSession, name };
+  const updated: Session = { ...cachedSession, ...patch };
   try {
     if (localStorage.getItem(STORAGE_KEY)) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -110,6 +111,29 @@ function patchSessionName(name: string) {
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const session = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  // Role/nickname cache ở đây chỉ mới bằng lần đăng nhập — super_admin có
+  // thể đã đổi role từ đó (api/admin/users/[userId]). Mỗi lần tải trang,
+  // hỏi /api/auth/session (đọc profiles, ký lại cookie nếu lệch) rồi vá
+  // cache để cờ isAdmin hiện/ẩn đúng nút mà không cần đăng nhập lại. 401
+  // thì để nguyên — đăng xuất vẫn là việc của logout().
+  const signedIn = session !== null;
+  useEffect(() => {
+    if (!signedIn) return;
+    let cancelled = false;
+    fetch("/api/auth/session")
+      .then((res) => (res.ok ? (res.json() as Promise<Session>) : null))
+      .then((fresh) => {
+        if (cancelled || !fresh || !cachedSession) return;
+        if (fresh.role !== cachedSession.role || fresh.name !== cachedSession.name) {
+          patchSession({ role: fresh.role, name: fresh.name });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn]);
 
   const login = useCallback(async (identifier: string, password: string, remember: boolean) => {
     const result = await loginRequest(identifier, password, remember);
@@ -156,7 +180,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateSessionName = useCallback((name: string) => {
-    patchSessionName(name);
+    patchSession({ name });
   }, []);
 
   return (

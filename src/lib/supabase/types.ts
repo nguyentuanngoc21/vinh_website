@@ -2281,6 +2281,14 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Nhật ký đổi quyền — chỉ service-role, ghi qua admin_set_user_role().
+      // Xem migrations/20260928_add_role_change_logs.sql.
+      role_change_logs: {
+        Row: { id: string; target_id: string; actor_id: string | null; old_role: Role; new_role: Role; created_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       contest_judge_score_events: {
         Row: {
           id: string;
@@ -2632,6 +2640,11 @@ export type Database = {
         Args: { p_contest_id: string; p_day?: string | null };
         /** Số dòng đã chụp (0 nếu ngoài giai đoạn hoặc ngày đó đã chụp). */
         Returns: number;
+      };
+      admin_set_user_role: {
+        Args: { p_actor_id: string; p_target_id: string; p_role: Role };
+        /** Role sau khi đổi. Lỗi hint: actor_not_super_admin, self_demotion, target_not_found. */
+        Returns: Role;
       };
       contest_passport_state: {
         Args: { p_user_id: string; p_contest_id: string; p_record_completion?: boolean };
