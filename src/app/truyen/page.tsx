@@ -3,8 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BookCover } from "@/components/covers/book-cover";
-import { createClient } from "@/lib/supabase/server";
-import { getBooksByGenre } from "@/lib/search/get-books-by-genre";
+import { getCachedBooksByGenre } from "@/lib/cache/public-data";
 import { BOOK_GENRES, GENRE_SLUGS, slugToGenre } from "@/lib/covers/genre-styles";
 
 export const metadata: Metadata = { title: "Truyện chữ theo thể loại — Vịnh" };
@@ -25,8 +24,7 @@ export default async function TruyenPage({
   const { "the-loai": slug } = await searchParams;
   const genre = slug ? (slugToGenre(slug) ?? null) : null;
 
-  const supabase = await createClient();
-  const { books } = await getBooksByGenre(supabase, genre);
+  const { books } = await getCachedBooksByGenre(genre);
 
   return (
     <div className="flex-1 bg-[#f2f2f3]">

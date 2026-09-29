@@ -20,13 +20,15 @@ const TONE_CLASS: Record<Tone, string> = {
 export function Alert({
   tone = "error",
   icon,
+  className = "",
   children,
 }: {
   tone?: Tone;
   icon?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
-  const base = `rounded-[10px] border px-4 py-3 text-[13px] leading-[1.5] ${TONE_CLASS[tone]}`;
+  const base = `rounded-[10px] border px-4 py-3 text-[13px] leading-[1.5] ${TONE_CLASS[tone]} ${className}`;
   if (!icon) {
     return <div className={base}>{children}</div>;
   }

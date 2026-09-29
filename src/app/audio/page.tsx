@@ -6,7 +6,8 @@ import { ContinueListening } from "@/components/audio-hub/continue-listening";
 import { ResumeRow } from "@/components/audio-hub/resume-row";
 import { LibraryGrid } from "@/components/audio-hub/library-grid";
 import { NarratorsRow } from "@/components/audio-hub/narrators-row";
-import { getAudioCatalog, getNarratorStats } from "@/lib/audio/get-audio-catalog";
+import { getNarratorStats } from "@/lib/audio/get-audio-catalog";
+import { getCachedAudioCatalog } from "@/lib/cache/public-data";
 import { getListeningProgress } from "@/lib/audio/get-listening-progress";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
@@ -38,7 +39,7 @@ export default async function AudioHubPage() {
   // Catalog không phụ thuộc viewer — chạy song song với chuỗi
   // viewer → tiến trình nghe.
   const [tracks, progress] = await Promise.all([
-    getAudioCatalog(supabase),
+    getCachedAudioCatalog(),
     getAuthedUserId().then((viewerId) => getListeningProgress(supabase, viewerId, RESUME_TOTAL_LIMIT)),
   ]);
   const narrators = getNarratorStats(tracks);

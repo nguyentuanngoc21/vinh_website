@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircleIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr";
+import { Field, Alert } from "@/components/ui";
 import type { Role } from "@/lib/supabase/types";
 
 export type RoleChangeEntry = {
@@ -224,25 +225,21 @@ export function UserDetailPanel({
           tính vào doanh thu chia sẻ tác giả.
         </p>
         <div className="flex flex-wrap items-end gap-2.5">
-          <div>
-            <label className="mb-1 block text-[12.5px] font-semibold text-stone-dark">Số token</label>
-            <input
-              type="number"
-              min={1}
-              value={bonusAmount}
-              onChange={(e) => setBonusAmount(e.target.value)}
-              className="w-32 rounded-lg border border-cream-border px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="min-w-[220px] flex-1">
-            <label className="mb-1 block text-[12.5px] font-semibold text-stone-dark">Lý do</label>
-            <input
-              value={bonusReason}
-              onChange={(e) => setBonusReason(e.target.value)}
-              placeholder="Ví dụ: Giải nhất cuộc thi viết tháng 9"
-              className="w-full rounded-lg border border-cream-border px-3 py-2 text-sm"
-            />
-          </div>
+          <Field
+            label="Số token"
+            type="number"
+            min={1}
+            value={bonusAmount}
+            onChange={(e) => setBonusAmount(e.target.value)}
+            wrapperClassName="w-32"
+          />
+          <Field
+            label="Lý do"
+            value={bonusReason}
+            onChange={(e) => setBonusReason(e.target.value)}
+            placeholder="Ví dụ: Giải nhất cuộc thi viết tháng 9"
+            wrapperClassName="min-w-[220px] flex-1"
+          />
           <button
             type="button"
             disabled={bonusPending}
@@ -253,14 +250,10 @@ export function UserDetailPanel({
           </button>
         </div>
         {bonusError && (
-          <div className="mt-2.5 flex items-center gap-1.5 text-[12.5px] font-medium text-error">
-            <WarningCircleIcon /> {bonusError}
-          </div>
+          <Alert tone="error" className="mt-2.5">{bonusError}</Alert>
         )}
         {bonusSuccess && (
-          <div className="mt-2.5 flex items-center gap-1.5 text-[12.5px] font-medium text-[#2C7453]">
-            <CheckCircleIcon weight="fill" /> {bonusSuccess}
-          </div>
+          <Alert tone="success" className="mt-2.5">{bonusSuccess}</Alert>
         )}
       </div>
     </div>

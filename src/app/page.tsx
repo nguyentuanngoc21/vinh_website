@@ -11,9 +11,8 @@ import { CopyrightBand } from "@/components/copyright-band";
 import { AuthorCta } from "@/components/author-cta";
 import { SiteFooter } from "@/components/site-footer";
 import { createClient } from "@/lib/supabase/server";
-import { getHomepageData } from "@/lib/home/get-homepage-books";
 import { getRecommendedBooks } from "@/lib/recommendations/get-recommended-books";
-import { getTopAudioTrack } from "@/lib/audio/get-audio-catalog";
+import { getCachedHomepageData, getCachedTopAudioTrack } from "@/lib/cache/public-data";
 import { getAuthedUserId } from "@/lib/wallet/session";
 
 const lora = Lora({
@@ -28,10 +27,11 @@ export default async function Home() {
   // tiếp ngay sau lookup viewer để cả 3 nhánh chạy song song.
   const viewerId = getAuthedUserId();
   const [{ featured, trending, newest, weeklyRanking }, spotlightTrack, recommended] = await Promise.all([
-    getHomepageData(supabase),
+    // Dữ liệu công khai — cache 5 phút + làm mới theo tag (lib/cache/public-data.ts).
+    getCachedHomepageData(),
     // "Nổi bật" = nghe nhiều nhất trong kho — thật, không còn hardcode "Vũng
     // Vịnh Cuối Trời — Chương 14". Rỗng thì không render section, không bịa.
-    getTopAudioTrack(supabase),
+    getCachedTopAudioTrack(),
     // Chỉ hiện với user đã đăng nhập — recommend_books() cần lịch sử đọc của
     // 1 user thật, không có gì để gợi ý cho khách vãng lai (không fallback
     // sang "sách mới" ở đây, NewWorksGrid đã làm việc đó rồi, tránh trùng).

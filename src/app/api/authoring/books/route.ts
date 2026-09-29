@@ -9,6 +9,7 @@ import {
   EXCLUSIVITY_AGREEMENT_ID,
 } from "@/lib/authoring/exclusivity-agreement";
 import type { BookGenre } from "@/lib/supabase/types";
+import { revalidatePublicBooks } from "@/lib/cache/public-data";
 
 function isBookGenre(value: unknown): value is BookGenre {
   return typeof value === "string" && (BOOK_GENRES as readonly string[]).includes(value);
@@ -180,6 +181,8 @@ export async function POST(request: Request) {
   if (chapterPublished) {
     const { error: publishError } = await supabase.from("books").update({ published: true }).eq("id", book.id);
     if (publishError) console.error("[authoring] publish book at creation failed:", publishError);
+    // Làm mới cache trang công khai (lib/cache/public-data.ts).
+    else revalidatePublicBooks();
   }
 
   return NextResponse.json({ bookId: book.id, chapterId: chapter.id });

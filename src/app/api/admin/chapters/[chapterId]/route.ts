@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { contestLockResponse } from "@/lib/contests/trigger-errors";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedAdminId } from "@/lib/wallet/session";
+import { revalidatePublicBooks } from "@/lib/cache/public-data";
 import {
   REASON_GROUPS,
   buildDetailText,
@@ -189,6 +190,9 @@ export async function PATCH(
   ]);
   if (notifError) console.error("[admin/chapters] notification insert failed:", notifError);
   if (messageError) console.error("[admin/chapters] system message insert failed:", messageError);
+
+  // Làm mới cache trang công khai (lib/cache/public-data.ts).
+  revalidatePublicBooks();
 
   return NextResponse.json({ ok: true });
 }

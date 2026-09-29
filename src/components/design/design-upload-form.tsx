@@ -14,7 +14,7 @@ import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { ART_STYLES } from "@/lib/design/art-styles";
 import { compressImageFile } from "@/lib/media/compress-image";
 import { useOrigin } from "@/lib/use-origin";
-import { Checkbox } from "@/components/ui";
+import { Field, Textarea, Button, Alert, Checkbox } from "@/components/ui";
 import type { ArtStyle, DesignItemCategory } from "@/lib/supabase/types";
 
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
@@ -297,15 +297,13 @@ export function DesignUploadForm({ className }: { className?: string }) {
     <div className={className}>
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="hidden" />
 
-      {formError && (
-        <div className="mb-4 rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-error">{formError}</div>
-      )}
+      {formError && <Alert tone="error" className="mb-4">{formError}</Alert>}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_1.1fr_260px]">
         {/* Cột trái — ảnh xem lại */}
         <div>
           {selected ? (
-            <div className="overflow-hidden rounded-2xl border border-[#e2ded7] bg-neutral-bg">
+            <div className="overflow-hidden rounded-2xl border border-border-light bg-neutral-bg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={selected.imageUrl ?? selected.previewUrl} alt="" className="h-auto w-full object-cover" />
             </div>
@@ -313,7 +311,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex w-full flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#e2ded7] bg-neutral-bg py-16 text-center transition-colors hover:border-brand-gold"
+              className="flex w-full flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-border-light bg-neutral-bg py-16 text-center transition-colors hover:border-brand-gold"
             >
               <UploadSimpleIcon size={26} color="var(--color-brand-gold-dark)" />
               <span className="text-sm font-semibold text-brand-ink">Chọn ảnh tác phẩm</span>
@@ -322,42 +320,31 @@ export function DesignUploadForm({ className }: { className?: string }) {
           )}
         </div>
 
-        {/* Cột giữa — thông tin ảnh đang chọn. min-w-0: item lưới mặc định có
-            min-width: auto = kích thước tối đa nội dung bên trong (chuỗi link
-            chia sẻ dài, không xuống dòng) — thiếu min-w-0 thì cả TRACK 1.1fr
-            này bị đẩy rộng ra theo chuỗi đó, tràn ngang cả trang thay vì để
-            div .truncate bên trong tự cắt (đã đúng "min-w-0 flex-1 truncate"
-            ở phần link chia sẻ, nhưng vô nghĩa nếu item lưới cha mẹ nó vẫn nở
-            theo nội dung). */}
+        {/* Cột giữa — thông tin ảnh đang chọn */}
         <div className="min-w-0">
           {selected ? (
             <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Tên tác phẩm</label>
-                <input
-                  value={selected.title}
-                  onChange={(e) => patchSelected({ title: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-[#e2ded7] px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
-                />
-              </div>
+              <Field
+                label="Tên tác phẩm"
+                value={selected.title}
+                onChange={(e) => patchSelected({ title: e.target.value })}
+                placeholder="Nhập tên tác phẩm…"
+              />
+
+              <Textarea
+                label="Mô tả"
+                value={selected.description}
+                onChange={(e) => patchSelected({ description: e.target.value })}
+                rows={3}
+                placeholder="Chất liệu, cảm hứng, hoặc bối cảnh sáng tác…"
+              />
 
               <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Mô tả</label>
-                <textarea
-                  value={selected.description}
-                  onChange={(e) => patchSelected({ description: e.target.value })}
-                  rows={3}
-                  placeholder="Chất liệu, cảm hứng, hoặc bối cảnh sáng tác…"
-                  className="mt-1.5 w-full resize-none rounded-xl border border-[#e2ded7] px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Loại sản phẩm</label>
+                <label className="mb-[7px] block text-[13px] font-semibold text-slate">Loại sản phẩm</label>
                 <select
                   value={selected.category}
                   onChange={(e) => patchSelected({ category: e.target.value as DesignItemCategory })}
-                  className="mt-1.5 w-full rounded-xl border border-[#e2ded7] bg-white px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
+                  className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none"
                 >
                   {DESIGN_CATEGORIES.map((c) => (
                     <option key={c.key} value={c.key}>
@@ -367,17 +354,14 @@ export function DesignUploadForm({ className }: { className?: string }) {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Alt text</label>
-                <input
-                  value={selected.altText}
-                  onChange={(e) => patchSelected({ altText: e.target.value })}
-                  placeholder="Mô tả ngắn cho người dùng máy đọc màn hình"
-                  className="mt-1.5 w-full rounded-xl border border-[#e2ded7] px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
-                />
-              </div>
+              <Field
+                label="Alt text"
+                value={selected.altText}
+                onChange={(e) => patchSelected({ altText: e.target.value })}
+                placeholder="Mô tả ngắn cho người dùng máy đọc màn hình"
+              />
 
-              <div className="rounded-xl border border-[#e2ded7] p-3.5">
+              <div className="rounded-xl border border-border-light p-3.5">
                 <button
                   type="button"
                   onClick={createOrRegenerateLink}
@@ -410,9 +394,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
               </div>
 
               {selected.error && (
-                <div className="rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-error">
-                  {selected.error}
-                </div>
+                <Alert tone="error">{selected.error}</Alert>
               )}
             </div>
           ) : (
@@ -422,14 +404,13 @@ export function DesignUploadForm({ className }: { className?: string }) {
 
         {/* Cột phải — album/phong cách chung + danh sách ảnh */}
         <div>
-          <label className="block text-[13px] font-semibold text-brand-ink">Tên album</label>
-          <input
+          <Field
+            label="Tên album"
             list="design-album-names"
             value={albumName}
             onChange={(e) => setAlbumName(e.target.value)}
             disabled={albumLocked}
             placeholder="Đặt tên album…"
-            className="mt-1.5 w-full rounded-xl border border-[#e2ded7] px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand-gold disabled:bg-neutral-bg disabled:text-stone"
           />
           <datalist id="design-album-names">
             {existingAlbums.map((a) => (
@@ -437,27 +418,29 @@ export function DesignUploadForm({ className }: { className?: string }) {
             ))}
           </datalist>
 
-          <label className="mt-3.5 block text-[13px] font-semibold text-brand-ink">Phong cách nghệ thuật</label>
-          <select
-            value={matchedAlbum ? matchedAlbum.art_style : artStyle}
-            onChange={(e) => setArtStyle(e.target.value as ArtStyle)}
-            disabled={albumLocked || Boolean(matchedAlbum)}
-            className="mt-1.5 w-full rounded-xl border border-[#e2ded7] bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand-gold disabled:bg-neutral-bg disabled:text-stone"
-          >
-            <option value="">— Chọn phong cách —</option>
-            {ART_STYLES.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <div className="mt-3.5">
+            <label className="mb-[7px] block text-[13px] font-semibold text-slate">Phong cách nghệ thuật</label>
+            <select
+              value={matchedAlbum ? matchedAlbum.art_style : artStyle}
+              onChange={(e) => setArtStyle(e.target.value as ArtStyle)}
+              disabled={albumLocked || Boolean(matchedAlbum)}
+              className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none disabled:bg-neutral-bg disabled:text-stone"
+            >
+              <option value="">— Chọn phong cách —</option>
+              {ART_STYLES.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
           {albumLocked && (
             <p className="mt-1.5 text-[11px] leading-[1.5] text-stone">
               Album đã chốt cho lượt đăng này — đổi tên/phong cách qua trang album sau khi đăng xong.
             </p>
           )}
 
-          <div className="mt-5 border-t border-[#e2ded7] pt-4">
+          <div className="mt-5 border-t border-border-light pt-4">
             <div className="flex items-center justify-between">
               <span className="text-[13px] font-semibold text-brand-ink">Ảnh trong lượt đăng này</span>
               <button
@@ -477,7 +460,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
                 type="button"
                 onClick={deleteChecked}
                 disabled={bulkDeletePending}
-                className="mt-2.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#FDECEC] py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
+                className="mt-2.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-error-bg py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
               >
                 <TrashIcon size={14} /> Xóa ({checkedKeys.size})
               </button>
@@ -489,7 +472,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
                   key={item.key}
                   onClick={() => setSelectedKey(item.key)}
                   className={`relative flex cursor-pointer items-center gap-2.5 rounded-xl border p-2 transition-colors ${
-                    item.key === selectedKey ? "border-brand-gold bg-[#fdf8ec]" : "border-[#e2ded7]"
+                    item.key === selectedKey ? "border-brand-gold bg-cream-card" : "border-border-light"
                   }`}
                 >
                   <span onClick={(e) => e.stopPropagation()} className="shrink-0">
@@ -517,7 +500,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
                         deleteOne(item.key);
                       }}
                       title="Xóa ảnh này"
-                      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone transition-colors hover:bg-[#FDECEC] hover:text-error"
+                      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone transition-colors hover:bg-error-bg hover:text-error"
                     >
                       <TrashIcon size={14} />
                     </button>
@@ -530,14 +513,15 @@ export function DesignUploadForm({ className }: { className?: string }) {
       </div>
 
       <div className="mt-8 flex justify-end">
-        <button
+        <Button
           type="button"
+          fullWidth={false}
           disabled={items.length === 0 || hasUploading || publishing}
           onClick={handleComplete}
-          className="cursor-pointer rounded-full bg-brand-gold px-6 py-3.5 text-sm font-bold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
+          className="rounded-full px-6 py-3.5 text-sm"
         >
           {publishing ? "Đang đăng…" : "Hoàn tất"}
-        </button>
+        </Button>
       </div>
     </div>
   );
