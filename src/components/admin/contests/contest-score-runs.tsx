@@ -105,10 +105,10 @@ Lưu ý: ${run.stale_reasons.join("; ")}.` : "";
         kết quả chính thức sau khi hết khung chấm và (nếu cấu hình yêu cầu) đủ phiếu chấm đã chốt.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2.5 text-sm" disabled={pending || !started} onClick={() => compute("preview")}>
+        <Button type="button" variant="ghost" fullWidth={false} size="sm" disabled={pending || !started} onClick={() => compute("preview")}>
           Tính thử
         </Button>
-        <Button type="button" variant="dark" fullWidth={false} className="px-4 py-2.5 text-sm" disabled={pending || !finished} onClick={() => compute("final")}>
+        <Button type="button" variant="dark" fullWidth={false} size="sm" disabled={pending || !finished} onClick={() => compute("final")}>
           Tính chính thức
         </Button>
       </div>

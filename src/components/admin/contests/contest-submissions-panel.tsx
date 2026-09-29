@@ -121,10 +121,10 @@ export function ContestSubmissionsPanel({
 
       {pages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-3 text-sm">
-          <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2 text-sm" disabled={page <= 1 || loading}
+          <Button type="button" variant="ghost" fullWidth={false} size="sm" disabled={page <= 1 || loading}
             onClick={() => applyFilter({ page: page - 1 })}>Trước</Button>
           <span className="text-stone-alt">Trang {page}/{pages}</span>
-          <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2 text-sm" disabled={page >= pages || loading}
+          <Button type="button" variant="ghost" fullWidth={false} size="sm" disabled={page >= pages || loading}
             onClick={() => applyFilter({ page: page + 1 })}>Sau</Button>
         </div>
       )}
@@ -251,10 +251,10 @@ function SubmissionRow({
                   {f.resolved_at === null && (
                     <div className="flex shrink-0 flex-wrap gap-2">
                       {(["fixed", "dismissed", "escalated"] as const).map((r) => (
-                        <button key={r} type="button" disabled={pending} onClick={() => call(`${base}/flags/${f.id}`, "PATCH", { resolution: r })}
-                          className="rounded-full border border-cream-border px-3 py-1.5 text-xs font-semibold text-brand-ink disabled:opacity-50">
+                        <Button key={r} type="button" variant="ghost" size="sm" fullWidth={false} disabled={pending}
+                          onClick={() => call(`${base}/flags/${f.id}`, "PATCH", { resolution: r })}>
                           {r === "fixed" ? "Đã sửa" : r === "dismissed" ? "Bỏ qua" : "Chuyển xử lý loại"}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   )}
@@ -300,7 +300,7 @@ function SubmissionRow({
                   placeholder="vd: Bổ sung tóm tắt ≥ 50 chữ để giữ tư cách dự thi" onChange={(e) => setFlagMessage(e.target.value)} maxLength={500} />
               </div>
               <Checkbox checked={flagVisible} onChange={() => setFlagVisible((v) => !v)}>Tác giả thấy cờ này</Checkbox>
-              <Button type="button" variant="ghost" fullWidth={false} className="self-start px-5 py-2.5 text-sm" disabled={pending || !flagMessage.trim()} onClick={addFlag}>
+              <Button type="button" variant="ghost" fullWidth={false} size="sm" className="self-start" disabled={pending || !flagMessage.trim()} onClick={addFlag}>
                 Gắn cờ
               </Button>
             </div>

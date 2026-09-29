@@ -10,7 +10,7 @@ import {
   CheckIcon,
   CopyIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Field, Textarea, Select, Alert, Checkbox } from "@/components/ui";
+import { Field, Textarea, Select, Button, Alert, Checkbox } from "@/components/ui";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { useOrigin } from "@/lib/use-origin";
 import type { DesignItemCategory } from "@/lib/supabase/types";
@@ -161,14 +161,17 @@ export function DesignManageGallery() {
   return (
     <div>
       {checkedIds.size > 0 && (
-        <button
+        <Button
           type="button"
+          variant="danger-outline"
+          size="sm"
+          fullWidth={false}
           onClick={deleteChecked}
           disabled={bulkDeletePending}
-          className="mb-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-error-bg px-4 py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
+          className="mb-4 gap-1.5 text-[12.5px] font-semibold"
         >
           <TrashIcon size={14} /> Xóa ({checkedIds.size})
-        </button>
+        </Button>
       )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">

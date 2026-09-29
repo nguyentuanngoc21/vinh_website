@@ -325,9 +325,9 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
       </div>
 
       {error && (
-        <div className="mt-2.5">
-          <Alert tone="error">{error}</Alert>
-        </div>
+        <Alert tone="error" className="mt-2.5">
+          {error}
+        </Alert>
       )}
 
       {needsBookAttach && (
@@ -461,14 +461,17 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
               />
             </label>
           ) : (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
               type="button"
               disabled={pending}
               onClick={() => call("/deliver", "POST", { asset: {} })}
-              className="cursor-pointer rounded-lg border border-brand-ink px-4 py-2 text-xs font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+              className="rounded-lg border-brand-ink text-xs font-semibold"
             >
               Đánh dấu đã bàn giao
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -487,14 +490,17 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
             Duyệt bản nháp
           </Button>
           {order.revisions_used < order.revisions_max && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
               type="button"
               disabled={pending}
               onClick={() => call("/draft/revise", "POST", {})}
-              className="cursor-pointer rounded-lg border border-brand-ink px-4 py-2 text-xs font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+              className="rounded-lg border-brand-ink text-xs font-semibold"
             >
               Yêu cầu sửa
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -531,9 +537,13 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
       )}
 
       {order.status === "disputed" && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#F3C3C3] bg-[#FDECEC] px-3 py-2.5 text-xs font-semibold text-error">
-          <WarningOctagonIcon weight="fill" size={16} /> Đơn hàng đang được Nền tảng xem xét — thao tác tạm khóa.
-        </div>
+        <Alert
+          tone="error"
+          icon={<WarningOctagonIcon weight="fill" size={16} className="shrink-0" />}
+          className="mt-3 gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold"
+        >
+          Đơn hàng đang được Nền tảng xem xét — thao tác tạm khóa.
+        </Alert>
       )}
 
       {serviceType === "ghostwriting" &&
@@ -569,22 +579,27 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
             {fileRequest?.status === "pending" && fileRequest.requested_by !== viewerId && (
               <>
                 <span className="text-xs text-stone">Bên kia yêu cầu mở file gốc.</span>
-                <button
+                <Button
+                  size="sm"
+                  fullWidth={false}
                   type="button"
                   disabled={pending}
                   onClick={() => resolveOriginal(true)}
-                  className="cursor-pointer rounded-full bg-brand-gold px-3.5 py-1.5 text-xs font-bold text-brand-ink disabled:opacity-60"
+                  className="rounded-full px-3.5 py-1.5 text-xs"
                 >
                   Đồng ý
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  fullWidth={false}
                   type="button"
                   disabled={pending}
                   onClick={() => resolveOriginal(false)}
-                  className="cursor-pointer rounded-full border border-cream px-3.5 py-1.5 text-xs font-semibold text-stone-dark disabled:opacity-60"
+                  className="rounded-full border-cream px-3.5 py-1.5 text-xs font-semibold text-stone-dark"
                 >
                   Từ chối
-                </button>
+                </Button>
               </>
             )}
             {fileRequest?.status === "pending" && fileRequest.requested_by === viewerId && (
@@ -609,22 +624,27 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-stone">Bên kia yêu cầu hủy đơn — hoàn {formatVnd(cancelRequest.refund_amount)} cho buyer.</span>
-                <button
+                <Button
+                  size="sm"
+                  fullWidth={false}
                   type="button"
                   disabled={pending}
                   onClick={() => resolveCancel(true)}
-                  className="cursor-pointer rounded-full bg-brand-gold px-3.5 py-1.5 text-xs font-bold text-brand-ink disabled:opacity-60"
+                  className="rounded-full px-3.5 py-1.5 text-xs"
                 >
                   Đồng ý hủy
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  fullWidth={false}
                   type="button"
                   disabled={pending}
                   onClick={() => resolveCancel(false)}
-                  className="cursor-pointer rounded-full border border-cream px-3.5 py-1.5 text-xs font-semibold text-stone-dark disabled:opacity-60"
+                  className="rounded-full border-cream px-3.5 py-1.5 text-xs font-semibold text-stone-dark"
                 >
                   Từ chối
-                </button>
+                </Button>
               </div>
             )
           ) : cancelPreview ? (
@@ -633,28 +653,34 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                 Nếu hủy: buyer được hoàn {formatVnd(cancelPreview.refund_amount)} ({cancelPreview.pct}%)
                 {cancelPreview.used_platform_minimum && " — áp dụng mức sàn của Nền tảng, dịch vụ chưa tự khai chính sách hủy/hoàn tiền"}.
               </span>
-              <button
+              <Button
+                variant="danger-outline"
+                size="sm"
+                fullWidth={false}
                 type="button"
                 disabled={pending}
                 onClick={confirmCancel}
-                className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-semibold text-error disabled:opacity-60"
+                className="rounded-full px-3.5 py-1.5 text-xs font-semibold"
               >
                 Xác nhận gửi yêu cầu hủy
-              </button>
+              </Button>
               <button type="button" onClick={() => setCancelPreview(null)} className="cursor-pointer text-xs text-stone">
                 Hủy bỏ
               </button>
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
                 type="button"
                 disabled={pending}
                 onClick={previewCancel}
-                className="cursor-pointer rounded-full border border-[#e6e2dd] px-3.5 py-1.5 text-xs font-medium text-stone-dark disabled:opacity-60"
+                className="rounded-full border-[#e6e2dd] px-3.5 py-1.5 text-xs font-medium text-stone-dark"
               >
                 Yêu cầu hủy đơn
-              </button>
+              </Button>
               <button
                 type="button"
                 disabled={pending}
@@ -663,7 +689,10 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
               >
                 Nhắc phản hồi
               </button>
-              <button
+              <Button
+                variant="danger-outline"
+                size="sm"
+                fullWidth={false}
                 type="button"
                 disabled={pending || !lostContact?.eligible}
                 title={
@@ -672,10 +701,10 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                     : "Cần nhắc phản hồi ít nhất 1 lần, đợi ≥7 ngày kể từ lần nhắc đầu và không ai nhắn thêm trong ≥72 giờ."
                 }
                 onClick={reportLostContact}
-                className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-medium text-error disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full px-3.5 py-1.5 text-xs font-medium disabled:opacity-40"
               >
                 Báo cáo mất liên lạc
-              </button>
+              </Button>
               {disputeOpen ? (
                 <div className="mt-1 flex w-full flex-col gap-2 rounded-lg border border-[#F3C3C3] bg-[#FDECEC] p-3">
                   <Select
@@ -700,27 +729,33 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                     size="sm"
                   />
                   <div className="flex gap-2">
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      fullWidth={false}
                       type="button"
                       disabled={pending || !disputeReason || !disputeDescription.trim()}
                       onClick={submitDispute}
-                      className="cursor-pointer rounded-full bg-error px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                      className="rounded-full px-3.5 py-1.5 text-xs"
                     >
                       Gửi tranh chấp
-                    </button>
+                    </Button>
                     <button type="button" onClick={() => setDisputeOpen(false)} className="cursor-pointer text-xs text-stone">
                       Hủy bỏ
                     </button>
                   </div>
                 </div>
               ) : (
-                <button
+                <Button
+                  variant="danger-outline"
+                  size="sm"
+                  fullWidth={false}
                   type="button"
                   onClick={() => setDisputeOpen(true)}
-                  className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-medium text-error"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-medium"
                 >
                   Mở tranh chấp
-                </button>
+                </Button>
               )}
             </div>
           )}

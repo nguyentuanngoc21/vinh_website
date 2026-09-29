@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SealCheckIcon } from "@phosphor-icons/react/dist/ssr";
-import { Alert, Button, Checkbox } from "@/components/ui";
+import { Alert, Button, Checkbox, RadioGroup } from "@/components/ui";
 
 type Agreement = {
   id: string;
@@ -121,20 +121,16 @@ export function AuthorNameAgreementPanel({ orderId, viewerId }: AuthorNameAgreem
               </li>
             </ol>
           </div>
-          <div className="mt-3 flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-xs">
-              <input
-                type="radio"
-                checked={choice === "customer_name"}
-                onChange={() => setChoice("customer_name")}
-              />
-              Khách hàng đứng tên tác giả duy nhất
-            </label>
-            <label className="flex items-center gap-2 text-xs">
-              <input type="radio" checked={choice === "co_authorship"} onChange={() => setChoice("co_authorship")} />
-              Đồng sáng tác — hiển thị cả 2 tên
-            </label>
-          </div>
+          <RadioGroup
+            label="Cách đứng tên tác giả"
+            value={choice}
+            onChange={setChoice}
+            options={[
+              { value: "customer_name", label: "Khách hàng đứng tên tác giả duy nhất" },
+              { value: "co_authorship", label: "Đồng sáng tác — hiển thị cả 2 tên" },
+            ]}
+            className="mt-3"
+          />
           <div className="mt-2.5 flex flex-col gap-2">
             <Checkbox checked={ghostwriterVisible} onChange={() => setGhostwriterVisible((v) => !v)}>
               Hiển thị tác phẩm này trong danh sách sample của tôi (người viết hộ)

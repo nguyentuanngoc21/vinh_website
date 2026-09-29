@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PencilSimpleIcon, PlusIcon, TrashIcon, UsersThreeIcon } from "@phosphor-icons/react/dist/ssr";
-import { Field } from "@/components/ui";
+import { Alert, Field } from "@/components/ui";
 import type { CharacterRole } from "@/lib/supabase/types";
 
 export type ManagedCharacter = {
@@ -215,9 +215,9 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
       </div>
 
       {error && (
-        <div className="mb-3 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2 text-[12.5px] font-medium text-error">
+        <Alert tone="error" className="mb-3 rounded-lg px-3 py-2 text-[12.5px] font-medium">
           {error}
-        </div>
+        </Alert>
       )}
 
       <div className="flex flex-col gap-2 rounded-[10px] border border-dashed border-cream-border p-3">

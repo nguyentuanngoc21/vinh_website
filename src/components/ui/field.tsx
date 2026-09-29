@@ -25,6 +25,11 @@ type FieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
   status?: FieldStatus;
   /** Render something (e.g. a show/hide-password button) inside the input's right edge. */
   suffix?: ReactNode;
+  /** Nội dung CÙNG HÀNG bên trong khung viền, trước/sau ô nhập (nhãn ngắn,
+   * icon xu, đơn vị "token"/"VNĐ"/"%"). Khác `suffix` (đặt tuyệt đối, cho
+   * icon/nút nhỏ): `start`/`end` chiếm chỗ thật, ô nhập co lại cho vừa. */
+  start?: ReactNode;
+  end?: ReactNode;
   /** className applies to the <input> itself; use this for the wrapping
    * <label> (e.g. `flex-1` in a flex row) — the two are NOT interchangeable,
    * see chat-tab.tsx's composer for the bug this caused before this prop
@@ -43,7 +48,7 @@ const SIZE_CLASS = {
 } as const;
 
 export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { label, hint, status, suffix, className = "", wrapperClassName = "", size = "md", ...inputProps },
+  { label, hint, status, suffix, start, end, className = "", wrapperClassName = "", size = "md", ...inputProps },
   ref
 ) {
   const toneClass =
@@ -58,6 +63,26 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
       {label !== null && (
         <div className="mb-[7px] text-[13px] font-semibold text-slate">{label}</div>
       )}
+      {start != null || end != null ? (
+        <div
+          className={cn(
+            "flex items-center gap-2.5 border bg-white focus-within:border-brand-ink",
+            toneClass,
+            SIZE_CLASS[size]
+          )}
+        >
+          {start}
+          <input
+            ref={ref}
+            className={cn(
+              "w-full min-w-0 flex-1 bg-transparent text-ink outline-none disabled:cursor-not-allowed disabled:text-stone-alt",
+              className
+            )}
+            {...inputProps}
+          />
+          {end}
+        </div>
+      ) : (
       <div className="relative">
         <input
           ref={ref}
@@ -74,6 +99,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
           <div className="absolute right-[13px] top-1/2 -translate-y-1/2">{suffix}</div>
         )}
       </div>
+      )}
       {(status || hint) && (
         <div
           className={`mt-1.5 text-xs ${

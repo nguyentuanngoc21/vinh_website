@@ -7,7 +7,7 @@ import {
   DEFAULT_RESPONSE_DAYS,
   type ReasonGroupId,
 } from "@/lib/moderation/chapter-removal-templates";
-import { Alert, Field, Modal, Select, Textarea } from "@/components/ui";
+import { Alert, Button, Field, Modal, Select, Textarea } from "@/components/ui";
 
 export type RemoveChapterPayload = {
   reasonGroup: ReasonGroupId;
@@ -137,24 +137,13 @@ export function RemoveChapterModal({
 
         {formError && <Alert tone="error" className="mb-3">{formError}</Alert>}
 
-        {/* Giữ nút thủ công: kit Button chưa có biến thể "nguy hiểm" (bg-error) cho
-            nút Xác nhận gỡ, và nút Huỷ phải cùng cỡ với nó. */}
         <div className="flex justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-cream-border px-4 py-2 text-[13px] font-semibold text-stone-dark"
-          >
+          <Button type="button" variant="ghost" size="sm" fullWidth={false} onClick={onCancel}>
             Huỷ
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={handleSubmit}
-            className="rounded-lg bg-error px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
-          >
+          </Button>
+          <Button type="button" variant="danger" size="sm" fullWidth={false} disabled={pending} onClick={handleSubmit}>
             {pending ? "Đang gỡ…" : "Xác nhận gỡ"}
-          </button>
+          </Button>
         </div>
     </Modal>
   );

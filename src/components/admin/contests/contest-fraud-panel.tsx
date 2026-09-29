@@ -120,7 +120,7 @@ export function ContestFraudPanel({
           ))}
         </div>
         {canScan && (
-          <Button type="button" variant="ghost" fullWidth={false} className="flex items-center gap-1.5 self-start px-4 py-2 text-sm sm:self-auto"
+          <Button type="button" variant="ghost" fullWidth={false} size="sm" className="gap-1.5 self-start sm:self-auto"
             disabled={loading} onClick={scan}>
             <ArrowClockwiseIcon size={15} /> Quét lại
           </Button>
@@ -212,15 +212,15 @@ function SignalRow({
           <div className="flex flex-wrap gap-2">
             {s.status === "open" ? (
               <>
-                <Button type="button" variant="dark" fullWidth={false} className="px-4 py-2.5 text-sm" disabled={pending} onClick={() => review("confirmed")}>
+                <Button type="button" variant="dark" fullWidth={false} size="sm" disabled={pending} onClick={() => review("confirmed")}>
                   Xác nhận gian lận
                 </Button>
-                <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2.5 text-sm" disabled={pending} onClick={() => review("dismissed")}>
+                <Button type="button" variant="ghost" fullWidth={false} size="sm" disabled={pending} onClick={() => review("dismissed")}>
                   Bỏ qua
                 </Button>
               </>
             ) : (
-              <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2 text-sm" disabled={pending} onClick={() => review("open")}>
+              <Button type="button" variant="ghost" fullWidth={false} size="sm" disabled={pending} onClick={() => review("open")}>
                 Mở lại
               </Button>
             )}

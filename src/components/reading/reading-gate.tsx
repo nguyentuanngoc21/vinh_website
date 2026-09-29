@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CoinsIcon, LockKeyIcon } from "@phosphor-icons/react/dist/ssr";
 import { LoginGateModal } from "@/components/access-gate/login-gate-modal";
+import { Alert } from "@/components/ui";
 import type { ThemeColors } from "./reader";
 
 // Vài dòng "giả" hiển thị mờ phía dưới đoạn preview cuối cùng — CHỈ để gợi
@@ -110,9 +111,9 @@ export function ReadingGate(props: ReadingGateProps) {
         </p>
 
         {purchaseError && (
-          <div className="rounded-[10px] border border-error-border bg-error-bg px-3.5 py-2 text-[12.5px] text-error">
+          <Alert tone="error" className="px-3.5 py-2 text-[12.5px]">
             {purchaseError}
-          </div>
+          </Alert>
         )}
 
         {props.variant === "purchase" && isLoggedIn ? (

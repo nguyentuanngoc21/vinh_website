@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CameraIcon, LinkSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { BookCover } from "@/components/covers/book-cover";
-import { Field } from "@/components/ui";
+import { Button, Field } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
 type BookCoverUploadProps = {
@@ -147,14 +147,9 @@ export function BookCoverUpload({
             placeholder="Dán link chia sẻ (…?id=…&token=…)"
             size="sm"
           />
-          <button
-            type="button"
-            onClick={submitLink}
-            disabled={pending}
-            className="mt-1.5 w-full cursor-pointer rounded-md bg-brand-gold py-1.5 text-[11.5px] font-bold text-brand-ink disabled:opacity-60"
-          >
+          <Button type="button" size="sm" onClick={submitLink} disabled={pending} className="mt-1.5 rounded-md py-1.5 text-[11.5px]">
             {pending ? "Đang gắn…" : "Gắn làm bìa"}
-          </button>
+          </Button>
         </div>
       )}
       {error && (

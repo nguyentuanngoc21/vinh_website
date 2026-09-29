@@ -251,35 +251,44 @@ export function PublishPanel({
             <div>
               <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Giá</div>
               <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2.5 rounded-lg border border-cream-border px-3 py-2.5">
-                  <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện chữ:</span>
-                  <CoinsIcon color="var(--color-brand-gold)" />
-                  <input
+                {/* start/end nằm trong khung viền của Field — cả hàng là <label> nên bấm nhãn cũng focus ô giá */}
+                <Field
+                  label={null}
+                  size="sm"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={price}
+                  disabled={Boolean(contestLock?.prices)}
+                  onChange={(event) => onPriceChange(Math.max(0, Number(event.target.value) || 0))}
+                  start={
+                    <>
+                      <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện chữ:</span>
+                      <CoinsIcon color="var(--color-brand-gold)" className="shrink-0" />
+                    </>
+                  }
+                  end={<span className="shrink-0 text-sm text-stone-alt">token</span>}
+                  className="text-sm font-semibold"
+                />
+                {hasAudio && (
+                  <Field
+                    label={null}
+                    size="sm"
                     type="number"
                     min="0"
                     step="1000"
-                    value={price}
+                    value={audioPrice}
                     disabled={Boolean(contestLock?.prices)}
-                    onChange={(event) => onPriceChange(Math.max(0, Number(event.target.value) || 0))}
-                    className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none disabled:cursor-not-allowed disabled:text-stone-alt"
+                    onChange={(event) => onAudioPriceChange(Math.max(0, Number(event.target.value) || 0))}
+                    start={
+                      <>
+                        <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện audio</span>
+                        <CoinsIcon color="var(--color-brand-gold)" className="shrink-0" />
+                      </>
+                    }
+                    end={<span className="shrink-0 text-sm text-stone-alt">token</span>}
+                    className="text-sm font-semibold"
                   />
-                  <span className="shrink-0 text-sm text-stone-alt">token</span>
-                </div>
-                {hasAudio && (
-                  <div className="flex items-center gap-2.5 rounded-lg border border-cream-border px-3 py-2.5">
-                    <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện audio</span>
-                    <CoinsIcon color="var(--color-brand-gold)" />
-                    <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      value={audioPrice}
-                      disabled={Boolean(contestLock?.prices)}
-                      onChange={(event) => onAudioPriceChange(Math.max(0, Number(event.target.value) || 0))}
-                      className="w-full min-w-0 bg-transparent text-sm font-semibold outline-none disabled:cursor-not-allowed disabled:text-stone-alt"
-                    />
-                    <span className="shrink-0 text-sm text-stone-alt">token</span>
-                  </div>
                 )}
                 {contestLock?.prices && (
                   <div className="rounded-lg bg-cream-card px-3 py-2 text-[12px] leading-normal text-cream-gold-text">{contestLock.prices}</div>

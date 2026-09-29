@@ -339,11 +339,11 @@ function ConfigSection({ contestId, initial }: { contestId: string; initial: Sco
       {notice && <div className="mt-3"><Alert tone="success">{notice}</Alert></div>}
       {!locked && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" variant="dark" fullWidth={false} className="px-5 py-2.5 text-sm" disabled={pending} onClick={save}>
+          <Button type="button" variant="dark" fullWidth={false} size="sm" disabled={pending} onClick={save}>
             Lưu version mới
           </Button>
           {(state.active || unlocked) && (
-            <Button type="button" variant="ghost" fullWidth={false} className="px-5 py-2.5 text-sm" disabled={pending}
+            <Button type="button" variant="ghost" fullWidth={false} size="sm" disabled={pending}
               onClick={() => {
                 setDraft(clone(state.active ?? DEFAULT_FINAL_SCORING_CONFIG));
                 setUnlocked(false);
@@ -424,14 +424,14 @@ function JudgesSection({ contestId, contestSlug, initial }: { contestId: string;
               </div>
             </div>
             {!j.removed_at && (
-              <button type="button" disabled={pending}
+              <Button type="button" variant="danger-outline" size="sm" fullWidth={false} disabled={pending}
                 onClick={() => {
                   const reason = window.prompt(`Lý do gỡ ${j.name}? Phiếu của người này sẽ không vào điểm.`);
                   if (reason && reason.trim()) void run(() => send(`/api/admin/contests/${contestId}/judges/${j.user_id}`, "DELETE", { reason }));
                 }}
-                className="inline-flex items-center gap-1.5 self-start rounded-full border border-cream-border px-3 py-1.5 text-xs font-semibold text-error disabled:opacity-50 sm:self-auto">
+                className="gap-1.5 self-start sm:self-auto">
                 <UserMinusIcon size={13} /> Gỡ
-              </button>
+              </Button>
             )}
           </li>
         ))}
