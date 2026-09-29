@@ -3,7 +3,7 @@
  * của reader — src/lib/reading/paragraph-comments.ts — vì không có khái
  * niệm "đoạn văn", chỉ 1 danh sách thread cho toàn bộ tác phẩm). Reply
  * lồng CHỈ 1 CẤP, cùng quy ước với paragraph comments — xem
- * migrations/20260917_add_design_audio_comments.sql.
+ * migrations/archive/20260917_add_design_audio_comments.sql.
  */
 
 export type ContentComment = {

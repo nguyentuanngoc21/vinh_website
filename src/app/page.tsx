@@ -13,7 +13,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { createClient } from "@/lib/supabase/server";
 import { getHomepageData } from "@/lib/home/get-homepage-books";
 import { getRecommendedBooks } from "@/lib/recommendations/get-recommended-books";
-import { getAudioCatalog } from "@/lib/audio/get-audio-catalog";
+import { getTopAudioTrack } from "@/lib/audio/get-audio-catalog";
 import { getAuthedUserId } from "@/lib/wallet/session";
 
 const lora = Lora({
@@ -24,19 +24,19 @@ const lora = Lora({
 
 export default async function Home() {
   const supabase = await createClient();
-  const [{ featured, trending, newest, weeklyRanking }, audioTracks, viewerId] = await Promise.all([
+  // Khuyến nghị cần viewerId nhưng không cần đợi dữ liệu trang chủ — nối
+  // tiếp ngay sau lookup viewer để cả 3 nhánh chạy song song.
+  const viewerId = getAuthedUserId();
+  const [{ featured, trending, newest, weeklyRanking }, spotlightTrack, recommended] = await Promise.all([
     getHomepageData(supabase),
-    getAudioCatalog(supabase),
-    getAuthedUserId(),
+    // "Nổi bật" = nghe nhiều nhất trong kho — thật, không còn hardcode "Vũng
+    // Vịnh Cuối Trời — Chương 14". Rỗng thì không render section, không bịa.
+    getTopAudioTrack(supabase),
+    // Chỉ hiện với user đã đăng nhập — recommend_books() cần lịch sử đọc của
+    // 1 user thật, không có gì để gợi ý cho khách vãng lai (không fallback
+    // sang "sách mới" ở đây, NewWorksGrid đã làm việc đó rồi, tránh trùng).
+    viewerId.then((id) => (id ? getRecommendedBooks(supabase, id) : [])),
   ]);
-  // Chỉ hiện với user đã đăng nhập — recommend_books() cần lịch sử đọc của
-  // 1 user thật, không có gì để gợi ý cho khách vãng lai (không fallback
-  // sang "sách mới" ở đây, NewWorksGrid đã làm việc đó rồi, tránh trùng).
-  const recommended = viewerId ? await getRecommendedBooks(supabase, viewerId) : [];
-  // "Nổi bật" = nghe nhiều nhất trong kho — thật, không còn hardcode "Vũng
-  // Vịnh Cuối Trời — Chương 14". Rỗng thì không render section, không bịa.
-  const spotlightTrack =
-    audioTracks.length > 0 ? [...audioTracks].sort((a, b) => b.playCount - a.playCount)[0] : null;
 
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>

@@ -56,7 +56,7 @@ export default async function AuthorBookOverviewPage({
       .order("order_index", { ascending: true }),
     resolveBookCoverUrl(supabase, book),
     // Chỉ có nhiều nhất 1 grant đang hoạt động/book (partial unique index,
-    // xem migrations/20260901_add_manuscript_share.sql) — join sang
+    // xem migrations/archive/20260901_add_manuscript_share.sql) — join sang
     // profiles để hiện @username thay vì chỉ uuid.
     supabase
       .from("manuscript_access_grants")

@@ -1,6 +1,6 @@
 /**
  * Contest Passport (Phase 3, Slice 3.2). Cột mốc + mục tiêu nằm DUY NHẤT ở
- * contest_passport_state() (migrations/20260927_add_contest_passport.sql);
+ * contest_passport_state() (migrations/archive/20260927_add_contest_passport.sql);
  * file này chỉ giữ nhãn hiển thị và nạp dữ liệu cho microsite / hub.
  * Tiến độ ghi ở record_contest_activity() (activity-service.ts) — không có
  * đường ghi thứ hai.

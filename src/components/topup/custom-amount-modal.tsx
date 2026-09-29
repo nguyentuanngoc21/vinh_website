@@ -72,7 +72,7 @@ export function CustomAmountModal({
             <PlusIcon size={17} />
           </button>
         </div>
-        <div className={`mt-2 text-[12.5px] ${isValid ? "text-stone" : "font-medium text-[#B02A37]"}`}>{hint}</div>
+        <div className={`mt-2 text-[12.5px] ${isValid ? "text-stone" : "font-medium text-error"}`}>{hint}</div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           {quickAmounts.map((amount) => {

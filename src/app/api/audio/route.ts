@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { AUDIO_GENRES } from "@/lib/audio/get-audio-catalog";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 
@@ -28,11 +28,9 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập để đăng tải audio." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase, "Vui lòng đăng nhập để đăng tải audio.");
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const form = await request.formData().catch(() => null);
   if (!form) {
@@ -91,7 +89,7 @@ export async function POST(request: Request) {
 
   // KHÔNG sửa file audio — không có thư viện ghi tag ID3/Vorbis/APE nào
   // trong project và mỗi định dạng (mp3/m4a/wav/ogg) lại khác nhau, không
-  // như PNG (xem migrations/20260907_add_content_protection_status.sql).
+  // như PNG (xem migrations/archive/20260907_add_content_protection_status.sql).
   // Chỉ ghi nhận "đã tuyên bố không cho AI huấn luyện" vào DB — hiển thị
   // rõ ở UI (xem src/components/audio-hub), không giả vờ đã nhúng vào
   // file. `content_protection_status` chỉ admin đọc được (RLS) nên phải

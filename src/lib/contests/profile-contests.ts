@@ -10,7 +10,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import type { ConnectWorkItem } from "@/components/connect/connect-directory";
+import type { ConnectWorkItem } from "@/lib/connect/types";
 import { PASSPORT_BADGE_NAME } from "@/lib/contests/passport-service";
 
 type Client = SupabaseClient<Database>;

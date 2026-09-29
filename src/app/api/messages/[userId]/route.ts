@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import { isLikelyOffPlatform } from "@/lib/orders/off-platform-detector";
+import { isAdminRole } from "@/lib/roles";
+import { isUuid } from "@/lib/validation/uuid";
 
 const THREAD_MESSAGE_LIMIT = 200;
 // `created_at` exactly as returned in a previous page (PostgREST keeps microseconds).
@@ -17,7 +19,7 @@ function resolveContext(value: unknown): MessageContext {
  * nhắn giữa mình và :userId TRONG ĐÚNG 1 hòm thư (context) — cùng 1 admin
  * giờ có thể có 2 hòm thư tách biệt với 1 tác giả: "personal" (chat bình
  * thường) và "moderation" (tin gỡ chương), xem
- * migrations/20260908_add_direct_message_context.sql. Danh tính người
+ * migrations/archive/20260908_add_direct_message_context.sql. Danh tính người
  * gửi LUÔN hiển thị thật ở cả 2 context — context chỉ định tuyến tin
  * nhắn vào đúng hòm thư, không che giấu ai gửi. Mặc định "personal" nếu
  * không truyền — giữ nguyên hành vi cũ cho mọi nơi gọi route này trước
@@ -28,7 +30,7 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId: counterpartyId } = await params;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(counterpartyId)) return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+  if (!isUuid(counterpartyId)) return NextResponse.json({ error: 'Người dùng không hợp lệ.' }, { status: 400 });
   const searchParams = new URL(request.url).searchParams;
   const context = resolveContext(searchParams.get("context"));
   // Tải tin cũ hơn (tùy chọn): ?before=<createdAt của tin cũ nhất đang có>&limit=N.
@@ -43,7 +45,7 @@ export async function GET(
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data: counterparty, error: counterpartyError } = await supabase
@@ -126,12 +128,12 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId: recipientId } = await params;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipientId)) return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+  if (!isUuid(recipientId)) return NextResponse.json({ error: 'Người dùng không hợp lệ.' }, { status: 400 });
   let auth;
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
   if (userId === recipientId) {
     return NextResponse.json({ error: "Không thể tự nhắn tin cho chính mình." }, { status: 400 });
@@ -159,7 +161,7 @@ export async function POST(
   let context: MessageContext = "personal";
   if (requestedContext === "moderation") {
     const { data: recipientProfile } = await supabase.from("profiles").select("role").eq("id", recipientId).maybeSingle();
-    const recipientIsAdmin = recipientProfile?.role === "admin" || recipientProfile?.role === "super_admin";
+    const recipientIsAdmin = isAdminRole(recipientProfile?.role);
     if (recipientIsAdmin) {
       const { data: priorNotice } = await supabase
         .from("direct_messages")

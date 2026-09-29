@@ -8,9 +8,10 @@ import { vndToTokens } from "@/lib/contests/admin-input";
 import type { AdminAward, AdminSubmission } from "@/lib/contests/admin-service";
 import type { AwardProposal } from "@/lib/contests/final-scoring-service";
 import type { ContestStatus } from "@/lib/supabase/types";
+import { formatVnd } from "@/lib/format-currency";
 
 const AWARDABLE: ContestStatus[] = ["submission_closed", "community_voting", "judging", "results"];
-const vnd = (n: number) => `${n.toLocaleString("vi-VN")}đ`;
+const vnd = formatVnd;
 
 /**
  * Trao giải (D10): nhập VND, server quy đổi token theo tỷ giá hiện hành và
@@ -116,7 +117,7 @@ export function ContestAwardsPanel({
                   <div className="text-xs text-stone-alt">{a.book_title} · {a.author_name}</div>
                   <div className="text-xs text-stone-dark">
                     {vnd(a.prize_vnd)} → {a.prize_tokens.toLocaleString("vi-VN")} token
-                    {a.token_vnd_rate ? ` (tỷ giá ${a.token_vnd_rate}đ/token)` : ""}
+                    {a.token_vnd_rate ? ` (tỷ giá ${a.token_vnd_rate} VNĐ/token)` : ""}
                     {a.prize_extras ? ` · ${a.prize_extras}` : ""}
                   </div>
                   {a.revoked_reason && <div className="text-xs text-error">Lý do thu hồi: {a.revoked_reason}</div>}
@@ -188,7 +189,7 @@ export function ContestAwardsPanel({
             <Field label="Mã giải" hint="Chữ thường, số, gạch dưới — vd first_prize, readers_choice" value={code} onChange={(e) => setCode(e.target.value)} />
             <Field label="Hạng (để trống nếu không xếp hạng)" type="number" min={1} inputMode="numeric" value={rank} onChange={(e) => setRank(e.target.value)} />
             <Field label="Hạng mục" value={category} onChange={(e) => setCategory(e.target.value)} />
-            <Field label="Giải thưởng (VND)" type="number" min={0} inputMode="numeric" value={prizeVnd}
+            <Field label="Giải thưởng (VNĐ)" type="number" min={0} inputMode="numeric" value={prizeVnd}
               hint={`≈ ${vndToTokens(Number(prizeVnd) || 0).toLocaleString("vi-VN")} token theo tỷ giá hiện hành`}
               onChange={(e) => setPrizeVnd(e.target.value)} />
             <Field label="Quà kèm" value={extras} placeholder="vd: Hợp đồng xuất bản" onChange={(e) => setExtras(e.target.value)} />
@@ -242,7 +243,7 @@ function ProposalsSection({
                 <span className="self-start rounded-full bg-success-form-bg px-2.5 py-1 text-[11px] font-semibold text-success-form sm:self-auto">Đã xác nhận</span>
               ) : (
                 <div className="flex items-end gap-2">
-                  <Field label="Tiền thưởng (VND)" type="number" min={0} step={1000} wrapperClassName="w-[150px]" value={prizes[key] ?? "0"}
+                  <Field label="Tiền thưởng (VNĐ)" type="number" min={0} step={1000} wrapperClassName="w-[150px]" value={prizes[key] ?? "0"}
                     disabled={!canAward} onChange={(e) => setPrizes((prev) => ({ ...prev, [key]: e.target.value }))} />
                   <Button type="button" variant="dark" fullWidth={false} className="px-4 py-3 text-xs" disabled={pending || !canAward}
                     onClick={() => void onConfirm(p, Math.max(0, Math.trunc(Number(prizes[key]) || 0)))}>

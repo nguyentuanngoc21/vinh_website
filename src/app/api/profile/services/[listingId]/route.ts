@@ -33,7 +33,7 @@ const EDITABLE_KEYS = [
   // Mục 12 — ĐỘC LẬP với 11 trường trên/is_accepting_orders, không tham
   // gia computeMissingFields(). Chỉ dùng riêng cho is_accepting_commissions
   // (xử lý bên dưới, giống is_accepting_orders). Xem
-  // migrations/20260910_add_service_commission_status.sql.
+  // migrations/archive/20260910_add_service_commission_status.sql.
   "monthly_commission_limit",
 ] as const;
 
@@ -51,7 +51,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ li
   try { auth = await getRequestContext(request); } catch (error) { return requestError(error); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data: current, error: fetchError } = await supabase
@@ -159,7 +159,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const supabase = createServiceRoleClient();
   const userId = await getAuthedUserId(supabase);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { count } = await supabase

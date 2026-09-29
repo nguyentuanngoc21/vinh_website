@@ -73,7 +73,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
               className={
                 "rounded-full px-[18px] py-2.5 text-sm font-medium no-underline transition-colors " +
                 (genre.active
-                  ? "bg-[#F7EFD8] font-semibold text-brand-gold-dark hover:bg-[#eedfc4]"
+                  ? "bg-cream-gold font-semibold text-brand-gold-dark hover:bg-[#eedfc4]"
                   : "bg-neutral-bg text-ink hover:bg-[#ebebeb] hover:text-brand-gold-dark")
               }
             >
@@ -81,7 +81,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
             </Link>
           ))}
         </div>
-        <div className="mt-[26px] flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-[#EBDCB4] bg-[#F7EFD8] p-5 sm:p-[22px]">
+        <div className="mt-[26px] flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-cream-gold-border bg-cream-gold p-5 sm:p-[22px]">
           <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-xl bg-brand-ink text-brand-gold-light">
             <FingerprintIcon weight="fill" size={24} />
           </div>
@@ -89,7 +89,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
             <div className="text-base font-semibold text-brand-ink">
               Watermark động theo phiên đọc
             </div>
-            <div className="text-[13px] leading-[1.5] text-[#6b5f3a]">
+            <div className="text-[13px] leading-[1.5] text-cream-gold-text">
               Mỗi trang đọc mang dấu chìm riêng gắn với tài khoản, truy được
               nguồn khi nội dung bị rò rỉ.
             </div>

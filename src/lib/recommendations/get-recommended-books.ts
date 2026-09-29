@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-books";
+import { HOMEPAGE_BOOK_COLUMNS, toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-books";
 
 const RECOMMENDATION_LIMIT = 10;
 
@@ -18,10 +18,14 @@ export async function getRecommendedBooks(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<HomepageBook[]> {
-  const { data, error } = await supabase.rpc("recommend_books", {
-    p_user_id: userId,
-    p_limit: RECOMMENDATION_LIMIT,
-  });
+  // .select() sau rpc(): PostgREST chỉ trả các cột cần, bỏ `embedding`
+  // mà hàm (returns setof books) vẫn trả về nguyên hàng.
+  const { data, error } = await supabase
+    .rpc("recommend_books", {
+      p_user_id: userId,
+      p_limit: RECOMMENDATION_LIMIT,
+    })
+    .select(HOMEPAGE_BOOK_COLUMNS);
   if (error || !data) return [];
   return toHomepageBooks(supabase, data);
 }

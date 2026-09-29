@@ -62,7 +62,7 @@ export function computeMissingFields(listing: ServiceListing): MissingField[] {
   if (!listing.default_usage_scope) missing.push({ key: "default_usage_scope", label: "Phạm vi quyền mặc định" });
   // Object 4 key cố định, mỗi giá trị 0-100 — xem ghi chú kiểu ở
   // service_listings.Row (src/lib/supabase/types.ts) và
-  // migrations/20260901_add_order_cancel_system.sql (calculate_refund()
+  // migrations/archive/20260901_add_order_cancel_system.sql (calculate_refund()
   // tra thẳng key này, không so khớp text tự do).
   const REFUND_STAGES = ["before_draft", "draft_pending", "draft_approved", "delivered"] as const;
   const hasCompleteRefundPolicy =
@@ -80,14 +80,6 @@ export function computeMissingFields(listing: ServiceListing): MissingField[] {
   if (listing.is_private == null) missing.push({ key: "is_private", label: "Chính sách private" });
 
   return missing;
-}
-
-/** Tự tắt is_accepting_orders nếu 1 trong 11 trường rỗng trở lại (Mục 2.1:
- * "Nếu user sửa một trong 11 trường khiến nó rỗng trở lại... hệ thống tự
- * động tắt is_accepting_orders và thông báo lý do") — gọi SAU mỗi lần
- * update, không đợi user tự bấm lại công tắc. */
-export function shouldForceStopAccepting(listing: ServiceListing): boolean {
-  return listing.is_accepting_orders && computeMissingFields(listing).length > 0;
 }
 
 /** Mẫu tự động khi người bán KHÔNG tự tải mẫu lên — Bộ quy tắc Commission
@@ -149,7 +141,7 @@ export type CommissionStatus = "available" | "busy" | "off";
  * delivered coi như đã xong phần khó, completed/cancelled/disputed
  * không tính). Đếm theo TỪNG gói riêng (listing_id), không cộng dồn theo
  * người bán — khớp field 12 (monthly_commission_limit) cũng đặt theo
- * từng gói. Xem migrations/20260910_add_service_commission_status.sql. */
+ * từng gói. Xem migrations/archive/20260910_add_service_commission_status.sql. */
 export async function getActiveCommissionCount(supabase: Client, listingId: string): Promise<number> {
   const { count } = await supabase
     .from("orders")

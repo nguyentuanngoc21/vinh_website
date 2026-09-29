@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { OrderService } from "@/lib/orders/order-service";
+import { rejectUnauthorizedCron } from "@/lib/cron-auth";
 
 /**
  * Scheduled via vercel.json — quét mọi đơn `delivered` mà `auto_confirm_at`
@@ -9,15 +10,8 @@ import { OrderService } from "@/lib/orders/order-service";
  * src/app/api/wallet/cron/settle-pending.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } else {
-    console.error("[orders] CRON_SECRET is not set — auto-confirm is unauthenticated.");
-  }
+  const denied = rejectUnauthorizedCron(request, "orders/auto-confirm");
+  if (denied) return denied;
 
   const supabase = createServiceRoleClient();
   const { data: due, error } = await supabase
@@ -28,7 +22,7 @@ export async function GET(request: Request) {
     .limit(500);
   if (error) {
     console.error("[orders] auto-confirm scan failed:", error);
-    return NextResponse.json({ error: "Scan failed" }, { status: 500 });
+    return NextResponse.json({ error: "Quét dữ liệu thất bại." }, { status: 500 });
   }
 
   let confirmed = 0;

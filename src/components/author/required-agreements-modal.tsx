@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WarningCircleIcon, ArrowSquareOutIcon } from "@phosphor-icons/react/dist/ssr";
-import { AGREEMENTS } from "@/lib/legal/registry";
+import { useAgreementHtml } from "@/lib/hooks/use-agreement-html";
 import { AgreementDocumentViewer, type AgreementRow } from "@/components/legal/agreement-document-viewer";
 import { acceptAgreement, missingInfoUrl } from "@/lib/legal/accept-agreement";
 import { Modal, Skeleton } from "@/components/ui";
@@ -33,6 +33,12 @@ export function RequiredAgreementsModal({
   const [rows, setRows] = useState<AgreementRow[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const docs = useAgreementHtml();
+
+  function openDocument(id: string) {
+    setOpenId(id);
+    docs.open(id);
+  }
 
   async function reload() {
     const res = await fetch("/api/profile/agreements");
@@ -82,7 +88,8 @@ export function RequiredAgreementsModal({
   }
 
   const openRow = rows?.find((r) => r.id === openId) ?? null;
-  const openDoc = openId ? AGREEMENTS.find((a) => a.id === openId) : null;
+  // HTML tải lười khi mở popup (không import registry.ts — xem use-agreement-html.ts).
+  const openDocKnown = openId ? docs.isKnown(openId) : false;
 
   return (
     <>
@@ -115,7 +122,7 @@ export function RequiredAgreementsModal({
                 <div className="min-w-0 text-[13.5px] font-semibold text-ink">{r.name}</div>
                 <button
                   type="button"
-                  onClick={() => setOpenId(r.id)}
+                  onClick={() => openDocument(r.id)}
                   disabled={acceptingId === r.id}
                   className="shrink-0 cursor-pointer whitespace-nowrap rounded-lg border border-brand-ink bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
                 >
@@ -143,10 +150,11 @@ export function RequiredAgreementsModal({
         </div>
       </Modal>
 
-      {openRow && openDoc && (
+      {openRow && openDocKnown && (
         <AgreementDocumentViewer
           row={openRow}
-          html={openDoc.html}
+          html={docs.htmlFor(openRow.id)}
+          error={docs.errorFor(openRow.id)}
           onClose={() => setOpenId(null)}
           onAccept={() => accept(openRow.id).then(() => setOpenId(null))}
           accepting={acceptingId === openRow.id}

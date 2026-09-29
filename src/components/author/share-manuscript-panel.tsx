@@ -107,7 +107,7 @@ export function ShareManuscriptPanel({ bookId, finalized: initialFinalized, init
                 type="button"
                 onClick={revoke}
                 disabled={pending}
-                className="flex shrink-0 items-center gap-1 rounded-full border border-[#f3c6c6] px-3 py-1.5 text-xs font-semibold text-[#B02A37] disabled:opacity-60"
+                className="flex shrink-0 items-center gap-1 rounded-full border border-error-border px-3 py-1.5 text-xs font-semibold text-error disabled:opacity-60"
               >
                 <XIcon size={13} /> Gỡ share
               </button>

@@ -18,7 +18,7 @@ export type WorkspaceChapter = {
   price: number;
   // Link audio đơn giản do tác giả tự dán + giá riêng — tách biệt cơ chế
   // chapter_audio_links/audio_narrations (ChapterAudioPanel/linkedAudio bên
-  // dưới). Xem migrations/20260909_add_chapter_audio_url_and_price.sql.
+  // dưới). Xem migrations/archive/20260909_add_chapter_audio_url_and_price.sql.
   audio_url: string | null;
   audio_price: number;
   is_last_chapter: boolean;
@@ -33,7 +33,7 @@ type AuthorWorkspaceProps = {
   bookSlug: string;
   bookPublished: boolean;
   // Độc quyền giờ ở cấp TRUYỆN (books.is_exclusive), không phải chương —
-  // xem migrations/20260826_add_book_exclusivity.sql.
+  // xem migrations/archive/20260826_add_book_exclusivity.sql.
   bookIsExclusive: boolean;
   bookPublishedAt: string | null;
   chapter: WorkspaceChapter;
@@ -146,7 +146,7 @@ export function AuthorWorkspace({
 
   // Không optimistic-rollback-lặng-lẽ như handleGenreChange/handleTagsChange
   // — đổi độc quyền có thể bị SERVER chặn (khoá 3 ngày, xem
-  // migrations/20260826_add_book_exclusivity.sql), nên phải chờ phản hồi
+  // migrations/archive/20260826_add_book_exclusivity.sql), nên phải chờ phản hồi
   // trước khi coi là thành công, và trả lỗi rõ nếu bị chặn.
   const handleExclusiveChange = async (nextExclusive: boolean) => {
     setExclusiveError(null);

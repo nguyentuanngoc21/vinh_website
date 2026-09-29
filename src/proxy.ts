@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { decodeSession, SESSION_COOKIE } from "@/lib/session";
+import { isAdminRole } from "@/lib/roles";
 
 /**
  * Server-side route protection by role.
@@ -45,7 +46,7 @@ export async function proxy(request: NextRequest) {
   // — trước đây chỉ check === "admin" nên 1 tài khoản super_admin bị đá
   // khỏi /admin hoàn toàn. getAuthedAdminId() (src/lib/wallet/session.ts)
   // đã chấp nhận cả 2 role đúng cách; sửa lại đây cho khớp.
-  if (needsAdmin && session?.role !== "admin" && session?.role !== "super_admin") {
+  if (needsAdmin && !isAdminRole(session?.role)) {
     if (!session) return redirectToLogin(request);
     // Đã đăng nhập nhưng cookie ghi role 'user' — có thể vừa được super_admin
     // nâng quyền (cookie chỉ mới bằng lần đăng nhập gần nhất). Cho qua

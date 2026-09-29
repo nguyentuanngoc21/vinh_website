@@ -4,6 +4,7 @@ import { advanceDueContests } from "@/lib/contests/lifecycle-service";
 import { detectAllActiveFraud } from "@/lib/contests/fraud-service";
 import { refreshAllActiveScores } from "@/lib/contests/scores-service";
 import { snapshotAllRanks } from "@/lib/contests/rank-snapshot-service";
+import { rejectUnauthorizedCron } from "@/lib/cron-auth";
 
 /**
  * Scheduled qua vercel.json (hằng ngày, 00:05 giờ Việt Nam — ngay sau các hạn
@@ -25,14 +26,8 @@ import { snapshotAllRanks } from "@/lib/contests/rank-snapshot-service";
  * `Authorization: Bearer ${CRON_SECRET}` do Vercel Cron tự gắn.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    if (request.headers.get("authorization") !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } else {
-    console.error("[contests] CRON_SECRET is not set — contests/cron/advance is unauthenticated.");
-  }
+  const denied = rejectUnauthorizedCron(request, "contests/advance");
+  if (denied) return denied;
 
   try {
     const client = createServiceRoleClient();

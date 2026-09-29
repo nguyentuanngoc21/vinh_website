@@ -17,60 +17,15 @@ import { Field, Alert } from "@/components/ui";
 import { usePendingNavigate } from "@/lib/navigation/pending-navigation";
 import { AVATAR_TONES } from "@/lib/profile";
 import type { CreatorTag } from "@/lib/supabase/types";
-
-export type ConnectWorkItem = {
-  id: string;
-  title: string;
-  meta: string;
-  date: string;
-  href: string | null;
-  imageUrl: string | null;
-  audioUrl?: string | null;
-};
-
-export type ConnectService = {
-  id: string;
-  serviceType: "illustration" | "voice" | "ghostwriting";
-  name: string;
-  minPrice: number | null;
-  deliveryDays: number | null;
-  /** "available" (xanh) / "busy" (đỏ) / "off" (xám, không tooltip) — xem
-   * src/lib/orders/service-listing-service.ts computeCommissionStatus().
-   * Đếm theo TỪNG gói riêng, không cộng dồn theo người bán. */
-  commissionStatus: "available" | "busy" | "off";
-  activeCommissionCount: number;
-  monthlyCommissionLimit: number | null;
-};
-
-export type ConnectPerson = {
-  id: string;
-  nickname: string;
-  username: string;
-  avatarUrl: string | null;
-  coverImageUrl: string | null;
-  bio: string | null;
-  joined: string;
-  creatorTags: CreatorTag[];
-  followerCount: number;
-  isFollowingByViewer: boolean;
-  /** Chỉ gồm listing is_accepting_orders=true & không riêng tư — xem
-   * src/app/ket-noi/page.tsx (GET service_listings). */
-  services: ConnectService[];
-  works: {
-    truyen: ConnectWorkItem[];
-    audio: ConnectWorkItem[];
-    design: ConnectWorkItem[];
-    /** Cuộc thi đã tham gia + thứ hạng / giải + huy hiệu Passport (Contest Engine Slice 3.3). */
-    cuoc_thi: ConnectWorkItem[];
-  };
-};
+import type { ConnectPerson } from "@/lib/connect/types";
+import { formatVnd } from "@/lib/format-currency";
 
 const SECTION_KEYS = ["truyen", "audio", "design", "cuoc_thi"] as const;
 type SectionKey = (typeof SECTION_KEYS)[number];
 
 const SECTION_META: Record<SectionKey, { label: string; sub: string; color: string; bg: string }> = {
   truyen: { label: "Truyện chữ", sub: "Tác phẩm văn bản đã xuất bản trên Vịnh", color: "#2C5870", bg: "var(--color-info-bg)" },
-  audio: { label: "Audio", sub: "Bản thu và chương audio", color: "#2C7453", bg: "#DBF3E8" },
+  audio: { label: "Audio", sub: "Bản thu và chương audio", color: "#2C7453", bg: "var(--color-success-form-border)" },
   design: { label: "Design", sub: "Ảnh bìa, minh họa đã đăng", color: "#6B21A8", bg: "#F3E8FF" },
   cuoc_thi: {
     label: "Cuộc thi",
@@ -279,7 +234,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                   type="button"
                   onClick={() => setSelectedId(p.id)}
                   style={{
-                    borderLeft: p.id === selected?.id ? "3px solid #D9A441" : "3px solid transparent",
+                    borderLeft: p.id === selected?.id ? "3px solid var(--color-brand-gold)" : "3px solid transparent",
                     background: p.id === selected?.id ? "var(--color-cream-card)" : "#fff",
                   }}
                   className="flex w-full cursor-pointer items-center gap-3.5 border-b border-[#f4f2ef] px-[18px] py-3.5 text-left transition-colors hover:bg-cream-card"
@@ -383,7 +338,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                 <div className="border-b border-[#f1efec] px-[22px] py-4">
                   <div className="text-xs font-bold tracking-[1.1px] text-stone">DỊCH VỤ NHẬN ĐẶT</div>
                   {orderError && (
-                    <div className="mt-2 text-xs font-semibold text-[#B02A37]">{orderError}</div>
+                    <div className="mt-2 text-xs font-semibold text-error">{orderError}</div>
                   )}
                   <div className="mt-2.5 flex flex-col gap-2">
                     {selected.services.map((s) => (
@@ -414,14 +369,14 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                                   s.commissionStatus === "available"
                                     ? "#2C7453"
                                     : s.commissionStatus === "busy"
-                                      ? "#B02A37"
+                                      ? "var(--color-error)"
                                       : "#dcdcdc",
                               }}
                             />
                             <span className="truncate">{s.name}</span>
                           </div>
                           <div className="mt-0.5 text-xs text-stone">
-                            {s.minPrice ? `Từ ${s.minPrice.toLocaleString("vi-VN")}₫` : "Liên hệ giá"}
+                            {s.minPrice ? `Từ ${formatVnd(s.minPrice)}` : "Liên hệ giá"}
                             {s.deliveryDays ? ` · ${s.deliveryDays} ngày` : ""}
                           </div>
                         </div>

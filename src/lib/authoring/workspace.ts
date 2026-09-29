@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { resolveBookCoverUrl, resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 
@@ -28,7 +28,7 @@ export async function listAuthorBooks(client: Client, userId: string) {
   const books = rows ?? [];
   const ids = books.map((b) => b.id);
   const [covers, { data: chapters }] = await Promise.all([
-    Promise.all(books.map((b) => resolveBookCoverUrl(client, b))),
+    resolveBookCoverUrls(client, books),
     ids.length
       ? client.from("chapters").select("book_id, published").in("book_id", ids)
       : Promise.resolve({ data: [] as { book_id: string; published: boolean }[] }),

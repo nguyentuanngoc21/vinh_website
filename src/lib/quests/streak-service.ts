@@ -19,7 +19,7 @@ export type RecordReadingActivityResult = {
 /**
  * `supabase` must be the service-role client — sync_reading_streak() and
  * rescue_streak_with_tokens() both have EXECUTE revoked from
- * anon/authenticated (see migrations/20260827_add_streak_sync_functions.sql).
+ * anon/authenticated (see migrations/archive/20260827_add_streak_sync_functions.sql).
  */
 export const StreakService = {
   /**

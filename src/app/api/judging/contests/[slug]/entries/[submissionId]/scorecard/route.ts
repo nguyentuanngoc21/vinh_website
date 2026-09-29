@@ -14,7 +14,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ slug
   const { slug, submissionId } = await params;
   const supabase = createServiceRoleClient();
   const judgeId = await getAuthedUserId(supabase);
-  if (!judgeId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!judgeId) return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   try {
     const body = await readJson(request);
     const raw = body.scores;

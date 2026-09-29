@@ -7,7 +7,7 @@ import type { Database, DesignItemCategory } from "@/lib/supabase/types";
  * — replaces the hardcoded DESIGN_PINS mock in src/lib/design-gallery.ts.
  * Reads public_design_items (RLS-transparent view over design_items, see
  * docs/supabase/schema.sql phần 9) joined with design_item_like_counts
- * (migrations/20260901_add_design_item_gallery_metadata.sql) and
+ * (migrations/archive/20260901_add_design_item_gallery_metadata.sql) and
  * author_public_profiles for the illustrator's display name/avatar.
  *
  * Only items with a category are shown — book-cover art created through
@@ -19,7 +19,7 @@ import type { Database, DesignItemCategory } from "@/lib/supabase/types";
  */
 
 // 14 giá trị (4 cũ + 10 mới, additive — xem
-// migrations/20260919_add_design_albums_and_multi_upload.sql). 12 mục đầu
+// migrations/archive/20260919_add_design_albums_and_multi_upload.sql). 12 mục đầu
 // khớp đúng thứ tự cột "Loại sản phẩm" của mega-menu
 // (src/components/nav-strip-links.tsx) — nguồn DUY NHẤT cho danh sách này,
 // nav-strip-links.tsx import lại từ đây thay vì tự khai báo riêng. 2 mục
@@ -79,7 +79,7 @@ export type GalleryDesignItem = {
   shareCount: number;
   likedByViewer: boolean;
   createdAt: string;
-  // Xem migrations/20260919_add_design_albums_and_multi_upload.sql —
+  // Xem migrations/archive/20260919_add_design_albums_and_multi_upload.sql —
   // album là thực thể lâu dài, hiện luôn ở đây (không chỉ ở form đăng).
   albumId: string | null;
   albumName: string | null;

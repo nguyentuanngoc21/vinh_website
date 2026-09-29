@@ -377,7 +377,7 @@ export function ChapterEditor({
                   {imageLinkPending ? "Đang kiểm tra…" : "Chèn"}
                 </button>
               </div>
-              {imageLinkError && <div className="mt-2 text-[12px] font-medium text-[#B02A37]">{imageLinkError}</div>}
+              {imageLinkError && <div className="mt-2 text-[12px] font-medium text-error">{imageLinkError}</div>}
               <p className="mt-2 text-[11.5px] text-stone-alt">
                 Link do hoạ sĩ gửi cho bạn (nút &quot;Tạo link liên kết&quot; ở trang đăng thiết kế) — ảnh sẽ hiện
                 đúng tại vị trí con trỏ đang đặt.

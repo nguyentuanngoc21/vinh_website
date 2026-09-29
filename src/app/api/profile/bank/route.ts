@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data, error } = await supabase
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   // dụng" ở đây dừng ở: ngân hàng nằm trong danh sách chính thức + đúng
   // định dạng số tài khoản + có tên chủ tài khoản. Tên chủ tài khoản do
   // người dùng tự khai, KHÔNG ép khớp real_name (xem
-  // migrations/20260827_add_bank_account_name.sql) — chủ tài khoản có
+  // migrations/archive/20260827_add_bank_account_name.sql) — chủ tài khoản có
   // thể không phải chính người lập hồ sơ (mượn tài khoản người thân), và
   // nhiều ngân hàng in tên không dấu nên khó so khớp cứng với real_name
   // có dấu dù đúng người. Đúng/sai thông tin này là trách nhiệm của

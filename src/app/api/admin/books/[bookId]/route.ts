@@ -22,7 +22,7 @@ import {
  * `deleted: true` giờ dùng CHUNG kiến trúc kiểm duyệt với
  * api/admin/chapters/[chapterId]/route.ts (bắt buộc chọn lý do, ghi
  * book_moderation_actions, gửi notifications + direct_messages từ chính
- * admin thực hiện) — xem migrations/20260908_add_book_moderation.sql.
+ * admin thực hiện) — xem migrations/archive/20260908_add_book_moderation.sql.
  * Trước đây route này chỉ set deleted_at, không có lý do/thông báo gì cả.
  *
  * `deleted: false` (khôi phục) và `is_exclusive` (bật/tắt độc quyền) vẫn
@@ -38,7 +38,7 @@ export async function PATCH(
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
   if (!adminId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);

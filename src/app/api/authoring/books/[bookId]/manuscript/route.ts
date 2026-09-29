@@ -6,7 +6,7 @@ import { getAuthedUserId } from "@/lib/wallet/session";
  * GET /api/authoring/books/:bookId/manuscript — đọc bản thảo cho người
  * ĐƯỢC SHARE (không phải tác giả, không cần book đã published). KHÔNG mở
  * rộng RLS select của books/chapters cho việc này (xem ghi chú ở
- * migrations/20260901_add_manuscript_share.sql) — dùng service-role, tự
+ * migrations/archive/20260901_add_manuscript_share.sql) — dùng service-role, tự
  * kiểm manuscript_access_grants còn hiệu lực (revoked_at is null — grant
  * đã LOCKED vẫn đọc được bình thường, locked chỉ chặn gỡ/share lại, xem
  * route share/route.ts).
@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ boo
   const supabase = createServiceRoleClient();
   const userId = await getAuthedUserId(supabase);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data: grant } = await supabase

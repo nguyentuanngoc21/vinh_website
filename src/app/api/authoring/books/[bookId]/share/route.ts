@@ -5,7 +5,7 @@ import { getUserContext, requestError } from "@/lib/mobile/request-context";
  * POST /api/authoring/books/:bookId/share — Share bản thảo kiểu Drive
  * (yêu cầu bổ sung #1), TỔNG QUÁT cho mọi truyện, không chỉ ghostwriting.
  * Đúng 1 tài khoản đang được share/truyện — ép bằng partial unique index
- * (migrations/20260901_add_manuscript_share.sql), route chỉ cần bắt lỗi
+ * (migrations/archive/20260901_add_manuscript_share.sql), route chỉ cần bắt lỗi
  * unique_violation để trả thông báo dễ hiểu, không tự kiểm tay.
  *
  * RLS-scoped client (createClient(), không phải service-role) — đúng

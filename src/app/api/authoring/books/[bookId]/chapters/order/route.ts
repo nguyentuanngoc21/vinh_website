@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
 import { getUserContext, requestError } from "@/lib/mobile/request-context";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "@/lib/validation/uuid";
 
 /**
  * PUT /api/authoring/books/:bookId/chapters/order — body `{ chapterIds }`: MỌI
  * chương của sách theo thứ tự mới. RPC reorder_book_chapters (SECURITY
  * INVOKER — RLS "authors update chapters on their own books" vẫn áp dụng) kiểm
  * chủ sách, đủ/không trùng chương, và chương cuối phải đứng cuối. Xem
- * migrations/20260925_add_chapter_delete_and_reorder.sql.
+ * migrations/archive/20260925_add_chapter_delete_and_reorder.sql.
  */
 export async function PUT(request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
-  if (!UUID.test(bookId)) {
+  if (!isUuid(bookId)) {
     return NextResponse.json({ error: "Không tìm thấy truyện." }, { status: 404 });
   }
   const body = await request.json().catch(() => null);
@@ -21,7 +20,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ book
     !Array.isArray(chapterIds) ||
     chapterIds.length === 0 ||
     chapterIds.length > 1000 ||
-    !chapterIds.every((id) => typeof id === "string" && UUID.test(id))
+    !chapterIds.every((id) => typeof id === "string" && isUuid(id))
   ) {
     return NextResponse.json({ error: "Danh sách chương không hợp lệ." }, { status: 400 });
   }

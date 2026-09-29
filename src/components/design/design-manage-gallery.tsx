@@ -133,7 +133,7 @@ export function DesignManageGallery() {
   const editing = items?.find((it) => it.id === editingId) ?? null;
 
   if (loadError) {
-    return <p className="text-sm text-[#B02A37]">{loadError}</p>;
+    return <p className="text-sm text-error">{loadError}</p>;
   }
 
   if (items === null) {
@@ -165,7 +165,7 @@ export function DesignManageGallery() {
           type="button"
           onClick={deleteChecked}
           disabled={bulkDeletePending}
-          className="mb-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#FDECEC] px-4 py-2 text-[12.5px] font-semibold text-[#B02A37] disabled:opacity-60"
+          className="mb-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#FDECEC] px-4 py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
         >
           <TrashIcon size={14} /> Xóa ({checkedIds.size})
         </button>
@@ -219,7 +219,7 @@ export function DesignManageGallery() {
                   onClick={() => deleteOne(item.id)}
                   disabled={deletePendingId === item.id}
                   title="Xóa"
-                  className="flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2ded7] px-2.5 py-1.5 text-[12px] font-semibold text-stone-dark transition-colors hover:bg-[#FDECEC] hover:text-[#B02A37] disabled:opacity-60"
+                  className="flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2ded7] px-2.5 py-1.5 text-[12px] font-semibold text-stone-dark transition-colors hover:bg-[#FDECEC] hover:text-error disabled:opacity-60"
                 >
                   <TrashIcon size={13} /> {deletePendingId === item.id ? "…" : ""}
                 </button>
@@ -332,7 +332,7 @@ export function DesignManageGallery() {
                 type="button"
                 onClick={() => deleteOne(editing.id)}
                 disabled={deletePendingId === editing.id}
-                className="mt-auto flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2ded7] py-2.5 text-[13px] font-semibold text-stone-dark transition-colors hover:bg-[#FDECEC] hover:text-[#B02A37] disabled:opacity-60"
+                className="mt-auto flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2ded7] py-2.5 text-[13px] font-semibold text-stone-dark transition-colors hover:bg-[#FDECEC] hover:text-error disabled:opacity-60"
               >
                 <TrashIcon size={14} /> {deletePendingId === editing.id ? "Đang xoá…" : "Xóa ảnh này"}
               </button>

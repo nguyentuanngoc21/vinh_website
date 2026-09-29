@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data, error } = await supabase
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     createdAt: data.created_at,
     coverImageUrl: data.cover_image_url,
     avatarUrl: data.avatar_url,
-    // Quest System — xem migrations/20260827_add_quest_streak_to_profiles.sql.
+    // Quest System — xem migrations/archive/20260827_add_quest_streak_to_profiles.sql.
     // Chỉ đọc ở đây, không có đường ghi (route POST không nhận field này) —
     // streak chỉ đổi qua sync_reading_streak()/rescue_streak_with_tokens().
     currentQuestStreak: data.current_quest_streak,
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);

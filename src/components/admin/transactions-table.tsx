@@ -15,9 +15,9 @@ const STATUS_LABELS: Record<TransactionStatus, string> = {
 };
 
 function badgeStyle(status: TransactionStatus) {
-  if (status === "completed" || status === "available") return { bg: "#DBF3E8", ink: "#2C7453" };
+  if (status === "completed" || status === "available") return { bg: "var(--color-success-form-border)", ink: "#2C7453" };
   if (status === "pending" || status === "processing") return { bg: "#FFE6CC", ink: "#894701" };
-  return { bg: "#F8D7DA", ink: "#B02A37" };
+  return { bg: "#F8D7DA", ink: "var(--color-error)" };
 }
 
 const GRID_COLS = "grid-cols-[1fr_1fr_130px_100px]";

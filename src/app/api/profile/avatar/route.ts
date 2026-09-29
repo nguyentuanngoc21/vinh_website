@@ -4,7 +4,7 @@ import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 // Kích thước tối đa (15MB) không còn kiểm ở route này — file giờ đi thẳng
 // từ trình duyệt lên Storage qua signed upload URL, route chỉ cấp URL.
 // Chốt chặn thật sự là storage.buckets.file_size_limit trên bucket
-// "avatars" (xem migrations/20260914_raise_avatar_cover_size_limit.sql);
+// "avatars" (xem migrations/archive/20260914_raise_avatar_cover_size_limit.sql);
 // phía client (profile-header.tsx) cũng tự chặn sớm cho UX.
 const ALLOWED_MIME_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data, error } = await supabase
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
@@ -79,7 +79,7 @@ export async function PATCH(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
@@ -111,7 +111,7 @@ export async function DELETE(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   // Chỉ gỡ tham chiếu — không xoá file khỏi bucket "avatars" (mirrors

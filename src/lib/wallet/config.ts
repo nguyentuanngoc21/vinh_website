@@ -18,7 +18,7 @@ export const HOLD_PERIOD_DAYS = 4;
 export const TOKEN_TO_VND_RATE = 200;
 
 /** Minimum a single withdrawal request may move, in tokens. */
-export const MIN_WITHDRAWAL_TOKENS = 500; // 500 * 200đ = 100,000đ
+export const MIN_WITHDRAWAL_TOKENS = 500; // 500 * 200 VNĐ = 100.000 VNĐ
 
 /** Max number of withdrawal *requests* (regardless of outcome) a user may
  * create in a rolling 30-day window. */

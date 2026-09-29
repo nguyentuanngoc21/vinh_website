@@ -23,7 +23,7 @@ import { resolveAuthorContractInfo } from "@/lib/legal/contract-info-service";
  * upsert theo primary key (user_id, agreement_id): xác nhận lại một văn
  * bản đã từng xác nhận (ví dụ sau khi nó được cập nhật) chỉ ghi đè, không
  * tạo thêm dòng lịch sử — khớp thiết kế "chỉ giữ lần xác nhận gần nhất" ở
- * migrations/20260828_add_agreement_acceptances.sql.
+ * migrations/archive/20260828_add_agreement_acceptances.sql.
  */
 export async function POST(
   request: Request,
@@ -39,7 +39,7 @@ export async function POST(
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   if (request.headers.has('authorization')) {

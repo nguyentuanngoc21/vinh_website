@@ -1,42 +1,16 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient as createSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { decodeSession, SESSION_COOKIE } from "@/lib/session";
+import { createServiceRoleClient } from "@/lib/supabase/server";
+import { getAuthedUserId } from "@/lib/wallet/session";
+import { getNextPenalty, getPenaltyDeduction, PENALTY_DAY_MS } from "@/lib/penalty/rules";
 
-type PenaltyRule = { percent: number; durationDays: number };
-type NextPenalty = PenaltyRule | { ban: true; durationDays: number } | { warning: true };
-
-const PENALTY_RULES: ReadonlyArray<PenaltyRule> = [
-  { percent: 10, durationDays: 3 },
-  { percent: 10, durationDays: 7 },
-  { percent: 15, durationDays: 14 },
-  { percent: 15, durationDays: 30 },
-];
-
-const PENALTY_BASE_TOKEN = 1000;
-
-// count=0 (vi phạm lần đầu tiên) -> CẢNH BÁO, không trừ token/không khoá —
-// xem hội thoại review UI/UX: reader chưa có bước "cảnh báo trước khi
-// phạt", lần đầu bị phát hiện đã trừ token ngay. Từ lần vi phạm THỨ 2 trở
-// đi (count>=1) mới áp PENALTY_RULES thật, lệch 1 chỉ số so với trước đây
-// (PENALTY_RULES[count-1] thay vì PENALTY_RULES[count]) để nhường chỗ cho
-// bước cảnh báo — cấm vĩnh viễn dời từ count>=4 sang count>=5 theo đúng độ
-// lệch đó (tổng 4 mốc phạt thật không đổi, chỉ thêm 1 mốc cảnh báo trước
-// mốc đầu).
-function getNextPenalty(count: number): NextPenalty {
-  if (count === 0) return { warning: true };
-  if (count >= 5) return { ban: true, durationDays: 30 };
-  return PENALTY_RULES[count - 1];
-}
-
-async function getPenaltyProfile(supabase: ReturnType<typeof createServiceRoleClient>, identifier: { username?: string; userId?: string }) {
-  const qb = supabase.from("profiles").select(
-    "id, screenshot_penalty_count, screenshot_penalty_expires_at, screenshot_penalty_banned, screenshot_penalty_last_offense_at"
-  );
-  if (identifier.username) qb.eq("username", identifier.username);
-  if (identifier.userId) qb.eq("id", identifier.userId);
-
-  const { data, error } = await qb.single();
+async function getPenaltyProfile(supabase: ReturnType<typeof createServiceRoleClient>, userId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, screenshot_penalty_count, screenshot_penalty_expires_at, screenshot_penalty_banned, screenshot_penalty_last_offense_at"
+    )
+    .eq("id", userId)
+    .single();
 
   if (error || !data) {
     return { data: null, error: error ?? new Error("Profile not found") };
@@ -45,66 +19,41 @@ async function getPenaltyProfile(supabase: ReturnType<typeof createServiceRoleCl
   return { data, error: null };
 }
 
-async function getSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return decodeSession(token);
+// Người gọi: cookie ký tay trước rồi tới phiên Supabase — dùng chung
+// getAuthedUserId() (src/lib/wallet/session.ts) thay vì tự dựng lại ở đây.
+// null -> 401; có id nhưng không có hồ sơ -> 404 (giữ nguyên như trước).
+// Trả NextResponse lỗi, hoặc dòng profiles cần cho GET/POST.
+async function resolvePenaltyProfile(supabase: ReturnType<typeof createServiceRoleClient>) {
+  const userId = await getAuthedUserId(supabase);
+  if (!userId) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
+  }
+  const profileResult = await getPenaltyProfile(supabase, userId);
+  if (profileResult.error || !profileResult.data) {
+    return NextResponse.json({ error: "Không tìm thấy hồ sơ." }, { status: 404 });
+  }
+  return profileResult.data;
 }
 
 export async function GET() {
-  const session = await getSession();
   const supabase = createServiceRoleClient();
-  let profileResult = null;
+  const profile = await resolvePenaltyProfile(supabase);
+  if (profile instanceof NextResponse) return profile;
 
-  if (session) {
-    profileResult = await getPenaltyProfile(supabase, { username: session.handle });
-  }
-
-  if (!profileResult || profileResult.error || !profileResult.data) {
-    const fallbackClient = await createSupabaseClient();
-    const { data: authUser, error: authError } = await fallbackClient.auth.getUser();
-    if (authError || !authUser?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    profileResult = await getPenaltyProfile(supabase, { userId: authUser.user.id });
-  }
-
-  if (!profileResult || profileResult.error || !profileResult.data) {
-    return NextResponse.json({ error: "Không tìm thấy hồ sơ." }, { status: 404 });
-  }
-
-  return NextResponse.json(profileResult.data);
+  return NextResponse.json(profile);
 }
 
 export async function POST(request: Request) {
   const payload = await request.json().catch(() => null);
   if (!payload || payload.event !== "screenshot") {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
-  const session = await getSession();
   const supabase = createServiceRoleClient();
-  let profileResult = null;
+  const profile = await resolvePenaltyProfile(supabase);
+  if (profile instanceof NextResponse) return profile;
 
-  if (session) {
-    profileResult = await getPenaltyProfile(supabase, { username: session.handle });
-  }
-
-  if (!profileResult || profileResult.error || !profileResult.data) {
-    const fallbackClient = await createSupabaseClient();
-    const { data: authUser, error: authError } = await fallbackClient.auth.getUser();
-    if (authError || !authUser?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    profileResult = await getPenaltyProfile(supabase, { userId: authUser.user.id });
-  }
-
-  if (!profileResult || profileResult.error || !profileResult.data) {
-    return NextResponse.json({ error: "Không tìm thấy hồ sơ." }, { status: 404 });
-  }
-
-  const currentCount = Number(profileResult.data.screenshot_penalty_count ?? 0);
+  const currentCount = Number(profile.screenshot_penalty_count ?? 0);
   const nextCount = currentCount + 1;
   const now = new Date();
   let expiresAt: string | null = null;
@@ -122,13 +71,13 @@ export async function POST(request: Request) {
   } else if ("ban" in nextPenalty && nextPenalty.ban) {
     banned = true;
   } else {
-    const expires = new Date(now.getTime() + nextPenalty.durationDays * 24 * 60 * 60 * 1000);
+    const expires = new Date(now.getTime() + nextPenalty.durationDays * PENALTY_DAY_MS);
     expiresAt = expires.toISOString();
     const percent = "percent" in nextPenalty ? nextPenalty.percent : 0;
-    lastDeductedAmount = Math.max(1, Math.ceil((PENALTY_BASE_TOKEN * percent) / 100));
+    lastDeductedAmount = getPenaltyDeduction(percent);
 
     const { error: transactionError } = await supabase.rpc("apply_transaction", {
-      p_user_id: profileResult.data.id,
+      p_user_id: profile.id,
       p_type: "screenshot_penalty",
       p_amount: -lastDeductedAmount,
       p_reference_type: "screenshot_penalty",
@@ -141,7 +90,7 @@ export async function POST(request: Request) {
         (typeof transactionError.message === "string" && transactionError.message.includes("p_penalty_percent"));
       if (missingFn) {
         const fallback = await supabase.rpc("apply_transaction", {
-          p_user_id: profileResult.data.id,
+          p_user_id: profile.id,
           p_type: "screenshot_penalty",
           p_amount: -lastDeductedAmount,
           p_reference_type: "screenshot_penalty",
@@ -177,7 +126,7 @@ export async function POST(request: Request) {
       screenshot_penalty_banned: banned,
       screenshot_penalty_last_offense_at: now.toISOString(),
     })
-    .eq("id", profileResult.data.id)
+    .eq("id", profile.id)
     .select(
       "screenshot_penalty_count, screenshot_penalty_expires_at, screenshot_penalty_banned, screenshot_penalty_last_offense_at"
     )

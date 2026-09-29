@@ -13,7 +13,7 @@ function isCharacterRole(value: unknown): value is CharacterRole {
 /**
  * POST /api/authoring/books/:bookId/characters — tạo 1 nhân vật cho sách
  * của chính tác giả (không phải chỉ để mở khoá quest — công cụ quản lý
- * nhân vật thật, xem migrations/20260919_add_characters.sql). Không tự
+ * nhân vật thật, xem migrations/archive/20260919_add_characters.sql). Không tự
  * check ownership tay — policy "authors manage characters in their own
  * books" đã chặn qua RLS, INSERT vi phạm sẽ trả lỗi (xử lý ở nhánh
  * `error` dưới), cùng cách các route authoring khác trong repo.

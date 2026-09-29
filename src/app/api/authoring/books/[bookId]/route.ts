@@ -34,7 +34,7 @@ const MAX_SYNOPSIS_LENGTH = 2000;
  *
  * is_exclusive: true -> false bị khoá nếu sách đã published QUÁ 3 NGÀY
  * (published_at + 3 ngày < now) và đang exclusive — xem
- * migrations/20260826_add_book_exclusivity.sql. Route admin riêng
+ * migrations/archive/20260826_add_book_exclusivity.sql. Route admin riêng
  * (src/app/api/admin/books/[bookId]/route.ts) bỏ qua luật này hoàn toàn.
  */
 export async function PATCH(

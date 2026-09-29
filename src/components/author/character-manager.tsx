@@ -15,7 +15,7 @@ export type ManagedCharacter = {
 const ROLE_LABEL: Record<CharacterRole, string> = { hero: "Chính diện", villain: "Phản diện", neutral: "Trung lập" };
 const ROLE_STYLE: Record<CharacterRole, string> = {
   hero: "bg-[#E4F1EA] text-[#256B4C]",
-  villain: "bg-[#FBEAEA] text-[#B02A37]",
+  villain: "bg-[#FBEAEA] text-error",
   neutral: "bg-cream-card-alt text-stone-dark",
 };
 const ROLES: CharacterRole[] = ["hero", "villain", "neutral"];
@@ -25,7 +25,7 @@ const EMPTY_DRAFT: Draft = { name: "", role: "neutral", trope: "" };
 
 /**
  * Quản lý nhân vật của 1 sách — công cụ THẬT cho tác giả (không chỉ để mở
- * khoá quest/thành tựu, xem migrations/20260919_add_characters.sql). Nối
+ * khoá quest/thành tựu, xem migrations/archive/20260919_add_characters.sql). Nối
  * vào book-overview.tsx. role phân loại rộng (chính diện/phản diện/trung
  * lập); trope là free-text tự do (vd "Ma vương", "Trượng nghĩa") — độc
  * giả gắn nhân vật vào từng chương ở chapter-characters-panel.tsx, follow
@@ -204,7 +204,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
                   type="button"
                   disabled={deletingId === c.id}
                   onClick={() => remove(c.id)}
-                  className="flex items-center gap-1 text-[12px] font-semibold text-[#B02A37] disabled:opacity-50"
+                  className="flex items-center gap-1 text-[12px] font-semibold text-error disabled:opacity-50"
                 >
                   <TrashIcon size={13} /> Xoá
                 </button>
@@ -215,7 +215,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
       </div>
 
       {error && (
-        <div className="mb-3 rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-3 py-2 text-[12.5px] font-medium text-[#B02A37]">
+        <div className="mb-3 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2 text-[12.5px] font-medium text-error">
           {error}
         </div>
       )}

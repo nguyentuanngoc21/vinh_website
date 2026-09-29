@@ -6,7 +6,7 @@
 import type { QuestType } from "@/lib/supabase/types";
 
 /** Token cost to rescue an at-risk streak (see rescue_streak_with_tokens()
- * in migrations/20260827_add_streak_sync_functions.sql). Fixed, not
+ * in migrations/archive/20260827_add_streak_sync_functions.sql). Fixed, not
  * scaled by streak length — confirmed choice; revisit if rescue turns out
  * to be abused (see note in that migration re: streak no longer fully
  * reflecting real reading behavior once paid rescue is unlimited). */
@@ -15,7 +15,7 @@ export const STREAK_RESCUE_TOKEN_COST = 50;
 /**
  * Display-only mirrors of constants that are actually enforced in SQL
  * (sync_reading_streak()/rescue_streak_with_tokens() — see
- * migrations/20260827_add_streak_sync_functions.sql). SQL is the source of
+ * migrations/archive/20260827_add_streak_sync_functions.sql). SQL is the source of
  * truth; these exist so UI copy ("còn 48 giờ để cứu streak", "đạt mốc 100
  * ngày để +1 thẻ nghỉ") doesn't hardcode magic numbers separately. If you
  * change the SQL, update these too — nothing enforces they stay in sync.
@@ -26,7 +26,7 @@ export const REST_DAY_BANK_CAP_GROWTH_INTERVAL_DAYS = 100;
 export const REST_DAY_BANK_CAP_MAX = 31;
 
 /**
- * Random daily quest pool (spec mục 1.3, migrations/20260828_add_user_quest_pool.sql).
+ * Random daily quest pool (spec mục 1.3, migrations/archive/20260828_add_user_quest_pool.sql).
  * Trọng số CỐ ĐỊNH theo quest_type (không theo user — không có khái
  * niệm level/rank nào trong hệ thống) — số càng lớn, càng dễ được random
  * chọn vào các slot "tự do" (ngoài 3 slot bắt buộc discovery/engagement/

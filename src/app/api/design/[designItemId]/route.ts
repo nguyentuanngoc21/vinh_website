@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import type { Database, DesignItemCategory } from "@/lib/supabase/types";
 
@@ -12,17 +12,15 @@ const CATEGORY_KEYS = DESIGN_CATEGORIES.map((c) => c.key);
  * Pinterest-style: mỗi ảnh tự lưu ngay khi chọn ở POST /api/design, sau đó
  * người dùng chỉnh Tên/Mô tả/Loại sản phẩm/Alt text cho từng ảnh riêng qua
  * route này). RLS "illustrators update their own design items" + GRANT
- * cột (migrations/20260919_add_design_albums_and_multi_upload.sql) đủ để
+ * cột (migrations/archive/20260919_add_design_albums_and_multi_upload.sql) đủ để
  * chặn — không cần route tự kiểm illustrator_id, update() không match
  * hàng nào của người khác thì trả về rows rỗng, không lỗi.
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ designItemId: string }> }) {
   const { designItemId } = await params;
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {

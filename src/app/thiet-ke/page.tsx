@@ -22,7 +22,7 @@ export const metadata: Metadata = {
  * Trước đây 100% mock (DESIGN_PINS, src/lib/design-gallery.ts) đứng sau
  * <DevelopmentOverlay>. Giờ đọc public_design_items thật (category/
  * description/share_count + design_item_like_counts, xem
- * migrations/20260901_add_design_item_gallery_metadata.sql và
+ * migrations/archive/20260901_add_design_item_gallery_metadata.sql và
  * src/lib/design/get-design-gallery.ts) — overlay đã gỡ.
  */
 export default async function DesignPage({
@@ -32,11 +32,22 @@ export default async function DesignPage({
 }) {
   const { album } = await searchParams;
   const supabase = await createClient();
-  const viewerId = await getAuthedUserId();
-  const items = await getDesignGallery(supabase, viewerId, album ?? null);
-  const activeAlbum = album
-    ? ((await supabase.from("design_albums").select("id, name").eq("id", album).maybeSingle()).data ?? null)
-    : null;
+  // Album đang lọc không phụ thuộc viewer — chạy song song với chuỗi
+  // viewer → gallery (gallery cần viewerId cho cờ đã thích).
+  const [{ viewerId, items }, activeAlbum] = await Promise.all([
+    getAuthedUserId().then(async (viewerId) => ({
+      viewerId,
+      items: await getDesignGallery(supabase, viewerId, album ?? null),
+    })),
+    album
+      ? supabase
+          .from("design_albums")
+          .select("id, name")
+          .eq("id", album)
+          .maybeSingle()
+          .then(({ data }) => data ?? null)
+      : Promise.resolve(null),
+  ]);
 
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>

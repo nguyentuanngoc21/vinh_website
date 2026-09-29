@@ -1,13 +1,16 @@
 "use client";
 
 import { XIcon } from "@phosphor-icons/react/dist/ssr";
-import { Modal } from "@/components/ui";
+import { Modal, Skeleton } from "@/components/ui";
 
 type LegalDocumentModalProps = {
   open: boolean;
   onClose: () => void;
   title: string;
-  html: string;
+  /** null = đang tải (LegalLink tải HTML lười khi mở popup). */
+  html: string | null;
+  /** Thông báo lỗi nếu tải HTML thất bại. */
+  error?: string | null;
 };
 
 /**
@@ -22,7 +25,7 @@ type LegalDocumentModalProps = {
  * button là cấu trúc DOM sai — đúng lý do Modal luôn portal cho MỌI modal,
  * không riêng file này.
  */
-export function LegalDocumentModal({ open, onClose, title, html }: LegalDocumentModalProps) {
+export function LegalDocumentModal({ open, onClose, title, html, error = null }: LegalDocumentModalProps) {
   return (
     <Modal open={open} onClose={onClose} panelClassName="flex max-h-[85vh] max-w-[720px] flex-col p-0">
       <div className="flex shrink-0 items-start justify-between gap-4 border-b border-cream-border px-7 py-5">
@@ -31,10 +34,26 @@ export function LegalDocumentModal({ open, onClose, title, html }: LegalDocument
           <XIcon size={20} />
         </button>
       </div>
+      {error ? (
+        <div role="alert" className="px-7 py-6 text-[14px] text-stone-dark">
+          {error}
+        </div>
+      ) : html === null ? (
+        <div aria-busy="true" aria-label="Đang tải văn bản" className="flex flex-col gap-3 px-7 py-6">
+          <Skeleton className="h-4 w-2/3 rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-3.5 w-full rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-3.5 w-full rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-3.5 w-5/6 rounded-[var(--radius-sm)]" />
+          <Skeleton className="mt-3 h-3.5 w-full rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-3.5 w-11/12 rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-3.5 w-3/4 rounded-[var(--radius-sm)]" />
+        </div>
+      ) : (
       <div
         className="overflow-y-auto px-7 py-6 text-[14px] leading-[1.7] text-stone-dark [&_em]:text-stone [&_h1]:mt-6 [&_h1]:text-[16px] [&_h1]:font-bold [&_h1]:text-brand-ink [&_h1:first-child]:mt-0 [&_li]:mb-1.5 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_strong]:font-semibold [&_strong]:text-brand-ink [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5"
         dangerouslySetInnerHTML={{ __html: html }}
       />
+      )}
     </Modal>
   );
 }

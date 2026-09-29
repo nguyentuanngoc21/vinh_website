@@ -7,7 +7,7 @@
 // `genres` vẫn ở đây — đây là danh mục thể loại CỐ ĐỊNH của nền tảng
 // (không phải sách), dùng cho "Khám phá thể loại" (ranking-genres.tsx).
 // Khớp đúng 10 giá trị chính thức, xem
-// migrations/20260825_update_book_genres.sql và
+// migrations/archive/20260825_update_book_genres.sql và
 // src/lib/covers/genre-styles.ts.
 export const genres = [
   { label: "Linh dị", slug: "linh-di", active: false },

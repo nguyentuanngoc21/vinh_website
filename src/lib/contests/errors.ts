@@ -1,6 +1,6 @@
 /**
  * Lỗi nghiệp vụ của cuộc thi. RPC/trigger trong
- * migrations/20260926_add_contest_engine_core.sql trả mã qua `hint`; bảng
+ * migrations/archive/20260926_add_contest_engine_core.sql trả mã qua `hint`; bảng
  * dưới đổi mã thành HTTP status + thông báo tiếng Việt, dùng chung cho mọi
  * route web và mobile.
  */

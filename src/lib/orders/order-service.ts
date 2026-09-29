@@ -1,13 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { ORDER_EARNING_HOLD_DAYS } from "@/lib/orders/config";
+import { isUuid } from "@/lib/validation/uuid";
 
 type Client = SupabaseClient<Database>;
 type Order = Database["public"]["Tables"]["orders"]["Row"];
 
 /**
  * Every write path onto the Order state machine, all funneled through the
- * security-definer RPCs added by migrations/20260901_add_order_system_core.sql
+ * security-definer RPCs added by migrations/archive/20260901_add_order_system_core.sql
  * — same shape as src/lib/wallet/ledger-service.ts. Nothing here does its
  * own read-then-write across `orders`/`order_events`; each call below is
  * ONE round trip to a Postgres function, which is what makes the status
@@ -32,15 +33,13 @@ export async function getOrderForActor(supabase: Client, orderId: string, actorI
   return data;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Orders where `userId` is buyer or seller, newest first — optionally only
  * those with one counterpart (`withUserId`, the chat thread's other party).
  * Both ids are interpolated into a PostgREST `.or()` filter, so they MUST be
  * validated as UUIDs first: an unchecked value could close the `and(...)`
  * group and append its own conditions, matching other users' orders. */
 export async function listOrdersForUser(supabase: Client, userId: string, withUserId?: string | null) {
-  if (!UUID.test(userId) || (withUserId != null && !UUID.test(withUserId))) {
+  if (!isUuid(userId) || (withUserId != null && !isUuid(withUserId))) {
     return { ok: false as const, status: 400, error: "Mã người dùng không hợp lệ." };
   }
   const filter = withUserId
@@ -209,7 +208,7 @@ export const OrderService = {
 
   /** Gắn 1 truyện của seller vào 1 đơn ghostwriting VÀ cấp quyền xem cho
    * buyer cùng lúc (Mục 4.3 đặc tả) — xem
-   * migrations/20260901_add_manuscript_share.sql. */
+   * migrations/archive/20260901_add_manuscript_share.sql. */
   async attachBook(supabase: Client, params: { orderId: string; actorId: string; bookId: string }): Promise<Order> {
     const { data, error } = await supabase.rpc("attach_order_book", {
       p_order_id: params.orderId,
@@ -243,7 +242,7 @@ export const OrderService = {
 
   /** Mục 5.1 — hàm THUẦN TÚY, dùng để preview số hoàn TRƯỚC khi request
    * hủy thật (request_order_cancel tự gọi lại hàm này để chốt số, không
-   * tin số client gửi lên — xem migrations/20260901_add_order_cancel_system.sql). */
+   * tin số client gửi lên — xem migrations/archive/20260901_add_order_cancel_system.sql). */
   async calculateRefund(supabase: Client, params: { orderId: string; cancelledBy: "buyer" | "seller" }) {
     const { data, error } = await supabase.rpc("calculate_refund", {
       p_order_id: params.orderId,

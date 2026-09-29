@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
   const supabase = createServiceRoleClient();
   const userId = await getAuthedUserId(supabase);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
@@ -31,7 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
       return NextResponse.json({ error: "Số dư token không đủ." }, { status: 400 });
     }
     // Giới hạn số tiền do record_order_payment() cưỡng chế — xem
-    // migrations/20260924_enforce_order_payment_amounts.sql.
+    // migrations/archive/20260924_enforce_order_payment_amounts.sql.
     const minDeposit = /Deposit must be at least (\d+)/.exec(message);
     if (minDeposit) {
       return NextResponse.json({ error: `Tiền cọc tối thiểu là ${minDeposit[1]} token.` }, { status: 400 });

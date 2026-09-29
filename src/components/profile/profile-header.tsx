@@ -1,10 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { CameraIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert } from "@/components/ui";
-import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { createClient } from "@/lib/supabase/client";
+
+// ImageCropModal kéo theo react-easy-crop — chỉ cần khi người dùng đã chọn
+// ảnh bìa/ảnh đại diện, nên tải lười. ssr: false vì modal chỉ mở sau thao
+// tác của người dùng (không có gì để prerender).
+const loadImageCropModal = () => import("@/components/ui/image-crop-modal").then((m) => m.ImageCropModal);
+const ImageCropModal = dynamic(loadImageCropModal, { ssr: false });
 
 // Tỉ lệ khung crop ảnh bìa — banner ở đây co giãn theo viewport (h-[120px]
 // -> h-[210px], w-full) nên không có 1 tỉ lệ "đúng" duy nhất; 2.7:1 là mức
@@ -33,7 +39,7 @@ type ProfileHeaderProps = {
 // 15MB — file đi thẳng lên Storage qua signed upload URL (xem
 // api/profile/avatar|cover/route.ts), không qua Next.js Function nữa nên
 // không còn bị giới hạn cứng ~4.5MB của Vercel. Chốt chặn thật ở
-// storage.buckets.file_size_limit (migrations/20260914_raise_avatar_cover_size_limit.sql).
+// storage.buckets.file_size_limit (migrations/archive/20260914_raise_avatar_cover_size_limit.sql).
 const COVER_MAX_BYTES = 15 * 1024 * 1024;
 const AVATAR_MAX_BYTES = 15 * 1024 * 1024;
 
@@ -60,8 +66,16 @@ export function ProfileHeader({
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [avatarCropSrc, setAvatarCropSrc] = useState<string | null>(null);
 
-  const handlePick = () => fileInputRef.current?.click();
-  const handlePickAvatar = () => avatarInputRef.current?.click();
+  // Tải sẵn chunk crop ngay khi mở hộp chọn file — người dùng còn đang
+  // chọn ảnh thì chunk đã về, modal hiện ra không bị trễ.
+  const handlePick = () => {
+    void loadImageCropModal();
+    fileInputRef.current?.click();
+  };
+  const handlePickAvatar = () => {
+    void loadImageCropModal();
+    avatarInputRef.current?.click();
+  };
 
   // Chỉ chọn + validate file ở đây — việc crop (kéo/zoom/cắt kiểu Facebook,
   // xem image-crop-modal.tsx) và upload tách ra 2 hàm riêng bên dưới, chạy
@@ -295,28 +309,34 @@ export function ProfileHeader({
       {/* key={coverCropSrc}: mỗi ảnh mới chọn ứng với 1 key khác nhau, buộc
           React unmount/remount component — cách reset crop/zoom nội bộ về
           mặc định mà không cần effect (xem comment trong image-crop-modal.tsx). */}
-      <ImageCropModal
-        key={coverCropSrc}
-        open={!!coverCropSrc}
-        imageSrc={coverCropSrc}
-        aspect={COVER_CROP_ASPECT}
-        cropShape="rect"
-        title="Cắt ảnh bìa"
-        outputFileName="cover"
-        onCancel={closeCoverCrop}
-        onConfirm={uploadCover}
-      />
-      <ImageCropModal
-        key={avatarCropSrc}
-        open={!!avatarCropSrc}
-        imageSrc={avatarCropSrc}
-        aspect={1}
-        cropShape="round"
-        title="Cắt ảnh đại diện"
-        outputFileName="avatar"
-        onCancel={closeAvatarCrop}
-        onConfirm={uploadAvatar}
-      />
+      {/* Chỉ mount khi đã có ảnh — next/dynamic tải chunk ngay khi component
+          được render, nên render sẵn lúc đóng sẽ tải react-easy-crop vô ích. */}
+      {coverCropSrc && (
+        <ImageCropModal
+          key={coverCropSrc}
+          open
+          imageSrc={coverCropSrc}
+          aspect={COVER_CROP_ASPECT}
+          cropShape="rect"
+          title="Cắt ảnh bìa"
+          outputFileName="cover"
+          onCancel={closeCoverCrop}
+          onConfirm={uploadCover}
+        />
+      )}
+      {avatarCropSrc && (
+        <ImageCropModal
+          key={avatarCropSrc}
+          open
+          imageSrc={avatarCropSrc}
+          aspect={1}
+          cropShape="round"
+          title="Cắt ảnh đại diện"
+          outputFileName="avatar"
+          onCancel={closeAvatarCrop}
+          onConfirm={uploadAvatar}
+        />
+      )}
     </>
   );
 }

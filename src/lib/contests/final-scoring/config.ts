@@ -1,7 +1,7 @@
 /**
  * Cấu hình chấm điểm CHUNG CUỘC (Slice 2.5–2.6) — nơi duy nhất định nghĩa
  * hình dạng, mặc định và kiểm hợp lệ. Lưu theo version trong
- * contest_scoring_configs (migrations/20260926_add_contest_judging.sql); mỗi lượt
+ * contest_scoring_configs (migrations/archive/20260926_add_contest_judging.sql); mỗi lượt
  * tính điểm ghi version đã dùng. Khác contests.scoring_config (cấu hình khám
  * phá / BXH trong lúc thi — src/lib/contests/config.ts).
  *

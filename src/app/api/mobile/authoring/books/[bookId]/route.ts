@@ -9,13 +9,13 @@ import { getUserContext, requestError } from '@/lib/mobile/request-context';
 import { mobileResponse } from '@/lib/mobile/response';
 import { forwardRequest, pick } from '@/lib/mobile/forward';
 import { getAuthorBook } from '@/lib/authoring/workspace';
+import { isUuid } from '@/lib/validation/uuid';
 export { OPTIONS } from '@/lib/mobile/response';
 
 type Ctx = { params: Promise<{ bookId: string }> };
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // A non-UUID id matches no row (the web routes answer 404) instead of reaching Postgres as bad input.
 const withCharacter = (context: Ctx, characterId: unknown) => ({
-  params: context.params.then(p => ({ ...p, characterId: typeof characterId === 'string' && UUID.test(characterId) ? characterId : '00000000-0000-0000-0000-000000000000' })),
+  params: context.params.then(p => ({ ...p, characterId: typeof characterId === 'string' && isUuid(characterId) ? characterId : '00000000-0000-0000-0000-000000000000' })),
 });
 
 // Book overview for its author: details, chapters (drafts and removed ones too), characters.
@@ -25,7 +25,7 @@ export function GET(request: Request, context: Ctx) {
     try { auth = await getUserContext(request); } catch (e) { return requestError(e); }
     if (!auth.userId) return Response.json({ error: 'Vui lòng đăng nhập lại.' }, { status: 401 });
     const { bookId } = await context.params;
-    const book = UUID.test(bookId) ? await getAuthorBook(auth.supabase, auth.userId, bookId) : null;
+    const book = isUuid(bookId) ? await getAuthorBook(auth.supabase, auth.userId, bookId) : null;
     if (!book) return Response.json({ error: 'Không tìm thấy truyện.' }, { status: 404 });
     return Response.json({ book });
   });

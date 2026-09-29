@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 /**
  * POST /api/audio/:audioNarrationId/share-token — "Tạo lại link" ở
@@ -14,10 +14,8 @@ export async function POST(
 ) {
   const { audioNarrationId } = await params;
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
 
   const { data, error } = await supabase.rpc("regenerate_audio_share_token", {
     p_audio_narration_id: audioNarrationId,

@@ -57,7 +57,7 @@ export function AudioQueue({ tracks }: { tracks: AudioTrack[] }) {
             </div>
           </button>
         ))}
-        <div className="mt-2 flex items-center gap-[13px] rounded-[10px] bg-[#F7EFD8] p-3">
+        <div className="mt-2 flex items-center gap-[13px] rounded-[10px] bg-cream-gold p-3">
           <div className="w-[30px] shrink-0 text-center">
             <SpeakerHighIcon weight="fill" size={18} color="var(--color-brand-gold-dark)" />
           </div>

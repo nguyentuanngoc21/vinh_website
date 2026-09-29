@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
+import { isAdminRole } from "@/lib/roles";
 
 /**
  * DELETE /api/chapters/:chapterId/comments/:commentId — chỉ chủ bình
@@ -8,7 +9,7 @@ import { getRequestContext, requestError } from "@/lib/mobile/request-context";
  * anchored comments"/"admins moderate anchored comments" (schema.sql
  * phần 10f) chỉ là lớp phòng thủ thứ 2, không phải chốt chặn thật cho
  * route này. Xoá 1 bình luận gốc tự xoá hết reply của nó (FK on delete
- * cascade — xem migrations/20260910_add_anchored_comment_replies.sql),
+ * cascade — xem migrations/archive/20260910_add_anchored_comment_replies.sql),
  * không cần dọn thêm ở đây.
  */
 export async function DELETE(
@@ -34,7 +35,7 @@ export async function DELETE(
 
   if (comment.user_id !== userId) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
-    const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
+    const isAdmin = isAdminRole(profile?.role);
     if (!isAdmin) {
       return NextResponse.json({ error: "Bạn không có quyền xoá bình luận này." }, { status: 403 });
     }

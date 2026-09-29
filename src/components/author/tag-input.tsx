@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Pill } from "@/components/ui";
 
-const MAX_TAGS = 20; // khớp CHECK books_tags_length_check (migrations/20260824_add_book_tags_and_view_count.sql)
+const MAX_TAGS = 20; // khớp CHECK books_tags_length_check (migrations/archive/20260824_add_book_tags_and_view_count.sql)
 
 type TagInputProps = {
   tags: string[];

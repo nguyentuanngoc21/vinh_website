@@ -13,7 +13,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ co
   const { contestId, awardId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const award = await payAward(supabase, {
       contestId: requireUuid(contestId, "contest_not_found"),

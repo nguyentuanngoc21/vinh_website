@@ -10,7 +10,7 @@ import { contestErrorResponse, readJson } from "@/lib/contests/route-helpers";
 export async function GET() {
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     return NextResponse.json({ contests: await listContestsForAdmin(supabase) });
   } catch (error) {
@@ -22,7 +22,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const parsed = parseContestPatch(await readJson(request), "create");
     if (!parsed.ok) throw new ContestError("invalid_input", parsed.errors);

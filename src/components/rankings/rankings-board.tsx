@@ -177,7 +177,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
               }}
               style={{
                 color: p.id === periodId ? "var(--color-brand-ink)" : "var(--color-stone-light)",
-                borderBottom: p.id === periodId ? "3px solid #D9A441" : "3px solid transparent",
+                borderBottom: p.id === periodId ? "3px solid var(--color-brand-gold)" : "3px solid transparent",
               }}
               className="cursor-pointer pb-3 text-[17px] font-bold transition-colors"
             >
@@ -439,9 +439,9 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
             </div>
 
             <div className="flex flex-col gap-6">
-              <div className="rounded-[18px] bg-[#F7EFD8] p-[22px]">
+              <div className="rounded-[18px] bg-cream-gold p-[22px]">
                 <div className="text-[17px] font-bold text-brand-ink">Cách tính hạng</div>
-                <div className="mt-3.5 flex flex-col gap-2.5 text-[13.5px] leading-[1.5] text-[#6b5f3a]">
+                <div className="mt-3.5 flex flex-col gap-2.5 text-[13.5px] leading-[1.5] text-cream-gold-text">
                   <div className="flex gap-2.5">
                     <CheckCircleIcon weight="fill" size={16} color="var(--color-brand-gold-dark)" className="mt-0.5 shrink-0" />
                     {formula1}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { applyPublicAssetWatermark } from "@/lib/copyright/public-asset-watermark";
 
 const COVER_MAX_BYTES = 8 * 1024 * 1024;
@@ -22,7 +22,7 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
  * @/lib/supabase/server, dùng session thật qua cookie sb-*) — KHÁC phần
  * lớn route khác trong repo vốn dùng service-role. Dùng service-role ở
  * đây sẽ khiến auth.uid() = null, RPC luôn báo "Bạn không sở hữu sách
- * này". Xem migrations/20260827_restrict_sensitive_rpc_execute_grants.sql
+ * này". Xem migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql
  * (ghi rõ link_cover_to_book nằm trong nhóm hàm "an toàn để client tự
  * gọi trực tiếp").
  *
@@ -37,11 +37,9 @@ export async function POST(
   const { bookId } = await params;
   const supabase = await createClient();
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase, "Vui lòng đăng nhập.");
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const { data: book, error: bookError } = await supabase
     .from("books")
@@ -145,11 +143,9 @@ export async function DELETE(
   const { bookId } = await params;
   const supabase = await createClient();
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase, "Vui lòng đăng nhập.");
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   // Xác nhận quyền sở hữu qua client RLS-checked TRƯỚC — cover_design_item_id
   // không nằm trong GRANT UPDATE cho authenticated nên kể cả set về null

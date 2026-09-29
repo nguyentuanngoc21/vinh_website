@@ -6,7 +6,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
  * (src/lib/share.ts) thành công ("shared" hoặc "copied"), tăng
  * share_count thật +1 qua RPC increment_design_item_share_count (an toàn
  * dưới race condition, không cho client tự set số tùy ý — xem
- * migrations/20260901_add_design_item_gallery_metadata.sql). Không yêu
+ * migrations/archive/20260901_add_design_item_gallery_metadata.sql). Không yêu
  * cầu đăng nhập — chia sẻ không cần tài khoản, giống lượt xem sách.
  */
 export async function POST(

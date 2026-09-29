@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 /**
  * POST /api/audio/progress — upsert vị trí nghe dở thật (audio_progress),
@@ -12,11 +12,9 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user) {
-    return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase, "Chưa đăng nhập.");
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const body = await request.json().catch(() => null);
   const audioNarrationId = typeof body?.audioNarrationId === "string" ? body.audioNarrationId : null;

@@ -152,7 +152,7 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
               disabled={pendingLikeId === c.id}
               onClick={() => toggleLike(c.id)}
               className="flex items-center gap-1 text-[11.5px] font-semibold text-stone-alt transition-colors disabled:opacity-50"
-              style={c.liked ? { color: "#B02A37" } : undefined}
+              style={c.liked ? { color: "var(--color-error)" } : undefined}
             >
               <HeartIcon size={12} weight={c.liked ? "fill" : "regular"} /> {c.likeCount > 0 ? c.likeCount : "Thích"}
             </button>
@@ -170,7 +170,7 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
                 type="button"
                 disabled={pendingDeleteId === c.id}
                 onClick={() => remove(c.id)}
-                className="flex items-center gap-1 text-[11.5px] font-semibold text-[#B02A37] transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 text-[11.5px] font-semibold text-error transition-colors disabled:opacity-50"
               >
                 <TrashIcon size={12} /> Xoá
               </button>
@@ -244,7 +244,7 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
         </div>
 
         {error && (
-          <div className="mx-6 mb-2 rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-3 py-2 text-[12.5px] font-medium text-[#B02A37]">
+          <div className="mx-6 mb-2 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2 text-[12.5px] font-medium text-error">
             {error}
           </div>
         )}

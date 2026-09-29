@@ -3,7 +3,7 @@
  * ngày (tính từ books.published_at) không được chuyển lại thành tự do
  * nữa qua luồng tác giả (admin override qua
  * src/app/api/admin/books/[bookId]/route.ts vẫn bỏ qua hoàn toàn, không
- * gọi hàm này). Xem migrations/20260826_add_book_exclusivity.sql.
+ * gọi hàm này). Xem migrations/archive/20260826_add_book_exclusivity.sql.
  *
  * Đặt trong 1 hàm thuần riêng (không gọi Date.now() trực tiếp trong
  * component) để tránh lỗi lint "Cannot call impure function during

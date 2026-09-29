@@ -9,7 +9,7 @@ export type QuestResult<T> = { ok: true; data: T } | { ok: false; error: string 
 
 /**
  * Shapes of hidden_quests.unlock_condition (jsonb — no DB-level schema,
- * shape varies per campaign, see migrations/20260827_add_hidden_quests.sql).
+ * shape varies per campaign, see migrations/archive/20260827_add_hidden_quests.sql).
  * Add a new variant + branch in isUnlockConditionMet() for every new
  * campaign type that ships. Unknown/malformed conditions fail CLOSED
  * (never unlock) — see the `default` branch below.
@@ -96,7 +96,7 @@ export const RewardEngine = {
   /** Wraps set_task_progress() — GHI ĐÈ progress (không cộng dồn), dùng
    * cho nhiệm vụ mà tiến trình là 1 trạng thái ngoài (vd streak hiện tại)
    * thay vì đếm hành động trong ngày. Xem
-   * migrations/20260918_add_streak_quests_and_time_windows.sql. */
+   * migrations/archive/20260918_add_streak_quests_and_time_windows.sql. */
   async setTaskProgress(
     supabase: Client,
     params: { userId: string; taskCode: string; progress: number }

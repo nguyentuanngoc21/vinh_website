@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: Params) {
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const [contest, events] = await Promise.all([getContestById(supabase, contestId), getStatusEvents(supabase, contestId)]);
     return NextResponse.json({ contest, events });
@@ -29,7 +29,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const parsed = parseContestPatch(await readJson(request), "update");
     if (!parsed.ok) throw new ContestError("invalid_input", parsed.errors);
@@ -44,7 +44,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     await deleteDraftContest(supabase, contestId);
     return new NextResponse(null, { status: 204 });

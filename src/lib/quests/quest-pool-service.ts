@@ -188,7 +188,7 @@ export const QuestPoolService = {
    * Đổi 1 quest trong pool hôm nay. Quest thay vào LUÔN CÙNG quest_type
    * với quest bị thay ra — bắt buộc, để không phá ràng buộc "tối thiểu 1
    * discovery/1 engagement/1 khác" của ngày đó (xem
-   * migrations/20260828_add_user_quest_pool.sql). Ngân sách reset CHUNG
+   * migrations/archive/20260828_add_user_quest_pool.sql). Ngân sách reset CHUNG
    * 3 lần/ngày cho cả pool — enforce thật ở RPC (đếm quest_reset_events),
    * đây chỉ truyền MAX_QUEST_RESETS_PER_DAY vào, không tự kiểm trước.
    */

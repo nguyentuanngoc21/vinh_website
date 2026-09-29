@@ -1,5 +1,5 @@
 /**
- * Turns an exception raised by the order RPCs (migrations/20260901_add_order_*.sql,
+ * Turns an exception raised by the order RPCs (migrations/archive/20260901_add_order_*.sql,
  * 20260901_add_trust_and_disputes.sql, 20260901_add_manuscript_share.sql…) into a message
  * safe to show to users. Several routes used to return `error.message` verbatim, so users
  * (web and mobile) saw raw English SQL text like "A file request is already pending…".

@@ -1,4 +1,5 @@
 import type { Session } from "@/lib/auth";
+import { isAdminRole } from "@/lib/roles";
 
 /**
  * Signed, httpOnly session cookie.
@@ -181,7 +182,7 @@ export async function requireAdmin(): Promise<Session> {
   const session = await decodeSession(token);
   // super_admin có mọi quyền của admin CỘNG THÊM — cùng lý do sửa ở
   // src/proxy.ts, khớp getAuthedAdminId() (src/lib/wallet/session.ts).
-  if (!session || (session.role !== "admin" && session.role !== "super_admin")) {
+  if (!session || !isAdminRole(session.role)) {
     redirect("/dang-nhap");
     throw new Error("unreachable"); // `redirect()` throws; this satisfies TS's control-flow analysis
   }
@@ -192,7 +193,7 @@ export async function requireAdmin(): Promise<Session> {
     .select("role")
     .eq("username", session.handle)
     .maybeSingle();
-  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
+  if (!profile || !isAdminRole(profile.role)) {
     redirect("/api/auth/session?next=/");
     throw new Error("unreachable");
   }

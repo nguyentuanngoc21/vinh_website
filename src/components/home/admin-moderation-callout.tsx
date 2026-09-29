@@ -8,7 +8,7 @@ import { useRole } from "@/lib/role";
 // Trước đây "7 tác phẩm chờ duyệt · 2 báo cáo bản quyền" + badge "9" đều
 // bịa (dựng từ ngày đầu scaffold dự án) — không có hàng đợi "chờ duyệt"
 // nào tồn tại (chương tự xuất bản ngay khi tác giả bấm, không qua duyệt
-// trước; xem migrations/20260908_add_chapter_moderation_and_notifications.sql),
+// trước; xem migrations/archive/20260908_add_chapter_moderation_and_notifications.sql),
 // và không có tính năng "báo cáo bản quyền" nào cả. Số THẬT duy nhất có
 // sẵn để hiện ở đây là tranh chấp đang mở (đã có trang thật
 // /admin/tranh-chap) — nối vào GET /api/admin/disputes (route có sẵn từ

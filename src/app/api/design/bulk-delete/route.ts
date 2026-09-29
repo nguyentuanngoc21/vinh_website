@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 const MAX_IDS = 100;
 
@@ -7,17 +7,15 @@ const MAX_IDS = 100;
  * POST /api/design/bulk-delete — nút "Xóa (N)" khi bulk-select nhiều ảnh
  * trong form đăng thiết kế. Soft-delete (set deleted_at), KHÔNG .delete()
  * thật — giữ lại dữ liệu theo quyết định sản phẩm, cùng tinh thần
- * migrations/20260826_add_book_soft_delete.sql. RLS "illustrators update
+ * migrations/archive/20260826_add_book_soft_delete.sql. RLS "illustrators update
  * their own design items" tự chặn theo hàng — .in("id", ids) chỉ set
  * được đúng những dòng thuộc về chính người gọi, dòng của người khác
  * lẫn trong danh sách chỉ đơn giản không match, không lỗi.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
 
   const body = await request.json().catch(() => null);
   const ids = Array.isArray(body?.ids) ? body.ids.filter((id: unknown) => typeof id === "string") : [];

@@ -11,7 +11,7 @@ type SuccessModalProps = {
 export function SuccessModal({ open, message, onClose }: SuccessModalProps) {
   return (
     <Modal open={open} onClose={onClose} layer="nested" panelClassName="max-w-[400px] p-8 text-center">
-      <div className="mx-auto flex h-[62px] w-[62px] items-center justify-center rounded-full bg-[#DBF3E8] text-[#2C7453]">
+      <div className="mx-auto flex h-[62px] w-[62px] items-center justify-center rounded-full bg-success-form-border text-[#2C7453]">
         <CheckCircleIcon weight="fill" size={34} />
       </div>
       <div className="mt-4 font-[family-name:var(--font-lora)] text-xl font-bold text-brand-ink">

@@ -7,7 +7,7 @@ import type { HomepageBook } from "@/lib/home/get-homepage-books";
  * tiêu đề + tác giả), khác nguồn dữ liệu (getRecommendedBooks() thay vì
  * sách mới nhất) và mỗi link có `?from=goi-y` — truyen/[slug]/page.tsx
  * đọc marker này để tính tiến trình nhiệm vụ reader_view_recommendations
- * (xem migrations/20260918_add_recommendations_and_content_tags.sql).
+ * (xem migrations/archive/20260918_add_recommendations_and_content_tags.sql).
  * Không render gì nếu rỗng (chưa đăng nhập, hoặc recommend_books() không
  * có gì để gợi ý) — không bịa danh sách giả.
  */

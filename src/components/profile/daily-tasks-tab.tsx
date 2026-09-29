@@ -45,7 +45,7 @@ type PoolResponse = {
 // Icon theo quest_type — KHÔNG dùng bookIcon/comment/headphones/share cũ
 // (đó là icon cho mock DAILY_TASKS đã bỏ) — 6 loại này khớp
 // task_templates.quest_type thật, xem
-// migrations/20260827_extend_task_templates_for_quests.sql.
+// migrations/archive/20260827_extend_task_templates_for_quests.sql.
 const QUEST_TYPE_ICONS: Record<string, typeof BookOpenIcon> = {
   discovery: CompassIcon,
   engagement: ChatCircleTextIcon,

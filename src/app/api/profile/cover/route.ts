@@ -13,7 +13,7 @@ const ALLOWED_MIME_EXT: Record<string, string> = {
  * Ảnh bìa trang cá nhân/tác giả — cùng bucket "avatars" đã có (public,
  * RLS folder-per-user), khác filename prefix ("cover-" thay vì
  * "avatar-"). Không cần bucket/migration storage riêng — xem
- * migrations/20260828_add_profile_cover_image.sql.
+ * migrations/archive/20260828_add_profile_cover_image.sql.
  *
  * Upload đi qua signed upload URL (POST tạo URL -> client PUT thẳng lên
  * Storage -> PATCH xác nhận), KHÔNG còn multipart qua route này — mirror
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data, error } = await supabase
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
@@ -75,7 +75,7 @@ export async function PATCH(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
@@ -104,7 +104,7 @@ export async function DELETE(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   // Chỉ gỡ tham chiếu — không xoá file khỏi bucket "avatars" (mirrors

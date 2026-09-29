@@ -6,7 +6,7 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 
 /**
  * Every write path onto the ledger, all funneled through the DB-side RPCs
- * added by migrations/20260807_wallet_ledger_extension.sql (plus the
+ * added by migrations/archive/20260807_wallet_ledger_extension.sql (plus the
  * pre-existing apply_transaction()). Nothing here does its own multi-step
  * read-then-write across the wallet — each call below is ONE round trip
  * to a `security definer` Postgres function, which is what actually makes

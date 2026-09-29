@@ -82,6 +82,15 @@ const nextConfig: NextConfig = {
     // local không bao giờ gặp lỗi này (public/ luôn có sẵn trên đĩa lúc dev).
     "/api/books/[id]/cover": ["./public/fonts/covers/*.ttf"],
   },
+  experimental: {
+    // @phosphor-icons/react là barrel ~1500 icon, KHÔNG nằm trong danh sách
+    // Next tối ưu sẵn (xem node_modules/next/dist/server/config.js và
+    // node_modules/next/dist/docs/.../optimizePackageImports.md). Gần như mọi
+    // chỗ import qua subpath "/dist/ssr" — Next so khớp đúng chuỗi specifier
+    // (giống các entry "@heroicons/react/24/solid" mặc định), nên phải khai
+    // báo cả subpath đó, không chỉ tên package gốc.
+    optimizePackageImports: ["@phosphor-icons/react", "@phosphor-icons/react/dist/ssr"],
+  },
   images: {
     remotePatterns: [
       // Token top-up flow renders its transfer QR from VietQR's image API

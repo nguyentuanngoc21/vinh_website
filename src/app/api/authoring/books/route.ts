@@ -101,7 +101,7 @@ export async function POST(request: Request) {
   // audio_url/audio_price — link audio đơn giản do tác giả tự dán + giá
   // niêm yết riêng, tách biệt hoàn toàn cơ chế chapter_audio_links/
   // audio_narrations (ChapterAudioPanel), CHƯA enforce chặn nghe. Xem
-  // migrations/20260909_add_chapter_audio_url_and_price.sql.
+  // migrations/archive/20260909_add_chapter_audio_url_and_price.sql.
   const audioUrl = (typeof body?.audioUrl === "string" ? body.audioUrl.trim() : "") || null;
   let audioPrice = 0;
   if (typeof body?.audioPrice === "number" && Number.isFinite(body.audioPrice) && body.audioPrice >= 0) {

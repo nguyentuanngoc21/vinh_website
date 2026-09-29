@@ -5,7 +5,7 @@ import { getRequestContext, requestError } from "@/lib/mobile/request-context";
  * POST /api/audio/:audioNarrationId/comments/:commentId/like — toggle
  * thích 1 bình luận. KHÔNG tính vào nhiệm vụ nào (narrator_interact_listeners
  * chỉ tính reply, khác designer_interact_readers — xem ghi chú trong
- * migrations/20260917_add_design_audio_comments.sql) — nút vẫn hiện để
+ * migrations/archive/20260917_add_design_audio_comments.sql) — nút vẫn hiện để
  * đối xứng UI với thiết kế, chỉ không có side-effect quest.
  */
 export async function POST(

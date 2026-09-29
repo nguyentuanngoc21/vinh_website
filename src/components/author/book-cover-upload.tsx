@@ -155,7 +155,7 @@ export function BookCoverUpload({
         </div>
       )}
       {error && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-10 rounded-md bg-[#FDECEC] px-2 py-1 text-[11px] font-medium text-[#B02A37]">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-10 rounded-md bg-[#FDECEC] px-2 py-1 text-[11px] font-medium text-error">
           {error}
         </div>
       )}

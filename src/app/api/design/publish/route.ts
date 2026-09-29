@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 const MAX_IDS = 100;
 
@@ -7,7 +7,7 @@ const MAX_IDS = 100;
  * POST /api/design/publish — nút "Hoàn tất" ở form đăng thiết kế
  * (design-upload-form.tsx). Ảnh chèn qua POST /api/design luôn ở trạng
  * thái draft (published_at NULL, xem
- * migrations/20260921_add_design_item_publish_state.sql) — chỉ SELECT
+ * migrations/archive/20260921_add_design_item_publish_state.sql) — chỉ SELECT
  * được bởi chính họa sĩ, KHÔNG hiện qua public_design_items. Route này là
  * nơi DUY NHẤT set published_at = now(), làm ảnh hiện công khai ở
  * /thiet-ke. .is("published_at", null) để idempotent — gọi lại không đè
@@ -15,10 +15,8 @@ const MAX_IDS = 100;
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
 
   const body = await request.json().catch(() => null);
   const ids = Array.isArray(body?.ids) ? body.ids.filter((id: unknown) => typeof id === "string") : [];

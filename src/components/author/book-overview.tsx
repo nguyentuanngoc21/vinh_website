@@ -279,7 +279,7 @@ export function BookOverview({
                 ? "Không thể xoá tác phẩm đã xuất bản ở dạng độc quyền — chuyển sang tự do trước, hoặc liên hệ quản trị viên."
                 : undefined
             }
-            className="flex items-center gap-1.5 rounded-[9px] border border-[#f3c6c6] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-[#B02A37] disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex items-center gap-1.5 rounded-[9px] border border-error-border bg-white px-4 py-2.5 text-[13.5px] font-semibold text-error disabled:cursor-not-allowed disabled:opacity-45"
           >
             <TrashIcon size={16} /> {deleting ? "Đang xoá…" : "Xoá truyện"}
           </button>

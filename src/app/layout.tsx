@@ -15,7 +15,8 @@ import "./globals.css";
 const beVietnamPro = Be_Vietnam_Pro({
   variable: "--font-be-vietnam-pro",
   subsets: ["latin", "vietnamese"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  // Không tải 300 — không có chỗ nào dùng font-light/font-weight 300.
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {

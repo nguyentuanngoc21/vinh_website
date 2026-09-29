@@ -1,5 +1,6 @@
 import { CoinsIcon, ReceiptIcon, UserPlusIcon, ArrowsClockwiseIcon } from "@phosphor-icons/react/dist/ssr";
 import type { OverviewStats } from "@/lib/admin/get-overview-stats";
+import { formatVnd } from "@/lib/format-currency";
 
 // Trước đây PRIMARY_KPIS/SECONDARY_KPIS bịa hoàn toàn — cả số lẫn %
 // tăng/giảm so với "tháng trước" (dựng từ ngày đầu scaffold dự án, chưa
@@ -10,9 +11,6 @@ import type { OverviewStats } from "@/lib/admin/get-overview-stats";
 // DAU/MAU, tỉ lệ chuyển đổi free→trả phí) hoặc chưa có định nghĩa kế
 // toán rõ ràng (chi trả tác giả — gộp payout thật từ những loại giao
 // dịch nào?) thì hiện rõ "Chưa có dữ liệu" thay vì bịa tiếp.
-function formatVnd(amount: number): string {
-  return new Intl.NumberFormat("vi-VN").format(amount) + "₫";
-}
 
 export function OverviewKpis({ stats }: { stats: OverviewStats }) {
   const primaryKpis = [

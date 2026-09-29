@@ -13,9 +13,9 @@ import { MAX_CHAPTER_CONTENT_LENGTH } from "@/lib/authoring/chapter-limits";
  * PATCH /api/authoring/chapters/:chapterId — dùng cho cả "Lưu nháp"
  * (published: false) và "Xuất bản" (published: true) ở
  * chapter-editor.tsx/publish-panel.tsx, cùng việc lưu Giá chương (price —
- * migrations/20260820_add_chapter_price.sql). Độc quyền KHÔNG còn ở đây —
+ * migrations/archive/20260820_add_chapter_price.sql). Độc quyền KHÔNG còn ở đây —
  * đã chuyển lên cấp truyện (books.is_exclusive, PATCH qua
- * /api/authoring/books/[bookId] — xem migrations/20260826_add_book_exclusivity.sql).
+ * /api/authoring/books/[bookId] — xem migrations/archive/20260826_add_book_exclusivity.sql).
  * Không tự check ownership tay — policy "authors update chapters on
  * their own books" (docs/supabase/schema.sql) đã chặn qua RLS.
  */
@@ -81,7 +81,7 @@ export async function PATCH(
   }
 
   // Chương đang bị ADMIN gỡ (removed_at khác null, xem
-  // migrations/20260908_add_chapter_moderation_and_notifications.sql) —
+  // migrations/archive/20260908_add_chapter_moderation_and_notifications.sql) —
   // chặn MỌI sửa đổi, không chỉ published=true. RLS "authors update
   // chapters on their own books" chỉ kiểm quyền sở hữu, không biết gì về
   // removed_at, nên nếu không chặn ở đây tác giả có thể tự xuất bản lại
@@ -109,7 +109,7 @@ export async function PATCH(
   }
 
   // Defense-in-depth cho chiều true -> false: trigger DB
-  // prevent_unset_last_chapter (migrations/20260824_add_chapter_is_last.sql)
+  // prevent_unset_last_chapter (migrations/archive/20260824_add_chapter_is_last.sql)
   // là chốt chặn thật; kiểm tra sớm ở đây chỉ để trả lỗi tiếng Việt gọn
   // thay vì để lộ exception thô của Postgres.
   if (update.is_last_chapter === false) {
@@ -221,7 +221,7 @@ export async function PATCH(
 /**
  * DELETE /api/authoring/chapters/:chapterId — xoá HẲN 1 chương (chương không
  * có deleted_at). Quy tắc (25/09/2026), policy "authors delete draft chapters
- * on their own books" (migrations/20260925_add_chapter_delete_and_reorder.sql)
+ * on their own books" (migrations/archive/20260925_add_chapter_delete_and_reorder.sql)
  * là chốt chặn thật ở DB, kiểm lại ở đây để trả lỗi tiếng Việt:
  *   - chỉ chương NHÁP (đang xuất bản thì lưu nháp trước);
  *   - không phải chương đang bị admin gỡ (giữ bằng chứng kiểm duyệt);

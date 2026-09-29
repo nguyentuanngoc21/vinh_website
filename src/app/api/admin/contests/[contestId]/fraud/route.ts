@@ -14,7 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ cont
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const id = requireUuid(contestId, "contest_not_found");
     const status = (new URL(request.url).searchParams.get("status") ?? "open") as ContestFraudStatus | "all";
@@ -31,7 +31,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ co
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const contest = await getContestById(supabase, requireUuid(contestId, "contest_not_found"));
     if (!FRAUD_SCAN_STATUSES.includes(contest.status)) throw new ContestError("not_allowed");

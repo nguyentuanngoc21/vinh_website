@@ -5,8 +5,7 @@ import { getContestById } from "@/lib/contests/admin-service";
 import { ContestError } from "@/lib/contests/errors";
 import { listScoreRuns, publishScoreRun } from "@/lib/contests/final-scoring-service";
 import { contestErrorResponse, optionalText, readJson, requireUuid } from "@/lib/contests/route-helpers";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "@/lib/validation/uuid";
 
 /**
  * POST /api/admin/contests/:contestId/score-runs/:runId/publish { reason } —
@@ -18,10 +17,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ con
   const { contestId, runId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const contest = await getContestById(supabase, requireUuid(contestId, "contest_not_found"));
-    if (!UUID.test(runId)) throw new ContestError("score_run_not_found");
+    if (!isUuid(runId)) throw new ContestError("score_run_not_found");
     const body = await readJson(request);
     await publishScoreRun(supabase, { contestId: contest.id, runId, adminId, reason: optionalText(body.reason, 1000) });
     return NextResponse.json({ runs: await listScoreRuns(supabase, contest) });

@@ -15,7 +15,7 @@ export type StoryCharacter = {
 const ROLE_LABEL: Record<CharacterRole, string> = { hero: "Chính diện", villain: "Phản diện", neutral: "Trung lập" };
 const ROLE_STYLE: Record<CharacterRole, string> = {
   hero: "bg-[#E4F1EA] text-[#256B4C]",
-  villain: "bg-[#FBEAEA] text-[#B02A37]",
+  villain: "bg-[#FBEAEA] text-error",
   neutral: "bg-cream-card-alt text-stone-dark",
 };
 
@@ -23,7 +23,7 @@ const ROLE_STYLE: Record<CharacterRole, string> = {
  * Danh sách nhân vật của 1 truyện — tab "Nhân vật" ở trang giới thiệu
  * (story-tabs.tsx). Follow toggle mirror handleToggleFollow trong
  * reader.tsx (author follow) — optimistic, rollback nếu lỗi/401. Xem
- * migrations/20260919_add_characters.sql.
+ * migrations/archive/20260919_add_characters.sql.
  */
 export function CharacterList({ characters: initial }: { characters: StoryCharacter[] }) {
   const [characters, setCharacters] = useState(initial);

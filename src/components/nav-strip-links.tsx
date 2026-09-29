@@ -47,7 +47,7 @@ export const MEGA_MENUS: Partial<Record<NavKey, MegaMenuColumn[]>> = {
     {
       title: "Loại sản phẩm",
       // Nguồn thật giờ là design_items.category (xem
-      // migrations/20260919_add_design_albums_and_multi_upload.sql) — chỉ
+      // migrations/archive/20260919_add_design_albums_and_multi_upload.sql) — chỉ
       // lấy 12 mục đầu của DESIGN_CATEGORIES, bỏ 2 mục cuối ("Minh họa"/
       // "Poster audio") vốn là 2 giá trị cũ giữ lại cho dữ liệu sẵn có,
       // không thuộc nội dung mega-menu gốc.
@@ -77,7 +77,7 @@ export function NavStripLinks() {
         const isActive = item.key === active;
         const className = isActive
           ? "shrink-0 whitespace-nowrap border-b-2 border-brand-gold pb-0.5 font-bold text-brand-gold-light no-underline"
-          : "shrink-0 whitespace-nowrap text-[#DDE6EA] no-underline transition-colors hover:text-brand-gold-light";
+          : "shrink-0 whitespace-nowrap text-hero-text no-underline transition-colors hover:text-brand-gold-light";
         const columns = MEGA_MENUS[item.key];
         if (columns) {
           return (

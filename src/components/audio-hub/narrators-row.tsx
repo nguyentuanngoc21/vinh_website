@@ -22,7 +22,7 @@ export function NarratorsRow({ narrators }: { narrators: NarratorStat[] }) {
           <Link
             key={n.narratorId}
             href={`/ket-noi?p=${n.narratorId}`}
-            className="flex flex-col items-center gap-2.5 rounded-2xl bg-[#F7EFD8] p-5 text-center no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.14)]"
+            className="flex flex-col items-center gap-2.5 rounded-2xl bg-cream-gold p-5 text-center no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.14)]"
           >
             {n.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -36,7 +36,7 @@ export function NarratorsRow({ narrators }: { narrators: NarratorStat[] }) {
               </div>
             )}
             <div className="text-[15px] font-semibold text-brand-ink">{n.name}</div>
-            <div className="text-[12.5px] text-[#6b5f3a]">
+            <div className="text-[12.5px] text-cream-gold-text">
               {n.trackCount} tác phẩm · {formatPlayCount(n.playCount)} nghe
             </div>
           </Link>

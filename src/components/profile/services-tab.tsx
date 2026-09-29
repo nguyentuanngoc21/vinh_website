@@ -18,7 +18,9 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { Field, Alert, Checkbox, Skeleton } from "@/components/ui";
 import { computeMissingFields } from "@/lib/orders/service-listing-service";
+import { SCOPE_OPTIONS } from "@/lib/orders/config";
 import type { Database } from "@/lib/supabase/types";
+import { formatVnd } from "@/lib/format-currency";
 
 type Listing = {
   id: string;
@@ -41,7 +43,7 @@ type Listing = {
   is_accepting_orders: boolean;
   // Mục 12 — ĐỘC LẬP với is_accepting_orders/11 trường trên. null = chưa
   // đặt hạn mức, khi đó is_accepting_commissions không bật được (route
-  // chặn). Xem migrations/20260910_add_service_commission_status.sql.
+  // chặn). Xem migrations/archive/20260910_add_service_commission_status.sql.
   monthly_commission_limit: number | null;
   is_accepting_commissions: boolean;
 };
@@ -72,12 +74,6 @@ const TYPE_META = {
   voice: { label: "Thu âm / lồng tiếng", icon: WaveformIcon },
   ghostwriting: { label: "Viết hộ", icon: PenNibIcon },
 };
-
-const SCOPE_OPTIONS = [
-  { value: "personal", label: "Cá nhân" },
-  { value: "commercial_limited", label: "Thương mại giới hạn" },
-  { value: "commercial_full", label: "Thương mại toàn phần" },
-];
 
 // Số trường "đếm được" hiển thị "X/Y mục" — khớp đúng các key mà
 // computeMissingFields() có thể trả về cho từng loại dịch vụ (tags chỉ
@@ -130,7 +126,7 @@ function priceLabelOf(l: Listing): string {
   const prices = tiers.map((t) => Number(t?.price)).filter((n) => Number.isFinite(n) && n > 0);
   if (prices.length === 0) return "— chưa có giá";
   const min = Math.min(...prices);
-  return min.toLocaleString("vi-VN") + "₫" + (prices.length > 1 ? " trở lên" : "");
+  return formatVnd(min) + (prices.length > 1 ? " trở lên" : "");
 }
 
 /**
@@ -380,9 +376,9 @@ export function ServicesTab() {
                 : "Bản nháp";
             const statusColor = l.is_accepting_orders
               ? rowOk
-                ? { bg: "#DBF3E8", fg: "#2C7453" }
-                : { bg: "#FDF3E7", fg: "#A9781A" }
-              : { bg: "#F1F3F4", fg: "#6f665c" };
+                ? { bg: "var(--color-success-form-border)", fg: "#2C7453" }
+                : { bg: "#FDF3E7", fg: "var(--color-brand-gold-dark)" }
+              : { bg: "#F1F3F4", fg: "var(--color-stone-dark)" };
             return (
               <div
                 key={l.id}
@@ -580,7 +576,7 @@ export function ServicesTab() {
       <div
         className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border px-5 py-4"
         style={{
-          borderColor: selected.is_accepting_orders ? "#CFE6D9" : "#eceae7",
+          borderColor: selected.is_accepting_orders ? "#CFE6D9" : "var(--color-cream)",
           background: selected.is_accepting_orders ? "#F2F8F4" : "#FBFAF8",
         }}
       >
@@ -588,7 +584,7 @@ export function ServicesTab() {
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px]"
             style={{
-              background: selected.is_accepting_orders ? "#DBF3E8" : "#EEF2F4",
+              background: selected.is_accepting_orders ? "var(--color-success-form-border)" : "#EEF2F4",
               color: selected.is_accepting_orders ? "#2C7453" : "#2C5870",
             }}
           >
@@ -600,7 +596,7 @@ export function ServicesTab() {
           <div>
             <div
               className="text-[13px] font-semibold"
-              style={{ color: selected.is_accepting_orders ? (ok ? "#2F7A4F" : "#A9781A") : ok ? "#6f665c" : "#a09689" }}
+              style={{ color: selected.is_accepting_orders ? (ok ? "var(--color-success-form)" : "var(--color-brand-gold-dark)") : ok ? "var(--color-stone-dark)" : "var(--color-stone-light)" }}
             >
               {onLabel}
             </div>
@@ -728,8 +724,8 @@ export function ServicesTab() {
                       <span
                         className="ml-auto rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold"
                         style={{
-                          background: groupDone ? "#DBF3E8" : g.optional ? "#F1F3F4" : "#F7EFD8",
-                          color: groupDone ? "#2C7453" : g.optional ? "#6f665c" : "#8A6414",
+                          background: groupDone ? "var(--color-success-form-border)" : g.optional ? "#F1F3F4" : "var(--color-cream-gold)",
+                          color: groupDone ? "#2C7453" : g.optional ? "var(--color-stone-dark)" : "#8A6414",
                         }}
                       >
                         {groupChip}
@@ -755,7 +751,7 @@ export function ServicesTab() {
                     </div>
                     {activeWarning && (
                       <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#F0D9B5] bg-[#FDF3E7] px-3 py-2">
-                        <WarningCircleIcon weight="fill" size={15} className="mt-0.5 shrink-0 text-[#A9781A]" />
+                        <WarningCircleIcon weight="fill" size={15} className="mt-0.5 shrink-0 text-brand-gold-dark" />
                         <div className="text-[11.5px] leading-[1.6] text-[#7a5a12]">{activeWarning}</div>
                       </div>
                     )}
@@ -861,7 +857,7 @@ export function ServicesTab() {
             tham gia computeMissingFields/validate publish). Chỉ phục vụ
             toggle "nhận comm" ở list view — bật toggle đó bị chặn nếu
             còn để trống. Xem
-            migrations/20260910_add_service_commission_status.sql. */}
+            migrations/archive/20260910_add_service_commission_status.sql. */}
         <NumberedField num={12} label="Số lượng comm nhận/tháng" filled={selected.monthly_commission_limit != null}>
           <Field
             label={null}
@@ -895,7 +891,7 @@ function RowMenuItem({
       type="button"
       onClick={onClick}
       className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-left text-[12.5px] font-medium hover:bg-neutral-bg"
-      style={{ color: danger ? "#A33A2B" : "#15110f" }}
+      style={{ color: danger ? "#A33A2B" : "var(--color-ink)" }}
     >
       {icon}
       {label}
@@ -920,19 +916,19 @@ function NumberedField({
   return (
     <div
       className="rounded-2xl border px-[18px] py-4"
-      style={{ borderColor: filled ? "#eceae7" : "#F0D9B5", background: filled ? "#fff" : "#FFFDF8" }}
+      style={{ borderColor: filled ? "var(--color-cream)" : "#F0D9B5", background: filled ? "#fff" : "#FFFDF8" }}
     >
       <div className="flex items-center gap-2.5">
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11.5px] font-bold"
-          style={{ background: filled ? "#EEF2F4" : "#F7EFD8", color: filled ? "#2C5870" : "#8A6414" }}
+          style={{ background: filled ? "#EEF2F4" : "var(--color-cream-gold)", color: filled ? "#2C5870" : "#8A6414" }}
         >
           {num}
         </span>
         <span className="flex-1 text-[13px] font-semibold text-slate">{label}</span>
         <span
           className="shrink-0 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold"
-          style={{ background: filled ? "#DBF3E8" : "#F7EFD8", color: filled ? "#2C7453" : "#8A6414" }}
+          style={{ background: filled ? "var(--color-success-form-border)" : "var(--color-cream-gold)", color: filled ? "#2C7453" : "#8A6414" }}
         >
           {filled ? "Đã điền" : "Còn thiếu"}
         </span>
@@ -964,7 +960,7 @@ function PriceTiersEditor({
             <input
               type="number"
               value={r.price || ""}
-              placeholder="Giá (₫)"
+              placeholder="Giá (VNĐ)"
               onChange={(e) =>
                 setRows((prev) => prev.map((row, idx) => (idx === i ? { ...row, price: Number(e.target.value) } : row)))
               }
@@ -993,7 +989,7 @@ type RefundPolicy = { before_draft: number; draft_pending: number; draft_approve
 
 // 4 mốc CỐ ĐỊNH — calculate_refund() (server) tra thẳng key này để tự suy
 // ra % hoàn khi hủy đơn, không so khớp text tự do được nữa (xem
-// migrations/20260901_add_order_cancel_system.sql). Không cho seller gõ
+// migrations/archive/20260901_add_order_cancel_system.sql). Không cho seller gõ
 // tên mốc tự do như bản cũ.
 const REFUND_STAGES: { key: keyof RefundPolicy; label: string }[] = [
   { key: "before_draft", label: "Chưa gửi bản nháp nào" },

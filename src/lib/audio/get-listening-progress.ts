@@ -11,7 +11,7 @@ export type ListeningProgressItem = {
 /**
  * Real per-user "đang nghe dở" data for ContinueListening (hero, top row)
  * and ResumeRow ("Nghe tiếp") on /audio — reads audio_progress
- * (migrations/20260901_add_audio_narration_hub_metadata.sql), most
+ * (migrations/archive/20260901_add_audio_narration_hub_metadata.sql), most
  * recently updated first. Returns [] for a guest or a listener with no
  * progress yet — both sections render nothing in that case (see
  * src/components/audio-hub/continue-listening.tsx/resume-row.tsx),

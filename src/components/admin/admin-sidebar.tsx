@@ -24,7 +24,7 @@ const NAV_ITEMS = [
   // Contest Engine — docs/CONTEST_ENGINE_AUDIT_AND_PLAN.md.
   { label: "Cuộc thi", icon: TrophyIcon, href: "/admin/cuoc-thi" },
   // Mục 9 đặc tả (Hệ thống giao dịch commission) — xem
-  // migrations/20260901_add_trust_and_disputes.sql.
+  // migrations/archive/20260901_add_trust_and_disputes.sql.
   { label: "Tranh chấp", icon: WarningOctagonIcon, href: "/admin/tranh-chap" },
   { label: "Người dùng", icon: UsersThreeIcon, href: "/admin/nguoi-dung" },
   { label: "Bản quyền", icon: ShieldCheckIcon, href: null },

@@ -19,7 +19,7 @@ const RPC_ERRORS: Record<string, { status: number; error: string }> = {
  * kỳ admin nào cũng tự nâng mình/người khác lên super_admin được. Kiểm
  * quyền, chặn super_admin tự hạ quyền, cập nhật và ghi role_change_logs
  * đều nằm trong RPC admin_set_user_role (1 transaction — xem
- * migrations/20260928_add_role_change_logs.sql); check ở đây chỉ để trả
+ * migrations/archive/20260928_add_role_change_logs.sql); check ở đây chỉ để trả
  * 403 sớm. Role đọc từ profiles, không từ cookie.
  *
  * Người bị đổi role KHÔNG cần đăng nhập lại: cookie vinh_session được làm
@@ -33,7 +33,7 @@ export async function PATCH(
   const supabase = createServiceRoleClient();
   const caller = await getAuthedAdmin(supabase);
   if (!caller) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   }
   if (caller.role !== "super_admin") {
     return NextResponse.json({ error: RPC_ERRORS.actor_not_super_admin.error }, { status: 403 });

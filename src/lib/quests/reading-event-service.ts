@@ -22,7 +22,7 @@ type ChapterContext = {
   bookGenre: BookGenre | null;
   viewCount: number;
   /** Giờ server/UTC lúc hoàn thành chương (0-23) — quyết định đã chốt ở
-   * migrations/20260917_add_reading_event_log.sql, không theo timezone
+   * migrations/archive/20260917_add_reading_event_log.sql, không theo timezone
    * từng user. */
   hourUtc: number;
 };
@@ -69,7 +69,7 @@ async function hasReadGenreBefore(supabase: Client, userId: string, genre: BookG
  * Gọi khi user thật sự đọc hết 1 chương (cuộn tới đoạn cuối cùng — xem
  * src/app/api/books/[bookId]/reading-progress/route.ts). Đây là nguồn duy
  * nhất nạp dữ liệu cho reading_history kể từ
- * migrations/20260917_add_reading_event_log.sql — mọi thứ phụ thuộc "đã đọc
+ * migrations/archive/20260917_add_reading_event_log.sql — mọi thứ phụ thuộc "đã đọc
  * lúc nào" (streak, achievement metric mới, điều kiện book_completed của
  * hidden quest) đều bắt nguồn từ đây.
  *
@@ -122,7 +122,7 @@ export const ReadingEventService = {
 
       // reader_3day_reading_streak — GHI ĐÈ progress bằng streak hiện tại
       // (chặn ở 3), KHÔNG cộng dồn như các mã khác — xem
-      // migrations/20260918_add_streak_quests_and_time_windows.sql.
+      // migrations/archive/20260918_add_streak_quests_and_time_windows.sql.
       const setResult = await RewardEngine.setTaskProgress(supabase, {
         userId: params.userId,
         taskCode: "reader_3day_reading_streak",

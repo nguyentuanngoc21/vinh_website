@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     console.error("[wallet] deposit webhook failed:", err);
     // 500 so the gateway retries — the credit was reverted to 'pending'
     // for exactly this reason, see deposit-service.ts.
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi hệ thống. Vui lòng thử lại sau." }, { status: 500 });
   }
 
   if (!result.ok) {

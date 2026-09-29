@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { rejectUnauthorizedCron } from "@/lib/cron-auth";
 
 /**
  * Scheduled via vercel.json — dọn tài khoản đăng ký rồi bỏ ngang, chưa bao
@@ -21,15 +22,8 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 const CUTOFF_HOURS = 48;
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } else {
-    console.error("[auth] CRON_SECRET is not set — purge-unconfirmed-registrations is unauthenticated.");
-  }
+  const denied = rejectUnauthorizedCron(request, "purge-unconfirmed-registrations");
+  if (denied) return denied;
 
   const admin = createServiceRoleClient();
   const cutoff = new Date(Date.now() - CUTOFF_HOURS * 60 * 60 * 1000).toISOString();
@@ -40,7 +34,7 @@ export async function GET(request: Request) {
   });
   if (error) {
     console.error("[auth] purge-unconfirmed-registrations scan failed:", error);
-    return NextResponse.json({ error: "Scan failed" }, { status: 500 });
+    return NextResponse.json({ error: "Quét dữ liệu thất bại." }, { status: 500 });
   }
 
   let deleted = 0;

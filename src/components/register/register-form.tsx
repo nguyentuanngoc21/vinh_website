@@ -260,7 +260,7 @@ export function RegisterForm() {
   if (submittedEmail) {
     return (
       <div className="mx-auto w-full max-w-[400px]">
-        <CheckCircleIcon weight="fill" size={40} color="#2F7A4F" />
+        <CheckCircleIcon weight="fill" size={40} className="text-success-form" />
         <div className="mt-4 text-[24px] font-bold tracking-[-0.4px] text-brand-ink">
           Cần bạn xác thực tài khoản
         </div>
@@ -414,7 +414,7 @@ export function RegisterForm() {
               ))}
             </div>
             <div
-              style={{ color: score >= 3 ? "#2F7A4F" : "var(--color-stone-light)" }}
+              style={{ color: score >= 3 ? "var(--color-success-form)" : "var(--color-stone-light)" }}
               className="mt-1.5 text-xs"
             >
               {PASSWORD_SCORE_LABELS[score] || "Ít nhất 8 ký tự"}

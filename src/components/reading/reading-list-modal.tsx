@@ -157,7 +157,7 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
           ))}
         </div>
 
-        {error && <div className="mt-3 text-[12.5px] font-medium text-[#B02A37]">{error}</div>}
+        {error && <div className="mt-3 text-[12.5px] font-medium text-error">{error}</div>}
 
         <div className="mt-4 flex items-center gap-2 border-t border-[#f1efec] pt-4">
           <input

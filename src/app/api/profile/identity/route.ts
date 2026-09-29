@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data, error } = await supabase
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const form = await request.formData().catch(() => null);
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
   }
 
   // Dùng service role (bypass RLS) — trigger enforce_cccd_verified_authority
-  // (migrations/20260826_add_profile_bank_info.sql) chỉ cho context tin
+  // (migrations/archive/20260826_add_profile_bank_info.sql) chỉ cho context tin
   // cậy như thế này đổi cccd_verified, chặn user tự set qua policy
   // "update own profile" thường.
   const { error: profileError } = await supabase

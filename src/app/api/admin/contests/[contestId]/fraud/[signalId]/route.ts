@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   const { contestId, signalId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const cid = requireUuid(contestId, "contest_not_found");
     const sid = requireUuid(signalId, "signal_not_found");

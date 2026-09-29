@@ -21,7 +21,7 @@ export async function POST(
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const result = await RewardEngine.incrementTaskProgress(supabase, { userId, taskCode: "reader_share_story" });

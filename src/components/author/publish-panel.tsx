@@ -71,7 +71,7 @@ function ChecklistSection({
       >
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-            done ? "bg-[#DBF3E8] text-[#2C7453]" : "bg-cream-card-alt text-stone-alt"
+            done ? "bg-success-form-border text-[#2C7453]" : "bg-cream-card-alt text-stone-alt"
           }`}
         >
           {done ? <CheckCircleIcon weight="fill" size={16} /> : <span className="h-2 w-2 rounded-full bg-current" />}
@@ -162,7 +162,7 @@ export function PublishPanel({
 
       <div className="px-[22px]">
         {error && (
-          <div className="mt-4 rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-[#B02A37]">
+          <div className="mt-4 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-error">
             {error}
           </div>
         )}
@@ -331,7 +331,7 @@ export function PublishPanel({
                     : "Tác giả có thể xuất bản truyện này ở các nền tảng khác."}
               </div>
               {exclusiveError && (
-                <div className="mt-2 text-[12px] font-medium text-[#B02A37]">{exclusiveError}</div>
+                <div className="mt-2 text-[12px] font-medium text-error">{exclusiveError}</div>
               )}
             </div>
           </div>

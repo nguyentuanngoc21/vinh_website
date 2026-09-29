@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
   if (!adminId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
