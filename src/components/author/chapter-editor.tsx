@@ -11,7 +11,7 @@ import {
   TextHTwoIcon,
   ImageSquareIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Checkbox, Field } from "@/components/ui";
+import { Button, Checkbox, Field } from "@/components/ui";
 import { isDesignShareLinkShape } from "@/lib/design/share-link";
 
 /**
@@ -288,7 +288,8 @@ export function ChapterEditor({
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Tên chương"
-            className="mb-1.5 w-full resize-none border-none bg-transparent p-0 font-[family-name:var(--font-lora)] text-[32px] font-semibold text-brand-ink outline-none"
+            // p-0!/text-[32px]! — Tailwind v4 không đảm bảo className đè được padding/cỡ chữ gốc của Field, nên dùng `!`
+            className="mb-1.5 border-none bg-transparent p-0! font-[family-name:var(--font-lora)] text-[32px]! font-semibold text-brand-ink outline-none"
           />
           <div className="mb-[22px] flex items-center gap-3.5 text-[13px] text-stone-alt">
             <span>{wordCount} chữ</span>
@@ -362,20 +363,24 @@ export function ChapterEditor({
           {imagePromptOpen && (
             <div className="mb-5 rounded-lg border border-cream-border bg-white p-3">
               <div className="flex gap-2">
-                <input
+                {/* Ô nhập gọn — size="sm" của kit */}
+                <Field
+                  label={null}
+                  wrapperClassName="min-w-0 flex-1"
                   value={imageLinkInput}
                   onChange={(e) => setImageLinkInput(e.target.value)}
                   placeholder="Dán link chia sẻ thiết kế (…?id=…&token=…)"
-                  className="flex-1 rounded-lg border border-cream-border px-3 py-2 text-[13px] text-ink outline-none focus:border-brand-gold"
+                  size="sm"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={insertDesignImage}
                   disabled={imageLinkPending}
-                  className="cursor-pointer rounded-lg bg-brand-gold px-4 text-[13px] font-bold text-brand-ink disabled:opacity-60"
+                  fullWidth={false}
+                  className="shrink-0 px-4 py-0! text-[13px]!"
                 >
                   {imageLinkPending ? "Đang kiểm tra…" : "Chèn"}
-                </button>
+                </Button>
               </div>
               {imageLinkError && <div className="mt-2 text-[12px] font-medium text-error">{imageLinkError}</div>}
               <p className="mt-2 text-[11.5px] text-stone-alt">

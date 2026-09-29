@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CameraIcon, LinkSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { BookCover } from "@/components/covers/book-cover";
+import { Field } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
 type BookCoverUploadProps = {
@@ -138,11 +139,13 @@ export function BookCoverUpload({
           onClick={(e) => e.stopPropagation()}
           className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 w-[220px] rounded-lg border border-cream-border bg-white p-2.5 shadow-[0_6px_20px_rgba(0,0,0,.15)]"
         >
-          <input
+          {/* Popover rộng 220px nên dùng cỡ gọn size="sm" */}
+          <Field
+            label={null}
             value={shareUrlInput}
             onChange={(e) => setShareUrlInput(e.target.value)}
             placeholder="Dán link chia sẻ (…?id=…&token=…)"
-            className="w-full rounded-md border border-cream-border px-2 py-1.5 text-[11.5px] text-ink outline-none focus:border-brand-gold"
+            size="sm"
           />
           <button
             type="button"

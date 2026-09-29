@@ -23,6 +23,7 @@
     "react-dom": "19.2.8",
     "react-easy-crop": "^6.2.3",
     "sharp": "^0.35.4",
+    "tailwind-merge": "^3.7.0",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

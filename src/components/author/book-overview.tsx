@@ -18,6 +18,7 @@ import { ImportManuscriptModal } from "@/components/author/import-manuscript-mod
 import { BookCoverUpload } from "@/components/author/book-cover-upload";
 import { ShareManuscriptPanel, type ManuscriptGrant } from "@/components/author/share-manuscript-panel";
 import { CharacterManager, type ManagedCharacter } from "@/components/author/character-manager";
+import { Textarea } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type OverviewChapter = {
@@ -317,13 +318,16 @@ export function BookOverview({
 
         {editingSynopsis ? (
           <div>
-            <textarea
+            {/* Cỡ gọn size="sm"; resize-none! vì `resize-y` của kit sinh sau trong CSS nên phải dùng `!` mới đè được */}
+            <Textarea
+              label={null}
               value={synopsisDraft}
               onChange={(e) => setSynopsisDraft(e.target.value)}
               placeholder="Vài dòng giới thiệu nội dung truyện cho độc giả…"
               rows={4}
               autoFocus
-              className="w-full resize-none rounded-lg border border-cream-border px-3 py-2.5 text-sm text-brand-ink outline-none focus:border-brand-ink"
+              size="sm"
+              className="resize-none!"
             />
             <div className="mt-2.5 flex gap-2">
               <button

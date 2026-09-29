@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowSquareOutIcon, GavelIcon, UserMinusIcon, UserPlusIcon } from "@phosphor-icons/react/dist/ssr";
-import { Alert, Button, Checkbox, Field, Textarea } from "@/components/ui";
+import { Alert, Button, Checkbox, Field, Select, Textarea } from "@/components/ui";
 import { formatVnDateTime } from "@/lib/contests/datetime";
 import {
   DEFAULT_FINAL_SCORING_CONFIG,
@@ -124,17 +124,14 @@ function NormalizationSelect({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="block">
-        <div className="mb-[7px] text-[13px] font-semibold text-slate">{label}</div>
-        <select value={value.type} disabled={disabled}
-          onChange={(e) => {
-            const t = e.target.value as NormalizationType;
-            onChange(t === "reference_value" ? { type: t, reference: value.type === "reference_value" ? value.reference : 0.3 } : ({ type: t } as NormalizationStrategy));
-          }}
-          className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14px] text-ink focus:border-brand-ink focus:outline-none disabled:bg-neutral-bg">
-          {options.map((o) => <option key={o} value={o}>{NORMALIZATION_LABEL[o]}</option>)}
-        </select>
-      </label>
+      <Select label={label} value={value.type} disabled={disabled}
+        onChange={(e) => {
+          const t = e.target.value as NormalizationType;
+          onChange(t === "reference_value" ? { type: t, reference: value.type === "reference_value" ? value.reference : 0.3 } : ({ type: t } as NormalizationStrategy));
+        }}
+        className="disabled:bg-neutral-bg">
+        {options.map((o) => <option key={o} value={o}>{NORMALIZATION_LABEL[o]}</option>)}
+      </Select>
       {value.type === "reference_value" && (
         <Field label="Mốc chuẩn (reference)" type="number" step="0.01" disabled={disabled} value={String(value.reference)}
           onChange={(e) => onChange({ type: "reference_value", reference: num(e.target.value) })} />
@@ -254,15 +251,12 @@ function ConfigSection({ contestId, initial }: { contestId: string; initial: Sco
           <div className="text-[13px] font-bold text-brand-ink">Chất lượng đọc — Depth (% nội dung đã đọc)</div>
           <div className="grid grid-cols-2 gap-2.5">
             {numberField("Tỷ trọng trong Chất lượng đọc", comp.reading_quality.depth.weight, (v) => update((c) => { c.components.reading_quality.depth.weight = v; }), { step: "0.05" })}
-            <label className="block">
-              <div className="mb-[7px] text-[13px] font-semibold text-slate">Tổng hợp</div>
-              <select value={comp.reading_quality.depth.aggregation} disabled={locked}
-                onChange={(e) => update((c) => { c.components.reading_quality.depth.aggregation = e.target.value as DepthAggregation; })}
-                className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14px] text-ink focus:border-brand-ink focus:outline-none disabled:bg-neutral-bg">
-                <option value="median">Trung vị (chống outlier)</option>
-                <option value="mean">Trung bình</option>
-              </select>
-            </label>
+            <Select label="Tổng hợp" value={comp.reading_quality.depth.aggregation} disabled={locked}
+              onChange={(e) => update((c) => { c.components.reading_quality.depth.aggregation = e.target.value as DepthAggregation; })}
+              className="disabled:bg-neutral-bg">
+              <option value="median">Trung vị (chống outlier)</option>
+              <option value="mean">Trung bình</option>
+            </Select>
           </div>
           <AdjustmentField label="Co về mức chung (C)" value={comp.reading_quality.depth.adjustment} disabled={locked}
             onChange={(v) => update((c) => { c.components.reading_quality.depth.adjustment = v; })} />

@@ -11,6 +11,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDurationShort, type AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { readDurationSeconds } from "@/lib/audio/read-duration";
+import { Alert, Field } from "@/components/ui";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
 
@@ -163,9 +164,9 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
       )}
 
       {error && (
-        <div className="mb-3 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2 text-[12px] font-medium text-error">
+        <Alert tone="error" className="mb-3">
           {error}
-        </div>
+        </Alert>
       )}
 
       {mode === null && (
@@ -207,11 +208,14 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
               </>
             )}
           </button>
-          <input
+          {/* Ô nhập gọn cho panel bên — size="sm" của kit */}
+          <Field
+            label={null}
+            wrapperClassName="mt-2.5"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Tên bản thu (tuỳ chọn)"
-            className="mt-2.5 w-full rounded-lg border border-cream-border px-3 py-2 text-[13px] text-ink outline-none focus:border-brand-gold"
+            size="sm"
           />
           <div className="mt-2.5 flex gap-2">
             <button
@@ -238,11 +242,12 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
 
       {mode === "link" && (
         <div>
-          <input
+          <Field
+            label={null}
             value={shareUrl}
             onChange={(e) => setShareUrl(e.target.value)}
             placeholder="Dán link chia sẻ (…?id=…&token=…)"
-            className="w-full rounded-lg border border-cream-border px-3 py-2 text-[13px] text-ink outline-none focus:border-brand-gold"
+            size="sm"
           />
           <div className="mt-2.5 flex gap-2">
             <button

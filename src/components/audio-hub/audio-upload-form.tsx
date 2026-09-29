@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UploadSimpleIcon, WaveformIcon } from "@phosphor-icons/react/dist/ssr";
 import { AUDIO_GENRES, formatDurationShort } from "@/lib/audio/get-audio-catalog";
 import { readDurationSeconds } from "@/lib/audio/read-duration";
+import { Alert, Button, Field } from "@/components/ui";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
 
@@ -87,16 +88,17 @@ export function AudioUploadForm({ className }: { className?: string }) {
         )}
       </button>
 
-      <label className="mt-6 block text-[13px] font-semibold text-brand-ink">Tiêu đề</label>
-      <input
+      <Field
+        label="Tiêu đề"
+        wrapperClassName="mt-6"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Ví dụ: Vũng Vịnh Cuối Trời — Chương 1"
-        className="mt-1.5 w-full rounded-xl border border-[#e2ded7] px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
       />
 
-      <label className="mt-5 block text-[13px] font-semibold text-brand-ink">Thể loại</label>
-      <div className="mt-1.5 flex flex-wrap gap-2">
+      {/* Nhóm chip thể loại — không phải ô nhập nên chỉ dùng nhãn cùng kiểu với Field */}
+      <div className="mb-[7px] mt-5 text-[13px] font-semibold text-slate">Thể loại</div>
+      <div className="flex flex-wrap gap-2">
         {AUDIO_GENRES.map((g) => (
           <button
             key={g}
@@ -112,18 +114,14 @@ export function AudioUploadForm({ className }: { className?: string }) {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-error">
+        <Alert tone="error" className="mt-4">
           {error}
-        </div>
+        </Alert>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="mt-6 w-full cursor-pointer rounded-full bg-brand-gold px-6 py-3.5 text-sm font-bold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
-      >
+      <Button type="submit" disabled={pending} className="mt-6">
         {pending ? "Đang đăng…" : "Đăng bản thu"}
-      </button>
+      </Button>
     </form>
   );
 }

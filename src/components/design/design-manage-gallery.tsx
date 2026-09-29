@@ -10,7 +10,7 @@ import {
   CheckIcon,
   CopyIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Field, Textarea, Alert, Checkbox } from "@/components/ui";
+import { Field, Textarea, Select, Alert, Checkbox } from "@/components/ui";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { useOrigin } from "@/lib/use-origin";
 import type { DesignItemCategory } from "@/lib/supabase/types";
@@ -273,20 +273,17 @@ export function DesignManageGallery() {
                 placeholder="Chất liệu, cảm hứng, hoặc bối cảnh sáng tác…"
               />
 
-              <div>
-                <label className="mb-[7px] block text-[13px] font-semibold text-slate">Loại sản phẩm</label>
-                <select
-                  value={editing.category ?? ""}
-                  onChange={(e) => patchEditing({ category: e.target.value as DesignItemCategory })}
-                  className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none"
-                >
-                  {DESIGN_CATEGORIES.map((c) => (
-                    <option key={c.key} value={c.key}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Loại sản phẩm"
+                value={editing.category ?? ""}
+                onChange={(e) => patchEditing({ category: e.target.value as DesignItemCategory })}
+              >
+                {DESIGN_CATEGORIES.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
 
               <Field
                 label="Alt text"

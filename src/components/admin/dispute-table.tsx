@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Alert } from "@/components/ui";
+import { Alert, Field, Select, Textarea } from "@/components/ui";
 
 export type DisputeRow = {
   id: string;
@@ -94,58 +94,50 @@ export function DisputeTable({ rows: initialRows }: { rows: DisputeRow[] }) {
           {openId === row.id && (
             <div className="border-t border-cream-border bg-cream-card px-5 py-4">
               <div className="text-xs leading-[1.6] text-ink">{row.description}</div>
-              {error && (
-                <div className="mt-2">
-                  <Alert tone="error">{error}</Alert>
-                </div>
-              )}
+              {error && <Alert tone="error" className="mt-2">{error}</Alert>}
+              {/* Nền panel là cream-card — bg-white để ô nhập nổi lên, đồng bộ với Select (kit đã có bg-white). */}
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="mb-1 text-xs font-semibold text-slate">Bên có lỗi</div>
-                  <select
-                    value={atFault}
-                    onChange={(e) => setAtFault(e.target.value as typeof atFault)}
-                    className="w-full rounded-[9px] border border-border-light px-3 py-2 text-sm"
-                  >
-                    <option value="">Không quy lỗi</option>
-                    <option value="buyer">Buyer ({row.buyerLabel})</option>
-                    <option value="seller">Seller ({row.sellerLabel})</option>
-                  </select>
-                </div>
-                <div>
-                  <div className="mb-1 text-xs font-semibold text-slate">Mở khóa đơn về trạng thái</div>
-                  <select
-                    value={resumeStatus}
-                    onChange={(e) => setResumeStatus(e.target.value)}
-                    className="w-full rounded-[9px] border border-border-light px-3 py-2 text-sm"
-                  >
-                    {RESUME_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <div className="mb-1 text-xs font-semibold text-slate">Hoàn tiền thủ công cho buyer (0 = không hoàn)</div>
-                  <input
-                    type="number"
-                    min={0}
-                    value={refundAmount}
-                    onChange={(e) => setRefundAmount(e.target.value)}
-                    className="w-full rounded-[9px] border border-border-light px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="mb-1 text-xs font-semibold text-slate">Ghi chú quyết định</div>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={3}
-                  className="w-full resize-y rounded-[9px] border border-border-light px-3 py-2 text-sm"
+                <Select
+                  label="Bên có lỗi"
+                  size="sm"
+                  value={atFault}
+                  onChange={(e) => setAtFault(e.target.value as typeof atFault)}
+                >
+                  <option value="">Không quy lỗi</option>
+                  <option value="buyer">Buyer ({row.buyerLabel})</option>
+                  <option value="seller">Seller ({row.sellerLabel})</option>
+                </Select>
+                <Select
+                  label="Mở khóa đơn về trạng thái"
+                  size="sm"
+                  value={resumeStatus}
+                  onChange={(e) => setResumeStatus(e.target.value)}
+                >
+                  {RESUME_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+                <Field
+                  label="Hoàn tiền thủ công cho buyer (0 = không hoàn)"
+                  size="sm"
+                  type="number"
+                  min={0}
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                  className="bg-white"
                 />
               </div>
+              <Textarea
+                label="Ghi chú quyết định"
+                size="sm"
+                wrapperClassName="mt-3"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                className="bg-white"
+              />
               <button
                 type="button"
                 disabled={pending}
