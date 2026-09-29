@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { setSessionCookie } from "@/lib/session";
 import type { Session } from "@/lib/auth";
+import {
+  getClientIp,
+  normalizeRateLimitIdentifier,
+  peekRateLimits,
+  rateLimitedResponse,
+  recordRateLimitHit,
+} from "@/lib/rate-limit";
+
+const VERIFY_WINDOW_MS = 10 * 60_000;
 
 /**
  * Alternative to /api/auth/confirm's link-based PKCE exchange: verifies the
@@ -32,11 +41,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Vui lòng nhập email và mã xác nhận." }, { status: 400 });
   }
 
+  // Mã chỉ có 6 số — chống dò mã: chỉ đếm lượt nhập SAI, 5/10 phút mỗi email
+  // (chung cho signup + recovery) và 20/10 phút mỗi IP. Kiểm tra trước
+  // verifyOtp() nên 429 như nhau dù email có tài khoản hay không. Limiter
+  // in-memory theo instance (xem lib/rate-limit.ts), GoTrue vẫn chặn thêm.
+  const limitRules = [
+    { key: `otp-verify:ip:${getClientIp(request)}`, limit: 20, windowMs: VERIFY_WINDOW_MS },
+    {
+      key: `otp-verify:email:${normalizeRateLimitIdentifier(email)}`,
+      limit: 5,
+      windowMs: VERIFY_WINDOW_MS,
+    },
+  ];
+  const limited = peekRateLimits(limitRules);
+  if (!limited.ok) {
+    return rateLimitedResponse(
+      "Bạn đã nhập sai mã quá nhiều lần. Vui lòng thử lại sau ít phút hoặc gửi lại mã mới.",
+      limited.retryAfterSec
+    );
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token, type });
 
   if (error || !data.user) {
     console.error("[verify-otp] verifyOtp failed:", error);
+    recordRateLimitHit(limitRules);
     return NextResponse.json(
       { error: "Mã xác nhận không đúng hoặc đã hết hạn. Vui lòng kiểm tra lại hoặc gửi lại mã." },
       { status: 400 }

@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { setSessionCookie } from "@/lib/session";
 import type { Session } from "@/lib/auth";
+import {
+  clearRateLimit,
+  getClientIp,
+  normalizeRateLimitIdentifier,
+  peekRateLimits,
+  rateLimitedResponse,
+  recordRateLimitHit,
+} from "@/lib/rate-limit";
 
 const GENERIC_ERROR = "Sai email/tên tài khoản hoặc mật khẩu.";
+const LOGIN_WINDOW_MS = 15 * 60_000;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -15,6 +24,25 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Vui lòng nhập email/tên tài khoản và mật khẩu." },
       { status: 400 }
+    );
+  }
+
+  // Chống dò mật khẩu: chỉ đếm lượt đăng nhập THẤT BẠI — 10/15 phút mỗi IP
+  // và 5/15 phút mỗi email/tên tài khoản (key đúng như người dùng gõ, đã
+  // chuẩn hoá hoa/thường). Kiểm tra TRƯỚC khi tra profile/gọi Supabase, nên
+  // 429 trả về như nhau dù tài khoản có tồn tại hay không — không lộ gì thêm
+  // so với GENERIC_ERROR. Limiter là in-memory theo instance (xem
+  // lib/rate-limit.ts), GoTrue vẫn là lớp chặn cuối.
+  const identifierKey = `login:id:${normalizeRateLimitIdentifier(identifier)}`;
+  const limitRules = [
+    { key: `login:ip:${getClientIp(request)}`, limit: 10, windowMs: LOGIN_WINDOW_MS },
+    { key: identifierKey, limit: 5, windowMs: LOGIN_WINDOW_MS },
+  ];
+  const limited = peekRateLimits(limitRules);
+  if (!limited.ok) {
+    return rateLimitedResponse(
+      "Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.",
+      limited.retryAfterSec
     );
   }
 
@@ -35,6 +63,7 @@ export async function POST(request: Request) {
       .single();
     const resolvedEmail = profile ? (await admin.auth.admin.getUserById(profile.id)).data.user?.email : null;
     if (!resolvedEmail) {
+      recordRateLimitHit(limitRules);
       return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
     }
     email = resolvedEmail;
@@ -44,8 +73,12 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) {
+    recordRateLimitHit(limitRules);
     return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
   }
+  // Đăng nhập đúng thì xoá bộ đếm sai theo tài khoản (không xoá bộ đếm IP —
+  // tránh kẻ dò mật khẩu xen 1 tài khoản của chính mình để "rửa" IP).
+  clearRateLimit(identifierKey);
 
   // service-role, không phải `supabase` (client vừa signInWithPassword() —
   // phiên vừa thiết lập ngay trong request này, không đáng tin cậy để RLS
