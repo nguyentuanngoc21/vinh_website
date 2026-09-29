@@ -59,3 +59,6 @@ mobile-vinh/web-build
 .claude/skills/
 .claude/agents/
 .claude/commands/
+
+# File khoá tạm của Microsoft Office (tự sinh khi đang mở .docx/.xlsx)
+~$*

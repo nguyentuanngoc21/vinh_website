@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircleIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import { Field, Alert } from "@/components/ui";
 import type { Role } from "@/lib/supabase/types";
 
