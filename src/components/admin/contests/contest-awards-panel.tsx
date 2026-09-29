@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TrophyIcon } from "@phosphor-icons/react/dist/ssr";
-import { Alert, Button, Field } from "@/components/ui";
+import { Alert, Button, Field, Select } from "@/components/ui";
 import { vndToTokens } from "@/lib/contests/admin-input";
 import type { AdminAward, AdminSubmission } from "@/lib/contests/admin-service";
 import type { AwardProposal } from "@/lib/contests/final-scoring-service";
@@ -178,13 +178,9 @@ export function ContestAwardsPanel({
           <p className="text-sm text-stone-alt">Chưa có bài hợp lệ nào.</p>
         ) : (
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block sm:col-span-2">
-              <div className="mb-[7px] text-[13px] font-semibold text-slate">Tác phẩm</div>
-              <select value={submissionId} onChange={(e) => setSubmissionId(e.target.value)}
-                className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none">
-                {candidates.map((c) => <option key={c.id} value={c.id}>{c.book_title} — {c.author_name}</option>)}
-              </select>
-            </label>
+            <Select label="Tác phẩm" wrapperClassName="sm:col-span-2" value={submissionId} onChange={(e) => setSubmissionId(e.target.value)}>
+              {candidates.map((c) => <option key={c.id} value={c.id}>{c.book_title} — {c.author_name}</option>)}
+            </Select>
             <Field label="Tên giải" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
             <Field label="Mã giải" hint="Chữ thường, số, gạch dưới — vd first_prize, readers_choice" value={code} onChange={(e) => setCode(e.target.value)} />
             <Field label="Hạng (để trống nếu không xếp hạng)" type="number" min={1} inputMode="numeric" value={rank} onChange={(e) => setRank(e.target.value)} />

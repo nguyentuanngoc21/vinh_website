@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TrashIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react/dist/ssr";
 import { reasonGroupLabel, type ReasonGroupId } from "@/lib/moderation/chapter-removal-templates";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
+import { Alert, Checkbox } from "@/components/ui";
 
 export type ChapterModerationRow = {
   id: string;
@@ -106,21 +107,14 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
 
   return (
     <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
-      <label className="mb-3.5 flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-stone-alt">
-        <input
-          type="checkbox"
-          checked={showPurged}
-          onChange={(e) => setShowPurged(e.target.checked)}
-          className="cursor-pointer"
-        />
-        Hiện cả chương đã dọn nội dung (&gt;30 ngày)
-      </label>
+      {/* w-fit — Checkbox là <button> flex (chiếm cả hàng); giữ vùng bấm chỉ quanh nhãn như cũ. */}
+      <div className="mb-3.5 w-fit">
+        <Checkbox checked={showPurged} onChange={() => setShowPurged((v) => !v)}>
+          Hiện cả chương đã dọn nội dung (&gt;30 ngày)
+        </Checkbox>
+      </div>
 
-      {error && (
-        <div className="mb-3.5 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-error">
-          {error}
-        </div>
-      )}
+      {error && <Alert tone="error" className="mb-3.5">{error}</Alert>}
 
       {/* overflow-x-auto — admin/layout.tsx bọc <main> bằng overflow-hidden
           (không cuộn được); bảng phải tự lo cuộn ngang của chính nó khi

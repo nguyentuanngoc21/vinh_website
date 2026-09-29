@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr";
-import { Field, Alert } from "@/components/ui";
+import { Field, Alert, Button, Select } from "@/components/ui";
 import type { Role } from "@/lib/supabase/types";
 
 export type RoleChangeEntry = {
@@ -157,20 +157,24 @@ export function UserDetailPanel({
         </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <label className="text-[13px] font-semibold text-stone-dark">Quyền</label>
+          <span id="user-role-label" className="text-[13px] font-semibold text-stone-dark">Quyền</span>
           {canEditRole ? (
-            <select
+            // Nhãn "Quyền" nằm cùng hàng (flex) nên label={null} + aria-labelledby;
+            // size="sm" giữ ô chọn gọn như cũ.
+            <Select
+              label={null}
+              aria-labelledby="user-role-label"
               value={role}
               disabled={rolePending}
               onChange={(e) => handleRoleChange(e.target.value as Role)}
-              className="rounded-lg border border-cream-border px-3 py-1.5 text-sm disabled:opacity-50"
+              size="sm"
             >
               {ROLE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </Select>
           ) : (
             <>
               <span className="text-sm text-brand-ink">
@@ -240,14 +244,17 @@ export function UserDetailPanel({
             placeholder="Ví dụ: Giải nhất cuộc thi viết tháng 9"
             wrapperClassName="min-w-[220px] flex-1"
           />
-          <button
+          {/* Nút kit cao ngang ô Field (py-[14px]) nên thẳng hàng trong hàng items-end. */}
+          <Button
             type="button"
+            variant="primary"
+            fullWidth={false}
             disabled={bonusPending}
             onClick={handleGrantBonus}
-            className="rounded-lg bg-brand-gold px-4 py-2 text-[13px] font-semibold text-brand-ink disabled:opacity-50"
+            className="px-5"
           >
             {bonusPending ? "Đang cấp…" : "Cấp thưởng"}
-          </button>
+          </Button>
         </div>
         {bonusError && (
           <Alert tone="error" className="mt-2.5">{bonusError}</Alert>

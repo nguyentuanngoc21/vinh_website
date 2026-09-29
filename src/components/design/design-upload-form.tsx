@@ -14,7 +14,7 @@ import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { ART_STYLES } from "@/lib/design/art-styles";
 import { compressImageFile } from "@/lib/media/compress-image";
 import { useOrigin } from "@/lib/use-origin";
-import { Field, Textarea, Button, Alert, Checkbox } from "@/components/ui";
+import { Field, Textarea, Select, Button, Alert, Checkbox } from "@/components/ui";
 import type { ArtStyle, DesignItemCategory } from "@/lib/supabase/types";
 
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
@@ -339,20 +339,17 @@ export function DesignUploadForm({ className }: { className?: string }) {
                 placeholder="Chất liệu, cảm hứng, hoặc bối cảnh sáng tác…"
               />
 
-              <div>
-                <label className="mb-[7px] block text-[13px] font-semibold text-slate">Loại sản phẩm</label>
-                <select
-                  value={selected.category}
-                  onChange={(e) => patchSelected({ category: e.target.value as DesignItemCategory })}
-                  className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none"
-                >
-                  {DESIGN_CATEGORIES.map((c) => (
-                    <option key={c.key} value={c.key}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Loại sản phẩm"
+                value={selected.category}
+                onChange={(e) => patchSelected({ category: e.target.value as DesignItemCategory })}
+              >
+                {DESIGN_CATEGORIES.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
 
               <Field
                 label="Alt text"
@@ -418,22 +415,22 @@ export function DesignUploadForm({ className }: { className?: string }) {
             ))}
           </datalist>
 
-          <div className="mt-3.5">
-            <label className="mb-[7px] block text-[13px] font-semibold text-slate">Phong cách nghệ thuật</label>
-            <select
-              value={matchedAlbum ? matchedAlbum.art_style : artStyle}
-              onChange={(e) => setArtStyle(e.target.value as ArtStyle)}
-              disabled={albumLocked || Boolean(matchedAlbum)}
-              className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none disabled:bg-neutral-bg disabled:text-stone"
-            >
-              <option value="">— Chọn phong cách —</option>
-              {ART_STYLES.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Phong cách nghệ thuật"
+            wrapperClassName="mt-3.5"
+            value={matchedAlbum ? matchedAlbum.art_style : artStyle}
+            onChange={(e) => setArtStyle(e.target.value as ArtStyle)}
+            disabled={albumLocked || Boolean(matchedAlbum)}
+            // Giữ kiểu "khoá" cũ (nền xám, chữ nhạt) khi album đã chốt/đã có phong cách
+            className="disabled:bg-neutral-bg disabled:text-stone"
+          >
+            <option value="">— Chọn phong cách —</option>
+            {ART_STYLES.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
           {albumLocked && (
             <p className="mt-1.5 text-[11px] leading-[1.5] text-stone">
               Album đã chốt cho lượt đăng này — đổi tên/phong cách qua trang album sau khi đăng xong.

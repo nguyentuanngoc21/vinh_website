@@ -16,7 +16,7 @@ import {
   PauseIcon,
   CopyIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Field, Alert, Checkbox, Skeleton } from "@/components/ui";
+import { Field, Alert, Checkbox, Skeleton, Textarea } from "@/components/ui";
 import { computeMissingFields } from "@/lib/orders/service-listing-service";
 import { SCOPE_OPTIONS } from "@/lib/orders/config";
 import type { Database } from "@/lib/supabase/types";
@@ -649,11 +649,11 @@ export function ServicesTab() {
         </NumberedField>
 
         <NumberedField num={2} label="Phạm vi công việc" filled={!missingKeys.has("scope_description")}>
-          <textarea
+          <Textarea
+            label={null}
             defaultValue={selected.scope_description}
             onBlur={(e) => e.target.value !== selected.scope_description && patch({ scope_description: e.target.value })}
             rows={3}
-            className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.65] outline-none focus:border-brand-gold"
           />
         </NumberedField>
 
@@ -781,24 +781,18 @@ export function ServicesTab() {
 
         <NumberedField num={7} label="Thể loại nhận / từ chối" filled={!missingKeys.has("content_policy")}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <div className="mb-1.5 text-[13px] font-semibold text-slate">Thể loại nhận</div>
-              <textarea
-                defaultValue={selected.accepted_content ?? ""}
-                onBlur={(e) => patch({ accepted_content: e.target.value })}
-                rows={2}
-                className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.6] outline-none focus:border-brand-gold"
-              />
-            </div>
-            <div>
-              <div className="mb-1.5 text-[13px] font-semibold text-slate">Thể loại từ chối</div>
-              <textarea
-                defaultValue={selected.rejected_content ?? ""}
-                onBlur={(e) => patch({ rejected_content: e.target.value })}
-                rows={2}
-                className="w-full resize-y rounded-xl border border-cream px-3.5 py-3 text-sm leading-[1.6] outline-none focus:border-brand-gold"
-              />
-            </div>
+            <Textarea
+              label="Thể loại nhận"
+              defaultValue={selected.accepted_content ?? ""}
+              onBlur={(e) => patch({ accepted_content: e.target.value })}
+              rows={2}
+            />
+            <Textarea
+              label="Thể loại từ chối"
+              defaultValue={selected.rejected_content ?? ""}
+              onBlur={(e) => patch({ rejected_content: e.target.value })}
+              rows={2}
+            />
           </div>
         </NumberedField>
 
@@ -951,20 +945,24 @@ function PriceTiersEditor({
       <div className="flex flex-col gap-2">
         {rows.map((r, i) => (
           <div key={i} className="flex gap-2">
-            <input
+            <Field
+              label={null}
               value={r.label}
               placeholder="Tên gói (vd: Cơ bản)"
+              size="sm"
               onChange={(e) => setRows((prev) => prev.map((row, idx) => (idx === i ? { ...row, label: e.target.value } : row)))}
-              className="flex-1 rounded-lg border border-cream px-3 py-2 text-sm outline-none focus:border-brand-gold"
+              wrapperClassName="min-w-0 flex-1"
             />
-            <input
+            <Field
+              label={null}
               type="number"
               value={r.price || ""}
               placeholder="Giá (VNĐ)"
+              size="sm"
               onChange={(e) =>
                 setRows((prev) => prev.map((row, idx) => (idx === i ? { ...row, price: Number(e.target.value) } : row)))
               }
-              className="w-32 rounded-lg border border-cream px-3 py-2 text-sm outline-none focus:border-brand-gold"
+              wrapperClassName="w-32 shrink-0"
             />
           </div>
         ))}
@@ -1019,13 +1017,15 @@ function RefundPolicyEditor({
           <div key={s.key} className="flex items-center justify-between gap-2">
             <div className="text-[13px] text-ink">{s.label}</div>
             <div className="flex shrink-0 items-center gap-1.5">
-              <input
+              <Field
+                label={null}
                 type="number"
                 min={0}
                 max={100}
                 value={values[s.key]}
                 onChange={(e) => setValues((prev) => ({ ...prev, [s.key]: Math.max(0, Math.min(100, Number(e.target.value))) }))}
-                className="w-20 rounded-lg border border-cream px-3 py-1.5 text-sm outline-none focus:border-brand-gold"
+                size="sm"
+                wrapperClassName="w-20"
               />
               <span className="text-xs text-stone">%</span>
             </div>

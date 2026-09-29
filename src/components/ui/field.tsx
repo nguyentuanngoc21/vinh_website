@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
+import { cn } from "@/lib/cn";
 
 /**
  * Shared text input used across auth forms, profile editing, and author
@@ -16,7 +17,7 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
  */
 type FieldStatus = { tone: "success" | "error"; message: string };
 
-type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
+type FieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
   /** Pass `null` to omit the label entirely — e.g. when a custom header
    * row (label + an inline link) is rendered above the Field instead. */
   label: ReactNode | null;
@@ -29,10 +30,20 @@ type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
    * see chat-tab.tsx's composer for the bug this caused before this prop
    * existed. */
   wrapperClassName?: string;
+  /** "sm" = bản gọn (bảng admin, thẻ đơn hàng, hàng giá…). Dùng prop này
+   * thay vì ghi đè padding/cỡ chữ qua `className` — thứ tự CSS Tailwind v4
+   * sinh ra không theo thứ tự class, override có thể không thắng (xem
+   * button.tsx). */
+  size?: "md" | "sm";
 };
 
+const SIZE_CLASS = {
+  md: "rounded-[10px] px-[15px] py-3 text-[14.5px]",
+  sm: "rounded-lg px-3 py-2 text-[13px]",
+} as const;
+
 export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { label, hint, status, suffix, className = "", wrapperClassName = "", ...inputProps },
+  { label, hint, status, suffix, className = "", wrapperClassName = "", size = "md", ...inputProps },
   ref
 ) {
   const toneClass =
@@ -43,16 +54,20 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
         : "border-border-light";
 
   return (
-    <label className={`block ${wrapperClassName}`}>
+    <label className={cn("block", wrapperClassName)}>
       {label !== null && (
         <div className="mb-[7px] text-[13px] font-semibold text-slate">{label}</div>
       )}
       <div className="relative">
         <input
           ref={ref}
-          className={`w-full rounded-[10px] border ${toneClass} px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none ${
-            suffix ? "pr-11" : ""
-          } ${className}`}
+          className={cn(
+            "w-full border text-ink focus:border-brand-ink focus:outline-none",
+            toneClass,
+            SIZE_CLASS[size],
+            suffix ? "pr-11" : null,
+            className
+          )}
           {...inputProps}
         />
         {suffix && (

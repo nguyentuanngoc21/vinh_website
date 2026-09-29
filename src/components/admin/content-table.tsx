@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwiseIcon, BookOpenTextIcon } from "@phosphor-icons/react/dist/ssr";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
+import { Alert, Checkbox } from "@/components/ui";
 
 export type ContentBookRow = {
   id: string;
@@ -100,7 +101,8 @@ export function ContentTable({
 
   return (
     <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
-      <div className="mb-3.5 flex items-center justify-between gap-4">
+      {/* flex-wrap — trên điện thoại ô tìm (280px) + checkbox + bộ đếm không đủ một hàng. */}
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
         <div className="flex items-center gap-2 rounded-lg border border-cream-border px-3 py-2">
           <MagnifyingGlassIcon size={15} color="var(--color-stone-alt)" />
           <input
@@ -111,15 +113,9 @@ export function ContentTable({
           />
         </div>
         <div className="flex items-center gap-3.5">
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-stone-alt">
-            <input
-              type="checkbox"
-              checked={showPurged}
-              onChange={(e) => setShowPurged(e.target.checked)}
-              className="cursor-pointer"
-            />
+          <Checkbox checked={showPurged} onChange={() => setShowPurged((v) => !v)}>
             Hiện cả truyện đã dọn nội dung (&gt;30 ngày)
-          </label>
+          </Checkbox>
           <div className="text-xs text-stone-alt">
             {filtered.length}/{rows.length} truyện
             {truncated && ` (chỉ tải ${fetchLimit} truyện mới nhất — có thể còn truyện cũ hơn không hiện ở đây)`}
@@ -127,11 +123,7 @@ export function ContentTable({
         </div>
       </div>
 
-      {error && (
-        <div className="mb-3.5 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-error">
-          {error}
-        </div>
-      )}
+      {error && <Alert tone="error" className="mb-3.5">{error}</Alert>}
 
       {/* overflow-x-auto — admin/layout.tsx bọc <main> bằng overflow-hidden
           (không cuộn được), nên bảng phải tự lo phần cuộn ngang CỦA CHÍNH

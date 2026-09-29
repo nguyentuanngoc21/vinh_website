@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { ArrowSquareOutIcon, FlagIcon } from "@phosphor-icons/react/dist/ssr";
-import { Alert, Button, Checkbox, Field } from "@/components/ui";
+import { Alert, Button, Checkbox, Field, Select } from "@/components/ui";
 import { formatVnDateTime, vnLocalToIso } from "@/lib/contests/datetime";
 import {
   ADMIN_NEXT_SUBMISSION_STATUSES,
@@ -292,13 +292,9 @@ function SubmissionRow({
               <div className="text-[13px] font-semibold text-slate">Gắn cờ “Cần bổ sung”</div>
               <p className="text-xs text-stone-alt">Bài vẫn hợp lệ, vẫn được đọc và bình chọn. Hết hạn mà chưa sửa thì quyết định giữ hoặc loại bài.</p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className="block">
-                  <div className="mb-[7px] text-[13px] font-semibold text-slate">Loại thiếu sót</div>
-                  <select value={flagCode} onChange={(e) => setFlagCode(e.target.value)}
-                    className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none">
-                    {COMMON_FLAG_CODES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-                  </select>
-                </label>
+                <Select label="Loại thiếu sót" value={flagCode} onChange={(e) => setFlagCode(e.target.value)}>
+                  {COMMON_FLAG_CODES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                </Select>
                 <Field label="Hạn bổ sung (giờ Việt Nam)" type="datetime-local" value={flagFixBy} onChange={(e) => setFlagFixBy(e.target.value)} />
                 <Field label="Nội dung gửi tác giả" wrapperClassName="sm:col-span-2" value={flagMessage}
                   placeholder="vd: Bổ sung tóm tắt ≥ 50 chữ để giữ tư cách dự thi" onChange={(e) => setFlagMessage(e.target.value)} maxLength={500} />

@@ -1,5 +1,6 @@
 export { Field } from "./field";
 export { Textarea } from "./textarea";
+export { Select } from "./select";
 export { Button } from "./button";
 export { Alert } from "./alert";
 export { Modal } from "./modal";

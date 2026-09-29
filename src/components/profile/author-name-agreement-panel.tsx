@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SealCheckIcon } from "@phosphor-icons/react/dist/ssr";
-import { Alert, Checkbox } from "@/components/ui";
+import { Alert, Button, Checkbox } from "@/components/ui";
 
 type Agreement = {
   id: string;
@@ -146,14 +146,15 @@ export function AuthorNameAgreementPanel({ orderId, viewerId }: AuthorNameAgreem
               Tôi đã đọc và hiểu hệ quả pháp lý ở trên
             </Checkbox>
           </div>
-          <button
+          <Button
             type="button"
+            fullWidth={false}
             disabled={pending || !acknowledged}
             onClick={start}
-            className="mt-3 cursor-pointer rounded-full bg-brand-gold px-4 py-2 text-xs font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
+            className="mt-3 rounded-full px-4 py-2 text-xs"
           >
             Bắt đầu thỏa thuận
-          </button>
+          </Button>
         </div>
       )}
 
@@ -162,14 +163,15 @@ export function AuthorNameAgreementPanel({ orderId, viewerId }: AuthorNameAgreem
           {myPendingConfirm ? (
             <>
               <div className="rounded-lg border border-cream bg-white p-3 text-xs leading-[1.6] text-ink">{myStatement}</div>
-              <button
+              <Button
                 type="button"
+                fullWidth={false}
                 disabled={pending}
                 onClick={confirm}
-                className="mt-2.5 cursor-pointer rounded-full bg-brand-gold px-4 py-2 text-xs font-bold text-brand-ink disabled:opacity-60"
+                className="mt-2.5 rounded-full px-4 py-2 text-xs"
               >
                 Tôi đồng ý
-              </button>
+              </Button>
             </>
           ) : (
             <div className="text-xs text-stone">Đang chờ bên còn lại xác nhận.</div>

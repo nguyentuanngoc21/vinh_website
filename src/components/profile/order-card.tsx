@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WalletIcon, ClockCountdownIcon, CheckCircleIcon, WarningOctagonIcon } from "@phosphor-icons/react/dist/ssr";
-import { Button, Alert } from "@/components/ui";
+import { Button, Alert, Field, Select, Textarea } from "@/components/ui";
 import { SCOPE_OPTIONS } from "@/lib/orders/config";
 import { AuthorNameAgreementPanel } from "@/components/profile/author-name-agreement-panel";
 import { formatVnd } from "@/lib/format-currency";
@@ -335,10 +335,12 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
           <div className="text-xs font-semibold text-ink">Gắn truyện đang viết vào đơn này</div>
           <div className="mt-0.5 text-xs text-stone-light">Khách hàng sẽ được cấp quyền xem bản thảo ngay sau khi gắn.</div>
           <div className="mt-2 flex gap-2">
-            <select
+            <Select
+              label={null}
               value={pickedBookId}
               onChange={(e) => setPickedBookId(e.target.value)}
-              className="flex-1 rounded-lg border border-cream px-3 py-2 text-sm outline-none focus:border-brand-gold"
+              wrapperClassName="min-w-0 flex-1"
+              size="sm"
             >
               <option value="">Chọn truyện…</option>
               {myBooks.map((b) => (
@@ -346,7 +348,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                   {b.title}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button type="button" disabled={pending || !pickedBookId} onClick={attachBook} className="rounded-lg px-4 py-2 text-xs font-semibold">
               Gắn
             </Button>
@@ -358,11 +360,13 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
       {order.status === "draft" && isBuyer && !order.usage_scope && (
         <div className="mt-3">
           <div className="text-xs font-semibold text-ink">Chọn phạm vi quyền sử dụng</div>
-          <input
+          <Field
+            label={null}
             value={scopeNote}
             onChange={(e) => setScopeNote(e.target.value)}
             placeholder="Mô tả mục đích sử dụng thương mại (bắt buộc nếu chọn Thương mại giới hạn)"
-            className="mt-1.5 w-full rounded-lg border border-cream px-3 py-2 text-xs outline-none focus:border-brand-gold"
+            wrapperClassName="mt-1.5"
+            size="sm"
           />
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {SCOPE_OPTIONS.map((o) => (
@@ -388,13 +392,15 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
       {order.status === "draft" && isBuyer && order.usage_scope && (
         <div className="mt-3">
           <div className="text-xs font-semibold text-ink">Brief yêu cầu</div>
-          <textarea
+          <Textarea
+            label={null}
             value={briefDraft}
             onChange={(e) => setBriefDraft(e.target.value)}
             onBlur={() => briefDraft !== order.brief && call("/brief", "PATCH", { brief: briefDraft })}
             rows={3}
             placeholder="Mô tả yêu cầu, tông màu, hạn mong muốn…"
-            className="mt-1.5 w-full resize-y rounded-lg border border-cream px-3 py-2 text-sm outline-none focus:border-brand-gold"
+            wrapperClassName="mt-1.5"
+            size="sm"
           />
           <Button
             type="button"
@@ -672,10 +678,11 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
               </button>
               {disputeOpen ? (
                 <div className="mt-1 flex w-full flex-col gap-2 rounded-lg border border-[#F3C3C3] bg-[#FDECEC] p-3">
-                  <select
+                  <Select
+                    label={null}
                     value={disputeReason}
                     onChange={(e) => setDisputeReason(e.target.value)}
-                    className="rounded-lg border border-cream px-3 py-1.5 text-xs outline-none"
+                    size="sm"
                   >
                     <option value="">Chọn lý do…</option>
                     <option value="not_as_described">Sản phẩm không đúng như thỏa thuận</option>
@@ -683,13 +690,14 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                     <option value="payment_issue">Vấn đề thanh toán/hoàn tiền</option>
                     <option value="off_platform">Bị yêu cầu giao dịch ngoài nền tảng</option>
                     <option value="other">Khác</option>
-                  </select>
-                  <textarea
+                  </Select>
+                  <Textarea
+                    label={null}
                     value={disputeDescription}
                     onChange={(e) => setDisputeDescription(e.target.value)}
                     rows={2}
                     placeholder="Mô tả chi tiết…"
-                    className="rounded-lg border border-cream px-3 py-2 text-xs outline-none"
+                    size="sm"
                   />
                   <div className="flex gap-2">
                     <button

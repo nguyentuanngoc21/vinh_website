@@ -7,7 +7,7 @@ import {
   DEFAULT_RESPONSE_DAYS,
   type ReasonGroupId,
 } from "@/lib/moderation/chapter-removal-templates";
-import { Alert, Field, Modal, Textarea } from "@/components/ui";
+import { Alert, Field, Modal, Select, Textarea } from "@/components/ui";
 
 export type RemoveChapterPayload = {
   reasonGroup: ReasonGroupId;
@@ -66,42 +66,42 @@ export function RemoveChapterModal({
           </button>
         </div>
 
-        <label className="mb-1 block text-[12.5px] font-semibold text-stone-dark">Lý do gỡ</label>
-        <select
+        <Select
+          label="Lý do gỡ"
+          size="sm"
+          wrapperClassName="mb-3"
           value={group}
           onChange={(e) => {
             setGroup(e.target.value as ReasonGroupId);
             setSubReason("");
             setFormError(null);
           }}
-          className="mb-3 w-full rounded-lg border border-cream-border px-3 py-2 text-sm"
         >
           {REASON_GROUPS.map((g) => (
             <option key={g.id} value={g.id}>
               {g.label}
             </option>
           ))}
-        </select>
+        </Select>
 
         {groupInfo.subReasons.length > 0 && (
-          <>
-            <label className="mb-1 block text-[12.5px] font-semibold text-stone-dark">Lý do cụ thể</label>
-            <select
-              value={subReason}
-              onChange={(e) => {
-                setSubReason(e.target.value);
-                setFormError(null);
-              }}
-              className="mb-3 w-full rounded-lg border border-cream-border px-3 py-2 text-sm"
-            >
-              <option value="">— Tự nhập bên dưới —</option>
-              {groupInfo.subReasons.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </>
+          <Select
+            label="Lý do cụ thể"
+            size="sm"
+            wrapperClassName="mb-3"
+            value={subReason}
+            onChange={(e) => {
+              setSubReason(e.target.value);
+              setFormError(null);
+            }}
+          >
+            <option value="">— Tự nhập bên dưới —</option>
+            {groupInfo.subReasons.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
         )}
 
         <div className="mb-3">
@@ -116,6 +116,7 @@ export function RemoveChapterModal({
               setFormError(null);
             }}
             rows={3}
+            size="sm"
             placeholder="Ví dụ: chương 12, đoạn 3 sao chép nguyên văn từ..."
             className="resize-none"
           />
@@ -127,18 +128,17 @@ export function RemoveChapterModal({
               label="Số ngày tác giả có thể phản hồi"
               type="number"
               min={1}
+              size="sm"
               value={responseDays}
               onChange={(e) => setResponseDays(Math.max(1, Number(e.target.value) || DEFAULT_RESPONSE_DAYS))}
             />
           </div>
         )}
 
-        {formError && (
-          <div className="mb-3">
-            <Alert tone="error">{formError}</Alert>
-          </div>
-        )}
+        {formError && <Alert tone="error" className="mb-3">{formError}</Alert>}
 
+        {/* Giữ nút thủ công: kit Button chưa có biến thể "nguy hiểm" (bg-error) cho
+            nút Xác nhận gỡ, và nút Huỷ phải cùng cỡ với nó. */}
         <div className="flex justify-end gap-2.5">
           <button
             type="button"

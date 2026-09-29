@@ -1,4 +1,5 @@
 import { type ButtonHTMLAttributes } from "react";
+import { cn } from "@/lib/cn";
 
 type Variant = "primary" | "dark" | "ghost";
 
@@ -39,7 +40,12 @@ export function Button({
   return (
     <button
       disabled={disabled}
-      className={`flex ${fullWidth ? "w-full" : "w-auto"} cursor-pointer items-center justify-center gap-[9px] rounded-[10px] py-[14px] text-[15px] font-bold transition-transform active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55 ${VARIANT_CLASS[variant]} ${className}`}
+      className={cn(
+        "flex cursor-pointer items-center justify-center gap-[9px] rounded-[10px] py-[14px] text-[15px] font-bold transition-transform active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55",
+        fullWidth ? "w-full" : "w-auto",
+        VARIANT_CLASS[variant],
+        className
+      )}
       {...props}
     />
   );

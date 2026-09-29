@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { cn } from "@/lib/cn";
 
 /**
  * Multi-line sibling of `Field` (see field.tsx) — same label/hint/status
@@ -18,10 +19,20 @@ type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   /** className applies to the <textarea> itself; use this for the wrapping
    * <label> (e.g. `flex-1` in a flex row) — see Field's wrapperClassName. */
   wrapperClassName?: string;
+  /** "sm" = bản gọn (bảng admin, thẻ đơn hàng, hàng giá…). Dùng prop này
+   * thay vì ghi đè padding/cỡ chữ qua `className` — thứ tự CSS Tailwind v4
+   * sinh ra không theo thứ tự class, override có thể không thắng (xem
+   * button.tsx). */
+  size?: "md" | "sm";
 };
 
+const SIZE_CLASS = {
+  md: "rounded-[10px] px-[15px] py-3 text-[14.5px]",
+  sm: "rounded-lg px-3 py-2 text-[13px]",
+} as const;
+
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
-  { label, hint, status, className = "", wrapperClassName = "", rows = 4, ...textareaProps },
+  { label, hint, status, className = "", wrapperClassName = "", size = "md", rows = 4, ...textareaProps },
   ref
 ) {
   const toneClass =
@@ -32,14 +43,19 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         : "border-border-light";
 
   return (
-    <label className={`block ${wrapperClassName}`}>
+    <label className={cn("block", wrapperClassName)}>
       {label !== null && (
         <div className="mb-[7px] text-[13px] font-semibold text-slate">{label}</div>
       )}
       <textarea
         ref={ref}
         rows={rows}
-        className={`w-full resize-y rounded-[10px] border ${toneClass} px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none ${className}`}
+        className={cn(
+          "w-full resize-y border text-ink focus:border-brand-ink focus:outline-none",
+          toneClass,
+          SIZE_CLASS[size],
+          className
+        )}
         {...textareaProps}
       />
       {(status || hint) && (

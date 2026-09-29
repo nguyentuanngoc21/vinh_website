@@ -4,40 +4,26 @@
 
 Các form trong [src/components/login/login-form.tsx](src/components/login/login-form.tsx) và [src/components/register/register-form.tsx](src/components/register/register-form.tsx) đã được dùng làm mẫu để chuyển sang hệ thống UI component chuẩn. Bước tiếp theo là refactor các file còn lại vẫn đang dùng `<input>`/`<label>`/`<select>`/`<textarea>` thủ công.
 
-Đã chuyển xong: `edit-profile-tab.tsx`, `following-tab.tsx`, `connect-directory.tsx`.
+**Trạng thái (29/09/2026): các form nhập liệu đã chuyển xong.** Đợt này chuyển thêm: design-upload-form, design-manage-gallery, audio-upload-form, chapter-editor, chapter-audio-panel, book-cover-upload, book-overview, import-manuscript-modal, services-tab, order-card, author-name-agreement-panel, user-detail-panel, remove-chapter-modal, dispute-table, content-table, chapter-moderation-table, contest-judging-panel, contest-submissions-panel, contest-awards-panel (trước đó: edit-profile-tab, following-tab, connect-directory, login-form, register-form).
 
-## Danh sách file cần refactor
+Bổ sung vào kit trong đợt này:
 
-Lấy bằng cách grep `<input`/`<label`/`<select`/`<textarea` ngoài `src/components/ui/` (không tính `<input type="file">` và `<label>` chỉ bọc input file). Số trong ngoặc là số chỗ còn dùng thủ công — cập nhật lại danh sách bằng grep sau mỗi lần refactor.
+- `Select` — cùng API `label`/`hint`/`status`/`wrapperClassName` với `Field`, bọc `<select>` gốc; truyền `<option>` qua `children`.
+- `size="sm"` cho `Field`/`Textarea`/`Select` — bản gọn cho bảng admin, thẻ đơn hàng, hàng giá.
+- `className` trên kit giờ **luôn thắng** class mặc định cùng thuộc tính (ghép qua `cn()` = `tailwind-merge`, [src/lib/cn.ts](../src/lib/cn.ts)). Trước đây Tailwind v4 xếp thứ tự CSS theo nội bộ nên `<Button className="py-2 text-xs">` bị `py-[14px] text-[15px]` đè mất. Không cần hậu tố `!` nữa (các chỗ đã dùng `!` vẫn chạy đúng).
+- `Alert` nhận `className` (margin ngoài không cần wrapper div).
 
-Form nhập liệu (ưu tiên chuyển sang `Field`/`Textarea`/`Checkbox`; kit chưa có `Select` chung — chỉ có `GenreSelect`/`BankSelect`):
+## Còn dùng thẻ thủ công — có chủ đích
 
-- [src/components/design/design-upload-form.tsx](src/components/design/design-upload-form.tsx) (~12)
-- [src/components/profile/services-tab.tsx](src/components/profile/services-tab.tsx) (~8)
-- [src/components/design/design-manage-gallery.tsx](src/components/design/design-manage-gallery.tsx) (~8)
-- [src/components/profile/order-card.tsx](src/components/profile/order-card.tsx) (~7)
-- [src/components/admin/user-detail-panel.tsx](src/components/admin/user-detail-panel.tsx) (~6)
-- [src/components/profile/author-name-agreement-panel.tsx](src/components/profile/author-name-agreement-panel.tsx) (~4)
-- [src/components/admin/remove-chapter-modal.tsx](src/components/admin/remove-chapter-modal.tsx) (~4)
-- [src/components/admin/dispute-table.tsx](src/components/admin/dispute-table.tsx) (~4)
-- [src/components/admin/contests/contest-judging-panel.tsx](src/components/admin/contests/contest-judging-panel.tsx) (~4)
-- [src/components/author/publish-panel.tsx](src/components/author/publish-panel.tsx) (~3)
-- [src/components/author/import-manuscript-modal.tsx](src/components/author/import-manuscript-modal.tsx) (~2)
-- [src/components/audio-hub/audio-upload-form.tsx](src/components/audio-hub/audio-upload-form.tsx) (~3)
-- [src/components/admin/content-table.tsx](src/components/admin/content-table.tsx) (~3)
-- [src/components/author/chapter-editor.tsx](src/components/author/chapter-editor.tsx) (~2)
-- [src/components/author/chapter-audio-panel.tsx](src/components/author/chapter-audio-panel.tsx) (~2)
-- [src/components/author/book-cover-upload.tsx](src/components/author/book-cover-upload.tsx) (~1)
-- [src/components/admin/contests/contest-submissions-panel.tsx](src/components/admin/contests/contest-submissions-panel.tsx) (~2)
-- [src/components/admin/contests/contest-awards-panel.tsx](src/components/admin/contests/contest-awards-panel.tsx) (~2)
-- [src/components/admin/chapter-moderation-table.tsx](src/components/admin/chapter-moderation-table.tsx) (~2)
-- [src/components/author/book-overview.tsx](src/components/author/book-overview.tsx) (~1)
+Đếm bằng grep `<input`/`<select`/`<textarea` ngoài `src/components/ui/` (không tính `type="file"`/`range`/`radio`/`hidden`):
 
-Ô nhập "inline" (ô tìm kiếm, khung soạn tin nhắn/bình luận, thanh trượt audio) — kiểu dáng riêng, `Field` hiện chưa hợp; chỉ chuyển nếu kit UI có biến thể phù hợp:
+- [publish-panel.tsx](../src/components/author/publish-panel.tsx) (2) — ô giá nằm trong hàng có icon xu + hậu tố "token"; `Field` chưa có "prefix/suffix text" để dựng lại đúng hàng đó.
+- [author-name-agreement-panel.tsx](../src/components/profile/author-name-agreement-panel.tsx) — 2 lựa chọn `type="radio"`: kit chưa có `Radio`.
+- [chapter-editor.tsx](../src/components/author/chapter-editor.tsx) — khung viết nội dung chương toàn trang (không viền, font riêng, cần ref chèn tại con trỏ).
+- Ô nhập "inline" kiểu riêng (khung soạn tin/bình luận, ô tìm kiếm, tag input): [chat-tab.tsx](../src/components/profile/chat-tab.tsx), [chat-bubble-window.tsx](../src/components/messenger/chat-bubble-window.tsx), [paragraph-comments-panel.tsx](../src/components/reading/paragraph-comments-panel.tsx), [content-comments-panel.tsx](../src/components/comments/content-comments-panel.tsx), [nav-bar-content.tsx](../src/components/nav-bar-content.tsx), [user-table.tsx](../src/components/admin/user-table.tsx), [content-table.tsx](../src/components/admin/content-table.tsx), [agreements-tab.tsx](../src/components/profile/agreements-tab.tsx), [tag-input.tsx](../src/components/author/tag-input.tsx), [reading-list-modal.tsx](../src/components/reading/reading-list-modal.tsx).
+- Thanh trượt `type="range"`: [now-playing.tsx](../src/components/audio/now-playing.tsx), [mini-player-bar.tsx](../src/components/audio-hub/mini-player-bar.tsx).
 
-- Khung soạn tin/bình luận: [chat-tab.tsx](src/components/profile/chat-tab.tsx), [chat-bubble-window.tsx](src/components/messenger/chat-bubble-window.tsx), [paragraph-comments-panel.tsx](src/components/reading/paragraph-comments-panel.tsx), [content-comments-panel.tsx](src/components/comments/content-comments-panel.tsx)
-- Ô tìm kiếm / nhập nhanh: [nav-bar-content.tsx](src/components/nav-bar-content.tsx), [user-table.tsx](src/components/admin/user-table.tsx), [agreements-tab.tsx](src/components/profile/agreements-tab.tsx), [tag-input.tsx](src/components/author/tag-input.tsx), [reading-list-modal.tsx](src/components/reading/reading-list-modal.tsx)
-- Thanh trượt `type="range"`: [now-playing.tsx](src/components/audio/now-playing.tsx), [mini-player-bar.tsx](src/components/audio-hub/mini-player-bar.tsx)
+Còn thiếu trong kit nếu muốn chuyển nốt: `Radio`, `Switch` (nút bật/tắt "Nhận đơn" ở services-tab), biến thể `Button` màu lỗi (nút "Gỡ"/"Tranh chấp"), và `Field` có prefix/suffix dạng chữ.
 
 ## Nguyên tắc refactor chung
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { setSessionCookie } from "@/lib/session";
 import type { Session } from "@/lib/auth";
+import { consumeRateLimits, getClientIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 /**
  * Step 3 of the reset flow: /dat-lai-mat-khau submits the new password here.
@@ -24,6 +25,19 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Mật khẩu phải có ít nhất 8 ký tự." },
       { status: 400 }
+    );
+  }
+
+  // Body không có email (chỉ dựa vào session phục hồi trong cookie sb-*),
+  // nên chỉ giới hạn theo IP: 10 lượt/15 phút, tính mọi lượt hợp lệ về định
+  // dạng. Limiter in-memory theo instance (xem lib/rate-limit.ts).
+  const limited = consumeRateLimits([
+    { key: `reset-password:ip:${getClientIp(request)}`, limit: 10, windowMs: 15 * 60_000 },
+  ]);
+  if (!limited.ok) {
+    return rateLimitedResponse(
+      "Bạn đã thử đặt lại mật khẩu quá nhiều lần. Vui lòng thử lại sau ít phút.",
+      limited.retryAfterSec
     );
   }
 

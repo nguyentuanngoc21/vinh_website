@@ -9,7 +9,7 @@ import {
   TextAlignLeftIcon,
   XIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Alert, Button, Field, Modal } from "@/components/ui";
+import { Alert, Button, Field, Modal, Textarea } from "@/components/ui";
 import { countWords, splitChapters, type DetectedChapter, type SplitMode } from "@/lib/authoring/split-chapters";
 
 type ImportManuscriptModalProps = {
@@ -318,13 +318,15 @@ export function ImportManuscriptModal({
               </label>
             ) : (
               <div>
-                <textarea
+                {/* resize-none! — class `resize-y` của kit sinh sau trong CSS nên phải dùng `!` mới đè được */}
+                <Textarea
+                  label={null}
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
                   placeholder={
                     'Dán toàn bộ bản thảo vào đây… Dùng "Chương 1", "Chương 2" ở đầu mỗi chương để hệ thống tự tách.'
                   }
-                  className="h-[220px] w-full resize-none rounded-[10px] border border-border-light p-3.5 text-sm leading-[1.7] text-ink outline-none focus:border-brand-ink"
+                  className="h-[220px] resize-none! leading-[1.7]"
                 />
                 <div className="mt-3 flex justify-end">
                   <Button

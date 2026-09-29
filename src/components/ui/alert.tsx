@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { cn } from "@/lib/cn";
 
 type Tone = "error" | "info" | "success";
 
@@ -28,12 +29,12 @@ export function Alert({
   className?: string;
   children: ReactNode;
 }) {
-  const base = `rounded-[10px] border px-4 py-3 text-[13px] leading-[1.5] ${TONE_CLASS[tone]} ${className}`;
+  const base = cn("rounded-[10px] border px-4 py-3 text-[13px] leading-[1.5]", TONE_CLASS[tone], className);
   if (!icon) {
     return <div className={base}>{children}</div>;
   }
   return (
-    <div className={`flex items-center gap-2.5 font-medium ${base}`}>
+    <div className={cn("flex items-center gap-2.5 font-medium", base)}>
       {icon}
       <div>{children}</div>
     </div>
