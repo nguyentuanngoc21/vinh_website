@@ -196,8 +196,18 @@ union all
 -- Metadata tier/rule/multi/optional/warn_text thêm cho service_tag_options
 -- (đối chiếu lại TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html sau
 -- khi người dùng báo giao diện tag sai — xem
--- migrations/20260901_add_service_tag_option_metadata.sql).
+-- migrations/archive/20260901_add_service_tag_option_metadata.sql).
 select '20260901_add_service_tag_option_metadata',
   exists(select 1 from information_schema.columns where table_schema='public' and table_name='service_tag_options' and column_name='tier')
   and exists(select 1 from information_schema.columns where table_schema='public' and table_name='service_tag_options' and column_name='warn_text')
+union all
+-- Index cho truy vấn nóng (rà soát tải DB 29/09/2026).
+select '20260929_add_hot_path_indexes',
+  exists(select 1 from pg_indexes where schemaname='public' and indexname='reading_history_user_chapter_read_idx')
+  and exists(select 1 from pg_indexes where schemaname='public' and indexname='books_pending_purge_idx')
+union all
+-- Gộp số liệu /rankings + thẻ truyện trong SQL.
+select '20260929_add_ranking_aggregates',
+  exists(select 1 from pg_proc where proname='book_read_counts_between' and pronamespace='public'::regnamespace)
+  and exists(select 1 from information_schema.views where table_schema='public' and table_name='book_chapter_stats')
 order by 1;
