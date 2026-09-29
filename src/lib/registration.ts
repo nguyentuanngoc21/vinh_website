@@ -52,6 +52,11 @@ export async function registerAccount(
   // Tùy chọn — bỏ trống thì không set vào profiles (xem insert bên dưới).
   const realname = String(form.get("realname") ?? "").trim();
   const phone = String(form.get("phone") ?? "").trim();
+  // "Cấp ngày" CCCD — tùy chọn, cùng quy tắc với POST /api/profile/identity.
+  // Lưu ngay lúc đăng ký để Hợp đồng khai thác tác phẩm độc quyền (cần "Số
+  // CCCD, cấp ngày") không bắt người dùng quay lại điền bù sau.
+  const cccdIssuedAtRaw = String(form.get("cccdIssuedAt") ?? "").trim();
+  const cccdIssuedAt = /^\d{4}-\d{2}-\d{2}$/.test(cccdIssuedAtRaw) ? cccdIssuedAtRaw : null;
 
   if (cccdSubmitted && !/^\d{12}$/.test(cccdRaw)) {
     return Response.json({ error: "Số căn cước công dân phải gồm đúng 12 chữ số." }, { status: 400 });
@@ -189,6 +194,7 @@ export async function registerAccount(
     const { error: verificationError } = await admin.from("identity_verifications").insert({
       user_id: newUserId,
       cccd_number: cccdRaw,
+      cccd_issued_at: cccdIssuedAt,
       cccd_front_path: frontPath,
       cccd_back_path: backPath,
       status: "approved",

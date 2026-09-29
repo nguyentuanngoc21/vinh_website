@@ -60,6 +60,7 @@ export function RegisterForm() {
   const [realname, setRealname] = useState("");
   const [phone, setPhone] = useState("");
   const [cccd, setCccd] = useState("");
+  const [cccdIssuedAt, setCccdIssuedAt] = useState("");
   const [files, setFiles] = useState<Record<SlotKey, File | null>>({ front: null, back: null });
   const [agree, setAgree] = useState(false);
   const { pending, error, run } = useAsyncSubmit(register);
@@ -191,7 +192,12 @@ export function RegisterForm() {
       // thì không gửi gì, register() ở lib/auth.ts sẽ không set các field
       // này vào FormData.
       ...(cccdComplete && files.front && files.back
-        ? { cccd: cccdDigits, cccdFront: files.front, cccdBack: files.back }
+        ? {
+            cccd: cccdDigits,
+            ...(cccdIssuedAt ? { cccdIssuedAt } : {}),
+            cccdFront: files.front,
+            cccdBack: files.back,
+          }
         : {}),
       ...(nextParam ? { next: nextParam } : {}),
     });
@@ -466,6 +472,14 @@ export function RegisterForm() {
           className="tracking-[1px]"
           status={cccdStatus}
           hint="Nhập đúng 12 chữ số trên thẻ CCCD gắn chip"
+        />
+
+        <Field
+          label="Ngày cấp CCCD (nếu có)"
+          type="date"
+          value={cccdIssuedAt}
+          onChange={(e) => setCccdIssuedAt(e.target.value)}
+          hint="Dùng để tự điền hợp đồng khi cần — có thể bỏ trống, bổ sung sau."
         />
 
         <div>

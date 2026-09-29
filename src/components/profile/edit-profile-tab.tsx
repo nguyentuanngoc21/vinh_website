@@ -7,7 +7,7 @@ import { CoinsIcon, CheckCircleIcon, WarningCircleIcon } from "@phosphor-icons/r
 import { transactionTypeLabel } from "@/lib/profile";
 import { Field, Button, Alert, Textarea, Skeleton } from "@/components/ui";
 import { BankInfoForm } from "@/components/profile/bank-info-form";
-import { IdentityForm } from "@/components/profile/identity-form";
+import { IdentityForm, type IdentityStatus } from "@/components/profile/identity-form";
 import { useRole } from "@/lib/role";
 import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
 import { AGREEMENT_META, AGREEMENT_ORDER, type AgreementId } from "@/lib/legal/agreement-meta";
@@ -92,6 +92,17 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
   // khi cả hai đã biết, tránh nháy sai trạng thái lúc đầu.
   const [bankSaved, setBankSaved] = useState<boolean | null>(null);
   const [cccdVerified, setCccdVerified] = useState<boolean | null>(null);
+  const [cccdIssuedAt, setCccdIssuedAt] = useState<string | null>(null);
+  const onIdentityStatus = ({ verified, issuedAt }: IdentityStatus) => {
+    setCccdVerified(verified);
+    setCccdIssuedAt(issuedAt);
+  };
+  // ?missing= là ảnh chụp lúc bị chặn xác nhận hợp đồng — ẩn cảnh báo ngay
+  // khi mục đó đã được bổ sung (kể cả CCCD đã lưu sẵn từ lúc đăng ký), thay
+  // vì báo "cần điền" mãi dù dữ liệu đã có.
+  const cccdNumberMissing = isMissing("cccdNumber") && !cccdVerified;
+  const cccdIssuedAtMissing = isMissing("cccdIssuedAt") && !cccdIssuedAt;
+  const identityMissing = cccdNumberMissing || cccdIssuedAtMissing;
   const eligibility =
     bankSaved === null || cccdVerified === null ? null : bankSaved && cccdVerified;
 
@@ -371,7 +382,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
         <div
           ref={identityCardRef}
           className={`rounded-[18px] border p-[26px] ${
-            isMissing("cccdNumber") || isMissing("cccdIssuedAt") ? "border-error" : "border-cream"
+            identityMissing ? "border-error" : "border-cream"
           }`}
         >
           <div className="text-[19px] font-bold text-brand-ink">Căn cước công dân</div>
@@ -379,13 +390,17 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
             Xác minh CCCD để mở khoá tính năng rút token — hệ thống tự đối chiếu số bạn nhập với ảnh
             tải lên.
           </div>
-          {(isMissing("cccdNumber") || isMissing("cccdIssuedAt")) && (
+          {identityMissing && (
             <div className="mt-3">
-              <Alert tone="error">{missingHint}</Alert>
+              <Alert tone="error">
+                {cccdVerified && cccdIssuedAtMissing
+                  ? `Thiếu ngày cấp CCCD — bổ sung ở ô bên dưới. ${missingHint}`
+                  : missingHint}
+              </Alert>
             </div>
           )}
           <div className="mt-[22px]">
-            <IdentityForm onVerified={setCccdVerified} />
+            <IdentityForm onStatusChange={onIdentityStatus} />
           </div>
         </div>
       </div>

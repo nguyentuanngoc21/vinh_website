@@ -141,6 +141,11 @@ export async function POST(request: Request) {
   });
   if (verificationError) {
     console.error("[profile/identity] insert identity_verifications failed:", verificationError);
+    // "23505" = unique_violation trên identity_verifications_cccd_number_active_idx
+    // — số CCCD đang hiệu lực ở tài khoản khác (cùng thông báo với đăng ký).
+    if (verificationError.code === "23505") {
+      return NextResponse.json({ error: "Số CCCD này đã được dùng để đăng ký một tài khoản khác." }, { status: 409 });
+    }
     return NextResponse.json({ error: `Lưu thông tin xác minh thất bại: ${verificationError.message}` }, { status: 500 });
   }
 
@@ -161,6 +166,88 @@ export async function POST(request: Request) {
     ok: true,
     cccdVerified: true,
     cccdNumberMasked: `********${cccd.slice(-4)}`,
+    cccdIssuedAt,
+  });
+}
+
+/**
+ * Ngoại lệ duy nhất cho quy tắc "sửa CCCD phải tải ảnh mới + OCR đối chiếu"
+ * (POST ở trên): tài khoản ĐÃ xác minh nhưng CHƯA có "cấp ngày" (vd đăng ký
+ * trước khi form đăng ký hỏi field này) được BỔ SUNG ngày cấp mà không cần
+ * tải lại ảnh. Chỉ thêm khi đang trống — đổi ngày đã có, hay đổi số CCCD,
+ * vẫn phải qua POST (xác minh lại từ đầu).
+ *
+ * identity_verifications cố tình không cho update (types.ts khai
+ * Update: never, xem comment ở POST) — dùng cùng cách xoá+insert như POST,
+ * chép nguyên số/ảnh/trạng thái của dòng đang hiệu lực, chỉ thêm
+ * cccd_issued_at. Xoá trước rồi mới insert (insert trước sẽ vỡ
+ * identity_verifications_cccd_number_active_idx vì trùng số); insert lỗi
+ * thì chèn lại đúng dòng cũ để không mất xác minh.
+ */
+export async function PATCH(request: Request) {
+  let auth;
+  try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
+  const { client: supabase, userId } = auth;
+  if (!userId) {
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const cccdIssuedAt = String(body?.cccdIssuedAt ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cccdIssuedAt) || Number.isNaN(Date.parse(cccdIssuedAt))) {
+    return NextResponse.json({ error: "Ngày cấp không hợp lệ." }, { status: 400 });
+  }
+  if (cccdIssuedAt > new Date().toISOString().slice(0, 10)) {
+    return NextResponse.json({ error: "Ngày cấp không được sau hôm nay." }, { status: 400 });
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("cccd_verified, cccd_last4")
+    .eq("id", userId)
+    .single();
+  const { data: current } = await supabase
+    .from("identity_verifications")
+    .select("id, cccd_number, cccd_issued_at, cccd_front_path, cccd_back_path, status")
+    .eq("user_id", userId)
+    .neq("status", "rejected")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!profile?.cccd_verified || !current) {
+    return NextResponse.json({ error: "Tài khoản chưa xác minh CCCD." }, { status: 400 });
+  }
+  if (current.cccd_issued_at) {
+    return NextResponse.json(
+      { error: "Ngày cấp đã có — muốn sửa, vui lòng xác minh lại CCCD kèm ảnh mới nhất." },
+      { status: 409 }
+    );
+  }
+
+  const { id: currentId, ...currentFields } = current;
+  const { error: deleteError } = await supabase.from("identity_verifications").delete().eq("id", currentId);
+  if (deleteError) {
+    console.error("[profile/identity] PATCH delete failed:", deleteError);
+    return NextResponse.json({ error: `Lưu ngày cấp thất bại: ${deleteError.message}` }, { status: 500 });
+  }
+
+  const { error: insertError } = await supabase
+    .from("identity_verifications")
+    .insert({ user_id: userId, ...currentFields, cccd_issued_at: cccdIssuedAt });
+  if (insertError) {
+    console.error("[profile/identity] PATCH insert failed:", insertError);
+    const { error: restoreError } = await supabase
+      .from("identity_verifications")
+      .insert({ user_id: userId, ...currentFields });
+    if (restoreError) console.error("[profile/identity] PATCH restore FAILED:", restoreError);
+    return NextResponse.json({ error: `Lưu ngày cấp thất bại: ${insertError.message}` }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    cccdVerified: true,
+    cccdNumberMasked: profile.cccd_last4 ? `********${profile.cccd_last4}` : null,
     cccdIssuedAt,
   });
 }
