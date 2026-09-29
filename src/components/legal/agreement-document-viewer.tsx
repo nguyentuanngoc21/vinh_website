@@ -7,6 +7,7 @@ import { SealCheckIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react/d
 import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
 import { fillPartyBlanksIntoHtml } from "@/lib/legal/fill-party-blanks";
 import { missingInfoUrl } from "@/lib/legal/accept-agreement";
+import { Skeleton } from "@/components/ui";
 import type { AgreementId } from "@/lib/legal/registry";
 
 export type AgreementRow = {
@@ -66,12 +67,16 @@ export function formatVi(iso: string): string {
 export function AgreementDocumentViewer({
   row,
   html,
+  error = null,
   onClose,
   onAccept,
   accepting,
 }: {
   row: AgreementRow;
-  html: string;
+  /** null = đang tải (HTML tải lười khi mở popup, xem use-agreement-html.ts). */
+  html: string | null;
+  /** Thông báo lỗi nếu tải HTML thất bại. */
+  error?: string | null;
   onClose: () => void;
   onAccept: () => void;
   accepting: boolean;
@@ -84,7 +89,7 @@ export function AgreementDocumentViewer({
   // "…") với "tải lỗi" (contractInfoError có giá trị — hiện thông báo rõ
   // thay vì để "…" treo mãi, vd khi DB production còn thiếu cột
   // date_of_birth/address/cccd_issued_at do chưa chạy
-  // migrations/20260829_add_author_contract_fields.sql).
+  // migrations/archive/20260829_add_author_contract_fields.sql).
   const [contractInfoError, setContractInfoError] = useState(false);
 
   useEffect(() => {
@@ -109,7 +114,7 @@ export function AgreementDocumentViewer({
   // fill-party-blanks.ts để biết vì sao an toàn với nhãn lặp lại
   // (Địa chỉ/Điện thoại/Email ở cả Bên A lẫn Bên B).
   const displayHtml = useMemo(() => {
-    if (!partyInfoSpec || !contractInfo || contractInfoError) return html;
+    if (html === null || !partyInfoSpec || !contractInfo || contractInfoError) return html;
     return fillPartyBlanksIntoHtml(html, partyInfoSpec, {
       author: contractInfo,
       platform: contractInfo.platformParty,
@@ -260,10 +265,26 @@ export function AgreementDocumentViewer({
             </div>
           )}
 
+          {error ? (
+            <div role="alert" className="text-[14px] text-stone-dark">
+              {error}
+            </div>
+          ) : displayHtml === null ? (
+            <div aria-busy="true" aria-label="Đang tải văn bản" className="flex flex-col gap-3">
+              <Skeleton className="h-4 w-2/3 rounded-[var(--radius-sm)]" />
+              <Skeleton className="h-3.5 w-full rounded-[var(--radius-sm)]" />
+              <Skeleton className="h-3.5 w-full rounded-[var(--radius-sm)]" />
+              <Skeleton className="h-3.5 w-5/6 rounded-[var(--radius-sm)]" />
+              <Skeleton className="mt-3 h-3.5 w-full rounded-[var(--radius-sm)]" />
+              <Skeleton className="h-3.5 w-11/12 rounded-[var(--radius-sm)]" />
+              <Skeleton className="h-3.5 w-3/4 rounded-[var(--radius-sm)]" />
+            </div>
+          ) : (
           <div
             className="text-[14px] leading-[1.7] text-stone-dark [&_em]:text-stone [&_h1]:mt-6 [&_h1]:text-[16px] [&_h1]:font-bold [&_h1]:text-brand-ink [&_h1:first-child]:mt-0 [&_li]:mb-1.5 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_strong]:font-semibold [&_strong]:text-brand-ink [&_u]:rounded [&_u]:bg-cream-card [&_u]:px-1 [&_u]:font-semibold [&_u]:text-brand-ink [&_u]:no-underline [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5"
             dangerouslySetInnerHTML={{ __html: displayHtml }}
           />
+          )}
         </div>
         <div className="flex flex-col gap-2.5 border-t border-[#f0f0ef] bg-[#fdfdfc] px-[26px] py-4">
           {missingAuthorFields.length > 0 && (
@@ -295,7 +316,7 @@ export function AgreementDocumentViewer({
                 <button
                   type="button"
                   onClick={handleAcceptClick}
-                  disabled={accepting || authorInfoLoading}
+                  disabled={accepting || authorInfoLoading || html === null || !!error}
                   className="cursor-pointer rounded-full bg-brand-gold px-[22px] py-2.5 text-[13.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
                 >
                   {authorInfoLoading

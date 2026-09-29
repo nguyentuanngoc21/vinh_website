@@ -2,7 +2,7 @@
  * Thống kê bài dự thi cho tác giả (Phase 2, Slice 2.7) — phần thuần: đọc
  * jsonb của get_contest_entry_stats() và dựng 8 ô chỉ số, nguồn độc giả, giữ
  * chân theo chương. Định nghĩa từng chỉ số ở
- * migrations/20260926_add_contest_entry_stats.sql. Không dùng lượt xem trang.
+ * migrations/archive/20260926_add_contest_entry_stats.sql. Không dùng lượt xem trang.
  */
 import type { ReadingSource } from "@/lib/supabase/types";
 import { formatVnDateTime } from "@/lib/contests/datetime";

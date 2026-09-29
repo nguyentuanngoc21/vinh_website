@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 /**
  * POST /api/design/:designItemId/share-token — "Tạo link liên kết" /
@@ -12,10 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(_request: Request, { params }: { params: Promise<{ designItemId: string }> }) {
   const { designItemId } = await params;
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
 
   const { data, error } = await supabase.rpc("regenerate_design_share_token", {
     p_design_item_id: designItemId,

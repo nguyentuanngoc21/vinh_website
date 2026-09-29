@@ -186,6 +186,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                   author={current.authorNickname}
                   genre={current.genre}
                   coverUrl={current.coverUrl}
+                  priority
                 />
               </Link>
             </div>
@@ -270,6 +271,10 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                 const isActive = d === 0;
                 const left = stripWidth / 2 - cardWidth / 2 + d * (cardWidth + STRIP_GAP);
                 const inView = left + cardWidth > 0 && left < stripWidth;
+                // Tải sớm cả ô ngay ngoài mép 2 bên (ô sẽ trượt vào ở lần chuyển
+                // kế tiếp) — lazy-load không kịp tải trong lúc trượt nên bìa bị trống.
+                const slot = cardWidth + STRIP_GAP;
+                const nearView = left + cardWidth > -slot && left < stripWidth + slot;
                 const style: CSSProperties = {
                   width: cardWidth,
                   transform: `translate(${left}px, ${STRIP_RING_SPACE}px)`,
@@ -288,6 +293,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                         author={book.authorNickname}
                         genre={book.genre}
                         coverUrl={book.coverUrl}
+                        priority={nearView}
                       />
                       {book.genre && (
                         <div className="absolute top-3 right-3 max-w-[calc(100%-24px)] truncate rounded-full bg-black/[0.34] px-2.5 py-1 text-[10.5px] font-semibold tracking-[.4px] text-white">

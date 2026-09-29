@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CaretDownIcon, CaretUpIcon } from "@phosphor-icons/react/dist/ssr";
+import { formatVnd } from "@/lib/format-currency";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Đang soạn",
@@ -15,9 +16,6 @@ const STATUS_LABELS: Record<string, string> = {
   disputed: "Đang tranh chấp",
 };
 
-function formatVnd(n: number): string {
-  return n.toLocaleString("vi-VN") + "₫";
-}
 
 export type OrderSummary = {
   id: string;

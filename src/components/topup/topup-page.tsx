@@ -194,7 +194,7 @@ export function TopupPage() {
         onPickQuick={(amount) => setCustomDraft(String(amount))}
         previewPack={previewPack}
         isValid={isDraftValid}
-        hint={isDraftValid ? "Đơn giá 200đ / token · tối thiểu 50 token." : "Số lượng tối thiểu là 50 token."}
+        hint={isDraftValid ? "Đơn giá 200 VNĐ / token · tối thiểu 50 token." : "Số lượng tối thiểu là 50 token."}
         onClose={() => setShowCustomModal(false)}
         onConfirm={confirmCustomModal}
       />

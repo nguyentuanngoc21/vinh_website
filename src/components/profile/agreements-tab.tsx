@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert, Skeleton } from "@/components/ui";
-import { AGREEMENTS } from "@/lib/legal/registry";
+import { useAgreementHtml } from "@/lib/hooks/use-agreement-html";
 import { AgreementDocumentViewer, formatVi, type AgreementRow } from "@/components/legal/agreement-document-viewer";
 import { acceptAgreement, missingInfoUrl } from "@/lib/legal/accept-agreement";
 
@@ -13,7 +13,7 @@ type LoadState = "loading" | "ready" | "error";
 /**
  * Tab "Cam kết & Thỏa thuận" — danh sách CÁC VĂN BẢN THẬT của Vịnh (cùng
  * nguồn nội dung với LegalLink ở footer/form đăng ký, xem
- * src/lib/legal/registry.ts), trạng thái xác nhận của người dùng hiện tại,
+ * src/lib/legal/agreement-meta.ts), trạng thái xác nhận của người dùng hiện tại,
  * và popup đọc toàn văn + xác nhận. Một thỏa thuận có "Ngày cập nhật" mới
  * hơn lần xác nhận trước sẽ tự rơi về "Chưa xác nhận" (accepted=false,
  * updatedSincePending=true) — xem GET /api/profile/agreements.
@@ -26,6 +26,12 @@ export function AgreementsTab() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const docs = useAgreementHtml();
+
+  function openDocument(id: string) {
+    setOpenId(id);
+    docs.open(id);
+  }
 
   async function load() {
     const res = await fetch("/api/profile/agreements");
@@ -89,7 +95,8 @@ export function AgreementsTab() {
   }, [rows, query]);
 
   const openRow = rows.find((r) => r.id === openId) ?? null;
-  const openDoc = openId ? AGREEMENTS.find((a) => a.id === openId) : null;
+  // HTML tải lười khi mở popup (không import registry.ts — xem use-agreement-html.ts).
+  const openDocKnown = openId ? docs.isKnown(openId) : false;
 
   if (state === "loading") {
     return (
@@ -129,7 +136,7 @@ export function AgreementsTab() {
             Đã xác nhận {acceptedCount}/{rows.length} thỏa thuận · {rows.length - acceptedCount} đang chờ bạn
           </div>
         </div>
-        <div className="flex w-[270px] items-center gap-2 rounded-full border border-cream-border bg-[#f4f4f5] px-4 py-2.5">
+        <div className="flex w-[270px] items-center gap-2 rounded-full border border-cream-border bg-neutral-bg px-4 py-2.5">
           <MagnifyingGlassIcon size={15} color="#9a9a9a" />
           <input
             value={query}
@@ -157,13 +164,13 @@ export function AgreementsTab() {
             <div>
               <button
                 type="button"
-                onClick={() => setOpenId(r.id)}
+                onClick={() => openDocument(r.id)}
                 className="cursor-pointer text-left text-[13.5px] font-semibold text-brand-gold-dark underline decoration-1 underline-offset-[3px]"
               >
                 {r.name}
               </button>
               {r.requiredForFeature && (
-                <div className="mt-1.5 inline-block rounded-full border border-[#EBDCB4] bg-cream-card px-2.5 py-0.5 text-[10.5px] font-semibold text-brand-gold-dark">
+                <div className="mt-1.5 inline-block rounded-full border border-cream-gold-border bg-cream-card px-2.5 py-0.5 text-[10.5px] font-semibold text-brand-gold-dark">
                   Bắt buộc để: {r.requiredForFeature}
                 </div>
               )}
@@ -175,8 +182,8 @@ export function AgreementsTab() {
             </div>
             <div className="flex flex-col items-end gap-1.5">
               {r.accepted ? (
-                <div className="flex items-center gap-2 text-[13px] font-semibold text-[#2F7A4F]">
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-[#2F7A4F]" /> Đã xác nhận
+                <div className="flex items-center gap-2 text-[13px] font-semibold text-success-form">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-success-form" /> Đã xác nhận
                 </div>
               ) : (
                 <>
@@ -200,10 +207,11 @@ export function AgreementsTab() {
         ))}
       </div>
 
-      {openRow && openDoc && (
+      {openRow && openDocKnown && (
         <AgreementDocumentViewer
           row={openRow}
-          html={openDoc.html}
+          html={docs.htmlFor(openRow.id)}
+          error={docs.errorFor(openRow.id)}
           onClose={() => setOpenId(null)}
           onAccept={() => accept(openRow.id).then(() => setOpenId(null))}
           accepting={pendingId === openRow.id}

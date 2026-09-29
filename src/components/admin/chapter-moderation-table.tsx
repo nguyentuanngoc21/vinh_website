@@ -15,7 +15,7 @@ export type ChapterModerationRow = {
   removedReasonDetail: string | null;
   /** not null = content đã bị rỗng hoá do gỡ quá 30 ngày (trực tiếp, HOẶC
    * gián tiếp vì cả sách đã bị xoá quá hạn) — xem
-   * migrations/20260908_add_content_purge_retention.sql. "Khôi phục" vô
+   * migrations/archive/20260908_add_content_purge_retention.sql. "Khôi phục" vô
    * nghĩa với hàng này. */
   contentPurgedAt: string | null;
 };
@@ -117,7 +117,7 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
       </label>
 
       {error && (
-        <div className="mb-3.5 rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-[#B02A37]">
+        <div className="mb-3.5 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-error">
           {error}
         </div>
       )}
@@ -147,9 +147,9 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
             <span
               className={`rounded-full px-[11px] py-1 text-[11px] font-semibold ${
                 r.removedAt
-                  ? "bg-[#F8D7DA] text-[#B02A37]"
+                  ? "bg-[#F8D7DA] text-error"
                   : r.published
-                    ? "bg-[#DBF3E8] text-[#2C7453]"
+                    ? "bg-success-form-border text-[#2C7453]"
                     : "bg-cream-card-alt text-stone-dark"
               }`}
             >
@@ -182,7 +182,7 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
                 type="button"
                 disabled={pendingId === r.id}
                 onClick={() => setRemovingChapter(r)}
-                className="flex items-center gap-1.5 rounded-lg border border-[#f3c6c6] px-3 py-1.5 text-[12.5px] font-semibold text-[#B02A37] disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-error-border px-3 py-1.5 text-[12.5px] font-semibold text-error disabled:opacity-50"
               >
                 <TrashIcon size={14} /> Gỡ chương
               </button>

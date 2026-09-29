@@ -1,7 +1,7 @@
 /**
  * Nhãn + mô tả tín hiệu gian lận cho màn admin (Phase 2, Slice 2.4). Mã và
  * bằng chứng do detect_contest_fraud_signals() ghi — xem
- * migrations/20260926_add_contest_fraud_detection.sql.
+ * migrations/archive/20260926_add_contest_fraud_detection.sql.
  */
 import type { ContestFraudSeverity, ContestFraudStatus } from "@/lib/supabase/types";
 import { formatVnDateTime } from "@/lib/contests/datetime";

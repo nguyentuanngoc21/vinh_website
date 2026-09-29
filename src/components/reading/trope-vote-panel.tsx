@@ -13,7 +13,7 @@ const ROLE_LABEL: Record<CharacterRole, string> = { hero: "Chính diện", villa
  * reader_vote_trope. Chỉ hiện khi chương có ít nhất 1 nhân vật đã gắn
  * (tác giả gắn qua chapter-characters-panel.tsx). 1 vote/chương, đổi ý
  * bấm nhân vật khác thì ghi đè (route tự UPDATE thay vì tạo vote mới).
- * Xem migrations/20260919_add_characters.sql.
+ * Xem migrations/archive/20260919_add_characters.sql.
  */
 export function TropeVotePanel({
   chapterId,
@@ -81,7 +81,7 @@ export function TropeVotePanel({
           </button>
         ))}
       </div>
-      {error && <div className="mt-2 text-[12px] font-medium text-[#B02A37]">{error}</div>}
+      {error && <div className="mt-2 text-[12px] font-medium text-error">{error}</div>}
     </div>
   );
 }

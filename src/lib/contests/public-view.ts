@@ -17,10 +17,9 @@ import {
   type ContestRow,
 } from "@/lib/contests/contest-service";
 import { ContestError, throwIfError } from "@/lib/contests/errors";
-import { toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-books";
+import { HOMEPAGE_BOOK_COLUMNS, toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-books";
 
 type Client = SupabaseClient<Database>;
-type BookRow = Database["public"]["Tables"]["books"]["Row"];
 
 export type PublicContest = {
   id: string;
@@ -200,15 +199,15 @@ export async function listPublicAwards(client: Client, contest: ContestRow, now:
   throwIfError(subsError, "load award submissions");
   const bookIds = [...new Set((subs ?? []).map((s) => s.book_id))];
   const [{ data: books, error: booksError }, { data: authors, error: authorsError }] = await Promise.all([
-    client.from("books").select("*").in("id", bookIds),
+    client.from("books").select(`${HOMEPAGE_BOOK_COLUMNS}, published, deleted_at`).in("id", bookIds),
     client.from("author_public_profiles").select("id, nickname").in("id", [...new Set((subs ?? []).map((s) => s.author_id))]),
   ]);
   throwIfError(booksError, "load award books");
   throwIfError(authorsError, "load award authors");
 
-  const visible = ((books ?? []) as BookRow[]).filter((b) => b.published && b.deleted_at === null);
+  const visible = (books ?? []).filter((b) => b.published && b.deleted_at === null);
   const cards = new Map((await toHomepageBooks(client, visible)).map((c) => [c.id, c]));
-  const bookById = new Map(((books ?? []) as BookRow[]).map((b) => [b.id, b]));
+  const bookById = new Map((books ?? []).map((b) => [b.id, b]));
   const nameById = new Map((authors ?? []).map((a) => [a.id, a.nickname]));
   const subById = new Map((subs ?? []).map((s) => [s.id, s]));
 

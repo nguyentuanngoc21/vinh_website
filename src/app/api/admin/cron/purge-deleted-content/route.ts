@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { rejectUnauthorizedCron } from "@/lib/cron-auth";
 
 /**
  * Scheduled qua vercel.json (hàng ngày) — dọn NỘI DUNG NẶNG (không xoá
@@ -33,15 +34,8 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 const RETENTION_DAYS = 30;
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } else {
-    console.error("[admin] CRON_SECRET is not set — purge-deleted-content is unauthenticated.");
-  }
+  const denied = rejectUnauthorizedCron(request, "purge-deleted-content");
+  if (denied) return denied;
 
   const supabase = createServiceRoleClient();
   const nowIso = new Date().toISOString();
@@ -99,7 +93,7 @@ export async function GET(request: Request) {
 
   purgedChapterIds.push(...(updatedStandaloneChapters ?? []).map((c) => c.id));
 
-  // 3. Bản chụp bài dự thi (Contest Engine, migrations/20260926_add_contest_snapshots.sql)
+  // 3. Bản chụp bài dự thi (Contest Engine, migrations/archive/20260926_add_contest_snapshots.sql)
   // giữ nội dung đã chấm — dọn theo cùng sách/chương vừa dọn, để bản chụp không
   // thành đường giữ lại nội dung vi phạm / đã gỡ. Chạy SAU bước 1–2.
   let purgedSnapshotChapters = 0;

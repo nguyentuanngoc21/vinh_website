@@ -1,3 +1,55 @@
+-- =======================================================================
+-- docs/supabase/schema.sql — FILE SINH TỰ ĐỘNG. ĐỪNG sửa tay — sửa file
+-- trong migrations/baseline/ rồi chạy `npm run build-schema`.
+--
+-- Ghép nguyên văn migrations/baseline/*.sql theo thứ tự tên file (mỗi file
+-- 1 domain, có header riêng liệt kê đối tượng + phụ thuộc). Chạy từ trên
+-- xuống trên 1 project Supabase MỚI, TRỐNG sẽ dựng lại toàn bộ schema +
+-- seed data. KHÔNG chạy trên production — xem migrations/baseline/README.md.
+-- =======================================================================
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/01_extensions_and_accounts.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 01 — Extension + tài khoản  (01_extensions_and_accounts.sql)
+-- =======================================================================
+-- Phạm vi: Extension (vector, pgcrypto), enum vai trò/tag sáng tác,
+-- profiles + view công khai, xác minh CCCD (identity_verifications + bucket
+-- identity-documents), bucket avatars, chặn đổi role/cccd_verified trái
+-- phép, kiểm tra đăng ký realtime, dọn đăng ký chưa xác nhận, nhật ký đổi
+-- quyền (role_change_logs) + admin_set_user_role().
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     profiles, identity_verifications, role_change_logs
+--   View:
+--     author_public_profiles
+--   Hàm:
+--     current_user_is_admin, is_email_registered,
+--     find_stale_unconfirmed_user_ids, enforce_role_change_authority,
+--     enforce_cccd_verified_authority, admin_set_user_role
+--   Kiểu (enum):
+--     user_role, creator_tag, verification_status
+--   Storage bucket:
+--     identity-documents, avatars
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260826_add_profile_bank_info.sql, 20260827_add_profile_bio.sql,
+--   20260827_restrict_profiles_column_grants.sql,
+--   20260828_add_profile_cover_image.sql,
+--   20260828_extend_author_public_profiles.sql,
+--   20260829_add_author_contract_fields.sql,
+--   20260901_add_blogger_creator_tag.sql,
+--   20260914_raise_avatar_cover_size_limit.sql,
+--   20260916_add_realtime_signup_checks.sql,
+--   20260916_add_unconfirmed_registration_purge.sql,
+--   20260926_fix_profiles_policy_recursion.sql,
+--   20260928_add_role_change_logs.sql
+--
+-- Phụ thuộc (phải chạy trước): không có
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
+
 -- Vịnh — starter Supabase schema.
 --
 -- Scope: covers accounts/roles, identity verification (CCCD upload),
@@ -11,15 +63,15 @@
 -- week/month/quarter (+ ▲/▼ vs the equal-length window before it) come
 -- from book_read_counts_daily, a day-bucketed public aggregate over
 -- reading_history (see that view's comment, and
--- migrations/20260831_add_book_read_counts_daily.sql); the all-time board
+-- migrations/archive/20260831_add_book_read_counts_daily.sql); the all-time board
 -- still ranks by books.view_count directly. /audio and /thiet-ke are real
 -- now too (src/lib/audio/get-audio-catalog.ts,
 -- src/lib/design/get-design-gallery.ts) — design_items grew
 -- category/description/share_count + a design_item_likes table
--- (migrations/20260901_add_design_item_gallery_metadata.sql),
+-- (migrations/archive/20260901_add_design_item_gallery_metadata.sql),
 -- audio_narrations grew genre/play_count + an audio_progress table for
 -- real "Nghe tiếp"/"Audio đang nghe" state
--- (migrations/20260901_add_audio_narration_hub_metadata.sql), and both
+-- (migrations/archive/20260901_add_audio_narration_hub_metadata.sql), and both
 -- gained independent-upload routes (/thiet-ke/new, /audio/new) since
 -- neither table ever got a row outside the book-cover/story_upload flow
 -- before that. Still NOT modeled: blog — src/lib/blog.ts and /rankings'
@@ -30,6 +82,16 @@
 -- real.
 --
 -- Run with: supabase db push  (or paste into the SQL editor)
+
+-- Bật extension pgvector (Database → Extensions, hoặc chạy lệnh dưới nếu
+-- role của bạn có quyền).
+create extension if not exists vector;
+
+-- Trên Supabase, pgcrypto thường được cài vào schema "extensions" (không
+-- phải "public") — nên mọi lời gọi gen_random_bytes() bên dưới đều chỉ
+-- rõ extensions.gen_random_bytes(...), tránh lỗi "function does not exist"
+-- nếu search_path không tình cờ bao gồm schema đó.
+create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------------
 -- 1. Roles & profiles
@@ -54,7 +116,7 @@ create type public.user_role as enum ('user', 'admin', 'super_admin');
 -- tag thể loại truyện: tự gắn, gắn nhiều cái cùng lúc, không ảnh hưởng gì
 -- tới RLS hay quyền truy cập. Một user có thể vừa là tác giả vừa là diễn
 -- viên lồng tiếng cùng lúc — mảng cho phép nhiều giá trị.
--- 'blogger' thêm bởi migrations/20260901_add_blogger_creator_tag.sql — mục
+-- 'blogger' thêm bởi migrations/archive/20260901_add_blogger_creator_tag.sql — mục
 -- "Blog" ở Kết nối vẫn CHƯA làm (chưa có bảng blog_posts thật, xem ghi
 -- chú đầu file); tag này chỉ để lọc, không kéo theo mục tác phẩm nào.
 create type public.creator_tag as enum ('author', 'illustrator', 'narrator', 'blogger');
@@ -66,19 +128,27 @@ create table public.profiles (
   avatar_url text, -- công khai — path trong bucket "avatars" (thêm ở phần 4) hoặc URL ngoài
   -- Ảnh bìa trang cá nhân/tác giả — cùng bucket "avatars", khác filename
   -- prefix ("cover-" thay vì "avatar-"), cùng folder-per-user nên RLS sẵn
-  -- có không cần sửa. Xem migrations/20260828_add_profile_cover_image.sql.
+  -- có không cần sửa. Xem migrations/archive/20260828_add_profile_cover_image.sql.
   cover_image_url text,
   role public.user_role not null default 'user',
   creator_tags public.creator_tag[] not null default '{}',
   real_name text,
   phone text,
-  -- migrations/20260829_add_author_contract_fields.sql — dùng để tự điền
+  -- migrations/archive/20260829_add_author_contract_fields.sql — dùng để tự điền
   -- "BÊN A" trong Hợp đồng khai thác tác phẩm độc quyền (xem
   -- src/lib/legal/registry.ts) mà không cần tác giả gõ tay lại.
   date_of_birth date,
   address text,
   cccd_verified boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Mô tả bản thân + mốc lần đổi nickname gần nhất (tab "Thông tin cá nhân",
+  -- src/components/profile/edit-profile-tab.tsx) — nickname_updated_at chỉ
+  -- dùng để enforce cooldown 30 ngày ở tầng ứng dụng
+  -- (src/app/api/profile/me/route.ts), không phải cột hiển thị. Khai báo
+  -- ngay trong CREATE TABLE (không ALTER ở phần 6 như trước) vì view
+  -- author_public_profiles ngay bên dưới đọc cột bio.
+  bio text,
+  nickname_updated_at timestamptz
 );
 
 alter table public.profiles enable row level security;
@@ -87,7 +157,7 @@ alter table public.profiles enable row level security;
 -- nếu policy tự subquery trên profiles, Postgres báo 42P17 "infinite
 -- recursion detected in policy for relation profiles" cho mọi role chịu RLS,
 -- kể cả gián tiếp qua policy bảng khác. Không nhận tham số: chỉ trả lời về
--- chính người gọi. Xem migrations/20260926_fix_profiles_policy_recursion.sql.
+-- chính người gọi. Xem migrations/archive/20260926_fix_profiles_policy_recursion.sql.
 create or replace function public.current_user_is_admin()
 returns boolean
 language sql
@@ -122,7 +192,7 @@ create policy "users can update their own profile (not their own role)"
 -- hiện tại đều qua server route dùng service-role client (bypass GRANT/RLS
 -- hoàn toàn) nên không cần re-grant cột nào cho authenticated — nếu sau
 -- này có route thật cần client tự update 1 cột, thêm GRANT UPDATE (cột đó)
--- lúc đó. Xem migrations/20260827_restrict_profiles_column_grants.sql.
+-- lúc đó. Xem migrations/archive/20260827_restrict_profiles_column_grants.sql.
 revoke update on public.profiles from authenticated, anon;
 
 -- A separate public-facing view for author pages / by-lines, so the app
@@ -133,85 +203,6 @@ revoke update on public.profiles from authenticated, anon;
 create view public.author_public_profiles as
   select id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags
   from public.profiles;
-
--- --- Theo dõi tác giả, dạng toggle (nút Theo dõi/Đang theo dõi ở trang
--- đọc chương) — quan hệ profile-to-profile nên đặt ngay đây, không thuộc
--- phần 3 (books/chapters). Composite PK, giống book_progress, không có
--- bảng nào khác cần FK trỏ vào 1 dòng follow. Route API thật dùng
--- service-role + userId resolve qua getAuthedUserId() (src/lib/wallet/session.ts)
--- — RLS dưới đây chỉ là defense-in-depth. Xem
--- migrations/20260824_add_author_follows.sql. ---
-create table public.author_follows (
-  follower_id uuid not null references auth.users (id) on delete cascade,
-  author_id uuid not null references auth.users (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (follower_id, author_id),
-  constraint author_follows_no_self_follow check (follower_id <> author_id)
-);
-
-create index author_follows_author_id_idx on public.author_follows (author_id);
-
-alter table public.author_follows enable row level security;
-
-create policy "followers manage their own follow rows"
-  on public.author_follows for all
-  using (auth.uid() = follower_id)
-  with check (auth.uid() = follower_id and follower_id <> author_id);
-
--- --- Nhắn tin 1-1 (tab "Hội thoại" ở /ca-nhan, nút "Nhắn tin" ở
--- /ket-noi) — 1 bảng duy nhất, không tách conversations/participants
--- riêng vì đây chỉ là chat 1-1 (không có group chat), "cuộc hội thoại"
--- giữa 2 người suy ra trực tiếp từ cặp (sender_id, recipient_id). Route
--- thật dùng service-role (khớp pattern api/profile/cover, .../identity)
--- — RLS dưới đây chỉ là defense-in-depth. Xem
--- migrations/20260828_add_direct_messages.sql. ---
-create table public.direct_messages (
-  id uuid primary key default gen_random_uuid(),
-  sender_id uuid not null references auth.users (id) on delete cascade,
-  recipient_id uuid not null references auth.users (id) on delete cascade,
-  body text not null check (char_length(body) between 1 and 4000),
-  -- null = người nhận chưa đọc. Chỉ có đọc/chưa đọc, không có trạng thái
-  -- "đã gửi/đã nhận" như app chat thật.
-  read_at timestamptz,
-  created_at timestamptz not null default now(),
-  constraint direct_messages_no_self_message check (sender_id <> recipient_id)
-);
-
--- Lọc theo least/greatest(sender_id, recipient_id) để 1 index dùng được
--- cho truy vấn "toàn bộ tin giữa tôi và người X" ở cả 2 chiều gửi/nhận.
-create index direct_messages_thread_idx
-  on public.direct_messages (least(sender_id, recipient_id), greatest(sender_id, recipient_id), created_at);
-
-create index direct_messages_unread_idx
-  on public.direct_messages (recipient_id, sender_id) where read_at is null;
-
--- Phục vụ GET /api/messages (danh sách hội thoại — "sender_id = :me OR
--- recipient_id = :me", không lọc theo 1 đối tác cụ thể nên
--- direct_messages_thread_idx ở trên không dùng được). Xem
--- migrations/20260912_add_direct_messages_participant_indexes.sql —
--- migration đó dùng CREATE INDEX CONCURRENTLY (production đã có
--- traffic), ở đây dùng cú pháp thường vì schema.sql chỉ dùng để dựng
--- project mới từ đầu (chưa có traffic, không cần CONCURRENTLY).
-create index direct_messages_sender_created_idx
-  on public.direct_messages (sender_id, created_at desc);
-
-create index direct_messages_recipient_created_idx
-  on public.direct_messages (recipient_id, created_at desc);
-
-alter table public.direct_messages enable row level security;
-
-create policy "participants read their own messages"
-  on public.direct_messages for select
-  using (auth.uid() = sender_id or auth.uid() = recipient_id);
-
-create policy "users send messages as themselves"
-  on public.direct_messages for insert
-  with check (auth.uid() = sender_id);
-
-create policy "recipients mark messages read"
-  on public.direct_messages for update
-  using (auth.uid() = recipient_id)
-  with check (auth.uid() = recipient_id);
 
 -- ---------------------------------------------------------------------
 -- 2. Identity verification (CCCD)
@@ -241,7 +232,7 @@ create type public.verification_status as enum ('pending', 'approved', 'rejected
 -- thêm luồng admin duyệt tay sau này nếu cần (set 'pending' thay vì
 -- 'approved' lúc insert, rồi admin tự đổi qua policy "admins can view and
 -- review all verifications" bên dưới).
--- migrations/20260916_add_realtime_signup_checks.sql — partial unique index
+-- migrations/archive/20260916_add_realtime_signup_checks.sql — partial unique index
 -- (định nghĩa ngay dưới bảng, sau CREATE TABLE) chặn 1 số CCCD dùng cho
 -- nhiều tài khoản. Bỏ qua status = 'rejected' để 1 lượt bị admin từ chối
 -- không khoá vĩnh viễn số đó — vẫn nộp lại được sau.
@@ -249,7 +240,7 @@ create table public.identity_verifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   cccd_number text not null,
-  -- migrations/20260829_add_author_contract_fields.sql — "cấp ngày" trong
+  -- migrations/archive/20260829_add_author_contract_fields.sql — "cấp ngày" trong
   -- Hợp đồng khai thác tác phẩm độc quyền, gắn cùng lúc xác minh CCCD.
   cccd_issued_at date,
   cccd_front_path text not null,
@@ -280,7 +271,7 @@ create unique index if not exists identity_verifications_cccd_number_active_idx
   on public.identity_verifications (cccd_number)
   where status <> 'rejected';
 
--- migrations/20260916_add_realtime_signup_checks.sql — email đã có tài
+-- migrations/archive/20260916_add_realtime_signup_checks.sql — email đã có tài
 -- khoản (đã xác nhận) hay chưa, dùng cho check real-time ở form đăng ký
 -- (src/app/api/auth/check-availability/route.ts) trước khi gọi
 -- supabase.auth.signUp() thật. auth.users không được PostgREST expose qua
@@ -304,7 +295,7 @@ revoke all on function public.is_email_registered(text) from public;
 -- anon/authenticated.
 grant execute on function public.is_email_registered(text) to service_role;
 
--- migrations/20260916_add_unconfirmed_registration_purge.sql — id các tài
+-- migrations/archive/20260916_add_unconfirmed_registration_purge.sql — id các tài
 -- khoản bỏ ngang đăng ký, chưa bao giờ xác nhận email, để cron
 -- src/app/api/auth/cron/purge-unconfirmed-registrations xoá — không dọn thì
 -- username/CCCD của những tài khoản đó khoá vĩnh viễn (xem precheck trong
@@ -327,34 +318,228 @@ $$;
 
 revoke all on function public.find_stale_unconfirmed_user_ids(timestamptz, integer) from public;
 grant execute on function public.find_stale_unconfirmed_user_ids(timestamptz, integer) to service_role;
-
--- migrations/20260828_add_agreement_acceptances.sql — 1 dòng/(user, văn
--- bản) giữ lần xác nhận GẦN NHẤT cho tab "Cam kết & Thỏa thuận" (/ca-nhan).
--- agreement_id tham chiếu AgreementId trong src/lib/legal/registry.ts,
--- không có bảng "agreements" riêng — danh sách văn bản là hằng số trong
--- code. accepted_version = "UTD" (yyyy-MM-dd) của văn bản lúc xác nhận; khi
--- văn bản được cập nhật (updatedAt đổi), version cũ không còn khớp nữa và
--- ứng dụng tự coi là "Chưa xác nhận" — không cần cột trạng thái riêng.
-create table public.agreement_acceptances (
-  user_id uuid not null references auth.users (id) on delete cascade,
-  agreement_id text not null check (char_length(agreement_id) between 1 and 64),
-  accepted_at timestamptz not null default now(),
-  accepted_version text not null,
-  primary key (user_id, agreement_id)
-);
-
-alter table public.agreement_acceptances enable row level security;
-
-create policy "users manage their own agreement acceptances"
-  on public.agreement_acceptances for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
 -- Data-retention note (Nghị định 13/2023/NĐ-CP): define how long a
 -- rejected/expired verification's CCCD images are kept, then enforce it
 -- with a scheduled job (Supabase Cron + Edge Function) that deletes the
 -- storage objects and nulls out cccd_number for rows past that window —
 -- RLS controls *who* can read this table, not *how long* the data lives.
+
+
+-- ---------------------------------------------------------------------
+-- 4. Storage buckets
+-- ---------------------------------------------------------------------
+insert into storage.buckets (id, name, public) values ('identity-documents', 'identity-documents', false)
+  on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true)
+  on conflict (id) do nothing;
+-- Avatar/ảnh bìa upload thẳng lên đây qua signed upload URL (bỏ qua giới
+-- hạn ~4.5MB body của Vercel Serverless Functions) — xem
+-- migrations/archive/20260914_raise_avatar_cover_size_limit.sql.
+update storage.buckets
+set
+  file_size_limit = 15728640, -- 15MB
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+where id = 'avatars';
+-- Không còn bucket 'book-covers' riêng — ảnh bìa giờ đi qua kho thiết kế
+-- dùng chung (bucket 'design-images', tạo ở phần 9), vì bìa sách cũng chỉ
+-- là 1 "design_item" như minh hoạ khác, được books.cover_design_item_id
+-- trỏ tới.
+
+create policy "users upload their own identity documents"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'identity-documents'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "users and admins read identity documents appropriately"
+  on storage.objects for select
+  using (
+    bucket_id = 'identity-documents'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin'))
+    )
+  );
+
+create policy "avatars are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+create policy "users upload and replace their own avatar"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "users update their own avatar"
+  on storage.objects for update
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- ---------------------------------------------------------------------
+-- 5. Chỉ super_admin được đổi role của bất kỳ ai
+-- ---------------------------------------------------------------------
+-- Bản trước chỉ chặn "không tự đổi role của chính mình" — vẫn còn lỗ
+-- hổng: 1 admin thường vẫn đổi được role của NGƯỜI KHÁC (kể cả tự phong
+-- thêm admin khác, hoặc phong ai đó lên admin tùy ý). Giờ chặt hơn: đổi
+-- role — của bất kỳ ai, kể cả role của chính mình — chỉ hợp lệ nếu người
+-- thực hiện đang có role = 'super_admin'.
+create function public.enforce_role_change_authority()
+returns trigger as $$
+begin
+  if new.role is distinct from old.role then
+    -- auth.uid() is null nghĩa là câu lệnh chạy ngoài phiên người dùng
+    -- thường (SQL Editor với quyền postgres, script dùng service role
+    -- key, migration) — coi là ngữ cảnh tin cậy, cho qua. Đây cũng là
+    -- cách duy nhất để tạo super_admin ĐẦU TIÊN (xem hướng dẫn cuối phần
+    -- này), vì lúc đó chưa ai có role super_admin để tự cấp cho người
+    -- khác qua app được.
+    if auth.uid() is not null and not exists (
+      select 1 from public.profiles p where p.id = auth.uid() and p.role = 'super_admin'
+    ) then
+      raise exception 'Only a super_admin can change a role';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger enforce_role_change_authority
+  before update on public.profiles
+  for each row execute function public.enforce_role_change_authority();
+
+-- Bootstrap super_admin đầu tiên (chạy 1 lần, trong SQL Editor — auth.uid()
+-- ở đó là null nên đi qua được trigger trên):
+--   update public.profiles set role = 'super_admin' where id = '<uuid của bạn>';
+-- Từ sau đó, mọi thay đổi role khác phải đi qua session đăng nhập thật
+-- của 1 super_admin (ví dụ 1 trang admin panel gọi update bằng chính
+-- phiên đăng nhập của họ) — không dùng SQL Editor cho việc thường xuyên,
+-- chỉ dùng đúng 1 lần lúc khởi tạo.
+
+-- cccd_verified giờ có thể được set true tự động khi OCR khớp ảnh CCCD —
+-- không chỉ lúc đăng ký (register/route.ts) mà cả khi cập nhật sau này
+-- trong Thông tin cá nhân (api/profile/identity/route.ts). Bảo vệ y hệt
+-- role ở trên: policy "update own profile" (auth.uid() = id) không tự
+-- chặn cột nào ngoài role, nên nếu thiếu trigger này thì user thường tự
+-- UPDATE profiles set cccd_verified = true được — xem
+-- migrations/archive/20260826_add_profile_bank_info.sql.
+create function public.enforce_cccd_verified_authority()
+returns trigger as $$
+begin
+  if new.cccd_verified is distinct from old.cccd_verified then
+    if auth.uid() is not null and not exists (
+      select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+    ) then
+      raise exception 'cccd_verified can only be set by a trusted server context or an admin';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger enforce_cccd_verified_authority
+  before update on public.profiles
+  for each row execute function public.enforce_cccd_verified_authority();
+
+-- --- Nhật ký đổi quyền + đổi quyền nguyên tử (chỉ super_admin). Xem
+-- migrations/archive/20260928_add_role_change_logs.sql. ---
+create table if not exists public.role_change_logs (
+  id uuid primary key default gen_random_uuid(),
+  target_id uuid not null references public.profiles (id) on delete cascade,
+  actor_id uuid references public.profiles (id) on delete set null,
+  old_role public.user_role not null,
+  new_role public.user_role not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists role_change_logs_target_idx
+  on public.role_change_logs (target_id, created_at desc);
+
+alter table public.role_change_logs enable row level security;
+revoke all on public.role_change_logs from anon, authenticated;
+
+-- Trả role sau khi đổi. Lỗi mang hint: actor_not_super_admin,
+-- self_demotion, target_not_found.
+create or replace function public.admin_set_user_role(
+  p_actor_id uuid,
+  p_target_id uuid,
+  p_role public.user_role
+)
+returns public.user_role
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_old public.user_role;
+begin
+  if not exists (
+    select 1 from public.profiles where id = p_actor_id and role = 'super_admin'
+  ) then
+    raise exception 'Only a super_admin can change a role' using hint = 'actor_not_super_admin';
+  end if;
+
+  if p_actor_id = p_target_id and p_role <> 'super_admin' then
+    raise exception 'A super_admin cannot demote themselves' using hint = 'self_demotion';
+  end if;
+
+  select role into v_old from public.profiles where id = p_target_id for update;
+  if v_old is null then
+    raise exception 'Profile % not found', p_target_id using hint = 'target_not_found';
+  end if;
+
+  if v_old = p_role then
+    return v_old;
+  end if;
+
+  update public.profiles set role = p_role where id = p_target_id;
+  insert into public.role_change_logs (target_id, actor_id, old_role, new_role)
+  values (p_target_id, p_actor_id, v_old, p_role);
+
+  return p_role;
+end;
+$$;
+
+revoke execute on function public.admin_set_user_role(uuid, uuid, public.user_role) from public, anon, authenticated;
+grant execute on function public.admin_set_user_role(uuid, uuid, public.user_role) to service_role;
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/02_books_and_chapters.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 02 — Truyện & chương  (02_books_and_chapters.sql)
+-- =======================================================================
+-- Phạm vi: books/chapters, giá + độc quyền, chương cuối, nhân vật, tags +
+-- lượt xem, soft-delete, genre, GRANT cột của books, kiểm duyệt cấp
+-- chương/truyện, xoá chương nháp + sắp xếp chương.
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     books, chapters, character_follows, character_trope_votes,
+--     chapter_moderation_actions, book_moderation_actions
+--   Hàm:
+--     increment_book_view_count, set_book_published_at,
+--     reorder_book_chapters
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260819_add_book_genre.sql, 20260820_add_chapter_price.sql,
+--   20260824_add_book_tags_and_view_count.sql,
+--   20260824_add_chapter_is_last.sql,
+--   20260825_restrict_books_column_grants.sql,
+--   20260826_add_book_exclusivity.sql, 20260826_add_book_soft_delete.sql,
+--   20260901_add_manuscript_share.sql, 20260906_add_book_synopsis_grant.sql,
+--   20260908_add_book_moderation.sql,
+--   20260908_add_chapter_moderation_and_notifications.sql,
+--   20260909_add_chapter_audio_url_and_price.sql,
+--   20260919_add_characters.sql, 20260925_add_chapter_delete_and_reorder.sql
+--   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
 
 -- ---------------------------------------------------------------------
 -- 3. Books & chapters (minimal starting model for author + reading flows)
@@ -369,13 +554,30 @@ create table public.books (
   -- bằng ALTER TABLE ở phần 9, sau khi bảng design_items tồn tại (không
   -- thể tham chiếu forward tới 1 bảng chưa được tạo).
   published boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- --- Soft-delete cho books — KHÔNG có DELETE thật/policy delete/GRANT
+  -- delete ở đâu cả. deleted_at is null = còn sống. Điều kiện được phép xoá
+  -- (chưa published, hoặc published nhưng không exclusive; và không có
+  -- purchase_transactions nào của chương thuộc sách) enforce ở API route
+  -- (src/app/api/authoring/books/[bookId]/route.ts, DELETE) — không ở DB,
+  -- vì purchase_transactions.chapter_id là uuid trần, không FK, và rule
+  -- phụ thuộc business logic. Xem migrations/archive/20260826_add_book_soft_delete.sql.
+  -- Khai báo ngay trong CREATE TABLE (không ALTER ở cuối phần 3 như trước)
+  -- vì policy "published books are public" + policy của chapters/characters
+  -- ngay bên dưới đọc cột này. ---
+  deleted_at timestamptz,
+  -- "Hoàn thiện" — xem phần 12e (prevent_unfinalize_book +
+  -- lock_manuscript_grants_on_finalize) và
+  -- migrations/archive/20260901_add_manuscript_share.sql. Khai báo ở đây (không
+  -- ALTER ở phần 12e như trước) vì GRANT UPDATE cột của books (ngay trước
+  -- phần 9) có finalized_at.
+  finalized_at timestamptz
 );
 
 alter table public.books enable row level security;
 
 -- deleted_at is null: sách bị soft-delete (phần 3b, xem
--- migrations/20260826_add_book_soft_delete.sql) không còn hiện với khách
+-- migrations/archive/20260826_add_book_soft_delete.sql) không còn hiện với khách
 -- công khai, dù published vẫn true. Tác giả (auth.uid() = author_id) vẫn
 -- thấy được để khôi phục.
 create policy "published books are public"
@@ -424,7 +626,7 @@ create policy "authors update chapters on their own books"
 -- purchase_transactions.amount — đó là số tiền 1 giao dịch thật, đây là
 -- giá niêm yết). is_exclusive: mặc định true, khớp UI mock cũ. Không cần
 -- RLS/trigger riêng — 2 cột thường, đã được policy update ở trên cover.
--- Xem migrations/20260820_add_chapter_price.sql. ---
+-- Xem migrations/archive/20260820_add_chapter_price.sql. ---
 alter table public.chapters
   add column price integer not null default 0;
 
@@ -440,7 +642,7 @@ alter table public.chapters
 -- id&token" của chapter_audio_links/audio_narrations (ChapterAudioPanel) —
 -- 2 cơ chế song song, không đụng nhau. audio_price CHƯA enforce chặn nghe,
 -- chỉ lưu giá niêm yết — xem
--- migrations/20260909_add_chapter_audio_url_and_price.sql. ---
+-- migrations/archive/20260909_add_chapter_audio_url_and_price.sql. ---
 alter table public.chapters
   add column audio_url text;
 
@@ -454,7 +656,7 @@ alter table public.chapters
 -- trạng thái "Đã hoàn thành" ở trang giới thiệu truyện (/truyen/[slug]).
 -- Tối đa 1 chương/sách được true, và KHÔNG được đổi lại false (trigger
 -- dưới đây chặn ở mức DB, áp dụng cả với service-role key).
--- Xem migrations/20260824_add_chapter_is_last.sql. ---
+-- Xem migrations/archive/20260824_add_chapter_is_last.sql. ---
 alter table public.chapters
   add column is_last_chapter boolean not null default false;
 
@@ -479,7 +681,7 @@ create trigger prevent_unset_last_chapter
 -- trong truyện (không chỉ để mở khoá quest/thành tựu). role phân loại
 -- rộng (chính diện/phản diện/trung lập); trope là free-text tác giả tự
 -- gõ (vd "Ma vương", "Trượng nghĩa"), cùng tinh thần books.tags — không
--- danh mục cố định. Xem migrations/20260919_add_characters.sql. ---
+-- danh mục cố định. Xem migrations/archive/20260919_add_characters.sql. ---
 create table public.characters (
   id uuid primary key default gen_random_uuid(),
   book_id uuid not null references public.books (id) on delete cascade,
@@ -586,7 +788,7 @@ create policy "users manage their own trope votes"
   with check (auth.uid() = user_id);
 
 -- --- Tags tự do (KHÁC genre — 1 sách vẫn 1 genre, xem phần 9) + lượt
--- xem. Xem migrations/20260824_add_book_tags_and_view_count.sql. ---
+-- xem. Xem migrations/archive/20260824_add_book_tags_and_view_count.sql. ---
 alter table public.books
   add column tags text[] not null default '{}';
 
@@ -610,15 +812,8 @@ $$ language sql security definer set search_path = public;
 
 grant execute on function public.increment_book_view_count(uuid) to anon, authenticated;
 
--- --- Soft-delete cho books — KHÔNG có DELETE thật/policy delete/GRANT
--- delete ở đâu cả. deleted_at is null = còn sống. Điều kiện được phép xoá
--- (chưa published, hoặc published nhưng không exclusive; và không có
--- purchase_transactions nào của chương thuộc sách) enforce ở API route
--- (src/app/api/authoring/books/[bookId]/route.ts, DELETE) — không ở DB,
--- vì purchase_transactions.chapter_id là uuid trần, không FK, và rule
--- phụ thuộc business logic. Xem migrations/20260826_add_book_soft_delete.sql. ---
-alter table public.books
-  add column deleted_at timestamptz;
+-- --- Soft-delete cho books: cột deleted_at đã chuyển vào CREATE TABLE
+-- public.books (đầu phần 3) — xem ghi chú ở đó. ---
 
 -- --- Độc quyền chuyển lên cấp TRUYỆN (trước đây chỉ có chapters.is_exclusive
 -- ở phần 3, không nhất quán giữa các chương cùng 1 sách). Cột
@@ -629,7 +824,7 @@ alter table public.books
 -- (không phải CHECK/trigger — CHECK không re-evaluate theo now() khi
 -- thời gian trôi qua, và admin override qua service-role phải bypass
 -- được rule này mà service-role không bypass trigger/constraint).
--- Xem migrations/20260826_add_book_exclusivity.sql. ---
+-- Xem migrations/archive/20260826_add_book_exclusivity.sql. ---
 alter table public.books
   add column is_exclusive boolean not null default true;
 
@@ -650,125 +845,752 @@ create trigger set_book_published_at
   before update on public.books
   for each row execute function public.set_book_published_at();
 
--- ---------------------------------------------------------------------
--- 4. Storage buckets
--- ---------------------------------------------------------------------
-insert into storage.buckets (id, name, public) values ('identity-documents', 'identity-documents', false)
-  on conflict (id) do nothing;
-insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true)
-  on conflict (id) do nothing;
--- Avatar/ảnh bìa upload thẳng lên đây qua signed upload URL (bỏ qua giới
--- hạn ~4.5MB body của Vercel Serverless Functions) — xem
--- migrations/20260914_raise_avatar_cover_size_limit.sql.
-update storage.buckets
-set
-  file_size_limit = 15728640, -- 15MB
-  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
-where id = 'avatars';
--- Không còn bucket 'book-covers' riêng — ảnh bìa giờ đi qua kho thiết kế
--- dùng chung (bucket 'design-images', tạo ở phần 9), vì bìa sách cũng chỉ
--- là 1 "design_item" như minh hoạ khác, được books.cover_design_item_id
--- trỏ tới.
+-- --- Genre — dùng bởi hệ thống sinh bìa tự động (src/lib/covers/*) khi
+-- sách chưa có cover_design_item_id. text + CHECK, không phải enum, để sửa
+-- 1 giá trị sai hay thêm thể loại chỉ cần đổi constraint, không phải mổ
+-- lại type — đã đúng như vậy: 10 giá trị dưới đây là taxonomy CHÍNH THỨC
+-- của nền tảng, thay thế 8 giá trị tạm ban đầu (xem
+-- migrations/archive/20260825_update_book_genres.sql). Nullable: sách cũ chưa có
+-- genre, code sinh bìa có nhánh fallback riêng cho null, không cần
+-- database nói dối bằng default giả. Không cần RLS/trigger riêng — genre
+-- là cột thường, đã được policy "authors update their own books" ở phần 3
+-- cover sẵn (khác cover_design_item_id, không phải link chéo bảng cần
+-- xác thực share_token). ---
+alter table public.books
+  add column genre text;
 
-create policy "users upload their own identity documents"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'identity-documents'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
+alter table public.books
+  add constraint books_genre_check
+  check (genre is null or genre in (
+    'Linh dị', 'Cổ tích & Thần thoại', 'Dã sử', 'Trinh thám',
+    'Tâm lý - tội phạm', 'Tình cảm', 'Đời sống - Xã hội',
+    'Khoa học viễn tưởng', 'Tiên hiệp/ kiếm hiệp', 'Kỳ ảo'
+  ));
 
-create policy "users and admins read identity documents appropriately"
-  on storage.objects for select
+create index books_genre_idx
+  on public.books (genre) where genre is not null;
+
+-- RLS ("authors update their own books", phần 3) chỉ kiểm AI được sửa
+-- hàng, không kiểm CỘT NÀO — Postgres RLS không làm được việc đó ở cấp
+-- cột. GRANT cấp cột dưới đây là lớp chặn bổ sung: dù đúng là chủ sách,
+-- client chỉ sửa được đúng các cột đang thật sự có đường update từ code
+-- (title/genre/tags qua PATCH /api/authoring/books/[bookId], published tự
+-- flip khi publish chương đầu tiên) — không tự PATCH thẳng
+-- view_count/author_id/... qua REST API của Supabase (anon key + JWT của
+-- chính họ) để bỏ qua route app. Đặt ở đây (không phải ngay sau policy ở
+-- phần 3) vì genre/tags chỉ vừa tồn tại tới điểm này trong file.
+-- Xem migrations/archive/20260825_restrict_books_column_grants.sql. Danh sách
+-- cột được mở rộng thêm deleted_at (soft-delete) và is_exclusive (độc
+-- quyền cấp truyện) bởi migrations/archive/20260826_add_book_soft_delete.sql và
+-- 20260826_add_book_exclusivity.sql, rồi finalized_at ("Hoàn thiện" —
+-- Share bản thảo, phần 12e) bởi migrations/archive/20260901_add_manuscript_share.sql
+-- — published_at CỐ Ý không có trong danh sách này, xem comment ở phần 3.
+-- Cột `synopsis` được cộng thêm bởi migrations/archive/20260906_add_book_synopsis_grant.sql
+-- — tác giả sửa tóm tắt truyện qua PATCH /api/authoring/books/[bookId].
+revoke update on public.books from authenticated, anon;
+grant update (title, genre, tags, published, deleted_at, is_exclusive, finalized_at, synopsis) on public.books to authenticated;
+
+-- --- Admin duyệt/gỡ chương + Thông báo — xem
+-- migrations/archive/20260908_add_chapter_moderation_and_notifications.sql.
+-- Người gửi tin nhắn khi gỡ chương LÀ chính admin thực hiện thao tác đó
+-- (tài khoản thật, không phải 1 tài khoản "hệ thống" ẩn danh riêng) — xem
+-- api/admin/chapters/[chapterId]/route.ts. ---
+
+-- Trạng thái gỡ/khôi phục chương của ADMIN — tách biệt hẳn với `published`
+-- (published=false do admin gỡ phải phân biệt được với published=false vì
+-- tác giả tự để nháp).
+alter table public.chapters
+  add column removed_at timestamptz,
+  add column removed_by uuid references auth.users (id),
+  add column removed_reason_group text,
+  add column removed_reason_detail text;
+
+-- Nhật ký MỌI lần gỡ/khôi phục (audit trail) — giữ lại lịch sử đầy đủ,
+-- không chỉ trạng thái hiện tại ở chapters.removed_*.
+create table public.chapter_moderation_actions (
+  id uuid primary key default gen_random_uuid(),
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  book_id uuid not null references public.books (id) on delete cascade,
+  author_id uuid not null references auth.users (id),
+  admin_id uuid not null references auth.users (id),
+  action text not null check (action in ('removed', 'restored')),
+  reason_group text,
+  reason_detail text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.chapter_moderation_actions enable row level security;
+
+create policy "admins view chapter moderation actions"
+  on public.chapter_moderation_actions for select
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+  ));
+
+create index chapter_moderation_actions_chapter_idx
+  on public.chapter_moderation_actions (chapter_id, created_at);
+
+-- --- Kiểm duyệt CẤP TRUYỆN (book-level) — dùng chung kiến trúc với
+-- kiểm duyệt cấp chương ở trên (bắt buộc lý do, audit trail, thông báo +
+-- tin nhắn hệ thống từ chính admin thực hiện). books.deleted_at đã có sẵn
+-- từ phần soft-delete phía trên — dùng lại, chỉ thêm 3 cột lý do. Xem
+-- migrations/archive/20260908_add_book_moderation.sql. ---
+alter table public.books
+  add column removed_by uuid references auth.users (id),
+  add column removed_reason_group text,
+  add column removed_reason_detail text;
+
+create table public.book_moderation_actions (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  author_id uuid not null references auth.users (id),
+  admin_id uuid not null references auth.users (id),
+  action text not null check (action in ('removed', 'restored')),
+  reason_group text,
+  reason_detail text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.book_moderation_actions enable row level security;
+
+create policy "admins view book moderation actions"
+  on public.book_moderation_actions for select
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+  ));
+
+create index book_moderation_actions_book_idx
+  on public.book_moderation_actions (book_id, created_at);
+-- --- Xoá chương nháp + sắp xếp thứ tự chương (tác giả, web + mobile).
+-- Xem migrations/archive/20260925_add_chapter_delete_and_reorder.sql. ---
+drop policy if exists "authors delete draft chapters on their own books" on public.chapters;
+create policy "authors delete draft chapters on their own books"
+  on public.chapters for delete
   using (
-    bucket_id = 'identity-documents'
-    and (
-      (storage.foldername(name))[1] = auth.uid()::text
-      or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin'))
+    not published
+    and removed_at is null
+    and not is_last_chapter
+    and exists (
+      select 1 from public.books b
+      where b.id = book_id and b.author_id = auth.uid() and b.deleted_at is null
     )
   );
 
-create policy "avatars are publicly readable"
-  on storage.objects for select
-  using (bucket_id = 'avatars');
-
-create policy "users upload and replace their own avatar"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-create policy "users update their own avatar"
-  on storage.objects for update
-  using (
-    bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
-
--- ---------------------------------------------------------------------
--- 5. Chỉ super_admin được đổi role của bất kỳ ai
--- ---------------------------------------------------------------------
--- Bản trước chỉ chặn "không tự đổi role của chính mình" — vẫn còn lỗ
--- hổng: 1 admin thường vẫn đổi được role của NGƯỜI KHÁC (kể cả tự phong
--- thêm admin khác, hoặc phong ai đó lên admin tùy ý). Giờ chặt hơn: đổi
--- role — của bất kỳ ai, kể cả role của chính mình — chỉ hợp lệ nếu người
--- thực hiện đang có role = 'super_admin'.
-create function public.enforce_role_change_authority()
-returns trigger as $$
+create or replace function public.reorder_book_chapters(p_book_id uuid, p_chapter_ids uuid[])
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_total integer;
+  v_last uuid;
 begin
-  if new.role is distinct from old.role then
-    -- auth.uid() is null nghĩa là câu lệnh chạy ngoài phiên người dùng
-    -- thường (SQL Editor với quyền postgres, script dùng service role
-    -- key, migration) — coi là ngữ cảnh tin cậy, cho qua. Đây cũng là
-    -- cách duy nhất để tạo super_admin ĐẦU TIÊN (xem hướng dẫn cuối phần
-    -- này), vì lúc đó chưa ai có role super_admin để tự cấp cho người
-    -- khác qua app được.
-    if auth.uid() is not null and not exists (
-      select 1 from public.profiles p where p.id = auth.uid() and p.role = 'super_admin'
-    ) then
-      raise exception 'Only a super_admin can change a role';
-    end if;
+  if not exists (
+    select 1 from public.books
+    where id = p_book_id and author_id = auth.uid() and deleted_at is null
+  ) then
+    raise exception 'Book % not found or not owned by caller', p_book_id;
   end if;
-  return new;
+
+  -- Khoá các chương của sách: 2 lần sắp xếp song song không ghi đè lẫn nhau.
+  perform 1 from public.chapters where book_id = p_book_id for update;
+  select count(*) into v_total from public.chapters where book_id = p_book_id;
+
+  if coalesce(array_length(p_chapter_ids, 1), 0) <> v_total
+     or (select count(distinct x) from unnest(p_chapter_ids) as x) <> v_total
+     or exists (
+       select 1 from unnest(p_chapter_ids) as x
+       where not exists (select 1 from public.chapters c where c.id = x and c.book_id = p_book_id)
+     ) then
+    raise exception 'Chapter list must contain every chapter of the book exactly once';
+  end if;
+
+  select id into v_last from public.chapters where book_id = p_book_id and is_last_chapter;
+  if v_last is not null and p_chapter_ids[v_total] <> v_last then
+    raise exception 'The last chapter must stay last';
+  end if;
+
+  update public.chapters c
+     set order_index = t.ord
+    from unnest(p_chapter_ids) with ordinality as t(id, ord)
+   where c.id = t.id and c.book_id = p_book_id and c.order_index is distinct from t.ord::integer;
+end;
+$$;
+
+revoke execute on function public.reorder_book_chapters(uuid, uuid[]) from public, anon;
+grant execute on function public.reorder_book_chapters(uuid, uuid[]) to authenticated;
+
+create index if not exists chapters_book_order_idx
+  on public.chapters (book_id, order_index);
+
+create index if not exists books_author_created_idx
+  on public.books (author_id, created_at desc) where deleted_at is null;
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/03_reading.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 03 — Đọc truyện  (03_reading.sql)
+-- =======================================================================
+-- Phạm vi: Gợi ý (pgvector embedding + recommend_books), reading_history +
+-- lượt đọc theo ngày, vote chương, tiến độ đọc, danh sách đọc, highlights,
+-- reading_sessions + heartbeat phía server, comment neo đoạn văn, ranking
+-- aggregates.
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     reading_history, chapter_votes, book_progress, reading_lists,
+--     reading_list_items, highlights, reading_sessions, anchored_comments
+--   View:
+--     book_read_counts_daily, chapter_vote_counts, book_chapter_stats
+--   Hàm:
+--     record_chapter_read, recommend_books, record_reading_heartbeat,
+--     book_read_counts_between
+--   Thêm cột vào bảng của file trước:
+--     books.embedding
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260824_add_book_progress.sql, 20260824_add_chapter_votes.sql,
+--   20260824_add_reading_lists.sql, 20260827_add_anchored_comments.sql,
+--   20260827_add_reading_behavior_tables.sql,
+--   20260831_add_book_read_counts_daily.sql,
+--   20260910_add_anchored_comment_replies.sql,
+--   20260910_add_book_progress_paragraph.sql,
+--   20260917_add_reading_event_log.sql,
+--   20260926_add_reading_session_tracking.sql,
+--   20260926_add_scoring_tracking.sql
+--   + migrations/20260929_add_hot_path_indexes.sql, migrations/20260929_add_ranking_aggregates.sql
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql
+-- Tham chiếu tới file SAU chỉ nằm trong thân hàm plpgsql (bind lúc chạy,
+-- không cần khi tạo): 11_contests.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
+
+-- ---------------------------------------------------------------------
+-- 8. Gợi ý truyện (pgvector)
+-- ---------------------------------------------------------------------
+
+-- Kích thước vector tuỳ model embedding bạn dùng để sinh (ví dụ
+-- text-embedding-3-small của OpenAI = 1536 chiều). Sinh embedding từ
+-- title + synopsis (+ có thể vài chương đầu) mỗi khi sách được publish,
+-- lưu vào cột này từ code server (không sinh trong SQL).
+alter table public.books add column embedding vector(1536);
+
+-- Lịch sử đọc — vừa là input để tính gợi ý, vừa là dữ liệu phân tích nói
+-- chung (sách nào được đọc nhiều, bỏ dở ở đâu, v.v.).
+create table public.reading_history (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  book_id uuid not null references public.books (id) on delete cascade,
+  chapter_id uuid references public.chapters (id) on delete set null,
+  read_at timestamptz not null default now()
+);
+
+alter table public.reading_history enable row level security;
+
+-- SELECT-only cho chủ hàng — bảng này nuôi streak + achievement metric
+-- (tiền thưởng thật) từ migrations/archive/20260917_add_reading_event_log.sql, nên
+-- không còn cho phép user tự INSERT/UPDATE/DELETE thẳng qua Supabase
+-- client nữa. Ghi DUY NHẤT qua record_chapter_read() (SECURITY DEFINER,
+-- service_role) ở dưới.
+create policy "users view their own reading history"
+  on public.reading_history for select
+  using (auth.uid() = user_id);
+
+-- Gọi khi user thật sự đọc hết 1 chương (cuộn tới đoạn cuối cùng — xem
+-- src/components/reading/reader.tsx +
+-- src/app/api/books/[bookId]/reading-progress/route.ts). Dedupe theo
+-- (user_id, chapter_id, NGÀY server/UTC) — trả NULL nếu đã ghi hôm nay, để
+-- caller (TS) biết KHÔNG lặp lại side-effect (tăng tiến trình nhiệm vụ,
+-- gọi streak) cho cùng 1 lần hoàn thành do client gửi lại. Xem
+-- migrations/archive/20260917_add_reading_event_log.sql.
+create function public.record_chapter_read(p_user_id uuid, p_book_id uuid, p_chapter_id uuid)
+returns public.reading_history as $$
+declare
+  v_row public.reading_history;
+begin
+  if exists (
+    select 1 from public.reading_history
+    where user_id = p_user_id and chapter_id = p_chapter_id and read_at::date = current_date
+  ) then
+    return null;
+  end if;
+
+  insert into public.reading_history (user_id, book_id, chapter_id)
+  values (p_user_id, p_book_id, p_chapter_id)
+  returning * into v_row;
+
+  return v_row;
 end;
 $$ language plpgsql security definer;
 
-create trigger enforce_role_change_authority
-  before update on public.profiles
-  for each row execute function public.enforce_role_change_authority();
+-- p_user_id trần — chỉ service_role gọi được, cùng lý do increment_task_progress.
+revoke execute on function public.record_chapter_read from public, anon, authenticated;
+grant execute on function public.record_chapter_read to service_role;
 
--- Bootstrap super_admin đầu tiên (chạy 1 lần, trong SQL Editor — auth.uid()
--- ở đó là null nên đi qua được trigger trên):
---   update public.profiles set role = 'super_admin' where id = '<uuid của bạn>';
--- Từ sau đó, mọi thay đổi role khác phải đi qua session đăng nhập thật
--- của 1 super_admin (ví dụ 1 trang admin panel gọi update bằng chính
--- phiên đăng nhập của họ) — không dùng SQL Editor cho việc thường xuyên,
--- chỉ dùng đúng 1 lần lúc khởi tạo.
+-- View công khai, đã ẩn danh (không có user_id) — số lượt đọc mỗi SÁCH
+-- theo TỪNG NGÀY, dùng để tính bảng xếp hạng tuần/tháng/quý thật ở
+-- /rankings (src/lib/rankings/get-book-rankings.ts). Cùng lý do
+-- chapter_vote_counts ở dưới không bị RLS bảng gốc chặn: view chạy với
+-- quyền OWNER. Xem migrations/archive/20260831_add_book_read_counts_daily.sql.
+create view public.book_read_counts_daily as
+  select book_id, date_trunc('day', read_at)::date as read_date, count(*)::integer as read_count
+  from public.reading_history
+  group by book_id, date_trunc('day', read_at)::date;
 
--- cccd_verified giờ có thể được set true tự động khi OCR khớp ảnh CCCD —
--- không chỉ lúc đăng ký (register/route.ts) mà cả khi cập nhật sau này
--- trong Thông tin cá nhân (api/profile/identity/route.ts). Bảo vệ y hệt
--- role ở trên: policy "update own profile" (auth.uid() = id) không tự
--- chặn cột nào ngoài role, nên nếu thiếu trigger này thì user thường tự
--- UPDATE profiles set cccd_verified = true được — xem
--- migrations/20260826_add_profile_bank_info.sql.
-create function public.enforce_cccd_verified_authority()
-returns trigger as $$
+-- --- Vote theo-chương, dạng toggle (bấm lại = bỏ vote) — nút "Bình chọn"
+-- trên trang đọc CHƯA được xây (phase sau); schema này chuẩn bị trước để
+-- trang giới thiệu truyện có cột số để hiển thị (sẽ luôn là 0 cho tới khi
+-- nút vote thật ra mắt). Bảng gốc chỉ chủ vote xem được dòng của mình
+-- (giống reading_history) — aggregate công khai đi qua view riêng, giống
+-- pattern public_design_items ở phần 9. Xem
+-- migrations/archive/20260824_add_chapter_votes.sql. ---
+create table public.chapter_votes (
+  id uuid primary key default gen_random_uuid(),
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (chapter_id, user_id)
+);
+
+create index chapter_votes_chapter_id_idx on public.chapter_votes (chapter_id);
+
+alter table public.chapter_votes enable row level security;
+
+create policy "users manage their own chapter votes"
+  on public.chapter_votes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.chapter_vote_counts as
+  select chapter_id, count(*)::integer as vote_count
+  from public.chapter_votes
+  group by chapter_id;
+
+-- Tổng vote của 1 SÁCH = SUM(vote_count) mọi chương thuộc sách đó, tính ở
+-- tầng app — không cần view/cột riêng ở cấp books.
+
+-- --- "Chương đọc gần nhất" cho nút "Tiếp tục đọc" — 1 dòng/cặp (user,
+-- sách), tra O(1). Cố ý là bảng RIÊNG, không thêm unique vào
+-- reading_history ở trên (bảng đó là log đầy đủ cho recommend_books() và
+-- phân tích, không được rút gọn). Xem
+-- migrations/archive/20260824_add_book_progress.sql. ---
+create table public.book_progress (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  book_id uuid not null references public.books (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, book_id)
+);
+
+-- Nhớ ĐOẠN VĂN cụ thể trong chapter_id ở trên — null = chưa có/chưa cuộn
+-- qua đoạn nào, reader.tsx coi như "bắt đầu từ đầu chương". Chỉ áp dụng
+-- khi mở LẠI đúng chapter_id này — route reading-progress luôn ghi đè cả
+-- 2 cột cùng lúc để không lệch nhau. Xem
+-- migrations/archive/20260910_add_book_progress_paragraph.sql.
+alter table public.book_progress
+  add column last_paragraph_index integer check (last_paragraph_index is null or last_paragraph_index >= 0);
+
+alter table public.book_progress enable row level security;
+
+create policy "users manage their own book progress"
+  on public.book_progress for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- --- "Đang nghe dở" cho Audio hub (audio_progress): đã chuyển xuống phần 9,
+-- ngay sau bảng audio_narrations mà nó tham chiếu FK. ---
+
+-- --- "Danh sách đọc" kiểu playlist YouTube — mỗi danh sách chứa nguyên
+-- SÁCH (không phải chương lẻ), 1 user có nhiều danh sách. 2 bảng, giống
+-- quan hệ books/chapters: 1 bảng cha (metadata danh sách) + 1 bảng con FK
+-- vào cha (sách nào nằm trong danh sách nào). Route API thật (add/remove
+-- item) dùng service-role + tự kiểm reading_lists.user_id = userId trước
+-- khi ghi — RLS dưới đây chỉ defense-in-depth. Xem
+-- migrations/archive/20260824_add_reading_lists.sql. ---
+create table public.reading_lists (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null check (char_length(trim(name)) > 0),
+  created_at timestamptz not null default now()
+);
+
+create index reading_lists_user_id_idx on public.reading_lists (user_id);
+
+alter table public.reading_lists enable row level security;
+
+create policy "users manage their own reading lists"
+  on public.reading_lists for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table public.reading_list_items (
+  list_id uuid not null references public.reading_lists (id) on delete cascade,
+  book_id uuid not null references public.books (id) on delete cascade,
+  added_at timestamptz not null default now(),
+  primary key (list_id, book_id)
+);
+
+create index reading_list_items_book_id_idx on public.reading_list_items (book_id);
+
+alter table public.reading_list_items enable row level security;
+
+-- Không có user_id trực tiếp trên bảng này — ownership đi qua
+-- list_id -> reading_lists.user_id, giống pattern "chapters" join tới
+-- "books.author_id" ở phần 3.
+create policy "users manage items in their own reading lists"
+  on public.reading_list_items for all
+  using (exists (select 1 from public.reading_lists rl where rl.id = list_id and rl.user_id = auth.uid()))
+  with check (exists (select 1 from public.reading_lists rl where rl.id = list_id and rl.user_id = auth.uid()));
+
+-- Index gần-đúng cho tìm kiếm vector nhanh trên tập sách lớn (bỏ qua nếu
+-- catalog còn nhỏ — dưới ~10k sách thì quét tuần tự vẫn đủ nhanh).
+-- create index on public.books using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+
+-- Gợi ý = sách có embedding gần với "vector trung bình" các sách user đã
+-- đọc gần đây, loại trừ sách đã đọc, chỉ lấy sách đã publish.
+create function public.recommend_books(p_user_id uuid, p_limit integer default 10)
+returns setof public.books as $$
+declare
+  v_profile_vector vector(1536);
 begin
-  if new.cccd_verified is distinct from old.cccd_verified then
-    if auth.uid() is not null and not exists (
-      select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')
-    ) then
-      raise exception 'cccd_verified can only be set by a trusted server context or an admin';
-    end if;
-  end if;
-  return new;
-end;
-$$ language plpgsql security definer;
+  -- Lưu ý: KHÔNG viết `select avg(embedding) ... order by ... limit 20`
+  -- trực tiếp — vì avg() là aggregate nên toàn bộ hàng khớp điều kiện sẽ
+  -- được gộp trước, ORDER BY/LIMIT ở ngoài chỉ tác dụng lên 1 dòng kết quả
+  -- cuối cùng (vô nghĩa). Phải giới hạn 20 lượt đọc gần nhất trong subquery
+  -- TRƯỚC, rồi mới avg() trên tập đã giới hạn đó.
+  select avg(embedding) into v_profile_vector
+  from (
+    select b.embedding
+    from public.reading_history rh
+    join public.books b on b.id = rh.book_id
+    where rh.user_id = p_user_id and b.embedding is not null
+    order by rh.read_at desc
+    limit 20 -- chỉ lấy 20 lượt đọc gần nhất, tránh gu đọc cũ kéo lệch gợi ý
+  ) recent_reads;
 
-create trigger enforce_cccd_verified_authority
-  before update on public.profiles
-  for each row execute function public.enforce_cccd_verified_authority();
+  if v_profile_vector is null then
+    -- Chưa có lịch sử đọc (user mới) — fallback: trả sách publish gần đây
+    -- nhất thay vì rỗng. Cân nhắc đổi thành "sách trending" nếu có bảng đó.
+    return query
+      select * from public.books
+      where published
+      order by created_at desc
+      limit p_limit;
+  else
+    return query
+      select b.* from public.books b
+      where b.published
+        and b.embedding is not null
+        and b.id not in (select book_id from public.reading_history where user_id = p_user_id)
+      order by b.embedding <=> v_profile_vector -- cosine distance, càng nhỏ càng giống
+      limit p_limit;
+  end if;
+end;
+$$ language plpgsql stable;
+
+-- Gọi từ Next.js: const { data } = await supabase.rpc('recommend_books', { p_user_id: userId });
+-- `security invoker` mặc định (không thêm security definer) — hàm chạy
+-- với quyền của người gọi, RLS của `books`/`reading_history` vẫn áp dụng
+-- bình thường, không cần lo hàm này lộ dữ liệu ngoài phạm vi cho phép.
+
+
+-- --- 10e. highlights + reading_sessions — dữ liệu hành vi đọc nền tảng,
+-- công trình PHẢI XÂY MỚI (không có sẵn trước Quest System). Passive
+-- signal — không gắn KPI ép buộc. Xem
+-- migrations/archive/20260827_add_reading_behavior_tables.sql. ---
+create table public.highlights (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  paragraph_index integer,
+  char_start integer not null check (char_start >= 0),
+  char_end integer not null check (char_end > char_start),
+  created_at timestamptz not null default now()
+);
+
+create index highlights_chapter_id_idx on public.highlights (chapter_id);
+create index highlights_user_id_idx on public.highlights (user_id);
+
+alter table public.highlights enable row level security;
+
+create policy "users manage their own highlights"
+  on public.highlights for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table public.reading_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  start_time timestamptz not null default now(),
+  end_time timestamptz,
+  drop_off_offset integer,
+  check (end_time is null or end_time >= start_time),
+  check (drop_off_offset is null or drop_off_offset >= 0)
+);
+
+create index reading_sessions_chapter_id_idx on public.reading_sessions (chapter_id);
+create index reading_sessions_user_id_idx on public.reading_sessions (user_id, start_time);
+
+alter table public.reading_sessions enable row level security;
+
+-- Chỉ SELECT của chủ hàng — client KHÔNG tự ghi (trước đây policy "for all"
+-- cho tự khai thời gian đọc qua PostgREST). Ghi duy nhất qua
+-- record_reading_heartbeat() (service-role) ở cuối file — xem
+-- migrations/archive/20260926_add_reading_session_tracking.sql.
+create policy "users view their own reading sessions"
+  on public.reading_sessions for select
+  using (auth.uid() = user_id);
+revoke insert, update, delete, truncate on public.reading_sessions from anon, authenticated;
+
+-- --- 10f. anchored_comments — comment neo vị trí, cơ chế trả lời DUY
+-- NHẤT cho quest cần "câu trả lời" (không trắc nghiệm/điền text tự do).
+-- Dùng chung vị trí neo với highlights. Xem
+-- migrations/archive/20260827_add_anchored_comments.sql. ---
+create table public.anchored_comments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  paragraph_index integer,
+  char_start integer not null check (char_start >= 0),
+  char_end integer not null check (char_end > char_start),
+  content text not null check (char_length(trim(content)) > 0),
+  -- Polymorphic, giống quest_reset_events.quest_id — NULL cho comment
+  -- thường (không trả lời quest nào).
+  quest_id uuid,
+  quest_source text check (quest_source is null or quest_source in ('task_template', 'hidden_quest')),
+  created_at timestamptz not null default now(),
+  check ((quest_id is null) = (quest_source is null))
+);
+
+-- Reply lồng 1 CẤP DUY NHẤT (không cho reply-vào-reply) — enforce ở API
+-- route (api/chapters/[chapterId]/comments), không phải CHECK DB. Reply
+-- copy chapter_id/paragraph_index/char_start/char_end từ hàng cha khi
+-- ghi. Xem migrations/archive/20260910_add_anchored_comment_replies.sql.
+alter table public.anchored_comments
+  add column parent_comment_id uuid references public.anchored_comments (id) on delete cascade;
+
+create index anchored_comments_chapter_id_idx on public.anchored_comments (chapter_id);
+create index anchored_comments_quest_idx on public.anchored_comments (quest_id, quest_source) where quest_id is not null;
+create index anchored_comments_parent_idx on public.anchored_comments (parent_comment_id) where parent_comment_id is not null;
+
+alter table public.anchored_comments enable row level security;
+
+-- Nội dung công khai dưới chương — ai cũng xem được, không cần đăng nhập.
+create policy "anchored comments are publicly readable"
+  on public.anchored_comments for select
+  using (true);
+
+create policy "users write their own anchored comments"
+  on public.anchored_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users update their own anchored comments"
+  on public.anchored_comments for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own anchored comments"
+  on public.anchored_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate anchored comments"
+  on public.anchored_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- --- Phiên đọc ghi ở server (Contest Engine Phase 2, P1): cột thời gian đọc
+-- thật (active_seconds do server cộng theo khoảng thật giữa 2 nhịp 60 giây),
+-- nguồn truy cập, đoạn xa nhất; record_reading_heartbeat() là đường ghi duy
+-- nhất. Policy ở phần 10e chỉ còn SELECT. Xem
+-- migrations/archive/20260926_add_reading_session_tracking.sql. ---
+
+alter table public.reading_sessions
+  add column if not exists book_id uuid references public.books (id) on delete cascade,
+  add column if not exists active_seconds integer not null default 0,
+  add column if not exists last_heartbeat_at timestamptz,
+  add column if not exists max_paragraph integer,
+  add column if not exists source text;
+
+do $$ begin
+  alter table public.reading_sessions add constraint reading_sessions_active_seconds_check check (active_seconds >= 0);
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.reading_sessions add constraint reading_sessions_source_check
+    check (source is null or source in ('contest', 'trending', 'search', 'profile', 'recommendation', 'other'));
+exception when duplicate_object then null; end $$;
+
+create index if not exists reading_sessions_book_user_idx on public.reading_sessions (book_id, user_id, start_time);
+
+-- Trả id phiên (mới hoặc cũ) + active_seconds hiện tại.
+-- p_session_id null / không khớp (người khác, chương khác, đã nguội > 30 phút)
+-- → mở phiên mới.
+alter table public.reading_sessions
+  add column if not exists words_reached integer;
+
+do $$ begin
+  alter table public.reading_sessions add constraint reading_sessions_words_reached_check
+    check (words_reached is null or words_reached >= 0);
+exception when duplicate_object then null; end $$;
+
+-- Slice 2.5a (migrations/archive/20260926_add_scoring_tracking.sql): thêm words_reached.
+create or replace function public.record_reading_heartbeat(
+  p_user_id uuid,
+  p_session_id uuid,
+  p_chapter_id uuid,
+  p_paragraph integer,
+  p_source text
+) returns table (session_id uuid, active_seconds integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row public.reading_sessions;
+  v_book uuid;
+  v_words integer;
+  v_elapsed numeric;
+  v_source text := case when p_source in ('contest', 'trending', 'search', 'profile', 'recommendation', 'other') then p_source else null end;
+begin
+  -- Số chữ tới hết đoạn p_paragraph (mảng 1-based; vượt số đoạn thì lấy hết chương).
+  select ch.book_id,
+         public.contest_word_count(array_to_string(
+           (string_to_array(ch.content, E'\n\n'))[1 : greatest(coalesce(p_paragraph, 0), 0) + 1], E'\n'))
+    into v_book, v_words
+  from public.chapters ch where ch.id = p_chapter_id;
+  if v_book is null then
+    raise exception 'Chapter % not found', p_chapter_id using hint = 'chapter_not_found';
+  end if;
+
+  if p_session_id is not null then
+    select * into v_row from public.reading_sessions
+    where id = p_session_id and user_id = p_user_id and chapter_id = p_chapter_id
+      and last_heartbeat_at > now() - interval '30 minutes'
+    for update;
+  end if;
+
+  if v_row.id is null then
+    insert into public.reading_sessions (user_id, chapter_id, book_id, start_time, end_time, last_heartbeat_at, max_paragraph, words_reached, source)
+    values (p_user_id, p_chapter_id, v_book, now(), now(), now(), greatest(coalesce(p_paragraph, 0), 0), v_words, v_source)
+    returning * into v_row;
+    return query select v_row.id, v_row.active_seconds;
+    return;
+  end if;
+
+  -- Khoảng thời gian THẬT từ nhịp trước. Quá 90 giây = đã bỏ đi / tab ẩn → không cộng.
+  v_elapsed := extract(epoch from (now() - v_row.last_heartbeat_at));
+  update public.reading_sessions s
+     set active_seconds = s.active_seconds + case when v_elapsed <= 90 then floor(v_elapsed)::integer else 0 end,
+         last_heartbeat_at = now(),
+         end_time = now(),
+         max_paragraph = greatest(coalesce(s.max_paragraph, 0), coalesce(p_paragraph, 0)),
+         words_reached = greatest(coalesce(s.words_reached, 0), v_words),
+         drop_off_offset = greatest(coalesce(p_paragraph, 0), 0),
+         source = coalesce(s.source, v_source)
+   where s.id = v_row.id
+  returning * into v_row;
+  return query select v_row.id, v_row.active_seconds;
+end;
+$$;
+
+revoke execute on function public.record_reading_heartbeat(uuid, uuid, uuid, integer, text) from public, anon, authenticated;
+grant execute on function public.record_reading_heartbeat(uuid, uuid, uuid, integer, text) to service_role;
+
+-- ===========================================================================
+-- Hot-path indexes — migrations/20260929_add_hot_path_indexes.sql
+-- ===========================================================================
+create index if not exists reading_history_user_chapter_read_idx
+  on public.reading_history (user_id, chapter_id, read_at);
+create index if not exists reading_history_user_read_at_idx
+  on public.reading_history (user_id, read_at desc) include (book_id);
+
+-- ===========================================================================
+-- Ranking aggregates — migrations/20260929_add_ranking_aggregates.sql
+-- ===========================================================================
+create index if not exists reading_history_read_at_idx
+  on public.reading_history (read_at) include (book_id);
+
+create or replace function public.book_read_counts_between(p_from timestamptz, p_to timestamptz)
+returns table (book_id uuid, read_count integer)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select rh.book_id, count(*)::integer as read_count
+  from public.reading_history rh
+  where rh.read_at >= p_from and rh.read_at < p_to
+  group by rh.book_id;
+$$;
+
+revoke execute on function public.book_read_counts_between(timestamptz, timestamptz) from public;
+grant execute on function public.book_read_counts_between(timestamptz, timestamptz) to anon, authenticated, service_role;
+
+-- 2. Thống kê chương đã publish theo sách — thay cho việc tải mọi hàng
+-- chapters để đếm (home, rankings, thẻ truyện). Chạy với quyền owner nên
+-- lọc ĐÚNG điều kiện công khai của policy "published chapters follow their
+-- book's visibility": chương published của sách published, chưa xoá.
+create or replace view public.book_chapter_stats as
+  select c.book_id,
+         count(*)::integer as published_chapter_count,
+         bool_or(c.is_last_chapter) as has_published_last_chapter,
+         max(c.created_at) as latest_published_chapter_at
+  from public.chapters c
+  join public.books b on b.id = c.book_id
+  where c.published and b.published and b.deleted_at is null
+  group by c.book_id;
+
+grant select on public.book_chapter_stats to anon, authenticated, service_role;
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/04_wallet_and_payments.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 04 — Ví token & thanh toán  (04_wallet_and_payments.sql)
+-- =======================================================================
+-- Phạm vi: Cột ví/phạt chụp màn hình/ngân hàng trên profiles,
+-- transaction_type/status, transactions + apply_transaction(), settle
+-- pending, nạp tiền, rút tiền, mua chương, thưởng nền tảng.
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     transactions, deposit_transactions, withdrawal_requests,
+--     purchase_transactions, platform_revenue_entries, platform_bonus_grants
+--   Hàm:
+--     apply_transaction, settle_pending_transaction,
+--     settle_due_pending_transactions, create_withdrawal_request,
+--     mark_withdrawal_result, create_purchase, grant_platform_bonus
+--   Kiểu (enum):
+--     transaction_type, transaction_status, deposit_status,
+--     withdrawal_status
+--   Thêm cột vào bảng của file trước:
+--     profiles.{token_balance, token_balance_pending,
+--     screenshot_penalty_count, screenshot_penalty_expires_at,
+--     screenshot_penalty_banned, screenshot_penalty_last_offense_at,
+--     cccd_last4, bank_code, bank_name, bank_account_number,
+--     bank_account_name}
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260806_add_penalty_percent.sql, 20260807_wallet_ledger_extension.sql,
+--   20260826_add_profile_bank_info.sql, 20260827_add_bank_account_name.sql,
+--   20260827_add_quest_reward_transaction_type.sql,
+--   20260827_add_streak_bonus_transaction_type.sql,
+--   20260827_add_streak_rescue_transaction_type.sql,
+--   20260827_drop_stale_apply_transaction_overloads.sql,
+--   20260827_restrict_sensitive_rpc_execute_grants.sql,
+--   20260901_add_order_earning_transaction_type.sql,
+--   20260901_add_order_payment_transaction_type.sql,
+--   20260901_add_order_refund_transaction_type.sql,
+--   20260908_add_achievement_bonus_transaction_type.sql,
+--   20260909_add_purchase_transactions_unique_buyer_chapter.sql
+--   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
 
 -- =======================================================================
 -- Phần bổ sung: ví token & lịch sử giao dịch, nhiệm vụ hàng ngày, gợi ý
@@ -800,7 +1622,7 @@ alter table public.profiles add column screenshot_penalty_last_offense_at timest
 -- Ngân hàng thụ hưởng để rút token (src/components/profile/bank-info-form.tsx)
 -- + 4 chữ số cuối CCCD để hiện dạng che bớt trong Thông tin cá nhân, không
 -- cần SELECT bảng identity_verifications nhạy cảm hơn cho việc đó — xem
--- migrations/20260826_add_profile_bank_info.sql. Rút token
+-- migrations/archive/20260826_add_profile_bank_info.sql. Rút token
 -- (create_withdrawal_request bên dưới, cùng phần 6) chỉ dùng được khi
 -- cccd_verified = true VÀ đủ 3 cột ngân hàng — xem
 -- WithdrawalService.requestWithdrawal.
@@ -810,19 +1632,15 @@ alter table public.profiles add column bank_name text;
 alter table public.profiles add column bank_account_number text;
 
 -- Tên chủ tài khoản ngân hàng — người dùng TỰ NHẬP, KHÔNG ép = real_name
--- nữa (xem migrations/20260827_add_bank_account_name.sql: chủ tài khoản
+-- nữa (xem migrations/archive/20260827_add_bank_account_name.sql: chủ tài khoản
 -- có thể khác người lập hồ sơ — mượn tài khoản người thân — và nhiều
 -- ngân hàng in tên không dấu, so khớp cứng với real_name có dấu sẽ sai
 -- dù đúng người). Thông tin do người dùng khai, sai thì trách nhiệm
 -- thuộc về người dùng.
 alter table public.profiles add column bank_account_name text;
 
--- Mô tả bản thân + mốc lần đổi nickname gần nhất (tab "Thông tin cá nhân",
--- src/components/profile/edit-profile-tab.tsx) — nickname_updated_at chỉ
--- dùng để enforce cooldown 30 ngày ở tầng ứng dụng
--- (src/app/api/profile/me/route.ts), không phải cột hiển thị.
-alter table public.profiles add column bio text;
-alter table public.profiles add column nickname_updated_at timestamptz;
+-- bio + nickname_updated_at: đã chuyển vào CREATE TABLE public.profiles
+-- (phần 1) — view author_public_profiles cần cột bio tồn tại trước.
 
 create type public.transaction_type as enum (
   'signup_bonus', 'daily_task_reward', 'purchase_chapter', 'topup', 'refund', 'admin_adjustment', 'screenshot_penalty',
@@ -830,7 +1648,7 @@ create type public.transaction_type as enum (
   -- vế cộng (pending) cho tác giả — xem phần 6e — tách riêng để không bao
   -- giờ lẫn 2 chiều của 1 giao dịch khi rà lịch sử.
   'purchase_credit', 'withdrawal', 'platform_bonus',
-  -- Thêm bởi migrations/20260827_add_quest_reward_transaction_type.sql,
+  -- Thêm bởi migrations/archive/20260827_add_quest_reward_transaction_type.sql,
   -- 20260827_add_streak_bonus_transaction_type.sql,
   -- 20260827_add_streak_rescue_transaction_type.sql.
   'quest_reward', 'streak_bonus', 'streak_rescue',
@@ -838,17 +1656,17 @@ create type public.transaction_type as enum (
   -- ngay của buyer khi đặt cọc/thanh toán; 'order_earning' là vế cộng
   -- (pending, hold period) của seller tại thời điểm buyer_confirmed/
   -- auto_confirmed — xem phần 12b, KHÔNG ghi lúc đặt cọc. Thêm bởi
-  -- migrations/20260901_add_order_payment_transaction_type.sql,
+  -- migrations/archive/20260901_add_order_payment_transaction_type.sql,
   -- 20260901_add_order_earning_transaction_type.sql.
   'order_payment', 'order_earning',
   -- Hoàn tiền khi hủy Order (Mục 5.1) — cộng ngay (status='completed'),
   -- không qua hold period. Thêm bởi
-  -- migrations/20260901_add_order_refund_transaction_type.sql.
+  -- migrations/archive/20260901_add_order_refund_transaction_type.sql.
   'order_refund',
   -- Thưởng thành tựu (author/narrator/designer) — reference_type =
   -- 'achievement', reference_id = achievement_templates.id. Chỉ ghi khi
   -- achievement_templates.reward_tokens > 0. Thêm bởi
-  -- migrations/20260908_add_achievement_bonus_transaction_type.sql.
+  -- migrations/archive/20260908_add_achievement_bonus_transaction_type.sql.
   'achievement_bonus'
 );
 
@@ -979,7 +1797,7 @@ $$ language plpgsql security definer;
 -- Chỉ service_role gọi được. KHÔNG ghi danh sách tham số (chỉ tên hàm) —
 -- an toàn vì tên này không bị overload, và tránh lệch chữ ký nếu chạy
 -- migration ở project chưa cập nhật hết. Xem
--- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.apply_transaction from public, anon, authenticated;
 grant execute on function public.apply_transaction to service_role;
 
@@ -1041,7 +1859,7 @@ $$ language plpgsql security definer;
 
 -- Hàm nội bộ của cron (vercel.json + api/wallet/cron/settle-pending) —
 -- không cần/không nên gọi từ client. Chỉ service_role gọi được. Xem
--- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.settle_pending_transaction from public, anon, authenticated;
 revoke execute on function public.settle_due_pending_transactions from public, anon, authenticated;
 grant execute on function public.settle_pending_transaction to service_role;
@@ -1147,7 +1965,7 @@ $$ language plpgsql security definer;
 -- p_user_id trần — nếu gọi được trực tiếp, user tự tạo yêu cầu rút tiền
 -- TRỪ số dư NGƯỜI KHÁC, chuyển vào ngân hàng do MÌNH chỉ định. Chỉ
 -- service_role gọi được. Xem
--- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.create_withdrawal_request from public, anon, authenticated;
 grant execute on function public.create_withdrawal_request to service_role;
 
@@ -1202,7 +2020,7 @@ $$ language plpgsql security definer;
 -- request CỦA CHÍNH MÌNH (id tự xem được qua policy select) để tự tạo
 -- hoàn tiền giả trong khi giao dịch rút tiền thật vẫn có thể được xử lý
 -- song song ở gateway thật (double-dip). Chỉ service_role gọi được. Xem
--- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.mark_withdrawal_result from public, anon, authenticated;
 grant execute on function public.mark_withdrawal_result to service_role;
 
@@ -1225,7 +2043,7 @@ create table public.purchase_transactions (
 
 -- Chặn mua trùng 1 chương (2 request gần như đồng thời cùng qua được check
 -- "đã mua chưa" ở tầng app) — xem
--- migrations/20260909_add_purchase_transactions_unique_buyer_chapter.sql +
+-- migrations/archive/20260909_add_purchase_transactions_unique_buyer_chapter.sql +
 -- POST /api/chapters/[chapterId]/purchase (bắt lỗi 23505, coi như đã sở hữu).
 create unique index if not exists purchase_transactions_buyer_chapter_key
   on public.purchase_transactions (buyer_id, chapter_id);
@@ -1307,7 +2125,7 @@ $$ language plpgsql security definer;
 -- tiếp, user tự đặt author_id = mình, buyer_id = NGƯỜI KHÁC để trừ tiền
 -- người khác, cộng doanh thu cho mình mà không cần mua gì. Chỉ
 -- service_role gọi được. Xem
--- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.create_purchase from public, anon, authenticated;
 grant execute on function public.create_purchase to service_role;
 
@@ -1374,9 +2192,70 @@ $$ language plpgsql security definer;
 -- theo tham số vẫn còn nếu sau này có endpoint khác gọi hàm này mà không
 -- tự resolve p_admin_id từ session — xem note trong migration. Chỉ
 -- service_role gọi được. Xem
--- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.grant_platform_bonus from public, anon, authenticated;
 grant execute on function public.grant_platform_bonus to service_role;
+
+create index if not exists transactions_user_created_idx
+  on public.transactions (user_id, created_at desc);
+
+create index if not exists purchase_transactions_chapter_idx
+  on public.purchase_transactions (chapter_id);
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/05_quests_and_achievements.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 05 — Nhiệm vụ & thành tựu  (05_quests_and_achievements.sql)
+-- =======================================================================
+-- Phạm vi: Nhiệm vụ hàng ngày, Quest System (taxonomy, pool mẫu, nhiệm vụ
+-- ẩn, reset, streak + mốc thưởng, cứu streak, quest pool ngày), hạ tầng
+-- Python quest_generation_jobs, gate for_role, thành tựu.
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     task_templates, user_daily_tasks, quest_examples_pool, hidden_quests,
+--     user_hidden_quest_progress, quest_reset_events, streak_milestones,
+--     user_streak_milestone_claims, user_quest_pool, quest_generation_jobs,
+--     achievement_templates, user_achievements
+--   Hàm:
+--     increment_task_progress, set_task_progress, claim_daily_task,
+--     complete_hidden_quest, enforce_quest_streak_authority,
+--     claim_streak_milestone, sync_reading_streak,
+--     rescue_streak_with_tokens, create_quest_pool_for_today,
+--     reset_quest_pool_slot, sync_user_achievements
+--   Thêm cột vào bảng của file trước:
+--     profiles.{current_quest_streak, streak_updated_at,
+--     streak_rest_days_banked, streak_at_risk_since}
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260827_add_hidden_quests.sql, 20260827_add_quest_examples_pool.sql,
+--   20260827_add_quest_reset_events.sql,
+--   20260827_add_quest_reward_transaction_type.sql,
+--   20260827_add_quest_streak_to_profiles.sql,
+--   20260827_add_streak_bonus_transaction_type.sql,
+--   20260827_add_streak_milestones.sql,
+--   20260827_add_streak_rescue_transaction_type.sql,
+--   20260827_add_streak_sync_functions.sql,
+--   20260827_extend_task_templates_for_quests.sql,
+--   20260827_restrict_sensitive_rpc_execute_grants.sql,
+--   20260828_add_quest_generation_jobs.sql,
+--   20260828_add_user_quest_pool.sql,
+--   20260908_add_achievement_bonus_transaction_type.sql,
+--   20260908_add_achievements.sql,
+--   20260908_add_task_template_role_gating.sql,
+--   20260917_add_reading_event_log.sql,
+--   20260918_add_streak_quests_and_time_windows.sql,
+--   20260919_add_bookmark_and_tag_achievements.sql,
+--   20260919_add_characters.sql,
+--   20260919_add_reading_behavior_achievements.sql,
+--   20260927_add_contest_quests.sql
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql, 03_reading.sql, 04_wallet_and_payments.sql
+-- Tham chiếu tới file SAU chỉ nằm trong thân hàm plpgsql (bind lúc chạy,
+-- không cần khi tạo): 07_design.sql, 08_audio.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
 
 -- ---------------------------------------------------------------------
 -- 7. Nhiệm vụ hàng ngày
@@ -1455,7 +2334,7 @@ $$ language plpgsql security definer;
 
 -- p_user_id trần — nếu gọi được trực tiếp, user tự ghi/hoàn thành tiến
 -- trình nhiệm vụ hàng ngày của NGƯỜI KHÁC. Chỉ service_role gọi được. Xem
--- migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.increment_task_progress from public, anon, authenticated;
 grant execute on function public.increment_task_progress to service_role;
 
@@ -1463,7 +2342,7 @@ grant execute on function public.increment_task_progress to service_role;
 -- không phải số lần hành động trong ngày — GHI ĐÈ progress thay vì cộng
 -- dồn như increment_task_progress ở trên. An toàn overwrite trong cùng 1
 -- ngày vì nguồn trạng thái (sync_reading_streak) không giảm giữa ngày. Xem
--- migrations/20260918_add_streak_quests_and_time_windows.sql.
+-- migrations/archive/20260918_add_streak_quests_and_time_windows.sql.
 create function public.set_task_progress(p_user_id uuid, p_task_code text, p_progress integer)
 returns public.user_daily_tasks as $$
 declare
@@ -1522,7 +2401,7 @@ $$ language plpgsql security definer;
 -- p_user_id trần — mức hại thấp hơn các hàm khác ở trên (chỉ cho phép
 -- ép claim thưởng CỦA NGƯỜI KHÁC, tiền vẫn về đúng người đó, không bị
 -- cướp), nhưng vẫn không nên gọi trực tiếp từ client. Chỉ service_role
--- gọi được. Xem migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+-- gọi được. Xem migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 revoke execute on function public.claim_daily_task from public, anon, authenticated;
 grant execute on function public.claim_daily_task to service_role;
 
@@ -1543,943 +2422,6 @@ grant execute on function public.claim_daily_task to service_role;
 -- dashboard), và cân nhắc chi phí insert nếu số lượng user lớn.
 
 -- ---------------------------------------------------------------------
--- 8. Gợi ý truyện (pgvector)
--- ---------------------------------------------------------------------
--- Bật extension pgvector (Database → Extensions, hoặc chạy lệnh dưới nếu
--- role của bạn có quyền).
-create extension if not exists vector;
-
--- Kích thước vector tuỳ model embedding bạn dùng để sinh (ví dụ
--- text-embedding-3-small của OpenAI = 1536 chiều). Sinh embedding từ
--- title + synopsis (+ có thể vài chương đầu) mỗi khi sách được publish,
--- lưu vào cột này từ code server (không sinh trong SQL).
-alter table public.books add column embedding vector(1536);
-
--- Lịch sử đọc — vừa là input để tính gợi ý, vừa là dữ liệu phân tích nói
--- chung (sách nào được đọc nhiều, bỏ dở ở đâu, v.v.).
-create table public.reading_history (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  book_id uuid not null references public.books (id) on delete cascade,
-  chapter_id uuid references public.chapters (id) on delete set null,
-  read_at timestamptz not null default now()
-);
-
-alter table public.reading_history enable row level security;
-
--- SELECT-only cho chủ hàng — bảng này nuôi streak + achievement metric
--- (tiền thưởng thật) từ migrations/20260917_add_reading_event_log.sql, nên
--- không còn cho phép user tự INSERT/UPDATE/DELETE thẳng qua Supabase
--- client nữa. Ghi DUY NHẤT qua record_chapter_read() (SECURITY DEFINER,
--- service_role) ở dưới.
-create policy "users view their own reading history"
-  on public.reading_history for select
-  using (auth.uid() = user_id);
-
--- Gọi khi user thật sự đọc hết 1 chương (cuộn tới đoạn cuối cùng — xem
--- src/components/reading/reader.tsx +
--- src/app/api/books/[bookId]/reading-progress/route.ts). Dedupe theo
--- (user_id, chapter_id, NGÀY server/UTC) — trả NULL nếu đã ghi hôm nay, để
--- caller (TS) biết KHÔNG lặp lại side-effect (tăng tiến trình nhiệm vụ,
--- gọi streak) cho cùng 1 lần hoàn thành do client gửi lại. Xem
--- migrations/20260917_add_reading_event_log.sql.
-create function public.record_chapter_read(p_user_id uuid, p_book_id uuid, p_chapter_id uuid)
-returns public.reading_history as $$
-declare
-  v_row public.reading_history;
-begin
-  if exists (
-    select 1 from public.reading_history
-    where user_id = p_user_id and chapter_id = p_chapter_id and read_at::date = current_date
-  ) then
-    return null;
-  end if;
-
-  insert into public.reading_history (user_id, book_id, chapter_id)
-  values (p_user_id, p_book_id, p_chapter_id)
-  returning * into v_row;
-
-  return v_row;
-end;
-$$ language plpgsql security definer;
-
--- p_user_id trần — chỉ service_role gọi được, cùng lý do increment_task_progress.
-revoke execute on function public.record_chapter_read from public, anon, authenticated;
-grant execute on function public.record_chapter_read to service_role;
-
--- View công khai, đã ẩn danh (không có user_id) — số lượt đọc mỗi SÁCH
--- theo TỪNG NGÀY, dùng để tính bảng xếp hạng tuần/tháng/quý thật ở
--- /rankings (src/lib/rankings/get-book-rankings.ts). Cùng lý do
--- chapter_vote_counts ở dưới không bị RLS bảng gốc chặn: view chạy với
--- quyền OWNER. Xem migrations/20260831_add_book_read_counts_daily.sql.
-create view public.book_read_counts_daily as
-  select book_id, date_trunc('day', read_at)::date as read_date, count(*)::integer as read_count
-  from public.reading_history
-  group by book_id, date_trunc('day', read_at)::date;
-
--- --- Vote theo-chương, dạng toggle (bấm lại = bỏ vote) — nút "Bình chọn"
--- trên trang đọc CHƯA được xây (phase sau); schema này chuẩn bị trước để
--- trang giới thiệu truyện có cột số để hiển thị (sẽ luôn là 0 cho tới khi
--- nút vote thật ra mắt). Bảng gốc chỉ chủ vote xem được dòng của mình
--- (giống reading_history) — aggregate công khai đi qua view riêng, giống
--- pattern public_design_items ở phần 9. Xem
--- migrations/20260824_add_chapter_votes.sql. ---
-create table public.chapter_votes (
-  id uuid primary key default gen_random_uuid(),
-  chapter_id uuid not null references public.chapters (id) on delete cascade,
-  user_id uuid not null references auth.users (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  unique (chapter_id, user_id)
-);
-
-create index chapter_votes_chapter_id_idx on public.chapter_votes (chapter_id);
-
-alter table public.chapter_votes enable row level security;
-
-create policy "users manage their own chapter votes"
-  on public.chapter_votes for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create view public.chapter_vote_counts as
-  select chapter_id, count(*)::integer as vote_count
-  from public.chapter_votes
-  group by chapter_id;
-
--- Tổng vote của 1 SÁCH = SUM(vote_count) mọi chương thuộc sách đó, tính ở
--- tầng app — không cần view/cột riêng ở cấp books.
-
--- --- "Chương đọc gần nhất" cho nút "Tiếp tục đọc" — 1 dòng/cặp (user,
--- sách), tra O(1). Cố ý là bảng RIÊNG, không thêm unique vào
--- reading_history ở trên (bảng đó là log đầy đủ cho recommend_books() và
--- phân tích, không được rút gọn). Xem
--- migrations/20260824_add_book_progress.sql. ---
-create table public.book_progress (
-  user_id uuid not null references auth.users (id) on delete cascade,
-  book_id uuid not null references public.books (id) on delete cascade,
-  chapter_id uuid not null references public.chapters (id) on delete cascade,
-  updated_at timestamptz not null default now(),
-  primary key (user_id, book_id)
-);
-
--- Nhớ ĐOẠN VĂN cụ thể trong chapter_id ở trên — null = chưa có/chưa cuộn
--- qua đoạn nào, reader.tsx coi như "bắt đầu từ đầu chương". Chỉ áp dụng
--- khi mở LẠI đúng chapter_id này — route reading-progress luôn ghi đè cả
--- 2 cột cùng lúc để không lệch nhau. Xem
--- migrations/20260910_add_book_progress_paragraph.sql.
-alter table public.book_progress
-  add column last_paragraph_index integer check (last_paragraph_index is null or last_paragraph_index >= 0);
-
-alter table public.book_progress enable row level security;
-
-create policy "users manage their own book progress"
-  on public.book_progress for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
--- --- "Đang nghe dở" cho Audio hub — cùng shape/lý do với book_progress ở
--- trên, nhưng cho audio_narrations thay vì books/chapters: 1 dòng/(user,
--- audio), upsert khi lưu (không phải log append-only). Powers "Audio đang
--- nghe" (dòng updated_at mới nhất) và "Nghe tiếp" (vài dòng kế tiếp) trên
--- /audio bằng dữ liệu thật — không có dòng nào thì không hiện gì, không
--- bịa số. Xem migrations/20260901_add_audio_narration_hub_metadata.sql. ---
-create table public.audio_progress (
-  user_id uuid not null references auth.users (id) on delete cascade,
-  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
-  position_seconds integer not null default 0,
-  updated_at timestamptz not null default now(),
-  primary key (user_id, audio_narration_id),
-  constraint audio_progress_position_seconds_check check (position_seconds >= 0)
-);
-
-alter table public.audio_progress enable row level security;
-
-create policy "users manage their own audio progress"
-  on public.audio_progress for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
--- --- "Danh sách đọc" kiểu playlist YouTube — mỗi danh sách chứa nguyên
--- SÁCH (không phải chương lẻ), 1 user có nhiều danh sách. 2 bảng, giống
--- quan hệ books/chapters: 1 bảng cha (metadata danh sách) + 1 bảng con FK
--- vào cha (sách nào nằm trong danh sách nào). Route API thật (add/remove
--- item) dùng service-role + tự kiểm reading_lists.user_id = userId trước
--- khi ghi — RLS dưới đây chỉ defense-in-depth. Xem
--- migrations/20260824_add_reading_lists.sql. ---
-create table public.reading_lists (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  name text not null check (char_length(trim(name)) > 0),
-  created_at timestamptz not null default now()
-);
-
-create index reading_lists_user_id_idx on public.reading_lists (user_id);
-
-alter table public.reading_lists enable row level security;
-
-create policy "users manage their own reading lists"
-  on public.reading_lists for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create table public.reading_list_items (
-  list_id uuid not null references public.reading_lists (id) on delete cascade,
-  book_id uuid not null references public.books (id) on delete cascade,
-  added_at timestamptz not null default now(),
-  primary key (list_id, book_id)
-);
-
-create index reading_list_items_book_id_idx on public.reading_list_items (book_id);
-
-alter table public.reading_list_items enable row level security;
-
--- Không có user_id trực tiếp trên bảng này — ownership đi qua
--- list_id -> reading_lists.user_id, giống pattern "chapters" join tới
--- "books.author_id" ở phần 3.
-create policy "users manage items in their own reading lists"
-  on public.reading_list_items for all
-  using (exists (select 1 from public.reading_lists rl where rl.id = list_id and rl.user_id = auth.uid()))
-  with check (exists (select 1 from public.reading_lists rl where rl.id = list_id and rl.user_id = auth.uid()));
-
--- Index gần-đúng cho tìm kiếm vector nhanh trên tập sách lớn (bỏ qua nếu
--- catalog còn nhỏ — dưới ~10k sách thì quét tuần tự vẫn đủ nhanh).
--- create index on public.books using ivfflat (embedding vector_cosine_ops) with (lists = 100);
-
--- Gợi ý = sách có embedding gần với "vector trung bình" các sách user đã
--- đọc gần đây, loại trừ sách đã đọc, chỉ lấy sách đã publish.
-create function public.recommend_books(p_user_id uuid, p_limit integer default 10)
-returns setof public.books as $$
-declare
-  v_profile_vector vector(1536);
-begin
-  -- Lưu ý: KHÔNG viết `select avg(embedding) ... order by ... limit 20`
-  -- trực tiếp — vì avg() là aggregate nên toàn bộ hàng khớp điều kiện sẽ
-  -- được gộp trước, ORDER BY/LIMIT ở ngoài chỉ tác dụng lên 1 dòng kết quả
-  -- cuối cùng (vô nghĩa). Phải giới hạn 20 lượt đọc gần nhất trong subquery
-  -- TRƯỚC, rồi mới avg() trên tập đã giới hạn đó.
-  select avg(embedding) into v_profile_vector
-  from (
-    select b.embedding
-    from public.reading_history rh
-    join public.books b on b.id = rh.book_id
-    where rh.user_id = p_user_id and b.embedding is not null
-    order by rh.read_at desc
-    limit 20 -- chỉ lấy 20 lượt đọc gần nhất, tránh gu đọc cũ kéo lệch gợi ý
-  ) recent_reads;
-
-  if v_profile_vector is null then
-    -- Chưa có lịch sử đọc (user mới) — fallback: trả sách publish gần đây
-    -- nhất thay vì rỗng. Cân nhắc đổi thành "sách trending" nếu có bảng đó.
-    return query
-      select * from public.books
-      where published
-      order by created_at desc
-      limit p_limit;
-  else
-    return query
-      select b.* from public.books b
-      where b.published
-        and b.embedding is not null
-        and b.id not in (select book_id from public.reading_history where user_id = p_user_id)
-      order by b.embedding <=> v_profile_vector -- cosine distance, càng nhỏ càng giống
-      limit p_limit;
-  end if;
-end;
-$$ language plpgsql stable;
-
--- Gọi từ Next.js: const { data } = await supabase.rpc('recommend_books', { p_user_id: userId });
--- `security invoker` mặc định (không thêm security definer) — hàm chạy
--- với quyền của người gọi, RLS của `books`/`reading_history` vẫn áp dụng
--- bình thường, không cần lo hàm này lộ dữ liệu ngoài phạm vi cho phép.
-
--- ---------------------------------------------------------------------
--- 9. Audio & Thiết kế — kho độc lập, liên kết vào truyện qua SHARE LINK
--- ---------------------------------------------------------------------
--- Mô hình (bản sửa — thêm cơ chế share-token, giống Google Drive):
---
---   • Diễn viên lồng tiếng / họa sĩ upload TỰ DO vào kho Audio / Thiết kế
---     — độc lập, không cần thuộc về chương/truyện nào cả lúc tạo.
---   • Kho này CÓ trang duyệt công khai (ai cũng xem/nghe được, giống
---     browse file "chỉ xem" trên Drive) — nhưng xem công khai KHÔNG đồng
---     nghĩa với việc ai cũng link được vào truyện của họ.
---   • Muốn link, tác giả cần đúng "share link" — một chuỗi bí mật
---     (`share_token`) do chủ sở hữu tạo ra và tự tay gửi cho tác giả sau
---     khi thoả thuận ngoài nền tảng. `share_token` KHÔNG xuất hiện ở
---     trang duyệt công khai — chỉ chủ sở hữu xem được token của chính
---     mình để copy đi chia sẻ, y hệt nút "Get link" của Google Drive.
---   • Copy id/URL từ vị trí người nghe/xem (trang duyệt công khai) sẽ
---     KHÔNG link được — vì hàm liên kết bắt buộc kiểm tra token đúng,
---     không chỉ id đúng.
---   • Tác giả tự upload từ máy (không qua ai khác): app tạo hộ 1 dòng
---     audio_narrations/design_items với narrator_id/illustrator_id =
---     chính tác giả, lấy luôn token vừa tạo (họ đang sở hữu, không cần ai
---     cho phép) để tự link cho mình trong cùng 1 thao tác.
-
--- Trên Supabase, pgcrypto thường được cài vào schema "extensions" (không
--- phải "public") — nên mọi lời gọi gen_random_bytes() bên dưới đều chỉ
--- rõ extensions.gen_random_bytes(...), tránh lỗi "function does not exist"
--- nếu search_path không tình cờ bao gồm schema đó.
-create extension if not exists pgcrypto with schema extensions;
-
-create type public.content_source as enum ('independent', 'story_upload');
-
--- --- Kho Thiết kế (ảnh bìa, minh hoạ) ---
-create table public.design_items (
-  id uuid primary key default gen_random_uuid(),
-  illustrator_id uuid not null references auth.users (id) on delete cascade,
-  title text not null,
-  image_url text not null, -- path trong bucket 'design-images'
-  -- Nullable: ảnh bìa tạo tự động qua luồng story_upload không hỏi họa sĩ
-  -- điền gì — chỉ nội dung đăng độc lập ở /thiet-ke/new mới bắt buộc chọn.
-  -- Xem migrations/20260901_add_design_item_gallery_metadata.sql.
-  category text,
-  description text,
-  share_count integer not null default 0,
-  source public.content_source not null default 'independent',
-  -- Chuỗi bí mật để chia sẻ quyền link — 48 ký tự hex (192 bit), không
-  -- đoán được. Đừng lộ cột này ra bất kỳ view/API công khai nào.
-  share_token text not null default encode(extensions.gen_random_bytes(24), 'hex'),
-  created_at timestamptz not null default now(),
-  constraint design_items_share_count_check check (share_count >= 0),
-  constraint design_items_category_check
-    check (category is null or category in ('bia_truyen', 'minh_hoa', 'fan_art', 'poster_audio'))
-);
-
-alter table public.design_items enable row level security;
-
--- CHỈ chủ sở hữu xem được toàn bộ dòng (bao gồm share_token, để họ copy
--- đi chia sẻ) — KHÔNG có policy "public select" trên bảng gốc này.
-create policy "illustrators view their own design items (incl. share token)"
-  on public.design_items for select
-  using (auth.uid() = illustrator_id);
-
-create policy "illustrators insert their own design items"
-  on public.design_items for insert
-  with check (auth.uid() = illustrator_id);
-
-create policy "illustrators update their own design items"
-  on public.design_items for update
-  using (auth.uid() = illustrator_id);
-
-create policy "illustrators delete their own design items"
-  on public.design_items for delete
-  using (auth.uid() = illustrator_id);
-
--- View công khai cho trang "duyệt kho Thiết kế" — CỐ Ý không có
--- share_token. Đây là view app dùng để hiện danh sách công khai. Lọc
--- deleted_at is null ngay ở đây (xem
--- migrations/20260919_add_design_albums_and_multi_upload.sql) — MỌI nơi
--- đọc công khai (gallery/search/comments/likes) đi qua view này, không
--- đọc bảng gốc, nên chỉ cần lọc 1 chỗ.
-create view public.public_design_items as
-  select id, illustrator_id, title, image_url, source, created_at, category, description, share_count,
-         album_id, alt_text, published_at
-  from public.design_items
-  where deleted_at is null and published_at is not null;
-
--- Bảng riêng cho lượt thích (toggle, 1 dòng/(tác phẩm, người thích)) —
--- cùng pattern "aggregate qua view riêng, bảng gốc owner-only RLS" như
--- chapter_votes/chapter_vote_counts. Xem
--- migrations/20260901_add_design_item_gallery_metadata.sql.
-create table public.design_item_likes (
-  design_item_id uuid not null references public.design_items (id) on delete cascade,
-  user_id uuid not null references auth.users (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (design_item_id, user_id)
-);
-
-create index design_item_likes_design_item_id_idx on public.design_item_likes (design_item_id);
-
-alter table public.design_item_likes enable row level security;
-
-create policy "users manage their own design item likes"
-  on public.design_item_likes for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create view public.design_item_like_counts as
-  select design_item_id, count(*)::integer as like_count
-  from public.design_item_likes
-  group by design_item_id;
-
--- --- Albums ("board") — long-lived grouping of design_items, shared name
--- + art_style across every item in it (xem
--- migrations/20260919_add_design_albums_and_multi_upload.sql). Hiện ở cả
--- form đăng /thiet-ke/new VÀ trang duyệt công khai /thiet-ke (khác nhãn
--- nội bộ chỉ dùng lúc đăng) — không có cột bí mật nào nên select công khai
--- thẳng trên bảng gốc, không cần view public_* riêng như design_items. ---
-create table public.design_albums (
-  id uuid primary key default gen_random_uuid(),
-  illustrator_id uuid not null references auth.users (id) on delete cascade,
-  name text not null,
-  -- 10 giá trị lấy từ cột "Phong cách nghệ thuật" của mega-menu
-  -- (nav-strip-links.tsx) — xem src/lib/design/art-styles.ts.
-  art_style text not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint design_albums_art_style_check
-    check (art_style in (
-      'anime_manga', 'ban_ta_thuc', 'ta_thuc', 'chibi', 'flat_vector',
-      'co_trang', 'dark_fantasy', 'pixel_art', 'painterly', 'render_3d'
-    ))
-);
-
-create index design_albums_illustrator_id_idx on public.design_albums (illustrator_id);
-
-alter table public.design_albums enable row level security;
-
-create policy "anyone can view design albums"
-  on public.design_albums for select
-  using (true);
-
-create policy "illustrators insert their own design albums"
-  on public.design_albums for insert
-  with check (auth.uid() = illustrator_id);
-
-create policy "illustrators update their own design albums"
-  on public.design_albums for update
-  using (auth.uid() = illustrator_id);
-
-create policy "illustrators delete their own design albums"
-  on public.design_albums for delete
-  using (auth.uid() = illustrator_id);
-
--- --- design_items: album_id/alt_text/deleted_at (mở rộng theo cùng
--- migration ở trên) — category_check mở rộng 4 → 14 giá trị, CỘNG THÊM
--- không remap: 'bia_truyen'/'fan_art' giữ nguyên slug (chỉ đổi nhãn hiện ở
--- UI thành "Bìa truyện/sách"/"Fanart"), 'minh_hoa'/'poster_audio' giữ
--- nguyên không đổi, 10 slug mới cho các mục mega-menu chưa có tương đương.
--- Xem src/lib/design/get-design-gallery.ts (DESIGN_CATEGORIES). ---
-alter table public.design_items
-  add column album_id uuid references public.design_albums (id) on delete set null,
-  add column alt_text text,
-  add column deleted_at timestamptz;
-
-create index design_items_album_id_idx on public.design_items (album_id) where album_id is not null;
-
-alter table public.design_items drop constraint design_items_category_check;
-alter table public.design_items
-  add constraint design_items_category_check
-  check (category is null or category in (
-    'bia_truyen', 'nhan_vat_don', 'nhan_vat_nhom', 'vu_khi_trang_bi',
-    'boi_canh_phong_canh', 'linh_vat', 'trang_phuc', 'chibi_deform',
-    'emote_pack', 'logo_icon', 'fan_art', 'tranh_doi', 'minh_hoa', 'poster_audio'
-  ));
-
--- Cột-cấp GRANT — policy "illustrators update their own design items" ở
--- trên chỉ chặn theo HÀNG, không theo CỘT, nên nếu không có REVOKE/GRANT
--- này, client tự PATCH thẳng share_token/image_url qua Supabase REST API
--- được, bỏ qua regenerate_design_share_token() và route upload. Cùng
--- pattern books (20260825_restrict_books_column_grants.sql).
-revoke update on public.design_items from authenticated;
-grant update (title, description, category, alt_text, album_id, deleted_at) on public.design_items to authenticated;
-
--- --- design_items: published_at (xem
--- migrations/20260921_add_design_item_publish_state.sql) — null = draft
--- riêng của họa sĩ (chưa hiện qua public_design_items ở trên), có giá trị
--- = đã công khai. POST /api/design (đăng ảnh) không set cột này, mặc
--- định NULL; POST /api/design/publish (bấm "Hoàn tất") là nơi duy nhất
--- set = now(). ---
-alter table public.design_items
-  add column published_at timestamptz;
-
-grant update (published_at) on public.design_items to authenticated;
-
--- security definer: tăng share_count an toàn dưới race condition, không
--- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 tác phẩm/lần gọi.
--- Không yêu cầu đăng nhập, giống increment_book_view_count.
-create function public.increment_design_item_share_count(p_design_item_id uuid)
-returns void as $$
-  update public.design_items set share_count = share_count + 1 where id = p_design_item_id;
-$$ language sql security definer set search_path = public;
-
-grant execute on function public.increment_design_item_share_count(uuid) to anon, authenticated;
-
--- --- Bình luận cho 1 tác phẩm thiết kế — mirror anchored_comments nhưng bỏ
--- paragraph_index/char_start/char_end/quest_id (không có khái niệm "đoạn
--- văn" hay "quest neo comment" ở đây). Reply 1 cấp duy nhất, enforce ở API
--- route, không phải CHECK DB. Xem migrations/20260917_add_design_audio_comments.sql. ---
-create table public.design_comments (
-  id uuid primary key default gen_random_uuid(),
-  design_item_id uuid not null references public.design_items (id) on delete cascade,
-  user_id uuid not null references auth.users (id) on delete cascade,
-  content text not null check (char_length(trim(content)) > 0),
-  parent_comment_id uuid references public.design_comments (id) on delete cascade,
-  created_at timestamptz not null default now()
-);
-
-create index design_comments_design_item_id_idx on public.design_comments (design_item_id);
-create index design_comments_parent_idx on public.design_comments (parent_comment_id) where parent_comment_id is not null;
-
-alter table public.design_comments enable row level security;
-
-create policy "design comments are publicly readable"
-  on public.design_comments for select
-  using (true);
-
-create policy "users write their own design comments"
-  on public.design_comments for insert
-  with check (auth.uid() = user_id);
-
-create policy "users delete their own design comments"
-  on public.design_comments for delete
-  using (auth.uid() = user_id);
-
-create policy "admins moderate design comments"
-  on public.design_comments for all
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
--- Toggle thích 1 bình luận — cùng pattern design_item_likes (aggregate qua
--- view riêng, bảng gốc owner-only RLS).
-create table public.design_comment_likes (
-  comment_id uuid not null references public.design_comments (id) on delete cascade,
-  user_id uuid not null references auth.users (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (comment_id, user_id)
-);
-
-create index design_comment_likes_comment_id_idx on public.design_comment_likes (comment_id);
-
-alter table public.design_comment_likes enable row level security;
-
-create policy "users manage their own design comment likes"
-  on public.design_comment_likes for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create view public.design_comment_like_counts as
-  select comment_id, count(*)::integer as like_count
-  from public.design_comment_likes
-  group by comment_id;
-
--- --- Kho Audio ---
-create table public.audio_narrations (
-  id uuid primary key default gen_random_uuid(),
-  narrator_id uuid not null references auth.users (id) on delete cascade,
-  title text not null,
-  audio_url text not null, -- path trong bucket 'audio-narrations'
-  duration_seconds integer,
-  -- Người nghe chọn ở /audio/new; với audio gắn vào chương sách qua
-  -- chapter_audio_links, app tự điền lại từ genre của sách đó thay vì hỏi
-  -- 2 lần — xem src/lib/audio/get-audio-catalog.ts. Cùng danh sách giá trị
-  -- với books.genre (không dùng chung constraint vì khác bảng).
-  genre text,
-  play_count integer not null default 0,
-  source public.content_source not null default 'independent',
-  share_token text not null default encode(extensions.gen_random_bytes(24), 'hex'),
-  created_at timestamptz not null default now(),
-  constraint audio_narrations_play_count_check check (play_count >= 0),
-  constraint audio_narrations_genre_check
-    check (genre is null or genre in (
-      'Linh dị', 'Cổ tích & Thần thoại', 'Dã sử', 'Trinh thám',
-      'Tâm lý - tội phạm', 'Tình cảm', 'Đời sống - Xã hội',
-      'Khoa học viễn tưởng', 'Tiên hiệp/ kiếm hiệp', 'Kỳ ảo'
-    ))
-);
-
-alter table public.audio_narrations enable row level security;
-
-create policy "narrators view their own audio narrations (incl. share token)"
-  on public.audio_narrations for select
-  using (auth.uid() = narrator_id);
-
-create policy "narrators insert their own audio narrations"
-  on public.audio_narrations for insert
-  with check (auth.uid() = narrator_id);
-
-create policy "narrators update their own audio narrations"
-  on public.audio_narrations for update
-  using (auth.uid() = narrator_id);
-
-create policy "narrators delete their own audio narrations"
-  on public.audio_narrations for delete
-  using (auth.uid() = narrator_id);
-
-create view public.public_audio_narrations as
-  select id, narrator_id, title, audio_url, duration_seconds, source, created_at, genre, play_count
-  from public.audio_narrations;
-
--- security definer: tăng play_count an toàn dưới race condition, không
--- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 bản ghi/lần gọi.
--- Không yêu cầu đăng nhập, giống increment_book_view_count.
-create function public.increment_audio_play_count(p_audio_narration_id uuid)
-returns void as $$
-  update public.audio_narrations set play_count = play_count + 1 where id = p_audio_narration_id;
-$$ language sql security definer set search_path = public;
-
-grant execute on function public.increment_audio_play_count(uuid) to anon, authenticated;
-
--- --- Bình luận cho 1 bản thu audio — cùng cấu trúc design_comments ở
--- trên, khác bảng gốc tham chiếu. Xem
--- migrations/20260917_add_design_audio_comments.sql. ---
-create table public.audio_comments (
-  id uuid primary key default gen_random_uuid(),
-  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
-  user_id uuid not null references auth.users (id) on delete cascade,
-  content text not null check (char_length(trim(content)) > 0),
-  parent_comment_id uuid references public.audio_comments (id) on delete cascade,
-  created_at timestamptz not null default now()
-);
-
-create index audio_comments_audio_narration_id_idx on public.audio_comments (audio_narration_id);
-create index audio_comments_parent_idx on public.audio_comments (parent_comment_id) where parent_comment_id is not null;
-
-alter table public.audio_comments enable row level security;
-
-create policy "audio comments are publicly readable"
-  on public.audio_comments for select
-  using (true);
-
-create policy "users write their own audio comments"
-  on public.audio_comments for insert
-  with check (auth.uid() = user_id);
-
-create policy "users delete their own audio comments"
-  on public.audio_comments for delete
-  using (auth.uid() = user_id);
-
-create policy "admins moderate audio comments"
-  on public.audio_comments for all
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
-create table public.audio_comment_likes (
-  comment_id uuid not null references public.audio_comments (id) on delete cascade,
-  user_id uuid not null references auth.users (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (comment_id, user_id)
-);
-
-create index audio_comment_likes_comment_id_idx on public.audio_comment_likes (comment_id);
-
-alter table public.audio_comment_likes enable row level security;
-
-create policy "users manage their own audio comment likes"
-  on public.audio_comment_likes for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create view public.audio_comment_like_counts as
-  select comment_id, count(*)::integer as like_count
-  from public.audio_comment_likes
-  group by comment_id;
-
--- --- Liên kết chương ↔ audio (nhiều-nhiều) ---
--- Bảng này TỰ NÓ không nhạy cảm (không có share_token), nên select công
--- khai được — vấn đề nằm ở việc TẠO dòng mới, không phải xem dòng đã có.
-create table public.chapter_audio_links (
-  id uuid primary key default gen_random_uuid(),
-  chapter_id uuid not null references public.chapters (id) on delete cascade,
-  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
-  linked_by uuid not null references auth.users (id),
-  linked_at timestamptz not null default now(),
-  unique (chapter_id, audio_narration_id)
-);
-
-alter table public.chapter_audio_links enable row level security;
-
-create policy "audio links are publicly viewable"
-  on public.chapter_audio_links for select
-  using (true);
-
--- KHÔNG có policy insert nào ở đây — cố ý. Tạo liên kết chỉ được phép
--- qua hàm link_audio_to_chapter() bên dưới, hàm đó mới là nơi kiểm tra
--- share_token. Nếu chỉ dùng RLS "book author sở hữu chapter" như bản
--- trước, tác giả copy được id công khai là link được luôn — không kiểm
--- tra được liệu diễn viên có thật sự đồng ý hay không.
-
--- Gỡ liên kết thì không cần xin phép diễn viên (đây là quyền của tác giả
--- với truyện của họ), nên vẫn cho phép DELETE trực tiếp.
-create policy "book authors unlink audio from their own chapters"
-  on public.chapter_audio_links for delete
-  using (exists (
-    select 1 from public.chapters c
-    join public.books b on b.id = c.book_id
-    where c.id = chapter_id and b.author_id = auth.uid()
-  ));
-
--- Hàm DUY NHẤT được phép tạo liên kết — kiểm tra CẢ 2 điều kiện:
--- (1) người gọi sở hữu sách chứa chương này, VÀ
--- (2) share_token khớp đúng với audio_narration đó (chứng minh chủ sở
---     hữu audio đã chủ động chia sẻ link, không phải tác giả tự đoán id).
-create function public.link_audio_to_chapter(
-  p_chapter_id uuid,
-  p_audio_narration_id uuid,
-  p_share_token text
-) returns public.chapter_audio_links as $$
-declare
-  v_row public.chapter_audio_links;
-begin
-  if not exists (
-    select 1 from public.chapters c
-    join public.books b on b.id = c.book_id
-    where c.id = p_chapter_id and b.author_id = auth.uid()
-  ) then
-    raise exception 'Bạn không sở hữu sách chứa chương này';
-  end if;
-
-  if not exists (
-    select 1 from public.audio_narrations
-    where id = p_audio_narration_id and share_token = p_share_token
-  ) then
-    raise exception 'Share link không đúng hoặc đã bị thu hồi';
-  end if;
-
-  insert into public.chapter_audio_links (chapter_id, audio_narration_id, linked_by)
-  values (p_chapter_id, p_audio_narration_id, auth.uid())
-  returning * into v_row;
-
-  return v_row;
-end;
-$$ language plpgsql security definer;
-
--- Cho diễn viên "thu hồi link" nếu lỡ chia sẻ nhầm, hoặc tác giả không
--- còn hợp tác nữa — sinh token mới, mọi link cũ vẫn hiển thị bình thường
--- (link đã tạo không tự mất) nhưng token cũ không dùng để link thêm được
--- nữa. Giống nút "Get new link" của Google Drive.
-create function public.regenerate_audio_share_token(p_audio_narration_id uuid)
-returns text as $$
-declare
-  v_new_token text := encode(extensions.gen_random_bytes(24), 'hex');
-begin
-  update public.audio_narrations
-    set share_token = v_new_token
-    where id = p_audio_narration_id and narrator_id = auth.uid();
-  if not found then
-    raise exception 'Không tìm thấy, hoặc bạn không phải chủ sở hữu';
-  end if;
-  return v_new_token;
-end;
-$$ language plpgsql security definer;
-
--- --- Ảnh bìa sách — cùng cơ chế token, nhưng gắn thẳng vào cột
--- books.cover_design_item_id thay vì 1 bảng liên kết riêng (1 sách chỉ
--- có 1 bìa tại 1 thời điểm, khác audio có thể nhiều bản cùng lúc). ---
-alter table public.books
-  add column cover_design_item_id uuid references public.design_items (id) on delete set null;
-
--- Chặn việc UPDATE trực tiếp cột này qua policy "authors update their own
--- books" ở phần 3 (policy đó cho sửa TOÀN BỘ cột, không phân biệt được
--- "sửa title" với "sửa cover" — RLS không làm được điều này). Trigger này
--- chặn khi giá trị mới KHÁC NULL và bị đổi trực tiếp — cho phép xoá bìa
--- (set về null) thoải mái vì việc đó không cần ai cho phép, chỉ chặn việc
--- ĐẶT bìa mới ngoài hàm link_cover_to_book().
-create function public.prevent_direct_cover_change()
-returns trigger as $$
-begin
-  if new.cover_design_item_id is distinct from old.cover_design_item_id
-     and new.cover_design_item_id is not null
-     and coalesce(current_setting('vinh.allow_cover_change', true), 'false') <> 'true' then
-    raise exception 'Dùng link_cover_to_book() để đổi bìa — không update trực tiếp được';
-  end if;
-  return new;
-end;
-$$ language plpgsql;
-
-create trigger enforce_cover_via_function
-  before update on public.books
-  for each row execute function public.prevent_direct_cover_change();
-
-create function public.link_cover_to_book(
-  p_book_id uuid,
-  p_design_item_id uuid,
-  p_share_token text
-) returns public.books as $$
-declare
-  v_row public.books;
-begin
-  if not exists (select 1 from public.books where id = p_book_id and author_id = auth.uid()) then
-    raise exception 'Bạn không sở hữu sách này';
-  end if;
-
-  if not exists (
-    select 1 from public.design_items
-    where id = p_design_item_id and share_token = p_share_token
-  ) then
-    raise exception 'Share link không đúng hoặc đã bị thu hồi';
-  end if;
-
-  -- Cờ tạm trong transaction hiện tại (true ở tham số cuối = local, tự
-  -- hết hiệu lực khi transaction kết thúc) — cho phép chính update ngay
-  -- dưới đây đi qua được trigger enforce_cover_via_function ở trên.
-  perform set_config('vinh.allow_cover_change', 'true', true);
-
-  update public.books set cover_design_item_id = p_design_item_id
-    where id = p_book_id
-    returning * into v_row;
-
-  return v_row;
-end;
-$$ language plpgsql security definer;
-
--- --- Genre — dùng bởi hệ thống sinh bìa tự động (src/lib/covers/*) khi
--- sách chưa có cover_design_item_id. text + CHECK, không phải enum, để sửa
--- 1 giá trị sai hay thêm thể loại chỉ cần đổi constraint, không phải mổ
--- lại type — đã đúng như vậy: 10 giá trị dưới đây là taxonomy CHÍNH THỨC
--- của nền tảng, thay thế 8 giá trị tạm ban đầu (xem
--- migrations/20260825_update_book_genres.sql). Nullable: sách cũ chưa có
--- genre, code sinh bìa có nhánh fallback riêng cho null, không cần
--- database nói dối bằng default giả. Không cần RLS/trigger riêng — genre
--- là cột thường, đã được policy "authors update their own books" ở phần 3
--- cover sẵn (khác cover_design_item_id, không phải link chéo bảng cần
--- xác thực share_token). ---
-alter table public.books
-  add column genre text;
-
-alter table public.books
-  add constraint books_genre_check
-  check (genre is null or genre in (
-    'Linh dị', 'Cổ tích & Thần thoại', 'Dã sử', 'Trinh thám',
-    'Tâm lý - tội phạm', 'Tình cảm', 'Đời sống - Xã hội',
-    'Khoa học viễn tưởng', 'Tiên hiệp/ kiếm hiệp', 'Kỳ ảo'
-  ));
-
-create index books_genre_idx
-  on public.books (genre) where genre is not null;
-
--- RLS ("authors update their own books", phần 3) chỉ kiểm AI được sửa
--- hàng, không kiểm CỘT NÀO — Postgres RLS không làm được việc đó ở cấp
--- cột. GRANT cấp cột dưới đây là lớp chặn bổ sung: dù đúng là chủ sách,
--- client chỉ sửa được đúng các cột đang thật sự có đường update từ code
--- (title/genre/tags qua PATCH /api/authoring/books/[bookId], published tự
--- flip khi publish chương đầu tiên) — không tự PATCH thẳng
--- view_count/author_id/... qua REST API của Supabase (anon key + JWT của
--- chính họ) để bỏ qua route app. Đặt ở đây (không phải ngay sau policy ở
--- phần 3) vì genre/tags chỉ vừa tồn tại tới điểm này trong file.
--- Xem migrations/20260825_restrict_books_column_grants.sql. Danh sách
--- cột được mở rộng thêm deleted_at (soft-delete) và is_exclusive (độc
--- quyền cấp truyện) bởi migrations/20260826_add_book_soft_delete.sql và
--- 20260826_add_book_exclusivity.sql, rồi finalized_at ("Hoàn thiện" —
--- Share bản thảo, phần 12e) bởi migrations/20260901_add_manuscript_share.sql
--- — published_at CỐ Ý không có trong danh sách này, xem comment ở phần 3.
--- Cột `synopsis` được cộng thêm bởi migrations/20260906_add_book_synopsis_grant.sql
--- — tác giả sửa tóm tắt truyện qua PATCH /api/authoring/books/[bookId].
-revoke update on public.books from authenticated, anon;
-grant update (title, genre, tags, published, deleted_at, is_exclusive, finalized_at, synopsis) on public.books to authenticated;
-
-create function public.regenerate_design_share_token(p_design_item_id uuid)
-returns text as $$
-declare
-  v_new_token text := encode(extensions.gen_random_bytes(24), 'hex');
-begin
-  update public.design_items
-    set share_token = v_new_token
-    where id = p_design_item_id and illustrator_id = auth.uid();
-  if not found then
-    raise exception 'Không tìm thấy, hoặc bạn không phải chủ sở hữu';
-  end if;
-  return v_new_token;
-end;
-$$ language plpgsql security definer;
-
--- --- Storage buckets ---
-insert into storage.buckets (id, name, public) values ('design-images', 'design-images', true)
-  on conflict (id) do nothing;
-insert into storage.buckets (id, name, public) values ('audio-narrations', 'audio-narrations', true)
-  on conflict (id) do nothing;
-
-create policy "design images are publicly readable"
-  on storage.objects for select
-  using (bucket_id = 'design-images');
-
-create policy "illustrators upload their own design images"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'design-images'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-create policy "illustrators update their own design images"
-  on storage.objects for update
-  using (
-    bucket_id = 'design-images'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-create policy "audio narrations are publicly readable"
-  on storage.objects for select
-  using (bucket_id = 'audio-narrations');
-
-create policy "narrators upload their own audio files"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'audio-narrations'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-create policy "narrators update their own audio files"
-  on storage.objects for update
-  using (
-    bucket_id = 'audio-narrations'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
-
--- --- Cách app dùng (gợi ý luồng, không phải SQL bắt buộc) ---
---
--- Diễn viên upload độc lập, lấy link để chia sẻ:
---   const { data } = await supabase.from('audio_narrations')
---     .insert({ narrator_id: user.id, title, audio_url, duration_seconds })
---     .select('id, share_token').single();
---   → hiện cho họ: vinh.vn/lien-ket-audio?id=${data.id}&token=${data.share_token}
---   → họ tự copy link này gửi cho tác giả (kênh nào cũng được — chat, email...).
---
--- Tác giả dán link (app tự parse id + token từ URL họ paste vào):
---   const { data, error } = await supabase.rpc('link_audio_to_chapter', {
---     p_chapter_id: chapterId,
---     p_audio_narration_id: parsedId,
---     p_share_token: parsedToken,
---   });
---   // error nếu token sai/đã bị thu hồi, hoặc tác giả không sở hữu chương này.
---
--- Tác giả tự upload từ máy (không qua ai khác) — app làm 2 bước liền
--- nhau trong 1 lần bấm, TỰ CÓ token vì vừa tạo xong nên không cần ai gửi:
---   const { data: item } = await supabase.from('audio_narrations')
---     .insert({ narrator_id: user.id, title, audio_url, source: 'story_upload' })
---     .select('id, share_token').single();
---   await supabase.rpc('link_audio_to_chapter', {
---     p_chapter_id: chapterId,
---     p_audio_narration_id: item.id,
---     p_share_token: item.share_token, // họ vừa tạo, tự có sẵn, không cần dán tay
---   });
---
--- Ảnh bìa dùng đúng logic tương tự với link_cover_to_book().
---
--- Lấy danh sách audio đã link cho 1 chương (để hiện "chọn giọng đọc") —
--- LƯU Ý: join qua view public_audio_narrations, không phải bảng gốc, vì
--- bảng gốc chỉ chủ sở hữu mới select được:
---   select an.*, p.nickname as narrator_name, p.avatar_url
---   from public.chapter_audio_links cal
---   join public.public_audio_narrations an on an.id = cal.audio_narration_id
---   join public.author_public_profiles p on p.id = an.narrator_id
---   where cal.chapter_id = :chapter_id
---   order by cal.linked_at asc;
-
--- =======================================================================
--- Nếu bạn ĐÃ CHẠY 1 trong 2 bản audio_narrations trước đó (bản có cột
--- chapter_id/status, HOẶC bản không-token vừa rồi) — chạy dọn dẹp sau
--- TRƯỚC khi chạy phần 9 ở trên. An toàn dù bản nào bạn từng chạy, vì
--- toàn bộ dùng IF EXISTS:
---
---   drop trigger if exists enforce_narration_column_ownership on public.audio_narrations;
---   drop trigger if exists enforce_cover_via_function on public.books;
---   drop function if exists public.enforce_narration_column_ownership cascade;
---   drop function if exists public.prevent_direct_cover_change cascade;
---   drop function if exists public.link_audio_to_chapter cascade;
---   drop function if exists public.link_cover_to_book cascade;
---   drop function if exists public.regenerate_audio_share_token cascade;
---   drop function if exists public.regenerate_design_share_token cascade;
---   drop view if exists public.public_audio_narrations cascade;
---   drop view if exists public.public_design_items cascade;
---   drop table if exists public.chapter_audio_links cascade;
---   drop table if exists public.audio_narrations cascade;
---   drop table if exists public.design_items cascade;
---   drop table if exists public.design_albums cascade;
---   drop type if exists public.narration_status cascade;
---   alter table public.books drop column if exists cover_design_item_id;
---   -- book-covers bucket cũ (nếu có) không còn dùng, để nguyên vô hại
---   -- hoặc xoá thủ công qua Dashboard → Storage nếu muốn dọn sạch.
--- =======================================================================
-
--- ---------------------------------------------------------------------
 -- 10. Hệ thống Nhiệm vụ Vịnh (Quest System)
 -- ---------------------------------------------------------------------
 -- Quest system KHÔNG tạo bảng system_quests/user_quest_progress riêng —
@@ -2489,7 +2431,7 @@ create policy "narrators update their own audio files"
 
 -- --- 10a. Mở rộng task_templates cho taxonomy quest. quest_type NULL =
 -- nhiệm vụ hàng ngày cũ, không thuộc Quest System. Xem
--- migrations/20260827_extend_task_templates_for_quests.sql. ---
+-- migrations/archive/20260827_extend_task_templates_for_quests.sql. ---
 alter table public.task_templates add column quest_type text;
 
 alter table public.task_templates
@@ -2527,7 +2469,7 @@ alter table public.user_daily_tasks
 
 -- --- 10b. quest_examples_pool — pool mẫu thủ công, few-shot cho AI sinh
 -- quest (Phase 2+). Bảng mới, không có tương đương cũ. Xem
--- migrations/20260827_add_quest_examples_pool.sql. ---
+-- migrations/archive/20260827_add_quest_examples_pool.sql. ---
 create table public.quest_examples_pool (
   id uuid primary key default gen_random_uuid(),
   quest_type text not null check (quest_type in (
@@ -2562,7 +2504,7 @@ create policy "admins manage quest examples pool"
 -- streak bonus (streak bonus tách bạch hoàn toàn, xem 10i/10j). Kèm
 -- user_hidden_quest_progress riêng (KHÔNG dùng chung user_daily_tasks —
 -- campaign theo khoảng thời gian, không theo nhịp ngày). Xem
--- migrations/20260827_add_hidden_quests.sql. ---
+-- migrations/archive/20260827_add_hidden_quests.sql. ---
 create table public.hidden_quests (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -2658,7 +2600,7 @@ grant execute on function public.complete_hidden_quest to service_role;
 -- --- 10d. quest_reset_events — lịch sử chi tiết reset (loại quest bị
 -- reset, quest thay thế, tần suất theo user) — hành vi né tránh cũng là
 -- dữ liệu cần track, không chỉ hành vi hoàn thành. Xem
--- migrations/20260827_add_quest_reset_events.sql. ---
+-- migrations/archive/20260827_add_quest_reset_events.sql. ---
 create table public.quest_reset_events (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -2684,110 +2626,6 @@ create policy "admins view all quest reset events"
   on public.quest_reset_events for select
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
 
--- --- 10e. highlights + reading_sessions — dữ liệu hành vi đọc nền tảng,
--- công trình PHẢI XÂY MỚI (không có sẵn trước Quest System). Passive
--- signal — không gắn KPI ép buộc. Xem
--- migrations/20260827_add_reading_behavior_tables.sql. ---
-create table public.highlights (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  chapter_id uuid not null references public.chapters (id) on delete cascade,
-  paragraph_index integer,
-  char_start integer not null check (char_start >= 0),
-  char_end integer not null check (char_end > char_start),
-  created_at timestamptz not null default now()
-);
-
-create index highlights_chapter_id_idx on public.highlights (chapter_id);
-create index highlights_user_id_idx on public.highlights (user_id);
-
-alter table public.highlights enable row level security;
-
-create policy "users manage their own highlights"
-  on public.highlights for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create table public.reading_sessions (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  chapter_id uuid not null references public.chapters (id) on delete cascade,
-  start_time timestamptz not null default now(),
-  end_time timestamptz,
-  drop_off_offset integer,
-  check (end_time is null or end_time >= start_time),
-  check (drop_off_offset is null or drop_off_offset >= 0)
-);
-
-create index reading_sessions_chapter_id_idx on public.reading_sessions (chapter_id);
-create index reading_sessions_user_id_idx on public.reading_sessions (user_id, start_time);
-
-alter table public.reading_sessions enable row level security;
-
--- Chỉ SELECT của chủ hàng — client KHÔNG tự ghi (trước đây policy "for all"
--- cho tự khai thời gian đọc qua PostgREST). Ghi duy nhất qua
--- record_reading_heartbeat() (service-role) ở cuối file — xem
--- migrations/20260926_add_reading_session_tracking.sql.
-create policy "users view their own reading sessions"
-  on public.reading_sessions for select
-  using (auth.uid() = user_id);
-revoke insert, update, delete, truncate on public.reading_sessions from anon, authenticated;
-
--- --- 10f. anchored_comments — comment neo vị trí, cơ chế trả lời DUY
--- NHẤT cho quest cần "câu trả lời" (không trắc nghiệm/điền text tự do).
--- Dùng chung vị trí neo với highlights. Xem
--- migrations/20260827_add_anchored_comments.sql. ---
-create table public.anchored_comments (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  chapter_id uuid not null references public.chapters (id) on delete cascade,
-  paragraph_index integer,
-  char_start integer not null check (char_start >= 0),
-  char_end integer not null check (char_end > char_start),
-  content text not null check (char_length(trim(content)) > 0),
-  -- Polymorphic, giống quest_reset_events.quest_id — NULL cho comment
-  -- thường (không trả lời quest nào).
-  quest_id uuid,
-  quest_source text check (quest_source is null or quest_source in ('task_template', 'hidden_quest')),
-  created_at timestamptz not null default now(),
-  check ((quest_id is null) = (quest_source is null))
-);
-
--- Reply lồng 1 CẤP DUY NHẤT (không cho reply-vào-reply) — enforce ở API
--- route (api/chapters/[chapterId]/comments), không phải CHECK DB. Reply
--- copy chapter_id/paragraph_index/char_start/char_end từ hàng cha khi
--- ghi. Xem migrations/20260910_add_anchored_comment_replies.sql.
-alter table public.anchored_comments
-  add column parent_comment_id uuid references public.anchored_comments (id) on delete cascade;
-
-create index anchored_comments_chapter_id_idx on public.anchored_comments (chapter_id);
-create index anchored_comments_quest_idx on public.anchored_comments (quest_id, quest_source) where quest_id is not null;
-create index anchored_comments_parent_idx on public.anchored_comments (parent_comment_id) where parent_comment_id is not null;
-
-alter table public.anchored_comments enable row level security;
-
--- Nội dung công khai dưới chương — ai cũng xem được, không cần đăng nhập.
-create policy "anchored comments are publicly readable"
-  on public.anchored_comments for select
-  using (true);
-
-create policy "users write their own anchored comments"
-  on public.anchored_comments for insert
-  with check (auth.uid() = user_id);
-
-create policy "users update their own anchored comments"
-  on public.anchored_comments for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create policy "users delete their own anchored comments"
-  on public.anchored_comments for delete
-  using (auth.uid() = user_id);
-
-create policy "admins moderate anchored comments"
-  on public.anchored_comments for all
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
 -- --- 10g. Thưởng quest — thêm loại giao dịch, KHÔNG có ledger riêng.
 -- Reward engine (service layer) đọc trực tiếp task_templates.reward_tokens
 -- (nhiệm vụ hàng ngày/rotate, mức cố định) hoặc hidden_quests.reward_tokens
@@ -2796,14 +2634,14 @@ create policy "admins moderate anchored comments"
 -- có bảng "reward_rules" chung — cả 2 nguồn đều tự giữ số token cố định
 -- ngay trên bảng định nghĩa quest của mình, không tra qua bảng nào khác,
 -- và KHÔNG cộng streak bonus (streak bonus tách bạch hoàn toàn, xem 10i).
--- Xem migrations/20260827_add_quest_reward_transaction_type.sql. ---
+-- Xem migrations/archive/20260827_add_quest_reward_transaction_type.sql. ---
 alter type public.transaction_type add value if not exists 'quest_reward';
 
 -- --- 10h. Streak — lưu sẵn trên profiles (đọc thường xuyên, ghi ít),
 -- bảo vệ trigger giống role/cccd_verified (phần 5). Kèm 2 cột phục vụ
 -- luật nghỉ/cứu streak (chốt qua trao đổi trực tiếp, không có trong bản
 -- phác spec gốc) — chi tiết luật ở 10l. Xem
--- migrations/20260827_add_quest_streak_to_profiles.sql. ---
+-- migrations/archive/20260827_add_quest_streak_to_profiles.sql. ---
 alter table public.profiles add column current_quest_streak integer not null default 0;
 alter table public.profiles add column streak_updated_at date;
 -- Kho "thẻ nghỉ" tích lũy — xem công thức tích luỹ/trần ở sync_reading_streak() (10l).
@@ -2841,7 +2679,7 @@ create trigger enforce_quest_streak_authority
 -- --- 10i. streak_bonus — loại giao dịch riêng cho thưởng mốc streak,
 -- TÁCH khỏi 'quest_reward' (10g) vì bản chất khác: không gắn với 1 quest
 -- cụ thể nào, chỉ gắn với chuỗi ngày đọc liên tục. Xem
--- migrations/20260827_add_streak_bonus_transaction_type.sql. ---
+-- migrations/archive/20260827_add_streak_bonus_transaction_type.sql. ---
 alter type public.transaction_type add value if not exists 'streak_bonus';
 
 -- --- 10j. streak_milestones — mốc thưởng đọc-liên-tục kiểu Duolingo,
@@ -2849,7 +2687,7 @@ alter type public.transaction_type add value if not exists 'streak_bonus';
 -- — KHÔNG liên quan/không cộng-nhân vào công thức thưởng của task_template
 -- hay hidden_quest (10c, 10g). profiles.current_quest_streak (10h) chỉ
 -- lưu số ngày hiện tại — bảng này định nghĩa CÁC MỐC, không lưu tiến
--- trình. Xem migrations/20260827_add_streak_milestones.sql. ---
+-- trình. Xem migrations/archive/20260827_add_streak_milestones.sql. ---
 create table public.streak_milestones (
   id uuid primary key default gen_random_uuid(),
   streak_days integer not null unique check (streak_days > 0),
@@ -2940,7 +2778,7 @@ grant execute on function public.claim_streak_milestone to service_role;
 -- cứu streak (rescue_streak_with_tokens(), 10l) — tách khỏi 'streak_bonus'
 -- (10i, khoản CỘNG) để báo cáo/đối soát đọc trực quan hơn, giống
 -- purchase_chapter/purchase_credit. Xem
--- migrations/20260827_add_streak_rescue_transaction_type.sql. ---
+-- migrations/archive/20260827_add_streak_rescue_transaction_type.sql. ---
 alter type public.transaction_type add value if not exists 'streak_rescue';
 
 -- --- 10l. sync_reading_streak() + rescue_streak_with_tokens() — state
@@ -2956,7 +2794,7 @@ alter type public.transaction_type add value if not exists 'streak_rescue';
 --     cứu trong 48h — hết hạn không cứu thì reset thật.
 --   - Lỡ ≥ 2 ngày liên tiếp mà kho không đủ bù hết: KHÔNG có cứu (rescue
 --     chỉ áp dụng lỡ đúng 1 ngày) — reset ngay, không ân hạn.
--- Xem migrations/20260827_add_streak_sync_functions.sql. ---
+-- Xem migrations/archive/20260827_add_streak_sync_functions.sql. ---
 create function public.sync_reading_streak(p_user_id uuid, p_activity_date date default current_date)
 returns public.profiles as $$
 declare
@@ -3091,7 +2929,7 @@ grant execute on function public.rescue_streak_with_tokens to service_role;
 -- quest, đã VÁ và verify trên cả staging + production):
 --   1. User tự PATCH token_balance/screenshot_penalty_*/... qua REST API
 --      bằng anon key — vá ở phần 1 (revoke update on public.profiles) —
---      xem migrations/20260827_restrict_profiles_column_grants.sql.
+--      xem migrations/archive/20260827_restrict_profiles_column_grants.sql.
 --   2. Các hàm reward cũ (apply_transaction, claim_daily_task,
 --      create_withdrawal_request, grant_platform_bonus, settle_*,
 --      increment_task_progress) không có REVOKE EXECUTE FROM PUBLIC
@@ -3099,11 +2937,11 @@ grant execute on function public.rescue_streak_with_tokens to service_role;
 --      mới, cho phép gọi thẳng RPC bằng anon key, tự chọn p_user_id là
 --      người khác — vá ở đúng vị trí định nghĩa mỗi hàm (phần 6/6b/6c/
 --      6d/6e/7 ở trên) — xem
---      migrations/20260827_restrict_sensitive_rpc_execute_grants.sql.
+--      migrations/archive/20260827_restrict_sensitive_rpc_execute_grants.sql.
 --      Đi kèm: apply_transaction từng có 3 overload cùng tồn tại (mỗi
 --      lần CREATE OR REPLACE đổi chữ ký lại tạo thêm bản mới, không ghi
 --      đè được bản cũ) — dọn về đúng 1 bản, xem
---      migrations/20260827_drop_stale_apply_transaction_overloads.sql.
+--      migrations/archive/20260827_drop_stale_apply_transaction_overloads.sql.
 
 -- ---------------------------------------------------------------------
 -- 10m. user_quest_pool — random pool hàng ngày (mục 1.3), chốt qua trao
@@ -3111,7 +2949,7 @@ grant execute on function public.rescue_streak_with_tokens to service_role;
 -- kế: task_templates/user_daily_tasks (phần 7) là mô hình LAZY-PULL,
 -- spec mục 1.3 cần mô hình PUSH (chốt sẵn N quest/ngày, cho reset đổi) —
 -- cần bảng mới, KHÔNG dùng chung user_daily_tasks (vẫn giữ vai trò track
--- progress cũ). Xem migrations/20260828_add_user_quest_pool.sql.
+-- progress cũ). Xem migrations/archive/20260828_add_user_quest_pool.sql.
 -- ---------------------------------------------------------------------
 create table public.user_quest_pool (
   id uuid primary key default gen_random_uuid(),
@@ -3197,7 +3035,7 @@ grant execute on function public.create_quest_pool_for_today to service_role;
 -- ngày đó). Ngân sách reset CHUNG 3 lần/ngày cho cả pool (không phải mỗi
 -- quest riêng) — đếm trực tiếp quest_reset_events, không cột counter
 -- riêng nào (tránh lệch nguồn sự thật).
--- Slice 3.1 (migrations/20260927_add_contest_quests.sql): từ chối ô / mẫu sự kiện.
+-- Slice 3.1 (migrations/archive/20260927_add_contest_quests.sql): từ chối ô / mẫu sự kiện.
 create function public.reset_quest_pool_slot(
   p_user_id uuid,
   p_pool_date date,
@@ -3282,7 +3120,7 @@ grant execute on function public.reset_quest_pool_slot to service_role;
 -- "đơn giản, không cần thêm hạ tầng ở giai đoạn này". Chưa wire route
 -- publish chương của Next.js tự insert job (quyết định chủ động, test
 -- tay trước) — xem python-service/. Xem
--- migrations/20260828_add_quest_generation_jobs.sql.
+-- migrations/archive/20260828_add_quest_generation_jobs.sql.
 -- ---------------------------------------------------------------------
 create table public.quest_generation_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -3308,720 +3146,6 @@ create policy "admins view quest generation jobs"
 -- bộ, chỉ Python worker (service role key RIÊNG, không dùng chung anon
 -- key với frontend) và (sau này) route publish chương viết.
 
--- ---------------------------------------------------------------------
--- 12. Hệ thống giao dịch commission (Order/Escrow) — xem
--- migrations/20260901_add_order_payment_transaction_type.sql,
--- 20260901_add_order_earning_transaction_type.sql,
--- 20260901_add_order_system_core.sql. Phase 1: order_events (nhật ký bất
--- biến) + máy trạng thái Order cơ bản + service_listings/service_samples
--- (Mục 2 đặc tả — tạo cùng lúc cho FK, API/UI quản lý là việc phase sau).
--- CHƯA gồm: hoàn tiền tự động, mất liên lạc, bàn giao chi tiết theo loại
--- hình (Share bản thảo ghostwriting), đứng tên tác giả thay,
--- is_ghostwritten, trust score, phát hiện giao dịch ngoài nền tảng,
--- dispute — các phase sau sẽ thêm section con 12d, 12e, ... nối tiếp.
--- ---------------------------------------------------------------------
-
-create type public.service_type as enum ('illustration', 'voice', 'ghostwriting');
-
--- 11 trường bắt buộc của Mục 2 đặc tả ánh xạ vào các cột dưới đây: 1 name,
--- 2 scope_description, 3 price_tiers, 4 deposit_pct, 5 delivery_days, 6
--- revisions_max, 7 tags (nhóm theo loại hình, chọn từ danh mục cố định do
--- Nền tảng quản lý — validate ở tầng service, KHÔNG ở DB), 8
--- default_usage_scope, 9 refund_policy, 10 lost_contact_days, 11
--- is_private. is_accepting_orders CHỈ được service layer bật khi đủ
--- 11/11 — xem src/lib/orders/service-listing-service.ts (phase sau).
-create table public.service_listings (
-  id uuid primary key default gen_random_uuid(),
-  seller_id uuid not null references auth.users (id) on delete cascade,
-  service_type public.service_type not null,
-  name text not null default '',
-  scope_description text not null default '',
-  price_tiers jsonb not null default '[]'::jsonb,
-  deposit_pct integer,
-  delivery_days integer,
-  revisions_max integer,
-  tags jsonb not null default '{}'::jsonb,
-  default_usage_scope text,
-  -- null = seller CHƯA tự khai — calculate_refund() (phase sau) dùng bảng
-  -- % tối thiểu của Nền tảng làm fallback; số liệu bảng đó CHƯA có.
-  refund_policy jsonb,
-  lost_contact_days integer not null default 7,
-  accepted_content text,
-  rejected_content text,
-  is_private boolean not null default false,
-  is_accepting_orders boolean not null default false,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  check (deposit_pct is null or deposit_pct between 0 and 100)
-);
-
--- Trạng thái "nhận comm" — ĐỘC LẬP với is_accepting_orders (không nằm
--- trong 11 mục bắt buộc để publish). monthly_commission_limit null = seller
--- chưa đặt hạn mức (khi đó is_accepting_commissions không có ý nghĩa gì,
--- route chặn bật). Đếm "đang nhận bao nhiêu comm" theo TỪNG gói riêng —
--- count(*) orders where listing_id=this and status='in_progress', tính
--- trực tiếp lúc đọc, không cache cột riêng. Xem
--- migrations/20260910_add_service_commission_status.sql.
-alter table public.service_listings
-  add column monthly_commission_limit integer,
-  add column is_accepting_commissions boolean not null default false,
-  add constraint service_listings_monthly_commission_limit_check
-    check (monthly_commission_limit is null or monthly_commission_limit > 0);
-
-alter table public.service_listings enable row level security;
-
-create policy "public can view listings accepting orders"
-  on public.service_listings for select
-  using (is_accepting_orders = true);
-
-create policy "sellers manage their own listings"
-  on public.service_listings for all
-  using (auth.uid() = seller_id)
-  with check (auth.uid() = seller_id);
-
-create policy "admins view all listings"
-  on public.service_listings for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
-create index service_listings_seller_idx on public.service_listings (seller_id);
-
-create table public.service_samples (
-  id uuid primary key default gen_random_uuid(),
-  listing_id uuid not null references public.service_listings (id) on delete cascade,
-  source text not null default 'upload' check (source in ('upload', 'auto', 'external')),
-  file_url text not null,
-  unverified_external boolean not null default false,
-  created_at timestamptz not null default now()
-);
-
-alter table public.service_samples enable row level security;
-
-create policy "public can view samples of listings accepting orders"
-  on public.service_samples for select
-  using (exists (select 1 from public.service_listings l where l.id = listing_id and l.is_accepting_orders = true));
-
-create policy "sellers manage samples of their own listings"
-  on public.service_samples for all
-  using (exists (select 1 from public.service_listings l where l.id = listing_id and l.seller_id = auth.uid()))
-  with check (exists (select 1 from public.service_listings l where l.id = listing_id and l.seller_id = auth.uid()));
-
-create index service_samples_listing_idx on public.service_samples (listing_id);
-
--- Giữ đủ 8 trạng thái đúng sơ đồ đặc tả (kể cả 'brief_confirmed' và
--- 'deposit_paid' dù thực tế chỉ dừng lại rất ngắn — xem
--- record_order_payment() bên dưới).
-create type public.order_status as enum (
-  'draft', 'brief_confirmed', 'deposit_paid', 'in_progress', 'delivered', 'completed', 'cancelled', 'disputed'
-);
-
-create sequence public.order_code_seq start 2000;
-
-create table public.orders (
-  id uuid primary key default gen_random_uuid(),
-  code text not null unique default ('DH-' || nextval('public.order_code_seq')),
-  buyer_id uuid not null references auth.users (id) on delete restrict,
-  seller_id uuid not null references auth.users (id) on delete restrict,
-  listing_id uuid not null references public.service_listings (id) on delete restrict,
-  status public.order_status not null default 'draft',
-  usage_scope text,
-  scope_note text,
-  brief text not null default '',
-  brief_locked_at timestamptz,
-  price integer not null,
-  paid integer not null default 0,
-  deposit_pct integer not null,
-  revisions_max integer not null default 2,
-  revisions_used integer not null default 0,
-  draft_number integer not null default 0,
-  drafts_approved integer not null default 0,
-  delivered_at timestamptz,
-  -- delivered_at + 7 ngày — cron (src/app/api/orders/cron/auto-confirm)
-  -- quét cột này.
-  auto_confirm_at timestamptz,
-  completed_at timestamptz,
-  cancelled_at timestamptz,
-  -- Nội dung TOS của seller TẠI THỜI ĐIỂM "Bắt đầu giao dịch" — snapshot
-  -- thật, không chỉ id.
-  tos_snapshot jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  check (buyer_id <> seller_id),
-  check (price >= 0 and paid >= 0),
-  check (deposit_pct between 0 and 100),
-  check (usage_scope is null or usage_scope in ('personal', 'commercial_limited', 'commercial_full'))
-);
-
-alter table public.orders enable row level security;
-
-create policy "order parties view their own orders"
-  on public.orders for select
-  using (auth.uid() = buyer_id or auth.uid() = seller_id);
-
-create policy "admins view all orders"
-  on public.orders for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
--- Không có policy insert/update cho "authenticated" — mọi thay đổi trạng
--- thái qua các hàm security definer bên dưới, giống public.transactions.
-
-create index orders_buyer_idx on public.orders (buyer_id);
-create index orders_seller_idx on public.orders (seller_id);
-create index orders_auto_confirm_idx on public.orders (auto_confirm_at) where status = 'delivered';
-
--- Nhật ký bất biến — created_at do server sinh, không nhận timestamp từ
--- client.
-create table public.order_events (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.orders (id) on delete cascade,
-  event_type text not null,
-  actor_id uuid references auth.users (id),
-  payload jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
-
-alter table public.order_events enable row level security;
-
-create policy "order parties view their own order events"
-  on public.order_events for select
-  using (exists (
-    select 1 from public.orders o
-    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
-  ));
-
-create policy "admins view all order events"
-  on public.order_events for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
-create index order_events_order_idx on public.order_events (order_id, created_at);
-
--- Hàm máy trạng thái — mỗi hành động 1 hàm riêng, không có hàm "update
--- status trần" nào được phép gọi trực tiếp từ route. Nội dung đầy đủ 10
--- hàm (create_order, set_order_scope, set_order_brief,
--- confirm_order_brief, record_order_payment, submit_order_draft,
--- approve_order_draft, request_order_revision, deliver_order,
--- confirm_order_received) xem
--- migrations/20260901_add_order_system_core.sql — không lặp lại ở đây để
--- tránh 2 bản dễ lệch nhau; file migration đó LÀ nguồn sự thật cho phần
--- thân hàm. Ngoại lệ: record_order_payment() được thay bởi
--- migrations/20260924_enforce_order_payment_amounts.sql (lần trả đầu phải
--- >= round(price * deposit_pct / 100), tổng đã trả không vượt price).
-
--- 12d. Danh mục tag cố định cho service_listings (Mục 2.2 đặc tả) — xem
--- migrations/20260901_add_service_tag_catalog.sql,
--- scripts/seed_service_tag_options.sql (dữ liệu seed). tier/rule/multi/
--- optional/warn_text thêm bởi migrations/20260901_add_service_tag_option_metadata.sql
--- (đối chiếu lại TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html).
-create table public.service_tag_options (
-  id uuid primary key default gen_random_uuid(),
-  service_type public.service_type not null,
-  group_key text not null,
-  group_label text not null,
-  label text not null,
-  sort_order integer not null default 0,
-  created_at timestamptz not null default now(),
-  tier text,
-  rule text,
-  multi boolean not null default true,
-  optional boolean not null default false,
-  warn_text text,
-  unique (service_type, group_key, label)
-);
-
-alter table public.service_tag_options enable row level security;
-
-create policy "public can view tag options"
-  on public.service_tag_options for select
-  using (true);
-
-create index service_tag_options_lookup_idx on public.service_tag_options (service_type, group_key, sort_order);
-
-create table public.service_tag_suggestions (
-  id uuid primary key default gen_random_uuid(),
-  submitted_by uuid not null references auth.users (id) on delete cascade,
-  service_type public.service_type not null,
-  group_key text not null,
-  label text not null,
-  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
-  resolved_by uuid references auth.users (id),
-  resolved_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
-alter table public.service_tag_suggestions enable row level security;
-
-create policy "users view their own tag suggestions"
-  on public.service_tag_suggestions for select
-  using (auth.uid() = submitted_by);
-
-create policy "admins view all tag suggestions"
-  on public.service_tag_suggestions for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
-create index service_tag_suggestions_status_idx on public.service_tag_suggestions (status, created_at);
-
--- Cờ riêng-tư MỖI ĐƠN (khác is_private của service_listings) — 1 đơn đã
--- completed có được dùng làm sample tự động (Mục 2.2 sample_source='auto')
--- hay không. Mặc định false.
-alter table public.orders add column is_private boolean not null default false;
-
--- 12e. Share bản thảo kiểu Drive (tổng quát cho MỌI truyện ở "Viết
--- truyện", không chỉ ghostwriting) + "Hoàn thiện" — xem
--- migrations/20260901_add_manuscript_share.sql. finalized_at đã gộp vào
--- GRANT UPDATE của books ở trên (phần 3).
-alter table public.books add column finalized_at timestamptz;
-
-create function public.prevent_unfinalize_book()
-returns trigger as $$
-begin
-  if old.finalized_at is not null and new.finalized_at is null then
-    raise exception 'Không thể bỏ trạng thái Hoàn thiện của một truyện đã hoàn thiện.';
-  end if;
-  return new;
-end;
-$$ language plpgsql;
-
-create trigger prevent_unfinalize_book_trigger
-  before update on public.books
-  for each row execute function public.prevent_unfinalize_book();
-
--- Tối đa 1 grant ĐANG HOẠT ĐỘNG/book — ép ở tầng DB qua partial unique
--- index, đúng ràng buộc "chỉ 1 tài khoản". order_id chỉ có giá trị khi
--- share phát sinh từ 1 đơn ghostwriting (route attach-book).
-create table public.manuscript_access_grants (
-  id uuid primary key default gen_random_uuid(),
-  book_id uuid not null references public.books (id) on delete cascade,
-  order_id uuid references public.orders (id),
-  granted_to_user_id uuid not null references auth.users (id) on delete cascade,
-  granted_by_user_id uuid not null references auth.users (id),
-  granted_at timestamptz not null default now(),
-  revoked_at timestamptz,
-  locked_at timestamptz,
-  check (granted_to_user_id <> granted_by_user_id)
-);
-
-create unique index manuscript_access_grants_one_active_idx
-  on public.manuscript_access_grants (book_id)
-  where revoked_at is null and locked_at is null;
-
-alter table public.manuscript_access_grants enable row level security;
-
-create policy "granter and grantee view their own grants"
-  on public.manuscript_access_grants for select
-  using (auth.uid() = granted_by_user_id or auth.uid() = granted_to_user_id);
-
-create policy "book owner grants access"
-  on public.manuscript_access_grants for insert
-  with check (
-    auth.uid() = granted_by_user_id
-    and exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid() and b.finalized_at is null)
-  );
-
-create policy "book owner revokes access before finalized"
-  on public.manuscript_access_grants for update
-  using (auth.uid() = granted_by_user_id and locked_at is null)
-  with check (auth.uid() = granted_by_user_id and locked_at is null);
-
-grant update (revoked_at) on public.manuscript_access_grants to authenticated;
-
-create index manuscript_access_grants_book_idx on public.manuscript_access_grants (book_id);
-create index manuscript_access_grants_grantee_idx on public.manuscript_access_grants (granted_to_user_id) where revoked_at is null;
-
--- Tự động khóa TOÀN BỘ grant đang hoạt động của 1 book khi "Hoàn thiện" —
--- không route nào tự set locked_at trực tiếp được (không nằm trong GRANT
--- ở trên).
-create function public.lock_manuscript_grants_on_finalize()
-returns trigger as $$
-begin
-  if new.finalized_at is not null and old.finalized_at is null then
-    update public.manuscript_access_grants
-      set locked_at = now()
-      where book_id = new.id and revoked_at is null and locked_at is null;
-  end if;
-  return new;
-end;
-$$ language plpgsql security definer;
-
-create trigger lock_manuscript_grants_on_finalize_trigger
-  after update on public.books
-  for each row execute function public.lock_manuscript_grants_on_finalize();
-
--- Order biết đang viết cho truyện nào — chỉ đơn ghostwriting mới gắn.
-alter table public.orders add column book_id uuid references public.books (id);
-
--- attach_order_book(): xem migrations/20260901_add_manuscript_share.sql —
--- không lặp lại thân hàm ở đây.
-
--- 12f. Bàn giao illustration/voice (Mục 4.1-4.2 đặc tả) — xem
--- migrations/20260901_add_order_delivery_assets.sql. ghostwriting đã
--- xong ở phần 12e (manuscript_access_grants).
-insert into storage.buckets (id, name, public)
-values ('order-deliverables', 'order-deliverables', false)
-on conflict (id) do nothing;
-
-create policy "order parties read their deliverables"
-  on storage.objects for select
-  using (
-    bucket_id = 'order-deliverables'
-    and exists (
-      select 1 from public.orders o
-      where o.id::text = (storage.foldername(name))[1]
-        and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
-    )
-  );
-
-create table public.order_delivered_assets (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.orders (id) on delete cascade,
-  kind text not null check (kind in ('illustration_preview', 'illustration_original', 'voice_stream', 'voice_original')),
-  storage_path text not null,
-  created_at timestamptz not null default now()
-);
-
-alter table public.order_delivered_assets enable row level security;
-
-create policy "order parties view their delivered assets"
-  on public.order_delivered_assets for select
-  using (exists (
-    select 1 from public.orders o
-    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
-  ));
-
-create policy "admins view all delivered assets"
-  on public.order_delivered_assets for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
-create index order_delivered_assets_order_idx on public.order_delivered_assets (order_id);
-
-create table public.order_file_requests (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.orders (id) on delete cascade,
-  requested_by uuid not null references auth.users (id),
-  status text not null default 'pending' check (status in ('pending', 'agreed', 'declined')),
-  created_at timestamptz not null default now(),
-  resolved_at timestamptz
-);
-
-alter table public.order_file_requests enable row level security;
-
-create policy "order parties view their file requests"
-  on public.order_file_requests for select
-  using (exists (
-    select 1 from public.orders o
-    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
-  ));
-
-create index order_file_requests_order_idx on public.order_file_requests (order_id, status);
-
--- request_order_file()/resolve_order_file_request(): xem
--- migrations/20260901_add_order_delivery_assets.sql — không lặp lại thân
--- hàm ở đây.
-
--- 12g. Tính hoàn tiền + Mất liên lạc (Mục 5.1, 5.4 đặc tả) — xem
--- migrations/20260901_add_order_refund_transaction_type.sql,
--- 20260901_add_order_cancel_system.sql. QUAN TRỌNG: từ đây
--- service_listings.refund_policy PHẢI là object 4 key cố định
--- ({"before_draft":70,"draft_pending":40,"draft_approved":15,"delivered":0})
--- thay vì mảng tự do đã mô tả ở phần 12d — xem ghi chú đầu file migration
--- 20260901_add_order_cancel_system.sql. calculate_refund() sau đó được
--- CREATE OR REPLACE bởi migrations/20260901_add_order_refund_minimum_table.sql
--- để thêm bảng % SÀN của Nền tảng khi seller chưa tự khai — vế
--- seller-fault KHÔNG còn là hằng số 100% (bảng sàn thật: 100/90/70/100
--- theo mốc), sửa lại giả định ban đầu chưa được xác nhận.
-create table public.order_cancel_requests (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.orders (id) on delete cascade,
-  requested_by uuid not null references auth.users (id),
-  cancelled_by text not null check (cancelled_by in ('buyer', 'seller')),
-  refund_amount integer not null,
-  status text not null default 'pending' check (status in ('pending', 'agreed', 'declined')),
-  created_at timestamptz not null default now(),
-  resolved_at timestamptz
-);
-
-alter table public.order_cancel_requests enable row level security;
-
-create policy "order parties view their cancel requests"
-  on public.order_cancel_requests for select
-  using (exists (
-    select 1 from public.orders o
-    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
-  ));
-
-create index order_cancel_requests_order_idx on public.order_cancel_requests (order_id, status);
-
--- calculate_refund()/request_order_cancel()/resolve_order_cancel_request()/
--- record_order_reminder()/record_lost_contact_report(): xem
--- migrations/20260901_add_order_cancel_system.sql — không lặp lại thân
--- hàm ở đây.
-
--- 12h. Đứng tên tác giả thay + is_ghostwritten/author_display (Module 5+6
--- đặc tả, yêu cầu bổ sung #2) — xem
--- migrations/20260901_add_ghostwriting_authorship.sql.
-alter table public.books
-  add column is_ghostwritten boolean not null default false,
-  add column author_display text not null default 'pen_name'
-    check (author_display in ('pen_name', 'anonymous', 'customer_name', 'co_authorship'));
-
--- 2 cột này KHÔNG nằm trong GRANT UPDATE của books (phần 3) — chỉ đổi
--- được qua confirm_author_name_agreement()/attach_order_book() (security
--- definer), không client nào PATCH thẳng qua REST API.
-
--- Mỗi Order ghostwriting tối đa 1 thỏa thuận — 2 bên xác nhận ĐỘC LẬP
--- (không phải request/resolve), bất biến sau khi đủ 2 xác nhận.
-create table public.author_name_agreements (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null unique references public.orders (id),
-  book_id uuid not null references public.books (id),
-  ghostwriter_id uuid not null references auth.users (id),
-  ghostwriter_confirmed_at timestamptz,
-  ghostwriter_statement_text text,
-  customer_id uuid not null references auth.users (id),
-  customer_confirmed_at timestamptz,
-  customer_statement_text text,
-  author_display_choice text not null check (author_display_choice in ('customer_name', 'co_authorship')),
-  ghostwriter_sample_visible boolean not null default false,
-  customer_profile_visible boolean not null default false,
-  created_at timestamptz not null default now()
-);
-
-alter table public.author_name_agreements enable row level security;
-
-create policy "ghostwriter and customer view their own agreement"
-  on public.author_name_agreements for select
-  using (auth.uid() = ghostwriter_id or auth.uid() = customer_id);
-
-create index author_name_agreements_book_idx on public.author_name_agreements (book_id);
-
--- initiate_author_name_agreement()/confirm_author_name_agreement(): xem
--- migrations/20260901_add_ghostwriting_authorship.sql — không lặp lại
--- thân hàm ở đây. attach_order_book() (phần 12e) được CREATE OR REPLACE
--- trong migration đó để thêm dòng set is_ghostwritten=true.
-
--- 12i. Độ uy tín + phát hiện giao dịch ngoài nền tảng + Tranh chấp
--- (Module 7, 8, 9 đặc tả) — xem migrations/20260901_add_trust_and_disputes.sql.
-alter table public.profiles
-  add column trust_orders_completed integer not null default 0,
-  add column trust_orders_cancelled_at_fault integer not null default 0,
-  add column trust_off_platform_flags integer not null default 0,
-  add column trust_violations_resolved integer not null default 0;
-
-alter table public.direct_messages add column flagged_off_platform boolean not null default false;
-
-create table public.disputes (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.orders (id),
-  reporter_id uuid not null references auth.users (id),
-  reason_category text not null,
-  description text not null,
-  status text not null default 'open' check (status in ('open', 'resolved')),
-  evidence_snapshot jsonb not null default '{}'::jsonb,
-  resolution_note text,
-  at_fault_user_id uuid references auth.users (id),
-  resolved_by uuid references auth.users (id),
-  resolved_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
-alter table public.disputes enable row level security;
-
-create policy "order parties view their disputes"
-  on public.disputes for select
-  using (exists (
-    select 1 from public.orders o
-    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
-  ));
-
-create policy "admins view all disputes"
-  on public.disputes for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
-
-create index disputes_order_idx on public.disputes (order_id);
-create index disputes_status_idx on public.disputes (status, created_at);
-
--- recalculate_trust_score()/open_dispute()/resolve_dispute(): xem
--- migrations/20260901_add_trust_and_disputes.sql — không lặp lại thân hàm
--- ở đây. confirm_order_received() (phần 12c) và
--- resolve_order_cancel_request() (phần 12g) được CREATE OR REPLACE trong
--- migration đó để gọi thêm recalculate_trust_score() tường minh.
-
--- --- Trạng thái bảo hộ bản quyền/"không cho AI huấn luyện" thật cho nội
--- dung công khai (ảnh Thiết kế, audio) — xem
--- migrations/20260907_add_content_protection_status.sql để biết vì sao
--- "chapter" (truyện chữ) không có dòng riêng ở bảng này. ---
-create table public.content_protection_status (
-  id uuid primary key default gen_random_uuid(),
-  content_type text not null check (content_type in ('audio', 'design')),
-  content_id uuid not null,
-  protected boolean not null default true,
-  method text not null,
-  applied_at timestamptz not null default now(),
-  unique (content_type, content_id)
-);
-
-alter table public.content_protection_status enable row level security;
-
-create policy "admins view content protection status"
-  on public.content_protection_status for select
-  using (exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
-  ));
-
-create index content_protection_status_type_idx
-  on public.content_protection_status (content_type);
-
--- --- Admin duyệt/gỡ chương + Thông báo — xem
--- migrations/20260908_add_chapter_moderation_and_notifications.sql.
--- Người gửi tin nhắn khi gỡ chương LÀ chính admin thực hiện thao tác đó
--- (tài khoản thật, không phải 1 tài khoản "hệ thống" ẩn danh riêng) — xem
--- api/admin/chapters/[chapterId]/route.ts. ---
-
--- Trạng thái gỡ/khôi phục chương của ADMIN — tách biệt hẳn với `published`
--- (published=false do admin gỡ phải phân biệt được với published=false vì
--- tác giả tự để nháp).
-alter table public.chapters
-  add column removed_at timestamptz,
-  add column removed_by uuid references auth.users (id),
-  add column removed_reason_group text,
-  add column removed_reason_detail text;
-
--- Nhật ký MỌI lần gỡ/khôi phục (audit trail) — giữ lại lịch sử đầy đủ,
--- không chỉ trạng thái hiện tại ở chapters.removed_*.
-create table public.chapter_moderation_actions (
-  id uuid primary key default gen_random_uuid(),
-  chapter_id uuid not null references public.chapters (id) on delete cascade,
-  book_id uuid not null references public.books (id) on delete cascade,
-  author_id uuid not null references auth.users (id),
-  admin_id uuid not null references auth.users (id),
-  action text not null check (action in ('removed', 'restored')),
-  reason_group text,
-  reason_detail text,
-  created_at timestamptz not null default now()
-);
-
-alter table public.chapter_moderation_actions enable row level security;
-
-create policy "admins view chapter moderation actions"
-  on public.chapter_moderation_actions for select
-  using (exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
-  ));
-
-create index chapter_moderation_actions_chapter_idx
-  on public.chapter_moderation_actions (chapter_id, created_at);
-
--- "Mục Thông báo" — lớp (A) ngắn gọn (title + link). Nội dung đầy đủ (lớp
--- B) nằm ở direct_messages, không lặp lại ở đây. `type` không CHECK cứng
--- để thêm loại thông báo mới sau này không cần sửa migration.
-create table public.notifications (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  type text not null,
-  title text not null,
-  link text,
-  read_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
-alter table public.notifications enable row level security;
-
-create policy "users view their own notifications"
-  on public.notifications for select
-  using (auth.uid() = user_id);
-
-create policy "users mark their own notifications read"
-  on public.notifications for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create index notifications_user_unread_idx
-  on public.notifications (user_id, created_at) where read_at is null;
-
--- Phục vụ GET /api/notifications (mọi thông báo, không chỉ chưa đọc) — xem
--- migrations/20260914_add_notifications_user_created_idx.sql.
-create index notifications_user_created_idx
-  on public.notifications (user_id, created_at desc);
-
--- Realtime cho tin nhắn + thông báo (app mobile đăng ký postgres_changes; RLS
--- SELECT ở trên quyết định ai nhận hàng nào) — xem
--- migrations/20260924_enable_realtime_messages_notifications.sql. Đặt sau khi cả
--- direct_messages và notifications đã được tạo.
-do $$
-begin
-  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    return;
-  end if;
-  if not exists (select 1 from pg_publication_tables
-                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'direct_messages') then
-    alter publication supabase_realtime add table public.direct_messages;
-  end if;
-  if not exists (select 1 from pg_publication_tables
-                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notifications') then
-    alter publication supabase_realtime add table public.notifications;
-  end if;
-end $$;
-
--- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context) —
--- cho phép 1 admin vừa gửi tin gỡ chương (kiểm duyệt) vừa tự chat bình
--- thường với CÙNG 1 tác giả mà không bị trộn vào chung 1 hòm thư. Danh
--- tính người gửi LUÔN hiển thị thật (context không dùng để che giấu) —
--- xem migrations/20260908_add_direct_message_context.sql. ---
-alter table public.direct_messages
-  add column context text not null default 'personal' check (context in ('personal', 'moderation'));
-
-drop index if exists direct_messages_thread_idx;
-create index direct_messages_thread_idx
-  on public.direct_messages (
-    least(sender_id, recipient_id),
-    greatest(sender_id, recipient_id),
-    context,
-    created_at
-  );
-
--- --- Kiểm duyệt CẤP TRUYỆN (book-level) — dùng chung kiến trúc với
--- kiểm duyệt cấp chương ở trên (bắt buộc lý do, audit trail, thông báo +
--- tin nhắn hệ thống từ chính admin thực hiện). books.deleted_at đã có sẵn
--- từ phần soft-delete phía trên — dùng lại, chỉ thêm 3 cột lý do. Xem
--- migrations/20260908_add_book_moderation.sql. ---
-alter table public.books
-  add column removed_by uuid references auth.users (id),
-  add column removed_reason_group text,
-  add column removed_reason_detail text;
-
-create table public.book_moderation_actions (
-  id uuid primary key default gen_random_uuid(),
-  book_id uuid not null references public.books (id) on delete cascade,
-  author_id uuid not null references auth.users (id),
-  admin_id uuid not null references auth.users (id),
-  action text not null check (action in ('removed', 'restored')),
-  reason_group text,
-  reason_detail text,
-  created_at timestamptz not null default now()
-);
-
-alter table public.book_moderation_actions enable row level security;
-
-create policy "admins view book moderation actions"
-  on public.book_moderation_actions for select
-  using (exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
-  ));
-
-create index book_moderation_actions_book_idx
-  on public.book_moderation_actions (book_id, created_at);
-
--- --- Dọn NỘI DUNG NẶNG (không xoá hàng) của truyện/chương đã xoá quá 30
--- ngày — tối ưu dung lượng, giữ hàng metadata vĩnh viễn cho audit trail.
--- KHÔNG xoá thật (orders.book_id/author_name_agreements.book_id tham
--- chiếu books không có ON DELETE CASCADE). Xem
--- migrations/20260908_add_content_purge_retention.sql +
--- api/admin/cron/purge-deleted-content/route.ts. ---
-alter table public.chapters
-  add column content_purged_at timestamptz;
-
-alter table public.books
-  add column content_purged_at timestamptz;
 
 -- --- Gate nhiệm vụ ngày theo "for_role" (tác giả/người thu âm/thiết kế) —
 -- NULL = áp dụng chung (mặc định đọc giả), cùng convention với quest_type
@@ -4030,7 +3154,7 @@ alter table public.books
 -- profiles — hệ thống không xoá hàng thật nên EXISTS đã tự vĩnh viễn.
 -- KHÔNG dùng profiles.creator_tags (tự khai, chưa có UI set, không mang
 -- quyền hạn theo thiết kế gốc — xem phần 1). Xem
--- migrations/20260908_add_task_template_role_gating.sql. ---
+-- migrations/archive/20260908_add_task_template_role_gating.sql. ---
 alter table public.task_templates add column for_role text;
 
 alter table public.task_templates
@@ -4040,12 +3164,12 @@ alter table public.task_templates
 -- --- Hệ thống Thành tựu (Achievements) — 1 khung chung cho mọi role, lọc +
 -- tô màu theo for_role ở UI (NULL = chung/đọc giả, cùng convention
 -- task_templates.for_role). Ghép nối với streak_milestones.badge_id
--- (placeholder từ migrations/20260827_add_streak_milestones.sql) — mốc
+-- (placeholder từ migrations/archive/20260827_add_streak_milestones.sql) — mốc
 -- streak dùng 1 hàng ở đây (metric NULL) chỉ để cấp metadata hiển thị,
 -- unlock/claim streak vẫn qua claim_streak_milestone(), KHÔNG đổi. Chỉ 3
 -- role sản phẩm dùng metric+threshold+sync_user_achievements(). Xem
--- migrations/20260908_add_achievement_bonus_transaction_type.sql +
--- migrations/20260908_add_achievements.sql. ---
+-- migrations/archive/20260908_add_achievement_bonus_transaction_type.sql +
+-- migrations/archive/20260908_add_achievements.sql. ---
 alter type public.transaction_type add value if not exists 'achievement_bonus';
 
 create table public.achievement_templates (
@@ -4296,65 +3420,2576 @@ $$ language plpgsql security definer;
 
 revoke execute on function public.sync_user_achievements from public, anon, authenticated;
 grant execute on function public.sync_user_achievements to service_role;
--- --- Xoá chương nháp + sắp xếp thứ tự chương (tác giả, web + mobile).
--- Xem migrations/20260925_add_chapter_delete_and_reorder.sql. ---
-drop policy if exists "authors delete draft chapters on their own books" on public.chapters;
-create policy "authors delete draft chapters on their own books"
-  on public.chapters for delete
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/06_social_and_messaging.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 06 — Mạng xã hội & tin nhắn  (06_social_and_messaging.sql)
+-- =======================================================================
+-- Phạm vi: Theo dõi tác giả, tin nhắn 1-1 (direct_messages + ngữ cảnh),
+-- thông báo, realtime publication.
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     author_follows, direct_messages, notifications
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260824_add_author_follows.sql, 20260828_add_direct_messages.sql,
+--   20260908_add_chapter_moderation_and_notifications.sql,
+--   20260908_add_direct_message_context.sql,
+--   20260912_add_direct_messages_participant_indexes.sql,
+--   20260914_add_notifications_user_created_idx.sql,
+--   20260924_enable_realtime_messages_notifications.sql
+--
+-- Phụ thuộc (phải chạy trước): không có
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
+
+-- --- Theo dõi tác giả, dạng toggle (nút Theo dõi/Đang theo dõi ở trang
+-- đọc chương) — quan hệ profile-to-profile nên đặt ngay đây, không thuộc
+-- phần 3 (books/chapters). Composite PK, giống book_progress, không có
+-- bảng nào khác cần FK trỏ vào 1 dòng follow. Route API thật dùng
+-- service-role + userId resolve qua getAuthedUserId() (src/lib/wallet/session.ts)
+-- — RLS dưới đây chỉ là defense-in-depth. Xem
+-- migrations/archive/20260824_add_author_follows.sql. ---
+create table public.author_follows (
+  follower_id uuid not null references auth.users (id) on delete cascade,
+  author_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, author_id),
+  constraint author_follows_no_self_follow check (follower_id <> author_id)
+);
+
+create index author_follows_author_id_idx on public.author_follows (author_id);
+
+alter table public.author_follows enable row level security;
+
+create policy "followers manage their own follow rows"
+  on public.author_follows for all
+  using (auth.uid() = follower_id)
+  with check (auth.uid() = follower_id and follower_id <> author_id);
+
+-- --- Nhắn tin 1-1 (tab "Hội thoại" ở /ca-nhan, nút "Nhắn tin" ở
+-- /ket-noi) — 1 bảng duy nhất, không tách conversations/participants
+-- riêng vì đây chỉ là chat 1-1 (không có group chat), "cuộc hội thoại"
+-- giữa 2 người suy ra trực tiếp từ cặp (sender_id, recipient_id). Route
+-- thật dùng service-role (khớp pattern api/profile/cover, .../identity)
+-- — RLS dưới đây chỉ là defense-in-depth. Xem
+-- migrations/archive/20260828_add_direct_messages.sql. ---
+create table public.direct_messages (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  recipient_id uuid not null references auth.users (id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 4000),
+  -- null = người nhận chưa đọc. Chỉ có đọc/chưa đọc, không có trạng thái
+  -- "đã gửi/đã nhận" như app chat thật.
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint direct_messages_no_self_message check (sender_id <> recipient_id)
+);
+
+-- Lọc theo least/greatest(sender_id, recipient_id) để 1 index dùng được
+-- cho truy vấn "toàn bộ tin giữa tôi và người X" ở cả 2 chiều gửi/nhận.
+create index direct_messages_thread_idx
+  on public.direct_messages (least(sender_id, recipient_id), greatest(sender_id, recipient_id), created_at);
+
+create index direct_messages_unread_idx
+  on public.direct_messages (recipient_id, sender_id) where read_at is null;
+
+-- Phục vụ GET /api/messages (danh sách hội thoại — "sender_id = :me OR
+-- recipient_id = :me", không lọc theo 1 đối tác cụ thể nên
+-- direct_messages_thread_idx ở trên không dùng được). Xem
+-- migrations/archive/20260912_add_direct_messages_participant_indexes.sql —
+-- migration đó dùng CREATE INDEX CONCURRENTLY (production đã có
+-- traffic), ở đây dùng cú pháp thường vì schema.sql chỉ dùng để dựng
+-- project mới từ đầu (chưa có traffic, không cần CONCURRENTLY).
+create index direct_messages_sender_created_idx
+  on public.direct_messages (sender_id, created_at desc);
+
+create index direct_messages_recipient_created_idx
+  on public.direct_messages (recipient_id, created_at desc);
+
+alter table public.direct_messages enable row level security;
+
+create policy "participants read their own messages"
+  on public.direct_messages for select
+  using (auth.uid() = sender_id or auth.uid() = recipient_id);
+
+create policy "users send messages as themselves"
+  on public.direct_messages for insert
+  with check (auth.uid() = sender_id);
+
+create policy "recipients mark messages read"
+  on public.direct_messages for update
+  using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
+
+-- "Mục Thông báo" — lớp (A) ngắn gọn (title + link). Nội dung đầy đủ (lớp
+-- B) nằm ở direct_messages, không lặp lại ở đây. `type` không CHECK cứng
+-- để thêm loại thông báo mới sau này không cần sửa migration.
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  type text not null,
+  title text not null,
+  link text,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.notifications enable row level security;
+
+create policy "users view their own notifications"
+  on public.notifications for select
+  using (auth.uid() = user_id);
+
+create policy "users mark their own notifications read"
+  on public.notifications for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index notifications_user_unread_idx
+  on public.notifications (user_id, created_at) where read_at is null;
+
+-- Phục vụ GET /api/notifications (mọi thông báo, không chỉ chưa đọc) — xem
+-- migrations/archive/20260914_add_notifications_user_created_idx.sql.
+create index notifications_user_created_idx
+  on public.notifications (user_id, created_at desc);
+
+-- Realtime cho tin nhắn + thông báo (app mobile đăng ký postgres_changes; RLS
+-- SELECT ở trên quyết định ai nhận hàng nào) — xem
+-- migrations/archive/20260924_enable_realtime_messages_notifications.sql. Đặt sau khi cả
+-- direct_messages và notifications đã được tạo.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    return;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'direct_messages') then
+    alter publication supabase_realtime add table public.direct_messages;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notifications') then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end $$;
+
+-- --- Tách "hòm thư" trong Hội thoại theo NGỮ CẢNH tin nhắn (context) —
+-- cho phép 1 admin vừa gửi tin gỡ chương (kiểm duyệt) vừa tự chat bình
+-- thường với CÙNG 1 tác giả mà không bị trộn vào chung 1 hòm thư. Danh
+-- tính người gửi LUÔN hiển thị thật (context không dùng để che giấu) —
+-- xem migrations/archive/20260908_add_direct_message_context.sql. ---
+alter table public.direct_messages
+  add column context text not null default 'personal' check (context in ('personal', 'moderation'));
+
+drop index if exists direct_messages_thread_idx;
+create index direct_messages_thread_idx
+  on public.direct_messages (
+    least(sender_id, recipient_id),
+    greatest(sender_id, recipient_id),
+    context,
+    created_at
+  );
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/07_design.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 07 — Thiết kế (ảnh)  (07_design.sql)
+-- =======================================================================
+-- Phạm vi: design_items + view công khai, lượt thích, album, bình luận, ảnh
+-- bìa sách (books.cover_design_item_id + link_cover_to_book), bucket
+-- design-images.
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     design_items, design_item_likes, design_albums, design_comments,
+--     design_comment_likes
+--   View:
+--     design_item_like_counts, public_design_items,
+--     design_comment_like_counts
+--   Hàm:
+--     increment_design_item_share_count, prevent_direct_cover_change,
+--     link_cover_to_book, regenerate_design_share_token
+--   Kiểu (enum):
+--     content_source
+--   Storage bucket:
+--     design-images
+--   Thêm cột vào bảng của file trước:
+--     books.cover_design_item_id
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260901_add_design_item_gallery_metadata.sql,
+--   20260917_add_design_audio_comments.sql,
+--   20260919_add_design_albums_and_multi_upload.sql,
+--   20260921_add_design_item_publish_state.sql
+--   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
+
+-- ---------------------------------------------------------------------
+-- 9. Audio & Thiết kế — kho độc lập, liên kết vào truyện qua SHARE LINK
+-- ---------------------------------------------------------------------
+-- Mô hình (bản sửa — thêm cơ chế share-token, giống Google Drive):
+--
+--   • Diễn viên lồng tiếng / họa sĩ upload TỰ DO vào kho Audio / Thiết kế
+--     — độc lập, không cần thuộc về chương/truyện nào cả lúc tạo.
+--   • Kho này CÓ trang duyệt công khai (ai cũng xem/nghe được, giống
+--     browse file "chỉ xem" trên Drive) — nhưng xem công khai KHÔNG đồng
+--     nghĩa với việc ai cũng link được vào truyện của họ.
+--   • Muốn link, tác giả cần đúng "share link" — một chuỗi bí mật
+--     (`share_token`) do chủ sở hữu tạo ra và tự tay gửi cho tác giả sau
+--     khi thoả thuận ngoài nền tảng. `share_token` KHÔNG xuất hiện ở
+--     trang duyệt công khai — chỉ chủ sở hữu xem được token của chính
+--     mình để copy đi chia sẻ, y hệt nút "Get link" của Google Drive.
+--   • Copy id/URL từ vị trí người nghe/xem (trang duyệt công khai) sẽ
+--     KHÔNG link được — vì hàm liên kết bắt buộc kiểm tra token đúng,
+--     không chỉ id đúng.
+--   • Tác giả tự upload từ máy (không qua ai khác): app tạo hộ 1 dòng
+--     audio_narrations/design_items với narrator_id/illustrator_id =
+--     chính tác giả, lấy luôn token vừa tạo (họ đang sở hữu, không cần ai
+--     cho phép) để tự link cho mình trong cùng 1 thao tác.
+
+
+create type public.content_source as enum ('independent', 'story_upload');
+
+-- --- Kho Thiết kế (ảnh bìa, minh hoạ) ---
+create table public.design_items (
+  id uuid primary key default gen_random_uuid(),
+  illustrator_id uuid not null references auth.users (id) on delete cascade,
+  title text not null,
+  image_url text not null, -- path trong bucket 'design-images'
+  -- Nullable: ảnh bìa tạo tự động qua luồng story_upload không hỏi họa sĩ
+  -- điền gì — chỉ nội dung đăng độc lập ở /thiet-ke/new mới bắt buộc chọn.
+  -- Xem migrations/archive/20260901_add_design_item_gallery_metadata.sql.
+  category text,
+  description text,
+  share_count integer not null default 0,
+  source public.content_source not null default 'independent',
+  -- Chuỗi bí mật để chia sẻ quyền link — 48 ký tự hex (192 bit), không
+  -- đoán được. Đừng lộ cột này ra bất kỳ view/API công khai nào.
+  share_token text not null default encode(extensions.gen_random_bytes(24), 'hex'),
+  created_at timestamptz not null default now(),
+  constraint design_items_share_count_check check (share_count >= 0),
+  constraint design_items_category_check
+    check (category is null or category in ('bia_truyen', 'minh_hoa', 'fan_art', 'poster_audio'))
+);
+
+alter table public.design_items enable row level security;
+
+-- CHỈ chủ sở hữu xem được toàn bộ dòng (bao gồm share_token, để họ copy
+-- đi chia sẻ) — KHÔNG có policy "public select" trên bảng gốc này.
+create policy "illustrators view their own design items (incl. share token)"
+  on public.design_items for select
+  using (auth.uid() = illustrator_id);
+
+create policy "illustrators insert their own design items"
+  on public.design_items for insert
+  with check (auth.uid() = illustrator_id);
+
+create policy "illustrators update their own design items"
+  on public.design_items for update
+  using (auth.uid() = illustrator_id);
+
+create policy "illustrators delete their own design items"
+  on public.design_items for delete
+  using (auth.uid() = illustrator_id);
+
+-- View công khai public_design_items: đã chuyển xuống ngay sau khi
+-- design_items có đủ album_id/alt_text/deleted_at/published_at (bên dưới).
+
+-- Bảng riêng cho lượt thích (toggle, 1 dòng/(tác phẩm, người thích)) —
+-- cùng pattern "aggregate qua view riêng, bảng gốc owner-only RLS" như
+-- chapter_votes/chapter_vote_counts. Xem
+-- migrations/archive/20260901_add_design_item_gallery_metadata.sql.
+create table public.design_item_likes (
+  design_item_id uuid not null references public.design_items (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (design_item_id, user_id)
+);
+
+create index design_item_likes_design_item_id_idx on public.design_item_likes (design_item_id);
+
+alter table public.design_item_likes enable row level security;
+
+create policy "users manage their own design item likes"
+  on public.design_item_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.design_item_like_counts as
+  select design_item_id, count(*)::integer as like_count
+  from public.design_item_likes
+  group by design_item_id;
+
+-- --- Albums ("board") — long-lived grouping of design_items, shared name
+-- + art_style across every item in it (xem
+-- migrations/archive/20260919_add_design_albums_and_multi_upload.sql). Hiện ở cả
+-- form đăng /thiet-ke/new VÀ trang duyệt công khai /thiet-ke (khác nhãn
+-- nội bộ chỉ dùng lúc đăng) — không có cột bí mật nào nên select công khai
+-- thẳng trên bảng gốc, không cần view public_* riêng như design_items. ---
+create table public.design_albums (
+  id uuid primary key default gen_random_uuid(),
+  illustrator_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  -- 10 giá trị lấy từ cột "Phong cách nghệ thuật" của mega-menu
+  -- (nav-strip-links.tsx) — xem src/lib/design/art-styles.ts.
+  art_style text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint design_albums_art_style_check
+    check (art_style in (
+      'anime_manga', 'ban_ta_thuc', 'ta_thuc', 'chibi', 'flat_vector',
+      'co_trang', 'dark_fantasy', 'pixel_art', 'painterly', 'render_3d'
+    ))
+);
+
+create index design_albums_illustrator_id_idx on public.design_albums (illustrator_id);
+
+alter table public.design_albums enable row level security;
+
+create policy "anyone can view design albums"
+  on public.design_albums for select
+  using (true);
+
+create policy "illustrators insert their own design albums"
+  on public.design_albums for insert
+  with check (auth.uid() = illustrator_id);
+
+create policy "illustrators update their own design albums"
+  on public.design_albums for update
+  using (auth.uid() = illustrator_id);
+
+create policy "illustrators delete their own design albums"
+  on public.design_albums for delete
+  using (auth.uid() = illustrator_id);
+
+-- --- design_items: album_id/alt_text/deleted_at (mở rộng theo cùng
+-- migration ở trên) — category_check mở rộng 4 → 14 giá trị, CỘNG THÊM
+-- không remap: 'bia_truyen'/'fan_art' giữ nguyên slug (chỉ đổi nhãn hiện ở
+-- UI thành "Bìa truyện/sách"/"Fanart"), 'minh_hoa'/'poster_audio' giữ
+-- nguyên không đổi, 10 slug mới cho các mục mega-menu chưa có tương đương.
+-- Xem src/lib/design/get-design-gallery.ts (DESIGN_CATEGORIES). ---
+alter table public.design_items
+  add column album_id uuid references public.design_albums (id) on delete set null,
+  add column alt_text text,
+  add column deleted_at timestamptz;
+
+create index design_items_album_id_idx on public.design_items (album_id) where album_id is not null;
+
+alter table public.design_items drop constraint design_items_category_check;
+alter table public.design_items
+  add constraint design_items_category_check
+  check (category is null or category in (
+    'bia_truyen', 'nhan_vat_don', 'nhan_vat_nhom', 'vu_khi_trang_bi',
+    'boi_canh_phong_canh', 'linh_vat', 'trang_phuc', 'chibi_deform',
+    'emote_pack', 'logo_icon', 'fan_art', 'tranh_doi', 'minh_hoa', 'poster_audio'
+  ));
+
+-- Cột-cấp GRANT — policy "illustrators update their own design items" ở
+-- trên chỉ chặn theo HÀNG, không theo CỘT, nên nếu không có REVOKE/GRANT
+-- này, client tự PATCH thẳng share_token/image_url qua Supabase REST API
+-- được, bỏ qua regenerate_design_share_token() và route upload. Cùng
+-- pattern books (20260825_restrict_books_column_grants.sql).
+revoke update on public.design_items from authenticated;
+grant update (title, description, category, alt_text, album_id, deleted_at) on public.design_items to authenticated;
+
+-- --- design_items: published_at (xem
+-- migrations/archive/20260921_add_design_item_publish_state.sql) — null = draft
+-- riêng của họa sĩ (chưa hiện qua public_design_items bên dưới), có giá trị
+-- = đã công khai. POST /api/design (đăng ảnh) không set cột này, mặc
+-- định NULL; POST /api/design/publish (bấm "Hoàn tất") là nơi duy nhất
+-- set = now(). ---
+alter table public.design_items
+  add column published_at timestamptz;
+
+grant update (published_at) on public.design_items to authenticated;
+
+-- View công khai cho trang "duyệt kho Thiết kế" — CỐ Ý không có
+-- share_token. Đây là view app dùng để hiện danh sách công khai. Lọc
+-- deleted_at is null ngay ở đây (xem
+-- migrations/archive/20260919_add_design_albums_and_multi_upload.sql) — MỌI nơi
+-- đọc công khai (gallery/search/comments/likes) đi qua view này, không
+-- đọc bảng gốc, nên chỉ cần lọc 1 chỗ. Đặt sau các ALTER ở trên vì view
+-- đọc album_id/alt_text/deleted_at/published_at.
+create view public.public_design_items as
+  select id, illustrator_id, title, image_url, source, created_at, category, description, share_count,
+         album_id, alt_text, published_at
+  from public.design_items
+  where deleted_at is null and published_at is not null;
+
+-- security definer: tăng share_count an toàn dưới race condition, không
+-- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 tác phẩm/lần gọi.
+-- Không yêu cầu đăng nhập, giống increment_book_view_count.
+create function public.increment_design_item_share_count(p_design_item_id uuid)
+returns void as $$
+  update public.design_items set share_count = share_count + 1 where id = p_design_item_id;
+$$ language sql security definer set search_path = public;
+
+grant execute on function public.increment_design_item_share_count(uuid) to anon, authenticated;
+
+-- --- Bình luận cho 1 tác phẩm thiết kế — mirror anchored_comments nhưng bỏ
+-- paragraph_index/char_start/char_end/quest_id (không có khái niệm "đoạn
+-- văn" hay "quest neo comment" ở đây). Reply 1 cấp duy nhất, enforce ở API
+-- route, không phải CHECK DB. Xem migrations/archive/20260917_add_design_audio_comments.sql. ---
+create table public.design_comments (
+  id uuid primary key default gen_random_uuid(),
+  design_item_id uuid not null references public.design_items (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  content text not null check (char_length(trim(content)) > 0),
+  parent_comment_id uuid references public.design_comments (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index design_comments_design_item_id_idx on public.design_comments (design_item_id);
+create index design_comments_parent_idx on public.design_comments (parent_comment_id) where parent_comment_id is not null;
+
+alter table public.design_comments enable row level security;
+
+create policy "design comments are publicly readable"
+  on public.design_comments for select
+  using (true);
+
+create policy "users write their own design comments"
+  on public.design_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own design comments"
+  on public.design_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate design comments"
+  on public.design_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Toggle thích 1 bình luận — cùng pattern design_item_likes (aggregate qua
+-- view riêng, bảng gốc owner-only RLS).
+create table public.design_comment_likes (
+  comment_id uuid not null references public.design_comments (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+create index design_comment_likes_comment_id_idx on public.design_comment_likes (comment_id);
+
+alter table public.design_comment_likes enable row level security;
+
+create policy "users manage their own design comment likes"
+  on public.design_comment_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.design_comment_like_counts as
+  select comment_id, count(*)::integer as like_count
+  from public.design_comment_likes
+  group by comment_id;
+
+-- --- Ảnh bìa sách — cùng cơ chế token, nhưng gắn thẳng vào cột
+-- books.cover_design_item_id thay vì 1 bảng liên kết riêng (1 sách chỉ
+-- có 1 bìa tại 1 thời điểm, khác audio có thể nhiều bản cùng lúc). ---
+alter table public.books
+  add column cover_design_item_id uuid references public.design_items (id) on delete set null;
+
+-- Chặn việc UPDATE trực tiếp cột này qua policy "authors update their own
+-- books" ở phần 3 (policy đó cho sửa TOÀN BỘ cột, không phân biệt được
+-- "sửa title" với "sửa cover" — RLS không làm được điều này). Trigger này
+-- chặn khi giá trị mới KHÁC NULL và bị đổi trực tiếp — cho phép xoá bìa
+-- (set về null) thoải mái vì việc đó không cần ai cho phép, chỉ chặn việc
+-- ĐẶT bìa mới ngoài hàm link_cover_to_book().
+create function public.prevent_direct_cover_change()
+returns trigger as $$
+begin
+  if new.cover_design_item_id is distinct from old.cover_design_item_id
+     and new.cover_design_item_id is not null
+     and coalesce(current_setting('vinh.allow_cover_change', true), 'false') <> 'true' then
+    raise exception 'Dùng link_cover_to_book() để đổi bìa — không update trực tiếp được';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger enforce_cover_via_function
+  before update on public.books
+  for each row execute function public.prevent_direct_cover_change();
+
+create function public.link_cover_to_book(
+  p_book_id uuid,
+  p_design_item_id uuid,
+  p_share_token text
+) returns public.books as $$
+declare
+  v_row public.books;
+begin
+  if not exists (select 1 from public.books where id = p_book_id and author_id = auth.uid()) then
+    raise exception 'Bạn không sở hữu sách này';
+  end if;
+
+  if not exists (
+    select 1 from public.design_items
+    where id = p_design_item_id and share_token = p_share_token
+  ) then
+    raise exception 'Share link không đúng hoặc đã bị thu hồi';
+  end if;
+
+  -- Cờ tạm trong transaction hiện tại (true ở tham số cuối = local, tự
+  -- hết hiệu lực khi transaction kết thúc) — cho phép chính update ngay
+  -- dưới đây đi qua được trigger enforce_cover_via_function ở trên.
+  perform set_config('vinh.allow_cover_change', 'true', true);
+
+  update public.books set cover_design_item_id = p_design_item_id
+    where id = p_book_id
+    returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+create function public.regenerate_design_share_token(p_design_item_id uuid)
+returns text as $$
+declare
+  v_new_token text := encode(extensions.gen_random_bytes(24), 'hex');
+begin
+  update public.design_items
+    set share_token = v_new_token
+    where id = p_design_item_id and illustrator_id = auth.uid();
+  if not found then
+    raise exception 'Không tìm thấy, hoặc bạn không phải chủ sở hữu';
+  end if;
+  return v_new_token;
+end;
+$$ language plpgsql security definer;
+
+-- --- Storage buckets ---
+insert into storage.buckets (id, name, public) values ('design-images', 'design-images', true)
+  on conflict (id) do nothing;
+
+create policy "design images are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'design-images');
+
+create policy "illustrators upload their own design images"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'design-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "illustrators update their own design images"
+  on storage.objects for update
   using (
-    not published
-    and removed_at is null
-    and not is_last_chapter
+    bucket_id = 'design-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create index if not exists design_items_illustrator_created_idx
+  on public.design_items (illustrator_id, created_at desc);
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/08_audio.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 08 — Audio  (08_audio.sql)
+-- =======================================================================
+-- Phạm vi: audio_narrations + view công khai, tiến độ nghe, bình luận, liên
+-- kết chương ↔ audio, bucket audio-narrations, trạng thái bảo hộ nội dung
+-- (dùng chung Thiết kế + Audio).
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     audio_narrations, audio_progress, audio_comments, audio_comment_likes,
+--     chapter_audio_links, content_protection_status
+--   View:
+--     public_audio_narrations, audio_comment_like_counts
+--   Hàm:
+--     increment_audio_play_count, link_audio_to_chapter,
+--     regenerate_audio_share_token
+--   Storage bucket:
+--     audio-narrations
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260901_add_audio_narration_hub_metadata.sql,
+--   20260907_add_content_protection_status.sql,
+--   20260917_add_design_audio_comments.sql
+--   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql, 07_design.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
+
+-- --- Kho Audio ---
+create table public.audio_narrations (
+  id uuid primary key default gen_random_uuid(),
+  narrator_id uuid not null references auth.users (id) on delete cascade,
+  title text not null,
+  audio_url text not null, -- path trong bucket 'audio-narrations'
+  duration_seconds integer,
+  -- Người nghe chọn ở /audio/new; với audio gắn vào chương sách qua
+  -- chapter_audio_links, app tự điền lại từ genre của sách đó thay vì hỏi
+  -- 2 lần — xem src/lib/audio/get-audio-catalog.ts. Cùng danh sách giá trị
+  -- với books.genre (không dùng chung constraint vì khác bảng).
+  genre text,
+  play_count integer not null default 0,
+  source public.content_source not null default 'independent',
+  share_token text not null default encode(extensions.gen_random_bytes(24), 'hex'),
+  created_at timestamptz not null default now(),
+  constraint audio_narrations_play_count_check check (play_count >= 0),
+  constraint audio_narrations_genre_check
+    check (genre is null or genre in (
+      'Linh dị', 'Cổ tích & Thần thoại', 'Dã sử', 'Trinh thám',
+      'Tâm lý - tội phạm', 'Tình cảm', 'Đời sống - Xã hội',
+      'Khoa học viễn tưởng', 'Tiên hiệp/ kiếm hiệp', 'Kỳ ảo'
+    ))
+);
+
+alter table public.audio_narrations enable row level security;
+
+create policy "narrators view their own audio narrations (incl. share token)"
+  on public.audio_narrations for select
+  using (auth.uid() = narrator_id);
+
+create policy "narrators insert their own audio narrations"
+  on public.audio_narrations for insert
+  with check (auth.uid() = narrator_id);
+
+create policy "narrators update their own audio narrations"
+  on public.audio_narrations for update
+  using (auth.uid() = narrator_id);
+
+create policy "narrators delete their own audio narrations"
+  on public.audio_narrations for delete
+  using (auth.uid() = narrator_id);
+
+create view public.public_audio_narrations as
+  select id, narrator_id, title, audio_url, duration_seconds, source, created_at, genre, play_count
+  from public.audio_narrations;
+
+-- security definer: tăng play_count an toàn dưới race condition, không
+-- cho client tự set bằng bất kỳ số nào — chỉ +1 đúng 1 bản ghi/lần gọi.
+-- Không yêu cầu đăng nhập, giống increment_book_view_count.
+create function public.increment_audio_play_count(p_audio_narration_id uuid)
+returns void as $$
+  update public.audio_narrations set play_count = play_count + 1 where id = p_audio_narration_id;
+$$ language sql security definer set search_path = public;
+
+grant execute on function public.increment_audio_play_count(uuid) to anon, authenticated;
+
+-- --- "Đang nghe dở" cho Audio hub — cùng shape/lý do với book_progress ở
+-- phần 8, nhưng cho audio_narrations thay vì books/chapters: 1 dòng/(user,
+-- audio), upsert khi lưu (không phải log append-only). Powers "Audio đang
+-- nghe" (dòng updated_at mới nhất) và "Nghe tiếp" (vài dòng kế tiếp) trên
+-- /audio bằng dữ liệu thật — không có dòng nào thì không hiện gì, không
+-- bịa số. Xem migrations/archive/20260901_add_audio_narration_hub_metadata.sql.
+-- Đặt ở đây (sau audio_narrations) thay vì cạnh book_progress vì FK. ---
+create table public.audio_progress (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
+  position_seconds integer not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, audio_narration_id),
+  constraint audio_progress_position_seconds_check check (position_seconds >= 0)
+);
+
+alter table public.audio_progress enable row level security;
+
+create policy "users manage their own audio progress"
+  on public.audio_progress for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- --- Bình luận cho 1 bản thu audio — cùng cấu trúc design_comments ở
+-- trên, khác bảng gốc tham chiếu. Xem
+-- migrations/archive/20260917_add_design_audio_comments.sql. ---
+create table public.audio_comments (
+  id uuid primary key default gen_random_uuid(),
+  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  content text not null check (char_length(trim(content)) > 0),
+  parent_comment_id uuid references public.audio_comments (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index audio_comments_audio_narration_id_idx on public.audio_comments (audio_narration_id);
+create index audio_comments_parent_idx on public.audio_comments (parent_comment_id) where parent_comment_id is not null;
+
+alter table public.audio_comments enable row level security;
+
+create policy "audio comments are publicly readable"
+  on public.audio_comments for select
+  using (true);
+
+create policy "users write their own audio comments"
+  on public.audio_comments for insert
+  with check (auth.uid() = user_id);
+
+create policy "users delete their own audio comments"
+  on public.audio_comments for delete
+  using (auth.uid() = user_id);
+
+create policy "admins moderate audio comments"
+  on public.audio_comments for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create table public.audio_comment_likes (
+  comment_id uuid not null references public.audio_comments (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+create index audio_comment_likes_comment_id_idx on public.audio_comment_likes (comment_id);
+
+alter table public.audio_comment_likes enable row level security;
+
+create policy "users manage their own audio comment likes"
+  on public.audio_comment_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create view public.audio_comment_like_counts as
+  select comment_id, count(*)::integer as like_count
+  from public.audio_comment_likes
+  group by comment_id;
+
+-- --- Liên kết chương ↔ audio (nhiều-nhiều) ---
+-- Bảng này TỰ NÓ không nhạy cảm (không có share_token), nên select công
+-- khai được — vấn đề nằm ở việc TẠO dòng mới, không phải xem dòng đã có.
+create table public.chapter_audio_links (
+  id uuid primary key default gen_random_uuid(),
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  audio_narration_id uuid not null references public.audio_narrations (id) on delete cascade,
+  linked_by uuid not null references auth.users (id),
+  linked_at timestamptz not null default now(),
+  unique (chapter_id, audio_narration_id)
+);
+
+alter table public.chapter_audio_links enable row level security;
+
+create policy "audio links are publicly viewable"
+  on public.chapter_audio_links for select
+  using (true);
+
+-- KHÔNG có policy insert nào ở đây — cố ý. Tạo liên kết chỉ được phép
+-- qua hàm link_audio_to_chapter() bên dưới, hàm đó mới là nơi kiểm tra
+-- share_token. Nếu chỉ dùng RLS "book author sở hữu chapter" như bản
+-- trước, tác giả copy được id công khai là link được luôn — không kiểm
+-- tra được liệu diễn viên có thật sự đồng ý hay không.
+
+-- Gỡ liên kết thì không cần xin phép diễn viên (đây là quyền của tác giả
+-- với truyện của họ), nên vẫn cho phép DELETE trực tiếp.
+create policy "book authors unlink audio from their own chapters"
+  on public.chapter_audio_links for delete
+  using (exists (
+    select 1 from public.chapters c
+    join public.books b on b.id = c.book_id
+    where c.id = chapter_id and b.author_id = auth.uid()
+  ));
+
+-- Hàm DUY NHẤT được phép tạo liên kết — kiểm tra CẢ 2 điều kiện:
+-- (1) người gọi sở hữu sách chứa chương này, VÀ
+-- (2) share_token khớp đúng với audio_narration đó (chứng minh chủ sở
+--     hữu audio đã chủ động chia sẻ link, không phải tác giả tự đoán id).
+create function public.link_audio_to_chapter(
+  p_chapter_id uuid,
+  p_audio_narration_id uuid,
+  p_share_token text
+) returns public.chapter_audio_links as $$
+declare
+  v_row public.chapter_audio_links;
+begin
+  if not exists (
+    select 1 from public.chapters c
+    join public.books b on b.id = c.book_id
+    where c.id = p_chapter_id and b.author_id = auth.uid()
+  ) then
+    raise exception 'Bạn không sở hữu sách chứa chương này';
+  end if;
+
+  if not exists (
+    select 1 from public.audio_narrations
+    where id = p_audio_narration_id and share_token = p_share_token
+  ) then
+    raise exception 'Share link không đúng hoặc đã bị thu hồi';
+  end if;
+
+  insert into public.chapter_audio_links (chapter_id, audio_narration_id, linked_by)
+  values (p_chapter_id, p_audio_narration_id, auth.uid())
+  returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+-- Cho diễn viên "thu hồi link" nếu lỡ chia sẻ nhầm, hoặc tác giả không
+-- còn hợp tác nữa — sinh token mới, mọi link cũ vẫn hiển thị bình thường
+-- (link đã tạo không tự mất) nhưng token cũ không dùng để link thêm được
+-- nữa. Giống nút "Get new link" của Google Drive.
+create function public.regenerate_audio_share_token(p_audio_narration_id uuid)
+returns text as $$
+declare
+  v_new_token text := encode(extensions.gen_random_bytes(24), 'hex');
+begin
+  update public.audio_narrations
+    set share_token = v_new_token
+    where id = p_audio_narration_id and narrator_id = auth.uid();
+  if not found then
+    raise exception 'Không tìm thấy, hoặc bạn không phải chủ sở hữu';
+  end if;
+  return v_new_token;
+end;
+$$ language plpgsql security definer;
+insert into storage.buckets (id, name, public) values ('audio-narrations', 'audio-narrations', true)
+  on conflict (id) do nothing;
+
+create policy "audio narrations are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'audio-narrations');
+
+create policy "narrators upload their own audio files"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'audio-narrations'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "narrators update their own audio files"
+  on storage.objects for update
+  using (
+    bucket_id = 'audio-narrations'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- --- Cách app dùng (gợi ý luồng, không phải SQL bắt buộc) ---
+--
+-- Diễn viên upload độc lập, lấy link để chia sẻ:
+--   const { data } = await supabase.from('audio_narrations')
+--     .insert({ narrator_id: user.id, title, audio_url, duration_seconds })
+--     .select('id, share_token').single();
+--   → hiện cho họ: vinh.vn/lien-ket-audio?id=${data.id}&token=${data.share_token}
+--   → họ tự copy link này gửi cho tác giả (kênh nào cũng được — chat, email...).
+--
+-- Tác giả dán link (app tự parse id + token từ URL họ paste vào):
+--   const { data, error } = await supabase.rpc('link_audio_to_chapter', {
+--     p_chapter_id: chapterId,
+--     p_audio_narration_id: parsedId,
+--     p_share_token: parsedToken,
+--   });
+--   // error nếu token sai/đã bị thu hồi, hoặc tác giả không sở hữu chương này.
+--
+-- Tác giả tự upload từ máy (không qua ai khác) — app làm 2 bước liền
+-- nhau trong 1 lần bấm, TỰ CÓ token vì vừa tạo xong nên không cần ai gửi:
+--   const { data: item } = await supabase.from('audio_narrations')
+--     .insert({ narrator_id: user.id, title, audio_url, source: 'story_upload' })
+--     .select('id, share_token').single();
+--   await supabase.rpc('link_audio_to_chapter', {
+--     p_chapter_id: chapterId,
+--     p_audio_narration_id: item.id,
+--     p_share_token: item.share_token, // họ vừa tạo, tự có sẵn, không cần dán tay
+--   });
+--
+-- Ảnh bìa dùng đúng logic tương tự với link_cover_to_book().
+--
+-- Lấy danh sách audio đã link cho 1 chương (để hiện "chọn giọng đọc") —
+-- LƯU Ý: join qua view public_audio_narrations, không phải bảng gốc, vì
+-- bảng gốc chỉ chủ sở hữu mới select được:
+--   select an.*, p.nickname as narrator_name, p.avatar_url
+--   from public.chapter_audio_links cal
+--   join public.public_audio_narrations an on an.id = cal.audio_narration_id
+--   join public.author_public_profiles p on p.id = an.narrator_id
+--   where cal.chapter_id = :chapter_id
+--   order by cal.linked_at asc;
+
+-- =======================================================================
+-- Nếu bạn ĐÃ CHẠY 1 trong 2 bản audio_narrations trước đó (bản có cột
+-- chapter_id/status, HOẶC bản không-token vừa rồi) — chạy dọn dẹp sau
+-- TRƯỚC khi chạy phần 9 ở trên. An toàn dù bản nào bạn từng chạy, vì
+-- toàn bộ dùng IF EXISTS:
+--
+--   drop trigger if exists enforce_narration_column_ownership on public.audio_narrations;
+--   drop trigger if exists enforce_cover_via_function on public.books;
+--   drop function if exists public.enforce_narration_column_ownership cascade;
+--   drop function if exists public.prevent_direct_cover_change cascade;
+--   drop function if exists public.link_audio_to_chapter cascade;
+--   drop function if exists public.link_cover_to_book cascade;
+--   drop function if exists public.regenerate_audio_share_token cascade;
+--   drop function if exists public.regenerate_design_share_token cascade;
+--   drop view if exists public.public_audio_narrations cascade;
+--   drop view if exists public.public_design_items cascade;
+--   drop table if exists public.chapter_audio_links cascade;
+--   drop table if exists public.audio_narrations cascade;
+--   drop table if exists public.design_items cascade;
+--   drop table if exists public.design_albums cascade;
+--   drop type if exists public.narration_status cascade;
+--   alter table public.books drop column if exists cover_design_item_id;
+--   -- book-covers bucket cũ (nếu có) không còn dùng, để nguyên vô hại
+--   -- hoặc xoá thủ công qua Dashboard → Storage nếu muốn dọn sạch.
+-- =======================================================================
+
+
+-- --- Trạng thái bảo hộ bản quyền/"không cho AI huấn luyện" thật cho nội
+-- dung công khai (ảnh Thiết kế, audio) — xem
+-- migrations/archive/20260907_add_content_protection_status.sql để biết vì sao
+-- "chapter" (truyện chữ) không có dòng riêng ở bảng này. ---
+create table public.content_protection_status (
+  id uuid primary key default gen_random_uuid(),
+  content_type text not null check (content_type in ('audio', 'design')),
+  content_id uuid not null,
+  protected boolean not null default true,
+  method text not null,
+  applied_at timestamptz not null default now(),
+  unique (content_type, content_id)
+);
+
+alter table public.content_protection_status enable row level security;
+
+create policy "admins view content protection status"
+  on public.content_protection_status for select
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+  ));
+
+create index content_protection_status_type_idx
+  on public.content_protection_status (content_type);
+create index if not exists audio_narrations_narrator_created_idx
+  on public.audio_narrations (narrator_id, created_at desc);
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/09_orders_and_services.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 09 — Đơn hàng & dịch vụ (commission)  (09_orders_and_services.sql)
+-- =======================================================================
+-- Phạm vi: service_listings/samples, danh mục tag, orders + máy trạng thái,
+-- share bản thảo, bàn giao file (bucket order-deliverables), hoàn
+-- tiền/huỷ/mất liên lạc, đứng tên tác giả thay (ghostwriting), độ uy tín +
+-- tranh chấp, thân các hàm RPC Order (12j).
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     service_listings, service_samples, orders, order_events,
+--     service_tag_options, service_tag_suggestions,
+--     manuscript_access_grants, order_delivered_assets, order_file_requests,
+--     order_cancel_requests, author_name_agreements, disputes
+--   Hàm:
+--     prevent_unfinalize_book, lock_manuscript_grants_on_finalize,
+--     create_order, set_order_scope, set_order_brief, confirm_order_brief,
+--     record_order_payment, submit_order_draft, approve_order_draft,
+--     request_order_revision, deliver_order, confirm_order_received,
+--     attach_order_book, request_order_file, resolve_order_file_request,
+--     calculate_refund, request_order_cancel, resolve_order_cancel_request,
+--     record_order_reminder, record_lost_contact_report,
+--     initiate_author_name_agreement, confirm_author_name_agreement,
+--     recalculate_trust_score, open_dispute, resolve_dispute
+--   Kiểu (enum):
+--     service_type, order_status
+--   Sequence:
+--     order_code_seq
+--   Storage bucket:
+--     order-deliverables
+--   Thêm cột vào bảng của file trước:
+--     books.{is_ghostwritten, author_display},
+--     profiles.{trust_orders_completed, trust_orders_cancelled_at_fault,
+--     trust_off_platform_flags, trust_violations_resolved},
+--     direct_messages.flagged_off_platform
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260901_add_ghostwriting_authorship.sql,
+--   20260901_add_manuscript_share.sql, 20260901_add_order_cancel_system.sql,
+--   20260901_add_order_delivery_assets.sql,
+--   20260901_add_order_refund_minimum_table.sql,
+--   20260901_add_order_system_core.sql,
+--   20260901_add_service_tag_catalog.sql,
+--   20260901_add_service_tag_option_metadata.sql,
+--   20260901_add_trust_and_disputes.sql,
+--   20260910_add_service_commission_status.sql,
+--   20260924_enforce_order_payment_amounts.sql
+--   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql, 04_wallet_and_payments.sql,
+--   06_social_and_messaging.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
+
+-- ---------------------------------------------------------------------
+-- 12. Hệ thống giao dịch commission (Order/Escrow) — xem
+-- migrations/archive/20260901_add_order_payment_transaction_type.sql,
+-- 20260901_add_order_earning_transaction_type.sql,
+-- 20260901_add_order_system_core.sql. Phase 1: order_events (nhật ký bất
+-- biến) + máy trạng thái Order cơ bản + service_listings/service_samples
+-- (Mục 2 đặc tả — tạo cùng lúc cho FK, API/UI quản lý là việc phase sau).
+-- CHƯA gồm: hoàn tiền tự động, mất liên lạc, bàn giao chi tiết theo loại
+-- hình (Share bản thảo ghostwriting), đứng tên tác giả thay,
+-- is_ghostwritten, trust score, phát hiện giao dịch ngoài nền tảng,
+-- dispute — các phase sau sẽ thêm section con 12d, 12e, ... nối tiếp.
+-- ---------------------------------------------------------------------
+
+create type public.service_type as enum ('illustration', 'voice', 'ghostwriting');
+
+-- 11 trường bắt buộc của Mục 2 đặc tả ánh xạ vào các cột dưới đây: 1 name,
+-- 2 scope_description, 3 price_tiers, 4 deposit_pct, 5 delivery_days, 6
+-- revisions_max, 7 tags (nhóm theo loại hình, chọn từ danh mục cố định do
+-- Nền tảng quản lý — validate ở tầng service, KHÔNG ở DB), 8
+-- default_usage_scope, 9 refund_policy, 10 lost_contact_days, 11
+-- is_private. is_accepting_orders CHỈ được service layer bật khi đủ
+-- 11/11 — xem src/lib/orders/service-listing-service.ts (phase sau).
+create table public.service_listings (
+  id uuid primary key default gen_random_uuid(),
+  seller_id uuid not null references auth.users (id) on delete cascade,
+  service_type public.service_type not null,
+  name text not null default '',
+  scope_description text not null default '',
+  price_tiers jsonb not null default '[]'::jsonb,
+  deposit_pct integer,
+  delivery_days integer,
+  revisions_max integer,
+  tags jsonb not null default '{}'::jsonb,
+  default_usage_scope text,
+  -- null = seller CHƯA tự khai — calculate_refund() (phase sau) dùng bảng
+  -- % tối thiểu của Nền tảng làm fallback; số liệu bảng đó CHƯA có.
+  refund_policy jsonb,
+  lost_contact_days integer not null default 7,
+  accepted_content text,
+  rejected_content text,
+  is_private boolean not null default false,
+  is_accepting_orders boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (deposit_pct is null or deposit_pct between 0 and 100)
+);
+
+-- Trạng thái "nhận comm" — ĐỘC LẬP với is_accepting_orders (không nằm
+-- trong 11 mục bắt buộc để publish). monthly_commission_limit null = seller
+-- chưa đặt hạn mức (khi đó is_accepting_commissions không có ý nghĩa gì,
+-- route chặn bật). Đếm "đang nhận bao nhiêu comm" theo TỪNG gói riêng —
+-- count(*) orders where listing_id=this and status='in_progress', tính
+-- trực tiếp lúc đọc, không cache cột riêng. Xem
+-- migrations/archive/20260910_add_service_commission_status.sql.
+alter table public.service_listings
+  add column monthly_commission_limit integer,
+  add column is_accepting_commissions boolean not null default false,
+  add constraint service_listings_monthly_commission_limit_check
+    check (monthly_commission_limit is null or monthly_commission_limit > 0);
+
+alter table public.service_listings enable row level security;
+
+create policy "public can view listings accepting orders"
+  on public.service_listings for select
+  using (is_accepting_orders = true);
+
+create policy "sellers manage their own listings"
+  on public.service_listings for all
+  using (auth.uid() = seller_id)
+  with check (auth.uid() = seller_id);
+
+create policy "admins view all listings"
+  on public.service_listings for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create index service_listings_seller_idx on public.service_listings (seller_id);
+
+create table public.service_samples (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid not null references public.service_listings (id) on delete cascade,
+  source text not null default 'upload' check (source in ('upload', 'auto', 'external')),
+  file_url text not null,
+  unverified_external boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.service_samples enable row level security;
+
+create policy "public can view samples of listings accepting orders"
+  on public.service_samples for select
+  using (exists (select 1 from public.service_listings l where l.id = listing_id and l.is_accepting_orders = true));
+
+create policy "sellers manage samples of their own listings"
+  on public.service_samples for all
+  using (exists (select 1 from public.service_listings l where l.id = listing_id and l.seller_id = auth.uid()))
+  with check (exists (select 1 from public.service_listings l where l.id = listing_id and l.seller_id = auth.uid()));
+
+create index service_samples_listing_idx on public.service_samples (listing_id);
+
+-- Giữ đủ 8 trạng thái đúng sơ đồ đặc tả (kể cả 'brief_confirmed' và
+-- 'deposit_paid' dù thực tế chỉ dừng lại rất ngắn — xem
+-- record_order_payment() bên dưới).
+create type public.order_status as enum (
+  'draft', 'brief_confirmed', 'deposit_paid', 'in_progress', 'delivered', 'completed', 'cancelled', 'disputed'
+);
+
+create sequence public.order_code_seq start 2000;
+
+create table public.orders (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique default ('DH-' || nextval('public.order_code_seq')),
+  buyer_id uuid not null references auth.users (id) on delete restrict,
+  seller_id uuid not null references auth.users (id) on delete restrict,
+  listing_id uuid not null references public.service_listings (id) on delete restrict,
+  status public.order_status not null default 'draft',
+  usage_scope text,
+  scope_note text,
+  brief text not null default '',
+  brief_locked_at timestamptz,
+  price integer not null,
+  paid integer not null default 0,
+  deposit_pct integer not null,
+  revisions_max integer not null default 2,
+  revisions_used integer not null default 0,
+  draft_number integer not null default 0,
+  drafts_approved integer not null default 0,
+  delivered_at timestamptz,
+  -- delivered_at + 7 ngày — cron (src/app/api/orders/cron/auto-confirm)
+  -- quét cột này.
+  auto_confirm_at timestamptz,
+  completed_at timestamptz,
+  cancelled_at timestamptz,
+  -- Nội dung TOS của seller TẠI THỜI ĐIỂM "Bắt đầu giao dịch" — snapshot
+  -- thật, không chỉ id.
+  tos_snapshot jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  check (buyer_id <> seller_id),
+  check (price >= 0 and paid >= 0),
+  check (deposit_pct between 0 and 100),
+  check (usage_scope is null or usage_scope in ('personal', 'commercial_limited', 'commercial_full'))
+);
+
+alter table public.orders enable row level security;
+
+create policy "order parties view their own orders"
+  on public.orders for select
+  using (auth.uid() = buyer_id or auth.uid() = seller_id);
+
+create policy "admins view all orders"
+  on public.orders for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+-- Không có policy insert/update cho "authenticated" — mọi thay đổi trạng
+-- thái qua các hàm security definer bên dưới, giống public.transactions.
+
+create index orders_buyer_idx on public.orders (buyer_id);
+create index orders_seller_idx on public.orders (seller_id);
+create index orders_auto_confirm_idx on public.orders (auto_confirm_at) where status = 'delivered';
+
+-- Nhật ký bất biến — created_at do server sinh, không nhận timestamp từ
+-- client.
+create table public.order_events (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders (id) on delete cascade,
+  event_type text not null,
+  actor_id uuid references auth.users (id),
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.order_events enable row level security;
+
+create policy "order parties view their own order events"
+  on public.order_events for select
+  using (exists (
+    select 1 from public.orders o
+    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
+  ));
+
+create policy "admins view all order events"
+  on public.order_events for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create index order_events_order_idx on public.order_events (order_id, created_at);
+
+-- Hàm máy trạng thái — mỗi hành động 1 hàm riêng, không có hàm "update
+-- status trần" nào được phép gọi trực tiếp từ route. Thân đầy đủ 10 hàm
+-- (create_order, set_order_scope, set_order_brief, confirm_order_brief,
+-- record_order_payment, submit_order_draft, approve_order_draft,
+-- request_order_revision, deliver_order, confirm_order_received) nằm ở
+-- phần 12j (sau 12i) — đặt sau cùng để mọi bảng/cột order mà chúng dùng
+-- đã tồn tại. Gốc: migrations/archive/20260901_add_order_system_core.sql;
+-- record_order_payment() là bản của
+-- migrations/archive/20260924_enforce_order_payment_amounts.sql (lần trả đầu phải
+-- >= round(price * deposit_pct / 100), tổng đã trả không vượt price).
+
+-- 12d. Danh mục tag cố định cho service_listings (Mục 2.2 đặc tả) — xem
+-- migrations/archive/20260901_add_service_tag_catalog.sql,
+-- scripts/seed_service_tag_options.sql (dữ liệu seed). tier/rule/multi/
+-- optional/warn_text thêm bởi migrations/archive/20260901_add_service_tag_option_metadata.sql
+-- (đối chiếu lại TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html).
+create table public.service_tag_options (
+  id uuid primary key default gen_random_uuid(),
+  service_type public.service_type not null,
+  group_key text not null,
+  group_label text not null,
+  label text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  tier text,
+  rule text,
+  multi boolean not null default true,
+  optional boolean not null default false,
+  warn_text text,
+  unique (service_type, group_key, label)
+);
+
+alter table public.service_tag_options enable row level security;
+
+create policy "public can view tag options"
+  on public.service_tag_options for select
+  using (true);
+
+create index service_tag_options_lookup_idx on public.service_tag_options (service_type, group_key, sort_order);
+
+create table public.service_tag_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  submitted_by uuid not null references auth.users (id) on delete cascade,
+  service_type public.service_type not null,
+  group_key text not null,
+  label text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  resolved_by uuid references auth.users (id),
+  resolved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.service_tag_suggestions enable row level security;
+
+create policy "users view their own tag suggestions"
+  on public.service_tag_suggestions for select
+  using (auth.uid() = submitted_by);
+
+create policy "admins view all tag suggestions"
+  on public.service_tag_suggestions for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create index service_tag_suggestions_status_idx on public.service_tag_suggestions (status, created_at);
+
+-- Cờ riêng-tư MỖI ĐƠN (khác is_private của service_listings) — 1 đơn đã
+-- completed có được dùng làm sample tự động (Mục 2.2 sample_source='auto')
+-- hay không. Mặc định false.
+alter table public.orders add column is_private boolean not null default false;
+
+-- 12e. Share bản thảo kiểu Drive (tổng quát cho MỌI truyện ở "Viết
+-- truyện", không chỉ ghostwriting) + "Hoàn thiện" — xem
+-- migrations/archive/20260901_add_manuscript_share.sql. finalized_at đã gộp vào
+-- GRANT UPDATE của books ở trên (phần 3). Cột finalized_at khai báo sẵn
+-- trong CREATE TABLE public.books (phần 3).
+
+create function public.prevent_unfinalize_book()
+returns trigger as $$
+begin
+  if old.finalized_at is not null and new.finalized_at is null then
+    raise exception 'Không thể bỏ trạng thái Hoàn thiện của một truyện đã hoàn thiện.';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger prevent_unfinalize_book_trigger
+  before update on public.books
+  for each row execute function public.prevent_unfinalize_book();
+
+-- Tối đa 1 grant ĐANG HOẠT ĐỘNG/book — ép ở tầng DB qua partial unique
+-- index, đúng ràng buộc "chỉ 1 tài khoản". order_id chỉ có giá trị khi
+-- share phát sinh từ 1 đơn ghostwriting (route attach-book).
+create table public.manuscript_access_grants (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  order_id uuid references public.orders (id),
+  granted_to_user_id uuid not null references auth.users (id) on delete cascade,
+  granted_by_user_id uuid not null references auth.users (id),
+  granted_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  locked_at timestamptz,
+  check (granted_to_user_id <> granted_by_user_id)
+);
+
+create unique index manuscript_access_grants_one_active_idx
+  on public.manuscript_access_grants (book_id)
+  where revoked_at is null and locked_at is null;
+
+alter table public.manuscript_access_grants enable row level security;
+
+create policy "granter and grantee view their own grants"
+  on public.manuscript_access_grants for select
+  using (auth.uid() = granted_by_user_id or auth.uid() = granted_to_user_id);
+
+create policy "book owner grants access"
+  on public.manuscript_access_grants for insert
+  with check (
+    auth.uid() = granted_by_user_id
+    and exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid() and b.finalized_at is null)
+  );
+
+create policy "book owner revokes access before finalized"
+  on public.manuscript_access_grants for update
+  using (auth.uid() = granted_by_user_id and locked_at is null)
+  with check (auth.uid() = granted_by_user_id and locked_at is null);
+
+grant update (revoked_at) on public.manuscript_access_grants to authenticated;
+
+create index manuscript_access_grants_book_idx on public.manuscript_access_grants (book_id);
+create index manuscript_access_grants_grantee_idx on public.manuscript_access_grants (granted_to_user_id) where revoked_at is null;
+
+-- Tự động khóa TOÀN BỘ grant đang hoạt động của 1 book khi "Hoàn thiện" —
+-- không route nào tự set locked_at trực tiếp được (không nằm trong GRANT
+-- ở trên).
+create function public.lock_manuscript_grants_on_finalize()
+returns trigger as $$
+begin
+  if new.finalized_at is not null and old.finalized_at is null then
+    update public.manuscript_access_grants
+      set locked_at = now()
+      where book_id = new.id and revoked_at is null and locked_at is null;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger lock_manuscript_grants_on_finalize_trigger
+  after update on public.books
+  for each row execute function public.lock_manuscript_grants_on_finalize();
+
+-- Order biết đang viết cho truyện nào — chỉ đơn ghostwriting mới gắn.
+alter table public.orders add column book_id uuid references public.books (id);
+
+-- attach_order_book(): thân hàm ở phần 12j (bản cuối từ
+-- migrations/archive/20260901_add_ghostwriting_authorship.sql).
+
+-- 12f. Bàn giao illustration/voice (Mục 4.1-4.2 đặc tả) — xem
+-- migrations/archive/20260901_add_order_delivery_assets.sql. ghostwriting đã
+-- xong ở phần 12e (manuscript_access_grants).
+insert into storage.buckets (id, name, public)
+values ('order-deliverables', 'order-deliverables', false)
+on conflict (id) do nothing;
+
+create policy "order parties read their deliverables"
+  on storage.objects for select
+  using (
+    bucket_id = 'order-deliverables'
     and exists (
-      select 1 from public.books b
-      where b.id = book_id and b.author_id = auth.uid() and b.deleted_at is null
+      select 1 from public.orders o
+      where o.id::text = (storage.foldername(name))[1]
+        and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
     )
   );
 
-create or replace function public.reorder_book_chapters(p_book_id uuid, p_chapter_ids uuid[])
-returns void
-language plpgsql
-security invoker
-set search_path = public
-as $$
+create table public.order_delivered_assets (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders (id) on delete cascade,
+  kind text not null check (kind in ('illustration_preview', 'illustration_original', 'voice_stream', 'voice_original')),
+  storage_path text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.order_delivered_assets enable row level security;
+
+create policy "order parties view their delivered assets"
+  on public.order_delivered_assets for select
+  using (exists (
+    select 1 from public.orders o
+    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
+  ));
+
+create policy "admins view all delivered assets"
+  on public.order_delivered_assets for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create index order_delivered_assets_order_idx on public.order_delivered_assets (order_id);
+
+create table public.order_file_requests (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders (id) on delete cascade,
+  requested_by uuid not null references auth.users (id),
+  status text not null default 'pending' check (status in ('pending', 'agreed', 'declined')),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+
+alter table public.order_file_requests enable row level security;
+
+create policy "order parties view their file requests"
+  on public.order_file_requests for select
+  using (exists (
+    select 1 from public.orders o
+    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
+  ));
+
+create index order_file_requests_order_idx on public.order_file_requests (order_id, status);
+
+-- request_order_file()/resolve_order_file_request(): thân hàm ở phần 12j
+-- (từ migrations/archive/20260901_add_order_delivery_assets.sql).
+
+-- 12g. Tính hoàn tiền + Mất liên lạc (Mục 5.1, 5.4 đặc tả) — xem
+-- migrations/archive/20260901_add_order_refund_transaction_type.sql,
+-- 20260901_add_order_cancel_system.sql. QUAN TRỌNG: từ đây
+-- service_listings.refund_policy PHẢI là object 4 key cố định
+-- ({"before_draft":70,"draft_pending":40,"draft_approved":15,"delivered":0})
+-- thay vì mảng tự do đã mô tả ở phần 12d — xem ghi chú đầu file migration
+-- 20260901_add_order_cancel_system.sql. calculate_refund() sau đó được
+-- CREATE OR REPLACE bởi migrations/archive/20260901_add_order_refund_minimum_table.sql
+-- để thêm bảng % SÀN của Nền tảng khi seller chưa tự khai — vế
+-- seller-fault KHÔNG còn là hằng số 100% (bảng sàn thật: 100/90/70/100
+-- theo mốc), sửa lại giả định ban đầu chưa được xác nhận.
+create table public.order_cancel_requests (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders (id) on delete cascade,
+  requested_by uuid not null references auth.users (id),
+  cancelled_by text not null check (cancelled_by in ('buyer', 'seller')),
+  refund_amount integer not null,
+  status text not null default 'pending' check (status in ('pending', 'agreed', 'declined')),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+
+alter table public.order_cancel_requests enable row level security;
+
+create policy "order parties view their cancel requests"
+  on public.order_cancel_requests for select
+  using (exists (
+    select 1 from public.orders o
+    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
+  ));
+
+create index order_cancel_requests_order_idx on public.order_cancel_requests (order_id, status);
+
+-- calculate_refund()/request_order_cancel()/resolve_order_cancel_request()/
+-- record_order_reminder()/record_lost_contact_report(): thân hàm ở phần
+-- 12j (gốc migrations/archive/20260901_add_order_cancel_system.sql).
+
+-- 12h. Đứng tên tác giả thay + is_ghostwritten/author_display (Module 5+6
+-- đặc tả, yêu cầu bổ sung #2) — xem
+-- migrations/archive/20260901_add_ghostwriting_authorship.sql.
+alter table public.books
+  add column is_ghostwritten boolean not null default false,
+  add column author_display text not null default 'pen_name'
+    check (author_display in ('pen_name', 'anonymous', 'customer_name', 'co_authorship'));
+
+-- 2 cột này KHÔNG nằm trong GRANT UPDATE của books (phần 3) — chỉ đổi
+-- được qua confirm_author_name_agreement()/attach_order_book() (security
+-- definer), không client nào PATCH thẳng qua REST API.
+
+-- Mỗi Order ghostwriting tối đa 1 thỏa thuận — 2 bên xác nhận ĐỘC LẬP
+-- (không phải request/resolve), bất biến sau khi đủ 2 xác nhận.
+create table public.author_name_agreements (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null unique references public.orders (id),
+  book_id uuid not null references public.books (id),
+  ghostwriter_id uuid not null references auth.users (id),
+  ghostwriter_confirmed_at timestamptz,
+  ghostwriter_statement_text text,
+  customer_id uuid not null references auth.users (id),
+  customer_confirmed_at timestamptz,
+  customer_statement_text text,
+  author_display_choice text not null check (author_display_choice in ('customer_name', 'co_authorship')),
+  ghostwriter_sample_visible boolean not null default false,
+  customer_profile_visible boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.author_name_agreements enable row level security;
+
+create policy "ghostwriter and customer view their own agreement"
+  on public.author_name_agreements for select
+  using (auth.uid() = ghostwriter_id or auth.uid() = customer_id);
+
+create index author_name_agreements_book_idx on public.author_name_agreements (book_id);
+
+-- initiate_author_name_agreement()/confirm_author_name_agreement(): thân
+-- hàm ở phần 12j (từ migrations/archive/20260901_add_ghostwriting_authorship.sql).
+-- attach_order_book() (phần 12e) được CREATE OR REPLACE trong migration đó
+-- để thêm dòng set is_ghostwritten=true — phần 12j chép bản đó.
+
+-- 12i. Độ uy tín + phát hiện giao dịch ngoài nền tảng + Tranh chấp
+-- (Module 7, 8, 9 đặc tả) — xem migrations/archive/20260901_add_trust_and_disputes.sql.
+alter table public.profiles
+  add column trust_orders_completed integer not null default 0,
+  add column trust_orders_cancelled_at_fault integer not null default 0,
+  add column trust_off_platform_flags integer not null default 0,
+  add column trust_violations_resolved integer not null default 0;
+
+alter table public.direct_messages add column flagged_off_platform boolean not null default false;
+
+create table public.disputes (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders (id),
+  reporter_id uuid not null references auth.users (id),
+  reason_category text not null,
+  description text not null,
+  status text not null default 'open' check (status in ('open', 'resolved')),
+  evidence_snapshot jsonb not null default '{}'::jsonb,
+  resolution_note text,
+  at_fault_user_id uuid references auth.users (id),
+  resolved_by uuid references auth.users (id),
+  resolved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.disputes enable row level security;
+
+create policy "order parties view their disputes"
+  on public.disputes for select
+  using (exists (
+    select 1 from public.orders o
+    where o.id = order_id and (auth.uid() = o.buyer_id or auth.uid() = o.seller_id)
+  ));
+
+create policy "admins view all disputes"
+  on public.disputes for select
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin', 'super_admin')));
+
+create index disputes_order_idx on public.disputes (order_id);
+create index disputes_status_idx on public.disputes (status, created_at);
+
+-- recalculate_trust_score()/open_dispute()/resolve_dispute(): thân hàm ở
+-- phần 12j ngay dưới (từ migrations/archive/20260901_add_trust_and_disputes.sql).
+-- confirm_order_received() (phần 12c) và resolve_order_cancel_request()
+-- (phần 12g) được CREATE OR REPLACE trong migration đó để gọi thêm
+-- recalculate_trust_score() tường minh — phần 12j chép bản đó.
+
+-- ---------------------------------------------------------------------
+-- 12j. Thân hàm RPC của hệ thống Order (phần 12c–12i) — trước đây chỉ có
+-- ghi chú "xem migration… không lặp lại thân hàm", nay chép đầy đủ BẢN
+-- CUỐI của từng hàm để file này tự dựng lại được toàn bộ schema trên 1
+-- project trống. Mỗi hàm ghi rõ bản cuối lấy từ migration nào. Tất cả là
+-- plpgsql security definer, CHỈ service_role được EXECUTE (route gọi qua
+-- createServiceRoleClient()).
+-- ---------------------------------------------------------------------
+
+-- --- 12c. Máy trạng thái đơn hàng ---
+
+-- create_order(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.create_order(
+  p_buyer_id uuid,
+  p_seller_id uuid,
+  p_listing_id uuid,
+  p_price integer,
+  p_deposit_pct integer,
+  p_revisions_max integer,
+  p_tos_snapshot jsonb
+) returns public.orders as $$
 declare
-  v_total integer;
-  v_last uuid;
+  v_row public.orders;
 begin
-  if not exists (
-    select 1 from public.books
-    where id = p_book_id and author_id = auth.uid() and deleted_at is null
-  ) then
-    raise exception 'Book % not found or not owned by caller', p_book_id;
-  end if;
+  insert into public.orders (buyer_id, seller_id, listing_id, price, deposit_pct, revisions_max, tos_snapshot)
+  values (p_buyer_id, p_seller_id, p_listing_id, p_price, p_deposit_pct, p_revisions_max, p_tos_snapshot)
+  returning * into v_row;
 
-  -- Khoá các chương của sách: 2 lần sắp xếp song song không ghi đè lẫn nhau.
-  perform 1 from public.chapters where book_id = p_book_id for update;
-  select count(*) into v_total from public.chapters where book_id = p_book_id;
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (v_row.id, 'order_created', p_buyer_id, jsonb_build_object('listing_id', p_listing_id));
 
-  if coalesce(array_length(p_chapter_ids, 1), 0) <> v_total
-     or (select count(distinct x) from unnest(p_chapter_ids) as x) <> v_total
-     or exists (
-       select 1 from unnest(p_chapter_ids) as x
-       where not exists (select 1 from public.chapters c where c.id = x and c.book_id = p_book_id)
-     ) then
-    raise exception 'Chapter list must contain every chapter of the book exactly once';
-  end if;
-
-  select id into v_last from public.chapters where book_id = p_book_id and is_last_chapter;
-  if v_last is not null and p_chapter_ids[v_total] <> v_last then
-    raise exception 'The last chapter must stay last';
-  end if;
-
-  update public.chapters c
-     set order_index = t.ord
-    from unnest(p_chapter_ids) with ordinality as t(id, ord)
-   where c.id = t.id and c.book_id = p_book_id and c.order_index is distinct from t.ord::integer;
+  return v_row;
 end;
-$$;
+$$ language plpgsql security definer;
 
-revoke execute on function public.reorder_book_chapters(uuid, uuid[]) from public, anon;
-grant execute on function public.reorder_book_chapters(uuid, uuid[]) to authenticated;
+revoke execute on function public.create_order from public, anon, authenticated;
+grant execute on function public.create_order to service_role;
+
+-- set_order_scope(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.set_order_scope(
+  p_order_id uuid,
+  p_actor_id uuid,
+  p_usage_scope text,
+  p_scope_note text default null
+) returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.buyer_id <> p_actor_id then raise exception 'Only the buyer selects usage scope'; end if;
+  if v_row.status not in ('draft', 'brief_confirmed') then
+    raise exception 'Cannot change usage scope in status %', v_row.status;
+  end if;
+
+  update public.orders set usage_scope = p_usage_scope, scope_note = p_scope_note
+    where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'scope_selected', p_actor_id, jsonb_build_object('usage_scope', p_usage_scope));
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.set_order_scope from public, anon, authenticated;
+grant execute on function public.set_order_scope to service_role;
+
+-- set_order_brief(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.set_order_brief(p_order_id uuid, p_actor_id uuid, p_brief text)
+returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.buyer_id <> p_actor_id then raise exception 'Only the buyer edits the brief'; end if;
+  if v_row.status <> 'draft' then raise exception 'Brief is locked once past draft, status is %', v_row.status; end if;
+
+  update public.orders set brief = p_brief where id = p_order_id returning * into v_row;
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.set_order_brief from public, anon, authenticated;
+grant execute on function public.set_order_brief to service_role;
+
+-- confirm_order_brief(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.confirm_order_brief(p_order_id uuid, p_actor_id uuid)
+returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.buyer_id <> p_actor_id then raise exception 'Only the buyer confirms the brief'; end if;
+  if v_row.status <> 'draft' then raise exception 'Order must be in draft to confirm brief, is %', v_row.status; end if;
+  if v_row.usage_scope is null then raise exception 'Usage scope must be selected before confirming brief'; end if;
+  if btrim(v_row.brief) = '' then raise exception 'Brief is empty'; end if;
+
+  update public.orders set status = 'brief_confirmed', brief_locked_at = now()
+    where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id)
+  values (p_order_id, 'brief_confirmed', p_actor_id);
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.confirm_order_brief from public, anon, authenticated;
+grant execute on function public.confirm_order_brief to service_role;
+
+-- record_order_payment(): bản cuối từ migrations/archive/20260924_enforce_order_payment_amounts.sql.
+create function public.record_order_payment(p_order_id uuid, p_actor_id uuid, p_amount integer)
+returns public.orders as $$
+declare
+  v_row public.orders;
+  v_min_deposit integer;
+begin
+  if p_amount <= 0 then raise exception 'Payment amount must be positive'; end if;
+
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.buyer_id <> p_actor_id then raise exception 'Only the buyer pays'; end if;
+  if v_row.status not in ('brief_confirmed', 'deposit_paid', 'in_progress') then
+    raise exception 'Cannot pay in status %', v_row.status;
+  end if;
+
+  -- Kiểm tra dưới khoá hàng (for update ở trên) — 2 request song song không
+  -- cùng lọt qua được giới hạn giá.
+  if v_row.paid + p_amount > v_row.price then
+    raise exception 'Payment exceeds order price (remaining %)', v_row.price - v_row.paid;
+  end if;
+  if v_row.status = 'brief_confirmed' then
+    v_min_deposit := round(v_row.price * v_row.deposit_pct / 100.0)::integer;
+    if p_amount < v_min_deposit then
+      raise exception 'Deposit must be at least %', v_min_deposit;
+    end if;
+  end if;
+
+  perform public.apply_transaction(
+    p_user_id => p_actor_id, p_type => 'order_payment', p_amount => -p_amount,
+    p_reference_type => 'order', p_reference_id => p_order_id
+  );
+
+  update public.orders set paid = paid + p_amount where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'payment_received', p_actor_id, jsonb_build_object('amount', p_amount));
+
+  if v_row.status = 'brief_confirmed' then
+    update public.orders set status = 'deposit_paid' where id = p_order_id returning * into v_row;
+    insert into public.order_events (order_id, event_type, actor_id, payload)
+    values (p_order_id, 'deposit_paid', p_actor_id, jsonb_build_object('amount', p_amount));
+
+    update public.orders set status = 'in_progress' where id = p_order_id returning * into v_row;
+    insert into public.order_events (order_id, event_type, actor_id)
+    values (p_order_id, 'work_started', null);
+  end if;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.record_order_payment from public, anon, authenticated;
+grant execute on function public.record_order_payment to service_role;
+
+-- submit_order_draft(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.submit_order_draft(p_order_id uuid, p_actor_id uuid, p_asset jsonb)
+returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.seller_id <> p_actor_id then raise exception 'Only the seller submits a draft'; end if;
+  if v_row.status <> 'in_progress' then raise exception 'Order must be in_progress to submit a draft, is %', v_row.status; end if;
+
+  update public.orders set draft_number = draft_number + 1 where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'draft_submitted', p_actor_id, jsonb_build_object('draft_number', v_row.draft_number) || coalesce(p_asset, '{}'::jsonb));
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.submit_order_draft from public, anon, authenticated;
+grant execute on function public.submit_order_draft to service_role;
+
+-- approve_order_draft(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.approve_order_draft(p_order_id uuid, p_actor_id uuid)
+returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.buyer_id <> p_actor_id then raise exception 'Only the buyer approves a draft'; end if;
+  if v_row.status <> 'in_progress' then raise exception 'Order must be in_progress, is %', v_row.status; end if;
+  if v_row.draft_number <= v_row.drafts_approved then raise exception 'No unapproved draft to approve'; end if;
+
+  update public.orders set drafts_approved = draft_number where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'draft_approved', p_actor_id, jsonb_build_object('draft_number', v_row.draft_number));
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.approve_order_draft from public, anon, authenticated;
+grant execute on function public.approve_order_draft to service_role;
+
+-- request_order_revision(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.request_order_revision(p_order_id uuid, p_actor_id uuid, p_note text default null)
+returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.buyer_id <> p_actor_id then raise exception 'Only the buyer requests a revision'; end if;
+  if v_row.status <> 'in_progress' then raise exception 'Order must be in_progress, is %', v_row.status; end if;
+  if v_row.revisions_used >= v_row.revisions_max then raise exception 'No revisions remaining'; end if;
+
+  update public.orders set revisions_used = revisions_used + 1 where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'revision_requested', p_actor_id, jsonb_build_object('note', p_note));
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.request_order_revision from public, anon, authenticated;
+grant execute on function public.request_order_revision to service_role;
+
+-- deliver_order(): bản cuối từ migrations/archive/20260901_add_order_system_core.sql.
+create function public.deliver_order(p_order_id uuid, p_actor_id uuid, p_asset jsonb default '{}'::jsonb)
+returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_row.seller_id <> p_actor_id then raise exception 'Only the seller delivers'; end if;
+  if v_row.status <> 'in_progress' then raise exception 'Order must be in_progress to deliver, is %', v_row.status; end if;
+
+  update public.orders
+    set status = 'delivered', delivered_at = now(), auto_confirm_at = now() + interval '7 days'
+    where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'delivered', p_actor_id, p_asset);
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.deliver_order from public, anon, authenticated;
+grant execute on function public.deliver_order to service_role;
+
+-- confirm_order_received(): bản cuối từ migrations/archive/20260901_add_trust_and_disputes.sql.
+create function public.confirm_order_received(
+  p_order_id uuid, p_actor_id uuid default null, p_is_system boolean default false, p_hold_days integer default 4
+) returns public.orders as $$
+declare
+  v_row public.orders;
+begin
+  select * into v_row from public.orders where id = p_order_id for update;
+  if v_row is null then raise exception 'Order % not found', p_order_id; end if;
+  if not p_is_system and v_row.buyer_id <> p_actor_id then raise exception 'Only the buyer confirms receipt'; end if;
+  if v_row.status <> 'delivered' then raise exception 'Order must be delivered to confirm, is %', v_row.status; end if;
+
+  perform public.apply_transaction(
+    p_user_id => v_row.seller_id, p_type => 'order_earning', p_amount => v_row.paid,
+    p_reference_type => 'order', p_reference_id => p_order_id,
+    p_status => 'pending', p_available_at => now() + (p_hold_days || ' days')::interval
+  );
+
+  update public.orders set status = 'completed', completed_at = now()
+    where id = p_order_id returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id)
+  values (p_order_id, case when p_is_system then 'auto_confirmed_by_system' else 'buyer_confirmed' end,
+          case when p_is_system then null else p_actor_id end);
+
+  perform public.recalculate_trust_score(v_row.buyer_id);
+  perform public.recalculate_trust_score(v_row.seller_id);
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.confirm_order_received from public, anon, authenticated;
+grant execute on function public.confirm_order_received to service_role;
+
+-- --- 12e. Gắn truyện vào đơn ghostwriting ---
+
+-- attach_order_book(): bản cuối từ migrations/archive/20260901_add_ghostwriting_authorship.sql.
+create function public.attach_order_book(p_order_id uuid, p_actor_id uuid, p_book_id uuid)
+returns public.orders as $$
+declare
+  v_order public.orders;
+  v_book public.books;
+  v_listing_type public.service_type;
+begin
+  select * into v_order from public.orders where id = p_order_id for update;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.seller_id <> p_actor_id then raise exception 'Only the seller attaches a manuscript'; end if;
+  if v_order.status = 'completed' or v_order.status = 'cancelled' then
+    raise exception 'Cannot attach a manuscript to a closed order';
+  end if;
+
+  select service_type into v_listing_type from public.service_listings where id = v_order.listing_id;
+  if v_listing_type <> 'ghostwriting' then
+    raise exception 'Only ghostwriting orders can attach a manuscript';
+  end if;
+
+  select * into v_book from public.books where id = p_book_id;
+  if v_book is null or v_book.author_id <> p_actor_id then
+    raise exception 'Book % not found or not owned by seller', p_book_id;
+  end if;
+
+  update public.orders set book_id = p_book_id where id = p_order_id returning * into v_order;
+  update public.books set is_ghostwritten = true where id = p_book_id;
+
+  begin
+    insert into public.manuscript_access_grants (book_id, order_id, granted_to_user_id, granted_by_user_id)
+    values (p_book_id, p_order_id, v_order.buyer_id, p_actor_id);
+  exception when unique_violation then
+    raise exception 'Truyện này đang được chia sẻ cho một tài khoản khác — gỡ chia sẻ cũ (mục Viết truyện) trước khi gắn vào đơn này.';
+  end;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'book_attached', p_actor_id, jsonb_build_object('book_id', p_book_id));
+
+  return v_order;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.attach_order_book from public, anon, authenticated;
+grant execute on function public.attach_order_book to service_role;
+
+-- --- 12f. Bàn giao file gốc ---
+
+-- request_order_file(): bản cuối từ migrations/archive/20260901_add_order_delivery_assets.sql.
+create function public.request_order_file(p_order_id uuid, p_actor_id uuid)
+returns public.order_file_requests as $$
+declare
+  v_order public.orders;
+  v_row public.order_file_requests;
+begin
+  select * into v_order from public.orders where id = p_order_id;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.buyer_id <> p_actor_id and v_order.seller_id <> p_actor_id then
+    raise exception 'Only order parties can request the original file';
+  end if;
+  if exists (select 1 from public.order_file_requests where order_id = p_order_id and status = 'pending') then
+    raise exception 'A file request is already pending for this order';
+  end if;
+
+  insert into public.order_file_requests (order_id, requested_by) values (p_order_id, p_actor_id) returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id)
+  values (p_order_id, 'file_request_created', p_actor_id);
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.request_order_file from public, anon, authenticated;
+grant execute on function public.request_order_file to service_role;
+
+-- resolve_order_file_request(): bản cuối từ migrations/archive/20260901_add_order_delivery_assets.sql.
+create function public.resolve_order_file_request(p_request_id uuid, p_actor_id uuid, p_agree boolean)
+returns public.order_file_requests as $$
+declare
+  v_req public.order_file_requests;
+  v_order public.orders;
+begin
+  select * into v_req from public.order_file_requests where id = p_request_id for update;
+  if v_req is null or v_req.status <> 'pending' then raise exception 'Request % not found or already resolved', p_request_id; end if;
+
+  select * into v_order from public.orders where id = v_req.order_id;
+  if p_actor_id <> v_order.buyer_id and p_actor_id <> v_order.seller_id then
+    raise exception 'Only order parties can resolve a file request';
+  end if;
+  if p_actor_id = v_req.requested_by then
+    raise exception 'The requester cannot resolve their own request — the OTHER party must agree';
+  end if;
+
+  update public.order_file_requests
+    set status = case when p_agree then 'agreed' else 'declined' end, resolved_at = now()
+    where id = p_request_id
+    returning * into v_req;
+
+  insert into public.order_events (order_id, event_type, actor_id)
+  values (v_req.order_id, case when p_agree then 'file_request_agreed' else 'file_request_declined' end, p_actor_id);
+
+  return v_req;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.resolve_order_file_request from public, anon, authenticated;
+grant execute on function public.resolve_order_file_request to service_role;
+
+-- --- 12g. Hoàn tiền / huỷ đơn / mất liên lạc ---
+
+-- calculate_refund(): bản cuối từ migrations/archive/20260901_add_order_refund_minimum_table.sql.
+create function public.calculate_refund(p_order_id uuid, p_cancelled_by text)
+returns jsonb as $$
+declare
+  v_order public.orders;
+  v_policy jsonb;
+  v_stage text;
+  v_pct integer;
+  v_refund integer;
+  v_used_platform_minimum boolean := false;
+begin
+  select * into v_order from public.orders where id = p_order_id;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if p_cancelled_by not in ('buyer', 'seller') then raise exception 'cancelled_by must be buyer or seller'; end if;
+
+  if exists (select 1 from public.order_events where order_id = p_order_id and event_type = 'delivered') then
+    v_stage := 'delivered';
+  elsif exists (select 1 from public.order_events where order_id = p_order_id and event_type = 'draft_approved') then
+    v_stage := 'draft_approved';
+  elsif exists (select 1 from public.order_events where order_id = p_order_id and event_type = 'draft_submitted') then
+    v_stage := 'draft_pending';
+  else
+    v_stage := 'before_draft';
+  end if;
+
+  select refund_policy into v_policy from public.service_listings where id = v_order.listing_id;
+
+  if p_cancelled_by = 'buyer' then
+    if v_policy is not null and (v_policy ? v_stage) then
+      v_pct := (v_policy ->> v_stage)::integer;
+    else
+      v_used_platform_minimum := true;
+      v_pct := case v_stage
+        when 'before_draft' then 100
+        when 'draft_pending' then 70
+        when 'draft_approved' then 40
+        when 'delivered' then 10
+      end;
+    end if;
+  else
+    -- seller-fault: seller đã tự khai policy nào đó -> vẫn hoàn 100% cố
+    -- định (quy ước cũ, luôn >= sàn nên hợp lệ). Chưa khai gì -> áp đúng
+    -- bảng sàn seller-fault ở trên (KHÔNG còn hằng số 100% nữa).
+    if v_policy is not null then
+      v_pct := 100;
+    else
+      v_used_platform_minimum := true;
+      v_pct := case v_stage
+        when 'before_draft' then 100
+        when 'draft_pending' then 90
+        when 'draft_approved' then 70
+        when 'delivered' then 100
+      end;
+    end if;
+  end if;
+
+  v_refund := round(v_order.paid * v_pct / 100.0)::integer;
+
+  return jsonb_build_object(
+    'stage', v_stage,
+    'pct', v_pct,
+    'refund_amount', v_refund,
+    'seller_amount', v_order.paid - v_refund,
+    'cancelled_by', p_cancelled_by,
+    -- true = số này lấy từ bảng sàn Nền tảng (seller chưa tự khai đủ cho
+    -- mốc/vai trò này), không phải từ TOS riêng của seller — hiển thị rõ
+    -- cho 2 bên biết nguồn gốc con số (xem order-card.tsx).
+    'used_platform_minimum', v_used_platform_minimum
+  );
+end;
+$$ language plpgsql stable;
+
+revoke execute on function public.calculate_refund from public, anon, authenticated;
+grant execute on function public.calculate_refund to service_role;
+
+-- request_order_cancel(): bản cuối từ migrations/archive/20260901_add_order_cancel_system.sql.
+create function public.request_order_cancel(p_order_id uuid, p_actor_id uuid)
+returns public.order_cancel_requests as $$
+declare
+  v_order public.orders;
+  v_cancelled_by text;
+  v_calc jsonb;
+  v_row public.order_cancel_requests;
+begin
+  select * into v_order from public.orders where id = p_order_id for update;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.buyer_id <> p_actor_id and v_order.seller_id <> p_actor_id then
+    raise exception 'Only order parties can request cancellation';
+  end if;
+  if v_order.status in ('completed', 'cancelled') then
+    raise exception 'Cannot cancel a closed order';
+  end if;
+  if exists (select 1 from public.order_cancel_requests where order_id = p_order_id and status = 'pending') then
+    raise exception 'A cancel request is already pending for this order';
+  end if;
+
+  v_cancelled_by := case when p_actor_id = v_order.buyer_id then 'buyer' else 'seller' end;
+  v_calc := public.calculate_refund(p_order_id, v_cancelled_by);
+
+  insert into public.order_cancel_requests (order_id, requested_by, cancelled_by, refund_amount)
+  values (p_order_id, p_actor_id, v_cancelled_by, (v_calc ->> 'refund_amount')::integer)
+  returning * into v_row;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'cancel_requested', p_actor_id, v_calc);
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.request_order_cancel from public, anon, authenticated;
+grant execute on function public.request_order_cancel to service_role;
+
+-- resolve_order_cancel_request(): bản cuối từ migrations/archive/20260901_add_trust_and_disputes.sql.
+create function public.resolve_order_cancel_request(p_request_id uuid, p_actor_id uuid, p_agree boolean)
+returns public.orders as $$
+declare
+  v_req public.order_cancel_requests;
+  v_order public.orders;
+begin
+  select * into v_req from public.order_cancel_requests where id = p_request_id for update;
+  if v_req is null or v_req.status <> 'pending' then
+    raise exception 'Request % not found or already resolved', p_request_id;
+  end if;
+
+  select * into v_order from public.orders where id = v_req.order_id for update;
+  if p_actor_id <> v_order.buyer_id and p_actor_id <> v_order.seller_id then
+    raise exception 'Only order parties can resolve a cancel request';
+  end if;
+  if p_actor_id = v_req.requested_by then
+    raise exception 'The requester cannot resolve their own request — the OTHER party must agree';
+  end if;
+
+  if not p_agree then
+    update public.order_cancel_requests set status = 'declined', resolved_at = now() where id = p_request_id;
+    insert into public.order_events (order_id, event_type, actor_id)
+    values (v_req.order_id, 'cancel_declined', p_actor_id);
+    return v_order;
+  end if;
+
+  if v_req.refund_amount > 0 then
+    perform public.apply_transaction(
+      p_user_id => v_order.buyer_id, p_type => 'order_refund', p_amount => v_req.refund_amount,
+      p_reference_type => 'order', p_reference_id => v_order.id
+    );
+  end if;
+
+  update public.order_cancel_requests set status = 'agreed', resolved_at = now() where id = p_request_id;
+  update public.orders set status = 'cancelled', cancelled_at = now() where id = v_order.id returning * into v_order;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (
+    v_order.id, 'cancelled', p_actor_id,
+    jsonb_build_object('refund_amount', v_req.refund_amount, 'cancelled_by', v_req.cancelled_by)
+  );
+
+  perform public.recalculate_trust_score(case when v_req.cancelled_by = 'buyer' then v_order.buyer_id else v_order.seller_id end);
+
+  return v_order;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.resolve_order_cancel_request from public, anon, authenticated;
+grant execute on function public.resolve_order_cancel_request to service_role;
+
+-- record_order_reminder(): bản cuối từ migrations/archive/20260901_add_order_cancel_system.sql.
+create function public.record_order_reminder(p_order_id uuid, p_actor_id uuid, p_target_user_id uuid)
+returns public.order_events as $$
+declare
+  v_order public.orders;
+  v_row public.order_events;
+begin
+  select * into v_order from public.orders where id = p_order_id;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.buyer_id <> p_actor_id and v_order.seller_id <> p_actor_id then
+    raise exception 'Only order parties can send a reminder';
+  end if;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'reminder_sent', p_actor_id, jsonb_build_object('target_user_id', p_target_user_id))
+  returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.record_order_reminder from public, anon, authenticated;
+grant execute on function public.record_order_reminder to service_role;
+
+-- record_lost_contact_report(): bản cuối từ migrations/archive/20260901_add_order_cancel_system.sql.
+create function public.record_lost_contact_report(p_order_id uuid, p_actor_id uuid)
+returns public.order_events as $$
+declare
+  v_order public.orders;
+  v_row public.order_events;
+begin
+  select * into v_order from public.orders where id = p_order_id;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.buyer_id <> p_actor_id and v_order.seller_id <> p_actor_id then
+    raise exception 'Only order parties can report lost contact';
+  end if;
+
+  insert into public.order_events (order_id, event_type, actor_id)
+  values (p_order_id, 'lost_contact_reported', p_actor_id)
+  returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.record_lost_contact_report from public, anon, authenticated;
+grant execute on function public.record_lost_contact_report to service_role;
+
+-- --- 12h. Thỏa thuận đứng tên tác giả ---
+
+-- initiate_author_name_agreement(): bản cuối từ migrations/archive/20260901_add_ghostwriting_authorship.sql.
+create function public.initiate_author_name_agreement(
+  p_order_id uuid, p_actor_id uuid, p_choice text,
+  p_ghostwriter_sample_visible boolean default false,
+  p_customer_profile_visible boolean default false
+) returns public.author_name_agreements as $$
+declare
+  v_order public.orders;
+  v_book public.books;
+  v_ghostwriter_name text;
+  v_customer_name text;
+  v_book_title text;
+  v_statement text;
+  v_row public.author_name_agreements;
+begin
+  if p_choice not in ('customer_name', 'co_authorship') then
+    raise exception 'Invalid author_display choice: %', p_choice;
+  end if;
+
+  select * into v_order from public.orders where id = p_order_id;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.seller_id <> p_actor_id and v_order.buyer_id <> p_actor_id then
+    raise exception 'Only order parties can start an author-name agreement';
+  end if;
+  if v_order.book_id is null then raise exception 'Order has no attached manuscript'; end if;
+  if exists (select 1 from public.author_name_agreements where order_id = p_order_id) then
+    raise exception 'An author-name agreement already exists for this order';
+  end if;
+
+  select * into v_book from public.books where id = v_order.book_id;
+  select nickname into v_ghostwriter_name from public.profiles where id = v_order.seller_id;
+  select nickname into v_customer_name from public.profiles where id = v_order.buyer_id;
+  v_book_title := v_book.title;
+
+  insert into public.author_name_agreements (
+    order_id, book_id, ghostwriter_id, customer_id, author_display_choice,
+    ghostwriter_sample_visible, customer_profile_visible
+  ) values (
+    p_order_id, v_order.book_id, v_order.seller_id, v_order.buyer_id, p_choice,
+    p_ghostwriter_sample_visible, p_customer_profile_visible
+  ) returning * into v_row;
+
+  -- Bên khởi tạo tự xác nhận phần của mình ngay — statement SINH RIÊNG
+  -- theo đúng vai trò (chủ ngữ là chính người xác nhận), y hệt logic ở
+  -- confirm_author_name_agreement() bên dưới — không suy ra bằng cách
+  -- thay thế chuỗi (dễ sai nếu 2 tên trùng/lồng nhau).
+  if p_actor_id = v_order.seller_id then
+    v_statement := case p_choice
+      when 'customer_name' then format('Tôi, %s, đồng ý để %s đứng tên tác giả công khai đối với tác phẩm "%s".', v_ghostwriter_name, v_customer_name, v_book_title)
+      else format('Tôi, %s, đồng ý cùng %s đứng tên đồng tác giả công khai đối với tác phẩm "%s".', v_ghostwriter_name, v_customer_name, v_book_title)
+    end;
+    update public.author_name_agreements
+      set ghostwriter_confirmed_at = now(), ghostwriter_statement_text = v_statement
+      where id = v_row.id returning * into v_row;
+  else
+    v_statement := case p_choice
+      when 'customer_name' then format('Tôi, %s, đồng ý đứng tên tác giả công khai đối với tác phẩm "%s" do %s viết hộ.', v_customer_name, v_book_title, v_ghostwriter_name)
+      else format('Tôi, %s, đồng ý cùng %s đứng tên đồng tác giả công khai đối với tác phẩm "%s".', v_customer_name, v_ghostwriter_name, v_book_title)
+    end;
+    update public.author_name_agreements
+      set customer_confirmed_at = now(), customer_statement_text = v_statement
+      where id = v_row.id returning * into v_row;
+  end if;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'author_name_agreement_initiated', p_actor_id, jsonb_build_object('choice', p_choice));
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.initiate_author_name_agreement from public, anon, authenticated;
+grant execute on function public.initiate_author_name_agreement to service_role;
+
+-- confirm_author_name_agreement(): bản cuối từ migrations/archive/20260901_add_ghostwriting_authorship.sql.
+create function public.confirm_author_name_agreement(p_agreement_id uuid, p_actor_id uuid)
+returns public.author_name_agreements as $$
+declare
+  v_row public.author_name_agreements;
+  v_order public.orders;
+  v_ghostwriter_name text;
+  v_customer_name text;
+  v_book_title text;
+  v_statement text;
+begin
+  select * into v_row from public.author_name_agreements where id = p_agreement_id for update;
+  if v_row is null then raise exception 'Agreement % not found', p_agreement_id; end if;
+  if v_row.ghostwriter_confirmed_at is not null and v_row.customer_confirmed_at is not null then
+    raise exception 'Agreement already fully confirmed — immutable';
+  end if;
+
+  select nickname into v_ghostwriter_name from public.profiles where id = v_row.ghostwriter_id;
+  select nickname into v_customer_name from public.profiles where id = v_row.customer_id;
+  select title into v_book_title from public.books where id = v_row.book_id;
+
+  if p_actor_id = v_row.ghostwriter_id and v_row.ghostwriter_confirmed_at is null then
+    v_statement := case v_row.author_display_choice
+      when 'customer_name' then format('Tôi, %s, đồng ý để %s đứng tên tác giả công khai đối với tác phẩm "%s".', v_ghostwriter_name, v_customer_name, v_book_title)
+      else format('Tôi, %s, đồng ý cùng %s đứng tên đồng tác giả công khai đối với tác phẩm "%s".', v_ghostwriter_name, v_customer_name, v_book_title)
+    end;
+    update public.author_name_agreements
+      set ghostwriter_confirmed_at = now(), ghostwriter_statement_text = v_statement
+      where id = p_agreement_id returning * into v_row;
+  elsif p_actor_id = v_row.customer_id and v_row.customer_confirmed_at is null then
+    v_statement := case v_row.author_display_choice
+      when 'customer_name' then format('Tôi, %s, đồng ý đứng tên tác giả công khai đối với tác phẩm "%s" do %s viết hộ.', v_customer_name, v_book_title, v_ghostwriter_name)
+      else format('Tôi, %s, đồng ý cùng %s đứng tên đồng tác giả công khai đối với tác phẩm "%s".', v_customer_name, v_ghostwriter_name, v_book_title)
+    end;
+    update public.author_name_agreements
+      set customer_confirmed_at = now(), customer_statement_text = v_statement
+      where id = p_agreement_id returning * into v_row;
+  else
+    raise exception 'Actor % has no pending confirmation on this agreement', p_actor_id;
+  end if;
+
+  select * into v_order from public.orders where id = v_row.order_id;
+  insert into public.order_events (order_id, event_type, actor_id)
+  values (v_row.order_id, 'author_name_agreement_confirmed', p_actor_id);
+
+  if v_row.ghostwriter_confirmed_at is not null and v_row.customer_confirmed_at is not null then
+    update public.books set author_display = v_row.author_display_choice where id = v_row.book_id;
+    insert into public.order_events (order_id, event_type, actor_id, payload)
+    values (v_row.order_id, 'author_name_agreement_finalized', null, jsonb_build_object('choice', v_row.author_display_choice));
+  end if;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.confirm_author_name_agreement from public, anon, authenticated;
+grant execute on function public.confirm_author_name_agreement to service_role;
+
+-- --- 12i. Độ uy tín + tranh chấp ---
+
+-- recalculate_trust_score(): bản cuối từ migrations/archive/20260901_add_trust_and_disputes.sql.
+create function public.recalculate_trust_score(p_user_id uuid)
+returns public.profiles as $$
+declare
+  v_completed integer;
+  v_cancelled_at_fault integer;
+  v_off_platform integer;
+  v_violations integer;
+  v_row public.profiles;
+begin
+  select count(*) into v_completed
+    from public.orders
+    where status = 'completed' and (buyer_id = p_user_id or seller_id = p_user_id);
+
+  -- "Lỗi của user này" = user đó là bên đã YÊU CẦU hủy (cancelled_by đúng
+  -- vai trò của họ trong order) và bên kia đã đồng ý — tự nhận trách
+  -- nhiệm hủy giữa chừng, không phải bên bị hủy oan.
+  select count(*) into v_cancelled_at_fault
+    from public.order_cancel_requests r
+    join public.orders o on o.id = r.order_id
+    where r.status = 'agreed'
+      and (
+        (r.cancelled_by = 'buyer' and o.buyer_id = p_user_id)
+        or (r.cancelled_by = 'seller' and o.seller_id = p_user_id)
+      );
+
+  select count(*) into v_off_platform
+    from public.direct_messages
+    where sender_id = p_user_id and flagged_off_platform = true;
+
+  select count(*) into v_violations
+    from public.disputes
+    where at_fault_user_id = p_user_id and status = 'resolved';
+
+  update public.profiles
+    set trust_orders_completed = v_completed,
+        trust_orders_cancelled_at_fault = v_cancelled_at_fault,
+        trust_off_platform_flags = v_off_platform,
+        trust_violations_resolved = v_violations
+    where id = p_user_id
+    returning * into v_row;
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.recalculate_trust_score from public, anon, authenticated;
+grant execute on function public.recalculate_trust_score to service_role;
+
+-- open_dispute(): bản cuối từ migrations/archive/20260901_add_trust_and_disputes.sql.
+create function public.open_dispute(
+  p_order_id uuid, p_reporter_id uuid, p_reason_category text, p_description text
+) returns public.disputes as $$
+declare
+  v_order public.orders;
+  v_events jsonb;
+  v_grants jsonb;
+  v_agreement jsonb;
+  v_messages jsonb;
+  v_row public.disputes;
+begin
+  select * into v_order from public.orders where id = p_order_id for update;
+  if v_order is null then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.buyer_id <> p_reporter_id and v_order.seller_id <> p_reporter_id then
+    raise exception 'Only order parties can open a dispute';
+  end if;
+  if v_order.status in ('completed', 'cancelled', 'disputed') then
+    raise exception 'Cannot open a dispute on this order in status %', v_order.status;
+  end if;
+
+  select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at), '[]'::jsonb) into v_events
+    from public.order_events e where e.order_id = p_order_id;
+
+  select coalesce(jsonb_agg(to_jsonb(g) order by g.granted_at), '[]'::jsonb) into v_grants
+    from public.manuscript_access_grants g where g.book_id = v_order.book_id;
+
+  select to_jsonb(a) into v_agreement from public.author_name_agreements a where a.order_id = p_order_id;
+
+  select coalesce(jsonb_agg(to_jsonb(m) order by m.created_at), '[]'::jsonb) into v_messages
+    from public.direct_messages m
+    where (m.sender_id = v_order.buyer_id and m.recipient_id = v_order.seller_id)
+       or (m.sender_id = v_order.seller_id and m.recipient_id = v_order.buyer_id);
+
+  insert into public.disputes (order_id, reporter_id, reason_category, description, evidence_snapshot)
+  values (
+    p_order_id, p_reporter_id, p_reason_category, p_description,
+    jsonb_build_object('order_events', v_events, 'manuscript_access_grants', v_grants, 'author_name_agreement', v_agreement, 'messages', v_messages, 'snapshot_at', now())
+  ) returning * into v_row;
+
+  update public.orders set status = 'disputed' where id = p_order_id;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (p_order_id, 'dispute_opened', p_reporter_id, jsonb_build_object('dispute_id', v_row.id, 'reason_category', p_reason_category));
+
+  return v_row;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.open_dispute from public, anon, authenticated;
+grant execute on function public.open_dispute to service_role;
+
+-- resolve_dispute(): bản cuối từ migrations/archive/20260901_add_trust_and_disputes.sql.
+create function public.resolve_dispute(
+  p_dispute_id uuid, p_admin_id uuid, p_resolution_note text,
+  p_at_fault_user_id uuid default null, p_resume_status public.order_status default 'cancelled',
+  p_refund_amount integer default 0
+) returns public.disputes as $$
+declare
+  v_dispute public.disputes;
+  v_order public.orders;
+begin
+  if not exists (select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')) then
+    raise exception 'Only admins can resolve a dispute';
+  end if;
+  if p_resume_status = 'disputed' then raise exception 'p_resume_status cannot be disputed'; end if;
+
+  select * into v_dispute from public.disputes where id = p_dispute_id for update;
+  if v_dispute is null or v_dispute.status <> 'open' then
+    raise exception 'Dispute % not found or already resolved', p_dispute_id;
+  end if;
+
+  select * into v_order from public.orders where id = v_dispute.order_id for update;
+
+  if p_refund_amount > 0 then
+    perform public.apply_transaction(
+      p_user_id => v_order.buyer_id, p_type => 'order_refund', p_amount => p_refund_amount,
+      p_reference_type => 'order', p_reference_id => v_order.id
+    );
+  end if;
+
+  update public.orders set status = p_resume_status,
+    cancelled_at = case when p_resume_status = 'cancelled' then now() else cancelled_at end
+    where id = v_order.id;
+
+  update public.disputes
+    set status = 'resolved', resolution_note = p_resolution_note, at_fault_user_id = p_at_fault_user_id,
+        resolved_by = p_admin_id, resolved_at = now()
+    where id = p_dispute_id
+    returning * into v_dispute;
+
+  insert into public.order_events (order_id, event_type, actor_id, payload)
+  values (
+    v_order.id, 'dispute_resolved', p_admin_id,
+    jsonb_build_object('resolution_note', p_resolution_note, 'at_fault_user_id', p_at_fault_user_id, 'refund_amount', p_refund_amount)
+  );
+
+  if p_at_fault_user_id is not null then
+    perform public.recalculate_trust_score(p_at_fault_user_id);
+  end if;
+
+  return v_dispute;
+end;
+$$ language plpgsql security definer;
+
+revoke execute on function public.resolve_dispute from public, anon, authenticated;
+grant execute on function public.resolve_dispute to service_role;
+
+create index if not exists orders_listing_status_idx
+  on public.orders (listing_id, status);
+create index if not exists author_name_agreements_ghostwriter_idx
+  on public.author_name_agreements (ghostwriter_id);
+create index if not exists author_name_agreements_customer_idx
+  on public.author_name_agreements (customer_id);
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/10_legal_agreements.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 10 — Văn bản pháp lý  (10_legal_agreements.sql)
+-- =======================================================================
+-- Phạm vi: agreement_acceptances — lần xác nhận gần nhất mỗi văn bản (tab
+-- "Cam kết & Thỏa thuận").
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     agreement_acceptances
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260828_add_agreement_acceptances.sql
+--
+-- Phụ thuộc (phải chạy trước): không có
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
+
+-- migrations/archive/20260828_add_agreement_acceptances.sql — 1 dòng/(user, văn
+-- bản) giữ lần xác nhận GẦN NHẤT cho tab "Cam kết & Thỏa thuận" (/ca-nhan).
+-- agreement_id tham chiếu AgreementId trong src/lib/legal/registry.ts,
+-- không có bảng "agreements" riêng — danh sách văn bản là hằng số trong
+-- code. accepted_version = "UTD" (yyyy-MM-dd) của văn bản lúc xác nhận; khi
+-- văn bản được cập nhật (updatedAt đổi), version cũ không còn khớp nữa và
+-- ứng dụng tự coi là "Chưa xác nhận" — không cần cột trạng thái riêng.
+create table public.agreement_acceptances (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  agreement_id text not null check (char_length(agreement_id) between 1 and 64),
+  accepted_at timestamptz not null default now(),
+  accepted_version text not null,
+  primary key (user_id, agreement_id)
+);
+
+alter table public.agreement_acceptances enable row level security;
+
+create policy "users manage their own agreement acceptances"
+  on public.agreement_acceptances for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/11_contests.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+-- =======================================================================
+-- Baseline 11 — Cuộc thi (Contest Engine)  (11_contests.sql)
+-- =======================================================================
+-- Phạm vi: contests/submissions/votes/awards, trigger chặn trên
+-- books/chapters, RPC, xếp hạng + feed, cờ cần bổ sung, snapshot, chi trả
+-- giải, tín hiệu + gian lận, điểm, chấm giám khảo, chấm chung cuộc + công
+-- bố, nhiệm vụ sự kiện, Contest Passport, chụp hạng BXH.
+--
+-- Đối tượng tạo trong file này:
+--   Bảng:
+--     contests, contest_status_events, contest_submissions,
+--     contest_submission_events, contest_votes, contest_awards,
+--     contest_reminders, contest_submission_snapshots,
+--     contest_submission_snapshot_chapters, contest_fraud_signals,
+--     contest_submission_scores, contest_score_state,
+--     contest_scoring_configs, contest_judges, contest_judge_scorecards,
+--     contest_judge_criterion_scores, contest_judge_score_events,
+--     contest_score_runs, contest_score_snapshots, contest_passport_reads,
+--     contest_passports, contest_rank_snapshots
+--   View:
+--     contest_award_details
+--   Hàm:
+--     contest_word_count, contest_status_transition_allowed,
+--     contest_submission_transition_allowed, contest_config_missing_key,
+--     contests_guard_write, contests_prevent_delete,
+--     contest_submissions_guard_write, get_books_contest_stats,
+--     book_has_active_contest_entry,
+--     book_has_active_exclusive_contest_entry,
+--     chapters_block_paid_during_contest,
+--     books_block_exclusive_off_during_contest, transition_contest_status,
+--     submit_contest_entry, set_contest_submission_status,
+--     cast_contest_vote, retract_contest_vote, get_contest_ranking,
+--     get_contest_entries, get_contest_summaries, add_contest_review_flag,
+--     resolve_contest_review_flag, contest_book_needs_snapshot,
+--     take_contest_snapshots_for_book, chapters_snapshot_before_write,
+--     books_snapshot_before_write, snapshot_contest_submissions,
+--     purge_contest_snapshots, pay_contest_award, refresh_contest_scores,
+--     get_contest_score_ranking, get_contest_signal_feed,
+--     get_contest_hidden_gem_pools, detect_contest_fraud_signals,
+--     review_contest_fraud_signal, get_contest_entry_stats,
+--     force_server_created_at, force_server_added_at,
+--     contests_guard_scoring_window, contest_scoring_configs_immutable,
+--     set_contest_scoring_config, save_judge_scorecard,
+--     review_judge_scorecard, get_contest_scoring_metrics,
+--     contest_score_snapshots_immutable, save_contest_score_run,
+--     contest_score_runs_guard_update, publish_contest_score_run,
+--     contest_quest_available, add_event_quest_slot, reset_event_quest_slot,
+--     record_contest_activity, contest_passport_state,
+--     snapshot_contest_ranks
+--   Kiểu (enum):
+--     contest_status, contest_submission_status
+--   Thêm cột vào bảng của file trước:
+--     task_templates.{quest_pool, contest_action},
+--     user_quest_pool.{slot_kind, contest_id, reroll_count}
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260926_add_contest_award_payout.sql,
+--   20260926_add_contest_engine_core.sql,
+--   20260926_add_contest_entry_stats.sql,
+--   20260926_add_contest_fraud_detection.sql,
+--   20260926_add_contest_judging.sql,
+--   20260926_add_contest_ranking_and_feeds.sql,
+--   20260926_add_contest_review_flags.sql, 20260926_add_contest_scores.sql,
+--   20260926_add_contest_signal_feeds.sql,
+--   20260926_add_contest_snapshots.sql, 20260926_add_final_scoring.sql,
+--   20260926_add_score_run_publish.sql, 20260926_add_scoring_tracking.sql,
+--   20260927_add_contest_passport.sql, 20260927_add_contest_quests.sql,
+--   20260928_add_contest_rank_snapshots.sql,
+--   20260928_contest_dry_run_fixes.sql
+--   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql, 03_reading.sql, 04_wallet_and_payments.sql,
+--   05_quests_and_achievements.sql, 06_social_and_messaging.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
 
 -- --- Contest Engine — lõi Phase 1 (cuộc thi viết). Contest ─< contest_submissions
 -- >─ Book (n–n); books vẫn là nguồn chân lý, không thêm cột nào vào books/
@@ -4362,7 +5997,7 @@ grant execute on function public.reorder_book_chapters(uuid, uuid[]) to authenti
 -- contest. Hai trigger mới trên bảng có sẵn: chapters_block_paid_during_contest
 -- (D8) và books_block_exclusive_off_during_contest (D11). Thiết kế:
 -- docs/CONTEST_ENGINE_AUDIT_AND_PLAN.md. Xem
--- migrations/20260926_add_contest_engine_core.sql. ---
+-- migrations/archive/20260926_add_contest_engine_core.sql. ---
 
 -- ---------------------------------------------------------------------
 -- 1. Enums
@@ -5341,7 +6976,7 @@ grant select on public.contest_award_details to anon, authenticated;
 -- --- Contest Engine — xếp hạng + feed (đọc, service_role): BXH Độc giả yêu
 -- thích (popular-v1 = số phiếu hợp lệ, rank() toàn cục, keyset), feed
 -- new/discover/az có trạng thái bình chọn của người xem theo lô, số bài/tác
--- giả cho thẻ cuộc thi. Xem migrations/20260926_add_contest_ranking_and_feeds.sql. ---
+-- giả cho thẻ cuộc thi. Xem migrations/archive/20260926_add_contest_ranking_and_feeds.sql. ---
 
 create or replace function public.get_contest_ranking(
   p_contest_id uuid,
@@ -5516,7 +7151,7 @@ grant execute on function public.get_contest_summaries(uuid[]) to service_role;
 
 -- --- Contest Engine — cờ "Cần bổ sung" (Q2): gắn / xử lý cờ trong
 -- contest_submissions.review_flags, khoá dòng + kiểm admin trong DB, không
--- đổi status bài (D4). Xem migrations/20260926_add_contest_review_flags.sql. ---
+-- đổi status bài (D4). Xem migrations/archive/20260926_add_contest_review_flags.sql. ---
 
 create or replace function public.add_contest_review_flag(
   p_submission_id uuid,
@@ -5642,7 +7277,7 @@ grant execute on function public.resolve_contest_review_flag(uuid, uuid, uuid, t
 -- snapshot-on-write (trigger BEFORE trên chapters/books chụp bản TRƯỚC khi
 -- sửa ở lần ghi đầu tiên sau hạn) + snapshot_contest_submissions() cho sách
 -- không bị sửa; purge_contest_snapshots() dọn theo nội dung đã gỡ. Chỉ
--- service-role đọc. Xem migrations/20260926_add_contest_snapshots.sql. ---
+-- service-role đọc. Xem migrations/archive/20260926_add_contest_snapshots.sql. ---
 
 create table if not exists public.contest_submission_snapshots (
   id uuid primary key default gen_random_uuid(),
@@ -5917,7 +7552,7 @@ grant execute on function public.purge_contest_snapshots(uuid[], uuid[]) to serv
 
 -- --- Contest Engine — admin chi trả giải thủ công (D10, Q6): pay_contest_award()
 -- khoá dòng giải, kiểm đã công bố / chưa thu hồi / chưa chi, rồi gọi
--- grant_platform_bonus() (sổ cái ví). Xem migrations/20260926_add_contest_award_payout.sql. ---
+-- grant_platform_bonus() (sổ cái ví). Xem migrations/archive/20260926_add_contest_award_payout.sql. ---
 
 do $$ begin
   alter table public.contest_awards
@@ -5983,107 +7618,10 @@ $$;
 revoke execute on function public.pay_contest_award(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.pay_contest_award(uuid, uuid) to service_role;
 
--- --- Phiên đọc ghi ở server (Contest Engine Phase 2, P1): cột thời gian đọc
--- thật (active_seconds do server cộng theo khoảng thật giữa 2 nhịp 60 giây),
--- nguồn truy cập, đoạn xa nhất; record_reading_heartbeat() là đường ghi duy
--- nhất. Policy ở phần 10e chỉ còn SELECT. Xem
--- migrations/20260926_add_reading_session_tracking.sql. ---
-
-alter table public.reading_sessions
-  add column if not exists book_id uuid references public.books (id) on delete cascade,
-  add column if not exists active_seconds integer not null default 0,
-  add column if not exists last_heartbeat_at timestamptz,
-  add column if not exists max_paragraph integer,
-  add column if not exists source text;
-
-do $$ begin
-  alter table public.reading_sessions add constraint reading_sessions_active_seconds_check check (active_seconds >= 0);
-exception when duplicate_object then null; end $$;
-do $$ begin
-  alter table public.reading_sessions add constraint reading_sessions_source_check
-    check (source is null or source in ('contest', 'trending', 'search', 'profile', 'recommendation', 'other'));
-exception when duplicate_object then null; end $$;
-
-create index if not exists reading_sessions_book_user_idx on public.reading_sessions (book_id, user_id, start_time);
-
--- Trả id phiên (mới hoặc cũ) + active_seconds hiện tại.
--- p_session_id null / không khớp (người khác, chương khác, đã nguội > 30 phút)
--- → mở phiên mới.
-alter table public.reading_sessions
-  add column if not exists words_reached integer;
-
-do $$ begin
-  alter table public.reading_sessions add constraint reading_sessions_words_reached_check
-    check (words_reached is null or words_reached >= 0);
-exception when duplicate_object then null; end $$;
-
--- Slice 2.5a (migrations/20260926_add_scoring_tracking.sql): thêm words_reached.
-create or replace function public.record_reading_heartbeat(
-  p_user_id uuid,
-  p_session_id uuid,
-  p_chapter_id uuid,
-  p_paragraph integer,
-  p_source text
-) returns table (session_id uuid, active_seconds integer)
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_row public.reading_sessions;
-  v_book uuid;
-  v_words integer;
-  v_elapsed numeric;
-  v_source text := case when p_source in ('contest', 'trending', 'search', 'profile', 'recommendation', 'other') then p_source else null end;
-begin
-  -- Số chữ tới hết đoạn p_paragraph (mảng 1-based; vượt số đoạn thì lấy hết chương).
-  select ch.book_id,
-         public.contest_word_count(array_to_string(
-           (string_to_array(ch.content, E'\n\n'))[1 : greatest(coalesce(p_paragraph, 0), 0) + 1], E'\n'))
-    into v_book, v_words
-  from public.chapters ch where ch.id = p_chapter_id;
-  if v_book is null then
-    raise exception 'Chapter % not found', p_chapter_id using hint = 'chapter_not_found';
-  end if;
-
-  if p_session_id is not null then
-    select * into v_row from public.reading_sessions
-    where id = p_session_id and user_id = p_user_id and chapter_id = p_chapter_id
-      and last_heartbeat_at > now() - interval '30 minutes'
-    for update;
-  end if;
-
-  if v_row.id is null then
-    insert into public.reading_sessions (user_id, chapter_id, book_id, start_time, end_time, last_heartbeat_at, max_paragraph, words_reached, source)
-    values (p_user_id, p_chapter_id, v_book, now(), now(), now(), greatest(coalesce(p_paragraph, 0), 0), v_words, v_source)
-    returning * into v_row;
-    return query select v_row.id, v_row.active_seconds;
-    return;
-  end if;
-
-  -- Khoảng thời gian THẬT từ nhịp trước. Quá 90 giây = đã bỏ đi / tab ẩn → không cộng.
-  v_elapsed := extract(epoch from (now() - v_row.last_heartbeat_at));
-  update public.reading_sessions s
-     set active_seconds = s.active_seconds + case when v_elapsed <= 90 then floor(v_elapsed)::integer else 0 end,
-         last_heartbeat_at = now(),
-         end_time = now(),
-         max_paragraph = greatest(coalesce(s.max_paragraph, 0), coalesce(p_paragraph, 0)),
-         words_reached = greatest(coalesce(s.words_reached, 0), v_words),
-         drop_off_offset = greatest(coalesce(p_paragraph, 0), 0),
-         source = coalesce(s.source, v_source)
-   where s.id = v_row.id
-  returning * into v_row;
-  return query select v_row.id, v_row.active_seconds;
-end;
-$$;
-
-revoke execute on function public.record_reading_heartbeat(uuid, uuid, uuid, integer, text) from public, anon, authenticated;
-grant execute on function public.record_reading_heartbeat(uuid, uuid, uuid, integer, text) to service_role;
-
 -- --- Contest Engine Phase 2, Slice 2.2: tín hiệu hợp lệ (meaningful read,
 -- độc giả hợp lệ, phiếu đã lọc), tín hiệu gian lận, bảng điểm cache làm mới
 -- lười 15 phút + chốt khi công bố kết quả. Xem
--- migrations/20260926_add_contest_scores.sql (mục 4 của migration — chuyển
+-- migrations/archive/20260926_add_contest_scores.sql (mục 4 của migration — chuyển
 -- cuộc thi chưa mở bình chọn sang popular-v2 — là dữ liệu, không ở đây). ---
 
 -- ---------------------------------------------------------------------
@@ -6351,7 +7889,7 @@ grant execute on function public.get_contest_score_ranking(uuid, text, integer, 
 
 -- --- Contest Engine Phase 2, Slice 2.3: hàng "Đang được chú ý", "Đang tăng
 -- tốc" và 2 nhóm ứng viên "Viên ngọc ẩn" (80/20 chọn ở src/lib/contests/signals.ts).
--- Xem migrations/20260926_add_contest_signal_feeds.sql. ---
+-- Xem migrations/archive/20260926_add_contest_signal_feeds.sql. ---
 
 create or replace function public.get_contest_signal_feed(
   p_contest_id uuid,
@@ -6447,7 +7985,7 @@ grant execute on function public.get_contest_hidden_gem_pools(uuid, text, intege
 -- --- Contest Engine Phase 2, Slice 2.4: phát hiện tín hiệu gian lận (bình
 -- chọn dồn dập, tài khoản vừa đủ tuổi bầu hàng loạt) + admin xét. Hệ thống chỉ
 -- gắn tín hiệu; chỉ tín hiệu đã xác nhận mới loại khỏi điểm (P10). Xem
--- migrations/20260926_add_contest_fraud_detection.sql. ---
+-- migrations/archive/20260926_add_contest_fraud_detection.sql. ---
 
 create unique index if not exists contest_fraud_signals_dedupe_idx
   on public.contest_fraud_signals (
@@ -6596,7 +8134,7 @@ grant execute on function public.review_contest_fraud_signal(uuid, uuid, text, t
 
 -- --- Contest Engine Phase 2, Slice 2.7: thống kê bài dự thi cho tác giả
 -- (không dùng lượt xem trang; số phiếu do route ẩn/hiện theo P9). Xem
--- migrations/20260926_add_contest_entry_stats.sql. ---
+-- migrations/archive/20260926_add_contest_entry_stats.sql. ---
 
 create or replace function public.get_contest_entry_stats(p_submission_id uuid)
 returns jsonb
@@ -6712,7 +8250,7 @@ grant execute on function public.get_contest_entry_stats(uuid) to service_role;
 
 -- --- Contest Engine Slice 2.5a: thời gian sự kiện engagement do server đặt
 -- (không ghi lùi / ghi trước để rơi vào khung chấm). Xem
--- migrations/20260926_add_scoring_tracking.sql. ---
+-- migrations/archive/20260926_add_scoring_tracking.sql. ---
 
 -- Thời gian sự kiện do server đặt: insert → now(); update → giữ giá trị cũ.
 create or replace function public.force_server_created_at()
@@ -6767,7 +8305,7 @@ create trigger reading_list_items_server_time
 
 -- --- Contest Engine Slice 2.5b: khung chấm chính thức, cấu hình chấm có
 -- version, giám khảo, phiếu chấm theo tiêu chí + nhật ký. Xem
--- migrations/20260926_add_contest_judging.sql. ---
+-- migrations/archive/20260926_add_contest_judging.sql. ---
 
 -- ---------------------------------------------------------------------
 -- 1. Khung chấm chính thức + con trỏ version cấu hình
@@ -7130,7 +8668,7 @@ grant execute on function public.review_judge_scorecard(uuid, uuid, text, text) 
 
 -- --- Contest Engine Slice 2.6a: số liệu chấm chung cuộc trong khung chấm +
 -- lượt tính / snapshot mọi tầng. Engine tính điểm ở
--- src/lib/contests/final-scoring/engine.ts. Xem migrations/20260926_add_final_scoring.sql. ---
+-- src/lib/contests/final-scoring/engine.ts. Xem migrations/archive/20260926_add_final_scoring.sql. ---
 
 create or replace function public.get_contest_scoring_metrics(p_contest_id uuid)
 returns table (
@@ -7482,7 +9020,7 @@ grant execute on function public.save_contest_score_run(uuid, uuid, jsonb) to se
 
 -- --- Contest Engine Slice 2.6b: công bố lượt tính chung cuộc (1 lượt đang công
 -- bố / cuộc thi; thay thế cần lý do, lượt cũ giữ lại). Xem
--- migrations/20260926_add_score_run_publish.sql. ---
+-- migrations/archive/20260926_add_score_run_publish.sql. ---
 
 create unique index if not exists contest_score_runs_one_published
   on public.contest_score_runs (contest_id) where published_at is not null and superseded_at is null;
@@ -7565,7 +9103,7 @@ grant execute on function public.publish_contest_score_run(uuid, uuid, text) to 
 -- --- Contest Engine Phase 3, Slice 3.1: nhiệm vụ sự kiện cuộc thi (1 ô sự kiện
 -- / ngày, ghi tiến độ nhận biết cuộc thi, mẫu seed). reset_quest_pool_slot đã
 -- sửa tại chỗ ở phần 10 (từ chối ô / mẫu sự kiện). Xem
--- migrations/20260927_add_contest_quests.sql. ---
+-- migrations/archive/20260927_add_contest_quests.sql. ---
 
 -- ---------------------------------------------------------------------
 -- 1. Cột mới
@@ -7719,7 +9257,7 @@ grant execute on function public.reset_event_quest_slot(uuid, date, uuid, intege
 -- ---------------------------------------------------------------------
 -- p_event: 'chapter_completed' | 'comment' | 'reading_list_add' | 'vote'.
 -- Trả true nếu tiến độ nhiệm vụ sự kiện hôm nay tăng.
--- Slice 3.2 (migrations/20260927_add_contest_passport.sql): ghi Passport trước nhiệm vụ sự kiện.
+-- Slice 3.2 (migrations/archive/20260927_add_contest_passport.sql): ghi Passport trước nhiệm vụ sự kiện.
 create or replace function public.record_contest_activity(
   p_user_id uuid,
   p_event text,
@@ -7862,7 +9400,7 @@ on conflict (code) do nothing;
 
 -- --- Contest Engine Phase 3, Slice 3.2: Contest Passport (7 cột mốc / cuộc
 -- thi, huy hiệu "Người đi hết mùa thi"). record_contest_activity đã sửa tại
--- chỗ ở khối Slice 3.1. Xem migrations/20260927_add_contest_passport.sql. ---
+-- chỗ ở khối Slice 3.1. Xem migrations/archive/20260927_add_contest_passport.sql. ---
 
 create table if not exists public.contest_passport_reads (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -7973,7 +9511,7 @@ revoke execute on function public.contest_passport_state(uuid, uuid, boolean) fr
 grant execute on function public.contest_passport_state(uuid, uuid, boolean) to service_role;
 
 -- --- Contest Engine Phase 3, Slice 3.4: chụp hạng BXH mỗi ngày (cột "Thay
--- đổi" ▲▼, K9). Xem migrations/20260928_add_contest_rank_snapshots.sql. ---
+-- đổi" ▲▼, K9). Xem migrations/archive/20260928_add_contest_rank_snapshots.sql. ---
 
 create table if not exists public.contest_rank_snapshots (
   contest_id uuid not null references public.contests (id) on delete cascade,
@@ -8066,64 +9604,248 @@ $$;
 revoke execute on function public.snapshot_contest_ranks(uuid, date) from public, anon, authenticated;
 grant execute on function public.snapshot_contest_ranks(uuid, date) to service_role;
 
--- --- Nhật ký đổi quyền + đổi quyền nguyên tử (chỉ super_admin). Xem
--- migrations/20260928_add_role_change_logs.sql. ---
-create table if not exists public.role_change_logs (
-  id uuid primary key default gen_random_uuid(),
-  target_id uuid not null references public.profiles (id) on delete cascade,
-  actor_id uuid references public.profiles (id) on delete set null,
-  old_role public.user_role not null,
-  new_role public.user_role not null,
-  created_at timestamptz not null default now()
-);
+create index if not exists contest_awards_payout_txn_idx
+  on public.contest_awards (payout_transaction_id) where payout_transaction_id is not null;
 
-create index if not exists role_change_logs_target_idx
-  on public.role_change_logs (target_id, created_at desc);
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/12_content_retention.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-alter table public.role_change_logs enable row level security;
-revoke all on public.role_change_logs from anon, authenticated;
+-- =======================================================================
+-- Baseline 12 — Lưu trữ / dọn nội dung  (12_content_retention.sql)
+-- =======================================================================
+-- Phạm vi: content_purged_at trên books/chapters + index hàng chờ dọn (cron
+-- purge-deleted-content).
+--
+-- Đối tượng tạo trong file này:
+--   Thêm cột vào bảng của file trước:
+--     chapters.content_purged_at, books.content_purged_at
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260908_add_content_purge_retention.sql
+--   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
 
--- Trả role sau khi đổi. Lỗi mang hint: actor_not_super_admin,
--- self_demotion, target_not_found.
-create or replace function public.admin_set_user_role(
-  p_actor_id uuid,
-  p_target_id uuid,
-  p_role public.user_role
-)
-returns public.user_role
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_old public.user_role;
-begin
-  if not exists (
-    select 1 from public.profiles where id = p_actor_id and role = 'super_admin'
-  ) then
-    raise exception 'Only a super_admin can change a role' using hint = 'actor_not_super_admin';
-  end if;
+-- --- Dọn NỘI DUNG NẶNG (không xoá hàng) của truyện/chương đã xoá quá 30
+-- ngày — tối ưu dung lượng, giữ hàng metadata vĩnh viễn cho audit trail.
+-- KHÔNG xoá thật (orders.book_id/author_name_agreements.book_id tham
+-- chiếu books không có ON DELETE CASCADE). Xem
+-- migrations/archive/20260908_add_content_purge_retention.sql +
+-- api/admin/cron/purge-deleted-content/route.ts. ---
+alter table public.chapters
+  add column content_purged_at timestamptz;
 
-  if p_actor_id = p_target_id and p_role <> 'super_admin' then
-    raise exception 'A super_admin cannot demote themselves' using hint = 'self_demotion';
-  end if;
+alter table public.books
+  add column content_purged_at timestamptz;
 
-  select role into v_old from public.profiles where id = p_target_id for update;
-  if v_old is null then
-    raise exception 'Profile % not found', p_target_id using hint = 'target_not_found';
-  end if;
+create index if not exists chapters_pending_purge_idx
+  on public.chapters (removed_at) where removed_at is not null and content_purged_at is null;
+create index if not exists books_pending_purge_idx
+  on public.books (deleted_at) where deleted_at is not null and content_purged_at is null;
 
-  if v_old = p_role then
-    return v_old;
-  end if;
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/99_seed_data.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-  update public.profiles set role = p_role where id = p_target_id;
-  insert into public.role_change_logs (target_id, actor_id, old_role, new_role)
-  values (p_target_id, p_actor_id, v_old, p_role);
+-- =======================================================================
+-- Baseline 99 — Seed data  (99_seed_data.sql)
+-- =======================================================================
+-- Phạm vi: Dữ liệu danh mục cố định: task_templates, achievement_templates,
+-- streak_milestones, service_tag_options.
+--
+-- Đối tượng tạo trong file này:
+--   (chỉ INSERT — không tạo đối tượng mới)
+--
+-- Gộp từ migration (migrations/archive/):
+--   20260917_add_design_audio_comments.sql,
+--   20260917_seed_phase1_quests_achievements.sql,
+--   20260918_add_streak_quests_and_time_windows.sql,
+--   20260918_seed_recommendation_quest.sql,
+--   20260919_add_bookmark_and_tag_achievements.sql,
+--   20260919_add_characters.sql,
+--   20260919_add_reading_behavior_achievements.sql
+--   + scripts/seed_service_tag_options.sql (bỏ DELETE dọn seed cũ ở đầu script)
+--
+-- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
+--   02_books_and_chapters.sql, 03_reading.sql, 04_wallet_and_payments.sql,
+--   05_quests_and_achievements.sql, 06_social_and_messaging.sql,
+--   09_orders_and_services.sql
+-- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
+-- =======================================================================
 
-  return p_role;
-end;
-$$;
+-- =======================================================================
+-- SEED DATA — dữ liệu danh mục cố định (không phải dữ liệu người dùng),
+-- gom từ các migration seed + scripts/seed_service_tag_options.sql để 1
+-- project trống dựng xong là dùng được ngay. Giữ nguyên ON CONFLICT nên
+-- chạy lại an toàn. KHÔNG chứa data fix 1 lần nào (UPDATE/DELETE backfill).
+-- 5 task_templates gốc đã có ở 05_quests_and_achievements.sql (phần 7), seed
+-- nhiệm vụ sự kiện cuộc thi ở 11_contests.sql (Slice 3.1).
+-- =======================================================================
 
-revoke execute on function public.admin_set_user_role(uuid, uuid, public.user_role) from public, anon, authenticated;
-grant execute on function public.admin_set_user_role(uuid, uuid, public.user_role) to service_role;
+-- task_templates: từ migrations/archive/20260917_seed_phase1_quests_achievements.sql
+INSERT INTO public.task_templates (code, title, description, for_role, quest_type, genre, target_count, reward_tokens, active)
+VALUES
+  ('reader_read_3_chapters', 'Đọc 3 chương bất kỳ', 'Đọc xong 3 chương của bất kỳ truyện nào hôm nay (ngoại trừ truyện tiên hiệp)', NULL, 'engagement', '!Tiên hiệp/ kiếm hiệp', 3, 10, true),
+  ('reader_comment_1', 'Để lại 1 bình luận tốt', 'Bình luận điểm tốt ở bất kỳ chương nào bạn đang đọc.', NULL, 'engagement', NULL, 1, 8, true),
+  ('reader_paragraph_comment', 'Soi từng câu chữ', 'Để lại 1 bình luận ngay tại dòng/đoạn văn bạn ấn tượng.', NULL, 'engagement', NULL, 1, 10, true),
+  ('author_publish_chapter', 'Ra chương mới', 'Xuất bản 1 chương mới cho 1 trong các truyện của bạn.', 'author', 'discovery', NULL, 1, 20, true),
+  ('narrator_upload_audio', 'Thu âm 1 chương', 'Đăng 1 audio lồng tiếng mới.', 'narrator', 'discovery', NULL, 1, 20, true),
+  ('designer_upload_design', 'Đăng 1 thiết kế', 'Đăng 1 thiết kế/minh hoạ mới.', 'designer', 'discovery', NULL, 1, 20, true),
+  ('reader_read_new_genre', 'Đọc thể loại mới', 'Đọc thử 1 chương thuộc thể loại bạn chưa từng đọc.', NULL, 'discovery', NULL, 1, 10, true),
+  ('reader_follow_new_author', 'Theo dõi tác giả mới', 'Follow 1 tác giả bạn chưa từng theo dõi.', NULL, 'discovery', NULL, 1, 8, true),
+  ('reader_add_wishlist', 'Thêm vào tủ sách', 'Thêm 1 truyện vào tủ sách/wishlist của bạn.', NULL, 'discovery', NULL, 1, 6, true),
+  ('reader_complete_chapter', 'Hoàn thành 1 chương', 'Đọc hết 1 chương bất kỳ.', NULL, 'engagement', NULL, 1, 8, true),
+  ('reader_complete_3_chapters', 'Kẻ nghiền chương', 'Đọc hết 3 chương bất kỳ.', NULL, 'engagement', NULL, 3, 12, true),
+  ('author_interact_readers', 'Tác giả thân thiện', 'Trả lời ít nhất 2 bình luận của độc giả trong tác phẩm của mình.', 'author', 'engagement', NULL, 2, 15, true),
+  ('reader_share_story', 'Chia sẻ truyện yêu thích', 'Chia sẻ 1 truyện bạn đang đọc ra ngoài (mạng xã hội, bạn bè).', NULL, 'engagement', NULL, 1, 10, true),
+  ('reader_read_underrated', 'Ẩn danh nhưng hay', 'Đọc một truyện ít lượt xem (dưới 50 lượt xem).', NULL, 'discovery', NULL, 1, 10, true),
+  ('reader_read_top_rated', 'Khám phá kho báu', 'Đọc 1 truyện được nhiều người xem (trên 300 lượt xem).', NULL, 'discovery', NULL, 1, 10, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- achievement_templates: từ migrations/archive/20260917_seed_phase1_quests_achievements.sql
+INSERT INTO public.achievement_templates (code, for_role, title, description, icon, color_token, metric, threshold, reward_tokens, active)
+VALUES
+  ('author_first_book', 'author', 'Tân binh cầm bút', 'Đăng và xuất bản truyện đầu tiên.', 'book', 'author', 'books_published', 1, 0, true),
+  ('author_5_books', 'author', 'Cây bút sung sức', 'Xuất bản 5 truyện trên nền tảng.', 'trophy', 'author', 'books_published', 5, 50, true),
+  ('author_10_books', 'author', 'Cây đại thụ', 'Xuất bản 10 truyện trên nền tảng.', 'trophy', 'author', 'books_published', 10, 100, true),
+  ('narrator_first_audio', 'narrator', 'Giọng đọc đầu tiên', 'Đăng audio lồng tiếng đầu tiên.', 'mic', 'narrator', 'audio_published', 1, 0, true),
+  ('narrator_5_audios', 'narrator', 'Giọng đọc sung sức', 'Đăng 5 audio lồng tiếng.', 'mic', 'narrator', 'audio_published', 5, 50, true),
+  ('designer_first_design', 'designer', 'Nét vẽ đầu tay', 'Đăng thiết kế/minh hoạ đầu tiên.', 'brush', 'designer', 'design_published', 1, 0, true),
+  ('designer_5_designs', 'designer', 'Cọ vẽ sung sức', 'Đăng 5 thiết kế/minh hoạ.', 'brush', 'designer', 'design_published', 5, 50, true),
+  ('reader_genre_explorer', NULL, 'Đa di năng', 'Đọc tác phẩm thuộc 5 thể loại khác nhau.', 'trophy', 'reader', 'genres_read_count', 5, 50, true),
+  ('reader_100_chapters', NULL, 'Đọc giả chuyên cần', 'Đọc từ 100 chương trở lên trên Vịnh.', 'book', 'reader', 'chapters_read', 100, 30, true),
+  ('reader_500_chapters', NULL, 'Đại đọc giả', 'Đọc từ 500 chương trở lên trên Vịnh.', 'trophy', 'reader', 'chapters_read', 500, 80, true),
+  ('reader_night_owl_master', NULL, 'Tri kỷ của đêm', 'Hoàn tất 30 lượt đọc vào khung giờ đêm (22h - 2h).', 'flame', 'reader', 'night_reads_count', 30, 80, true),
+  ('reader_avid_reader', NULL, 'Mọt sách', 'Đọc từ 50 chương trở lên trên Vịnh.', 'book', 'reader', 'chapters_read', 50, 0, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- task_templates: từ migrations/archive/20260917_add_design_audio_comments.sql
+INSERT INTO public.task_templates (code, title, description, for_role, quest_type, genre, target_count, reward_tokens, active)
+VALUES
+  ('designer_interact_readers', 'Thiết kế thân thiện', 'Trả lời hoặc thả tim ít nhất 2 bình luận về thiết kế của bạn.', 'designer', 'engagement', NULL, 2, 15, true),
+  ('narrator_interact_listeners', 'Giọng đọc thân thiện', 'Trả lời ít nhất 2 bình luận về audio của bạn.', 'narrator', 'engagement', NULL, 2, 15, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- task_templates: từ migrations/archive/20260918_add_streak_quests_and_time_windows.sql
+INSERT INTO public.task_templates (code, title, description, for_role, quest_type, genre, target_count, reward_tokens, active)
+VALUES
+  ('reader_night_owl_read', 'Cú đêm mê đọc', 'Đọc ít nhất 1 chương sách trong khoảng từ 22:00 - 02:00 sáng.', NULL, 'discovery', NULL, 1, 12, true),
+  ('reader_morning_fly', 'Đón ngày mới cùng sách', 'Đọc 1 chương sách trong khoảng từ 06:00 - 09:00 sáng.', NULL, 'discovery', NULL, 1, 10, true),
+  ('reader_tea_time', 'Độc giả giờ nghỉ', 'Đọc 1 chương sách trong khoảng từ 11:00 - 14:00.', NULL, 'discovery', NULL, 1, 10, true),
+  ('reader_peak_hour_session', 'Giờ vàng của bạn', 'Mở ứng dụng/web và đọc trong khung giờ cố định (Sáng 7-9h hoặc Đêm 22-1h).', NULL, 'engagement', NULL, 1, 10, true),
+  ('reader_3day_reading_streak', '3 ngày liên tiếp', 'Đọc ít nhất 1 chương mỗi ngày, 3 ngày liên tiếp.', NULL, 'engagement', NULL, 3, 20, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- achievement_templates: từ migrations/archive/20260918_add_streak_quests_and_time_windows.sql
+INSERT INTO public.achievement_templates (code, for_role, title, description, icon, color_token, metric, threshold, reward_tokens, active)
+VALUES
+  ('reader_streak_7d', NULL, 'Bền bỉ 7 ngày', 'Đọc sách liên tục 7 ngày không ngắt quãng.', 'flame', 'reader', NULL, NULL, 0, true),
+  ('reader_streak_30d', NULL, 'Đam mê bất tận', 'Đọc sách liên tục 30 ngày không ngắt quãng.', 'flame', 'reader', NULL, NULL, 0, true),
+  ('reader_streak_100d', NULL, 'Huyền thoại kiên trì', 'Đọc sách liên tục 100 ngày không ngắt quãng.', 'flame', 'reader', NULL, NULL, 0, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- streak_milestones: từ migrations/archive/20260918_add_streak_quests_and_time_windows.sql
+INSERT INTO public.streak_milestones (streak_days, reward_token, badge_id)
+VALUES
+  (7, 30, (SELECT id FROM public.achievement_templates WHERE code = 'reader_streak_7d')),
+  (30, 150, (SELECT id FROM public.achievement_templates WHERE code = 'reader_streak_30d')),
+  (100, 300, (SELECT id FROM public.achievement_templates WHERE code = 'reader_streak_100d'))
+ON CONFLICT (streak_days) DO UPDATE SET badge_id = excluded.badge_id;
+
+-- task_templates: từ migrations/archive/20260918_seed_recommendation_quest.sql
+INSERT INTO public.task_templates (code, title, description, for_role, quest_type, genre, target_count, reward_tokens, active)
+VALUES
+  ('reader_view_recommendations', 'Xem gợi ý cho bạn', 'Xem trang giới thiệu của 3 tác phẩm trong mục gợi ý.', NULL, 'discovery', NULL, 3, 8, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- achievement_templates: từ migrations/archive/20260919_add_reading_behavior_achievements.sql
+INSERT INTO public.achievement_templates (code, for_role, title, description, icon, color_token, metric, threshold, reward_tokens, active)
+VALUES
+  ('reader_finish_story', NULL, 'Hoàn thành một hành trình', 'Đọc hết một truyện hoàn chỉnh.', 'book', 'reader', 'finished_stories_count', 1, 20, true),
+  ('reader_read_series', NULL, 'Theo dõi một series', 'Đọc ít nhất 5 chương liên tiếp của cùng một truyện.', 'book', 'reader', 'longest_consecutive_chapters', 5, 15, true),
+  ('reader_return_next_day', NULL, 'Quay lại ngày mai', 'Trở lại đọc tiếp sau ngày đầu tiên.', 'trophy', 'reader', 'distinct_reading_days_count', 2, 10, true),
+  ('reader_read_multiple_sessions', NULL, 'Đọc nhiều phiên', 'Có ít nhất 3 phiên đọc trong ngày.', 'trophy', 'reader', 'max_reading_sessions_per_day', 3, 10, true),
+  ('reader_continue_after_pause', NULL, 'Tiếp tục hành trình', 'Quay lại truyện sau 7 ngày không đọc.', 'trophy', 'reader', 'max_gap_days_same_book', 7, 15, true),
+  ('reader_comeback_15d', NULL, 'Không bỏ cuộc', 'Quay lại truyện đã ngưng đọc được 15 ngày.', 'flame', 'reader', 'max_gap_days_same_book', 15, 20, true),
+  ('reader_weekend_reader', NULL, 'Cuối tuần cùng truyện', 'Đọc sách trong cả 2 ngày thứ Bảy & Chủ Nhật.', 'flame', 'reader', 'weekend_both_days_read', 1, 15, true),
+  ('reader_genre_loyalist', NULL, 'Kẻ săn thể loại', 'Đọc ≥5 truyện cùng thể loại.', 'trophy', 'reader', 'max_books_read_same_genre', 5, 30, true),
+  ('reader_genre_switcher', NULL, 'Kẻ đổi vị', 'Đọc 5 thể loại khác nhau trong vòng 15 ngày.', 'trophy', 'reader', 'max_genres_within_15_days', 5, 40, true),
+  ('reader_first_topup', NULL, 'Người ủng hộ đầu tiên', 'Thực hiện nạp token lần đầu tiên.', 'trophy', 'reader', 'topup_count', 1, 0, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- achievement_templates: từ migrations/archive/20260919_add_bookmark_and_tag_achievements.sql
+INSERT INTO public.achievement_templates (code, for_role, title, description, icon, color_token, metric, threshold, reward_tokens, active)
+VALUES
+  ('reader_tragedy_hunter', NULL, 'Người săn bi kịch', 'Hoàn thành 10 truyện có kết buồn.', 'trophy', 'reader', 'sad_ending_finished_count', 10, 50, true),
+  ('reader_underdog_reader', NULL, 'Đi ngược số đông', 'Đọc hết 1 bộ truyện dưới 50 view.', 'trophy', 'reader', 'underrated_finished_count', 1, 20, true),
+  ('reader_first_bookmark_collection', NULL, 'Bộ sưu tập đầu tiên', 'Bookmark 5 truyện.', 'trophy', 'reader', 'bookmarked_books_count', 5, 15, true),
+  ('reader_genre_bookmark_collector', NULL, 'Nhà sưu tầm thể loại', 'Bookmark 5 truyện cùng genre.', 'trophy', 'reader', 'max_bookmarked_books_same_genre', 5, 20, true),
+  ('reader_save_10_quotes', NULL, 'Người giữ ký ức', 'Lưu 10 đoạn yêu thích.', 'book', 'reader', 'saved_highlights_count', 10, 20, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- achievement_templates: từ migrations/archive/20260919_add_characters.sql
+INSERT INTO public.achievement_templates (code, for_role, title, description, icon, color_token, metric, threshold, reward_tokens, active)
+VALUES
+  ('reader_follow_villain', NULL, 'Kẻ tìm kiếm phản diện', 'Theo dõi 1 nhân vật villain.', 'trophy', 'reader', 'villain_followed_count', 1, 10, true),
+  ('reader_follow_hero', NULL, 'Người yêu chính nghĩa', 'Theo dõi 1 nhân vật người hùng.', 'trophy', 'reader', 'hero_followed_count', 1, 10, true),
+  ('reader_character_guardian', NULL, 'Người bảo hộ nhân vật', 'Follow một nhân vật và đọc toàn bộ chương có nhân vật đó.', 'trophy', 'reader', 'character_guardian_achieved', 1, 30, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- task_templates: từ migrations/archive/20260919_add_characters.sql
+INSERT INTO public.task_templates (code, title, description, for_role, quest_type, genre, target_count, reward_tokens, active)
+VALUES
+  ('reader_vote_trope', 'Bắt đúng gu nhân vật', 'Bình chọn mẫu hình nhân vật bạn thích nhất trong chương (vd: Ma vương, Trượng nghĩa, Lạnh lùng).', NULL, 'lore_hunt', NULL, 1, 10, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- service_tag_options: từ scripts/seed_service_tag_options.sql (bỏ
+-- "delete from public.service_tag_options" ở đầu script đó — chỉ để dọn
+-- seed cũ trên DB đã có dữ liệu, không cần cho project trống).
+insert into public.service_tag_options
+  (service_type, group_key, group_label, label, sort_order, tier, rule, multi, optional, warn_text)
+values
+  -- illustration: Tầng 1 — Loại sản phẩm (chọn nhiều)
+  ('illustration', 'g1', 'Loại sản phẩm', 'Bìa truyện/sách', 1, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Nhân vật đơn (character art)', 2, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Nhân vật nhóm/cảnh nhiều người', 3, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Vũ khí/trang bị', 4, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Bối cảnh/phong cảnh', 5, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Linh vật/thú cưng giả tưởng', 6, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Trang phục/thiết kế thời trang', 7, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Chibi/deform', 8, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Biểu tượng cảm xúc (emote pack)', 9, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Logo/huy hiệu/icon', 10, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Fanart', 11, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  ('illustration', 'g1', 'Loại sản phẩm', 'Tranh đôi/couple art', 12, 'Tầng 1', 'Chọn nhiều — quyết định gói của bạn xuất hiện ở nhóm tìm kiếm nào.', true, false, null),
+  -- illustration: Tầng 2 — Phong cách nghệ thuật (chọn nhiều)
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Anime/manga', 1, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Bán tả thực', 2, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Tả thực', 3, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Chibi', 4, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Phẳng/vector (flat design)', 5, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Cổ trang/historical', 6, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Dark fantasy/gothic', 7, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Pixel art', 8, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', 'Tranh vẽ tay (painterly/màu nước)', 9, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  ('illustration', 'g2', 'Phong cách nghệ thuật', '3D/render', 10, 'Tầng 2', 'Chọn nhiều — chỉ khai đúng năng lực thật, khách đối chiếu với mẫu ở mục 11.', true, false, null),
+  -- illustration: Tầng 3 — Mức độ hoàn thiện (chọn ĐÚNG 1 — mỗi mức là 1 gói giá riêng)
+  ('illustration', 'g3', 'Mức độ hoàn thiện', 'Line art (chỉ nét)', 1, 'Tầng 3', 'Chọn 1 — mỗi mức giá là một gói riêng, không phải thẻ tự do.', false, false, null),
+  ('illustration', 'g3', 'Mức độ hoàn thiện', 'Flat color (tô màu phẳng)', 2, 'Tầng 3', 'Chọn 1 — mỗi mức giá là một gói riêng, không phải thẻ tự do.', false, false, null),
+  ('illustration', 'g3', 'Mức độ hoàn thiện', 'Full color + đổ bóng', 3, 'Tầng 3', 'Chọn 1 — mỗi mức giá là một gói riêng, không phải thẻ tự do.', false, false, null),
+  ('illustration', 'g3', 'Mức độ hoàn thiện', 'Rendered chi tiết (painterly hoàn thiện cao)', 4, 'Tầng 3', 'Chọn 1 — mỗi mức giá là một gói riêng, không phải thẻ tự do.', false, false, null),
+  -- illustration: Tầng 4 — Nội dung nhận (chọn nhiều, BẮT BUỘC, có cảnh báo)
+  ('illustration', 'g4', 'Nội dung nhận', 'SFW (an toàn)', 1, 'Tầng 4', 'Bắt buộc khai báo — đây là căn cứ kiểm duyệt, không phải thẻ trang trí.', true, false, null),
+  ('illustration', 'g4', 'Nội dung nhận', 'NSFW nhẹ (gợi cảm, không khỏa thân)', 2, 'Tầng 4', 'Bắt buộc khai báo — đây là căn cứ kiểm duyệt, không phải thẻ trang trí.', true, false, null),
+  ('illustration', 'g4', 'Nội dung nhận', 'NSFW 18+ (cần xác thực tuổi cả hai bên)', 3, 'Tầng 4', 'Bắt buộc khai báo — đây là căn cứ kiểm duyệt, không phải thẻ trang trí.', true, false, 'Gói 18+ chỉ hiện với tài khoản đã xác thực tuổi. Cả bạn và khách đều phải xác thực trước khi mở đơn.'),
+  ('illustration', 'g4', 'Nội dung nhận', 'Gore/máu me', 4, 'Tầng 4', 'Bắt buộc khai báo — đây là căn cứ kiểm duyệt, không phải thẻ trang trí.', true, false, 'Bản giao sẽ bị làm mờ mặc định trong hội thoại và không xuất hiện ở trang chủ.'),
+  ('illustration', 'g4', 'Nội dung nhận', 'Fanart có bản quyền bên thứ ba', 5, 'Tầng 4', 'Bắt buộc khai báo — đây là căn cứ kiểm duyệt, không phải thẻ trang trí.', true, false, 'Rủi ro pháp lý về sở hữu trí tuệ thuộc về bạn. Vịnh gắn cảnh báo IP lên gói và không hỗ trợ khi chủ sở hữu khiếu nại.'),
+  -- voice: Tầng 1 — Lồng tiếng (chọn nhiều, KHÔNG bắt buộc riêng — xem ANY_OF ở service-listing-service.ts)
+  ('voice', 'v1', 'Lồng tiếng', 'Người kể chuyện', 1, 'Tầng 1', 'Chọn nhiều — bỏ trống nếu bạn chỉ nhận nhạc cụ.', true, true, null),
+  ('voice', 'v1', 'Lồng tiếng', 'Thoại nhân vật một giọng', 2, 'Tầng 1', 'Chọn nhiều — bỏ trống nếu bạn chỉ nhận nhạc cụ.', true, true, null),
+  ('voice', 'v1', 'Lồng tiếng', 'Thoại nhân vật nhiều giọng', 3, 'Tầng 1', 'Chọn nhiều — bỏ trống nếu bạn chỉ nhận nhạc cụ.', true, true, null),
+  -- voice: Tầng 2 — Nhạc cụ (chọn nhiều, KHÔNG bắt buộc riêng)
+  ('voice', 'v2', 'Nhạc cụ', 'Sáo', 1, 'Tầng 2', 'Chọn nhiều — bỏ trống nếu bạn chỉ nhận lồng tiếng. Cần ít nhất một thẻ ở một trong hai tầng.', true, true, null),
+  ('voice', 'v2', 'Nhạc cụ', 'Piano', 2, 'Tầng 2', 'Chọn nhiều — bỏ trống nếu bạn chỉ nhận lồng tiếng. Cần ít nhất một thẻ ở một trong hai tầng.', true, true, null),
+  ('voice', 'v2', 'Nhạc cụ', 'Trống', 3, 'Tầng 2', 'Chọn nhiều — bỏ trống nếu bạn chỉ nhận lồng tiếng. Cần ít nhất một thẻ ở một trong hai tầng.', true, true, null)
+on conflict (service_type, group_key, label) do update
+  set sort_order = excluded.sort_order, tier = excluded.tier, rule = excluded.rule,
+      multi = excluded.multi, optional = excluded.optional, warn_text = excluded.warn_text;

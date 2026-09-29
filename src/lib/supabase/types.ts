@@ -14,15 +14,15 @@ export type CreatorTag =
   | "author"
   | "illustrator"
   | "narrator"
-  // Added by migrations/20260901_add_blogger_creator_tag.sql — chỉ là nhãn
+  // Added by migrations/archive/20260901_add_blogger_creator_tag.sql — chỉ là nhãn
   // lọc ở Kết nối, KHÔNG kéo theo mục "Blog" trong danh sách tác phẩm (repo
   // chưa có bảng blog_posts thật, xem ghi chú đầu docs/supabase/schema.sql).
   | "blogger";
 
 export type ContentSource = "independent" | "story_upload";
 
-// Xem migrations/20260901_add_design_item_gallery_metadata.sql +
-// migrations/20260919_add_design_albums_and_multi_upload.sql (mở rộng 4 →
+// Xem migrations/archive/20260901_add_design_item_gallery_metadata.sql +
+// migrations/archive/20260919_add_design_albums_and_multi_upload.sql (mở rộng 4 →
 // 14, additive — không remap giá trị cũ). 10 giá trị mới khớp cột "Loại
 // sản phẩm" của mega-menu (nav-strip-links.tsx) — xem
 // src/lib/design/get-design-gallery.ts (DESIGN_CATEGORIES).
@@ -42,7 +42,7 @@ export type DesignItemCategory =
   | "minh_hoa"
   | "poster_audio";
 
-// Xem migrations/20260919_add_design_albums_and_multi_upload.sql +
+// Xem migrations/archive/20260919_add_design_albums_and_multi_upload.sql +
 // src/lib/design/art-styles.ts. Dùng cho design_albums.art_style — khớp
 // cột "Phong cách nghệ thuật" của mega-menu.
 export type ArtStyle =
@@ -59,8 +59,8 @@ export type ArtStyle =
 
 // Dùng bởi hệ thống sinh bìa tự động (src/lib/covers/genre-styles.ts) khi
 // books.cover_design_item_id còn null. 10 giá trị = taxonomy CHÍNH THỨC
-// của nền tảng (migrations/20260825_update_book_genres.sql, thay cho 8
-// giá trị tạm ban đầu ở migrations/20260819_add_book_genre.sql). Cột
+// của nền tảng (migrations/archive/20260825_update_book_genres.sql, thay cho 8
+// giá trị tạm ban đầu ở migrations/archive/20260819_add_book_genre.sql). Cột
 // thật là `text` + CHECK, không phải Postgres enum, nên type ở đây là
 // union thường, không map từ 1 Postgres enum type.
 export type BookGenre =
@@ -77,10 +77,10 @@ export type BookGenre =
 
 // achievement_templates.metric — NULL = không tự tính (thành tựu
 // streak-linked qua streak_milestones.badge_id). 6 giá trị đầu từ
-// migrations/20260908_add_achievements.sql (3 role) +
-// migrations/20260917_add_reading_event_log.sql (3 giá trị dựa
+// migrations/archive/20260908_add_achievements.sql (3 role) +
+// migrations/archive/20260917_add_reading_event_log.sql (3 giá trị dựa
 // reading_history). 9 giá trị sau từ
-// migrations/20260919_add_reading_behavior_achievements.sql — mỗi giá trị
+// migrations/archive/20260919_add_reading_behavior_achievements.sql — mỗi giá trị
 // 1 công thức riêng, tính song song ở sync_user_achievements() (SQL,
 // nguồn sự thật cho unlock) và getMetricCounts() (TS,
 // src/lib/quests/achievement-service.ts, chỉ để vẽ progress bar) — PHẢI
@@ -111,7 +111,7 @@ export type AchievementMetric =
   | "character_guardian_achieved";
 
 // characters.role — phân loại rộng, KHÁC characters.trope (free-text, tác
-// giả tự gõ). Xem migrations/20260919_add_characters.sql.
+// giả tự gõ). Xem migrations/archive/20260919_add_characters.sql.
 export type CharacterRole = "hero" | "villain" | "neutral";
 
 export type TransactionType =
@@ -122,27 +122,27 @@ export type TransactionType =
   | "refund"
   | "admin_adjustment"
   | "screenshot_penalty"
-  // Added by migrations/20260807_wallet_ledger_extension.sql.
+  // Added by migrations/archive/20260807_wallet_ledger_extension.sql.
   | "purchase_credit" // author's revenue-share leg of a purchase_chapter debit — starts 'pending'
   | "withdrawal"
   | "platform_bonus"
-  // Added by migrations/20260827_add_quest_reward_transaction_type.sql —
+  // Added by migrations/archive/20260827_add_quest_reward_transaction_type.sql —
   // reference_type = 'quest', reference_id = task_templates.id or
   // hidden_quests.id. No separate quest ledger; reuses apply_transaction().
   | "quest_reward"
-  // Added by migrations/20260827_add_streak_bonus_transaction_type.sql —
+  // Added by migrations/archive/20260827_add_streak_bonus_transaction_type.sql —
   // reference_type = 'streak_milestone', reference_id = streak_milestones.id.
   // Deliberately separate from 'quest_reward' — not tied to any quest,
   // never a multiplier on task_templates/hidden_quests rewards.
   | "streak_bonus"
-  // Added by migrations/20260827_add_streak_rescue_transaction_type.sql —
+  // Added by migrations/archive/20260827_add_streak_rescue_transaction_type.sql —
   // a DEBIT (negative amount), reference_type = 'streak_rescue'. Paid by
   // the user to save a streak after missing exactly 1 day with an empty
   // rest-day bank. Separate from 'streak_bonus' (a credit) for the same
   // reason purchase_chapter/purchase_credit are separate.
   | "streak_rescue"
   // Hệ thống giao dịch commission (schema.sql phần 12) — xem
-  // migrations/20260901_add_order_payment_transaction_type.sql,
+  // migrations/archive/20260901_add_order_payment_transaction_type.sql,
   // 20260901_add_order_earning_transaction_type.sql. 'order_payment' = vế
   // trừ ngay-lập-tức của buyer (status luôn 'completed', KHÔNG 'pending').
   // 'order_earning' = vế cộng (pending, hold period) của seller, ghi tại
@@ -150,17 +150,17 @@ export type TransactionType =
   | "order_payment"
   | "order_earning"
   // Hoàn tiền khi hủy Order (Mục 5.1) — cộng ngay, không hold period. Thêm
-  // bởi migrations/20260901_add_order_refund_transaction_type.sql.
+  // bởi migrations/archive/20260901_add_order_refund_transaction_type.sql.
   | "order_refund"
   // Thưởng thành tựu (author/narrator/designer) — reference_type =
   // 'achievement', reference_id = achievement_templates.id. Only written
   // when achievement_templates.reward_tokens > 0. Added by
-  // migrations/20260908_add_achievement_bonus_transaction_type.sql.
+  // migrations/archive/20260908_add_achievement_bonus_transaction_type.sql.
   | "achievement_bonus";
 
 // schema.sql phần 12. Giữ đủ 8 giá trị đúng sơ đồ đặc tả dù
 // 'brief_confirmed'/'deposit_paid' chỉ dừng lại rất ngắn trong thực tế —
-// xem record_order_payment() trong migrations/20260901_add_order_system_core.sql.
+// xem record_order_payment() trong migrations/archive/20260901_add_order_system_core.sql.
 export type OrderStatus =
   | "draft"
   | "brief_confirmed"
@@ -173,7 +173,7 @@ export type OrderStatus =
 
 export type ServiceType = "illustration" | "voice" | "ghostwriting";
 
-// Quest System taxonomy — see migrations/20260827_extend_task_templates_for_quests.sql.
+// Quest System taxonomy — see migrations/archive/20260827_extend_task_templates_for_quests.sql.
 // Same 6 values used by task_templates.quest_type and quest_examples_pool.quest_type.
 export type QuestType = "discovery" | "engagement" | "lore_hunt" | "cross_compare" | "prediction" | "topup";
 
@@ -181,7 +181,7 @@ export type QuestType = "discovery" | "engagement" | "lore_hunt" | "cross_compar
 // audio_narrations/design_items), tính bằng EXISTS (src/lib/quests/
 // creator-roles.ts), KHÔNG phải profiles.creator_tags. Không có "reader" —
 // đó là mặc định khi for_role NULL. See
-// migrations/20260908_add_task_template_role_gating.sql.
+// migrations/archive/20260908_add_task_template_role_gating.sql.
 export type CreatorRole = "author" | "narrator" | "designer";
 
 // Polymorphic discriminator for quest_id columns (quest_reset_events,
@@ -189,18 +189,18 @@ export type CreatorRole = "author" | "narrator" | "designer";
 // No FK, same pattern as purchase_transactions.chapter_id.
 export type QuestSource = "task_template" | "hidden_quest";
 
-// See migrations/20260807_wallet_ledger_extension.sql part 2. Every row
+// See migrations/archive/20260807_wallet_ledger_extension.sql part 2. Every row
 // created before that migration is 'completed' by default (backfilled).
 export type TransactionStatus = "pending" | "processing" | "available" | "completed" | "failed" | "reversed";
 
 // Nguồn truy cập của phiên đọc — chỉ cho analytics, không vào điểm cuộc thi
-// (client tự khai được). Xem migrations/20260926_add_reading_session_tracking.sql.
+// (client tự khai được). Xem migrations/archive/20260926_add_reading_session_tracking.sql.
 export type ReadingSource = "contest" | "trending" | "search" | "profile" | "recommendation" | "other";
 
 export type DepositStatus = "pending" | "success" | "failed";
 export type WithdrawalStatus = "pending" | "processing" | "success" | "failed";
 
-// Contest Engine — xem migrations/20260926_add_contest_engine_core.sql và
+// Contest Engine — xem migrations/archive/20260926_add_contest_engine_core.sql và
 // docs/CONTEST_ENGINE_AUDIT_AND_PLAN.md (ma trận trạng thái ở mục IV.4, VI.1).
 export type ContestStatus =
   | "draft"
@@ -257,7 +257,7 @@ export type Database = {
           nickname: string;
           avatar_url: string | null;
           // Ảnh bìa trang cá nhân/tác giả — xem
-          // migrations/20260828_add_profile_cover_image.sql.
+          // migrations/archive/20260828_add_profile_cover_image.sql.
           cover_image_url: string | null;
           role: Role;
           // Nhãn mô tả, không phải quyền hạn — ai cũng tự gắn được, xem
@@ -265,30 +265,30 @@ export type Database = {
           creator_tags: CreatorTag[];
           real_name: string | null;
           phone: string | null;
-          // migrations/20260829_add_author_contract_fields.sql — điền
+          // migrations/archive/20260829_add_author_contract_fields.sql — điền
           // "BÊN A" trong Hợp đồng khai thác tác phẩm độc quyền.
           date_of_birth: string | null;
           address: string | null;
           cccd_last4: string | null; // last 4 digits only — see schema.sql note
           cccd_verified: boolean;
           // Ngân hàng thụ hưởng để rút token — xem
-          // migrations/20260826_add_profile_bank_info.sql. Rút token chỉ
+          // migrations/archive/20260826_add_profile_bank_info.sql. Rút token chỉ
           // dùng được khi cccd_verified = true và cả 3 cột này khác null
           // (WithdrawalService.requestWithdrawal).
           bank_code: string | null;
           bank_name: string | null;
           bank_account_number: string | null;
           // Người dùng tự nhập — KHÔNG ép = real_name (xem
-          // migrations/20260827_add_bank_account_name.sql).
+          // migrations/archive/20260827_add_bank_account_name.sql).
           bank_account_name: string | null;
-          // Xem migrations/20260827_add_profile_bio.sql. nickname_updated_at
+          // Xem migrations/archive/20260827_add_profile_bio.sql. nickname_updated_at
           // chỉ dùng để enforce cooldown 30 ngày ở api/profile/me/route.ts —
           // không hiển thị trực tiếp.
           bio: string | null;
           nickname_updated_at: string | null;
           token_balance: number;
           // Author revenue-share still inside its hold period — see
-          // migrations/20260807_wallet_ledger_extension.sql part 1.
+          // migrations/archive/20260807_wallet_ledger_extension.sql part 1.
           // Visible to the user, not spendable/withdrawable yet.
           token_balance_pending: number;
           screenshot_penalty_count: number;
@@ -298,7 +298,7 @@ export type Database = {
           // Độ uy tín (Module 7 đặc tả) — CHỈ đổi qua recalculate_trust_score()
           // (security definer, tính lại từ nguồn dữ liệu gốc mỗi lần gọi,
           // không phải increment rải rác) — xem
-          // migrations/20260901_add_trust_and_disputes.sql. Không có trong
+          // migrations/archive/20260901_add_trust_and_disputes.sql. Không có trong
           // Insert/Update, client không tự set được.
           trust_orders_completed: number;
           trust_orders_cancelled_at_fault: number;
@@ -307,10 +307,10 @@ export type Database = {
           // Quest System — lưu sẵn, không tính lại mỗi lần đọc. Chặn write
           // trực tiếp bởi trigger enforce_quest_streak_authority (giống
           // role/cccd_verified) — xem
-          // migrations/20260827_add_quest_streak_to_profiles.sql. KHÔNG có
+          // migrations/archive/20260827_add_quest_streak_to_profiles.sql. KHÔNG có
           // trong Insert/Update, client không tự set được. Cả 4 cột chỉ
           // đổi qua sync_reading_streak()/rescue_streak_with_tokens() —
-          // xem migrations/20260827_add_streak_sync_functions.sql.
+          // xem migrations/archive/20260827_add_streak_sync_functions.sql.
           current_quest_streak: number;
           streak_updated_at: string | null;
           // Kho "thẻ nghỉ" tích lũy (+1/7 ngày streak liên tục, trần tăng
@@ -357,7 +357,7 @@ export type Database = {
           id: string;
           user_id: string;
           cccd_number: string;
-          // migrations/20260829_add_author_contract_fields.sql — "cấp
+          // migrations/archive/20260829_add_author_contract_fields.sql — "cấp
           // ngày" trong Hợp đồng khai thác tác phẩm độc quyền.
           cccd_issued_at: string | null;
           cccd_front_path: string;
@@ -415,7 +415,7 @@ export type Database = {
           // riêng cho trường hợp này, không coi null là lỗi.
           genre: BookGenre | null;
           // Free text, tác giả tự định nghĩa — KHÁC genre (1 giá trị, danh
-          // sách cố định). Xem migrations/20260824_add_book_tags_and_view_count.sql.
+          // sách cố định). Xem migrations/archive/20260824_add_book_tags_and_view_count.sql.
           tags: string[];
           // Tăng mỗi lần tải trang chương, không khử trùng lặp. Chỉ đổi
           // được qua RPC increment_book_view_count() — không có trong
@@ -424,7 +424,7 @@ export type Database = {
           published: boolean;
           // true = chỉ phân phối trên Vịnh (mặc định) — độc quyền giờ ở
           // cấp TRUYỆN (chapters.is_exclusive vẫn còn cột nhưng app không
-          // đọc/viết nữa). Xem migrations/20260826_add_book_exclusivity.sql.
+          // đọc/viết nữa). Xem migrations/archive/20260826_add_book_exclusivity.sql.
           is_exclusive: boolean;
           // Mốc lúc published chuyển false -> true, set 1 lần bởi trigger
           // set_book_published_at — KHÔNG có trong Insert/Update, client
@@ -433,18 +433,18 @@ export type Database = {
           // migration này (không backfill).
           published_at: string | null;
           // null = còn sống. Soft-delete — không có DELETE thật. Xem
-          // migrations/20260826_add_book_soft_delete.sql.
+          // migrations/archive/20260826_add_book_soft_delete.sql.
           deleted_at: string | null;
           // Ai/vì sao — chỉ có giá trị khi admin gỡ (deleted_at do admin,
           // không phải tác giả tự xoá bản thảo). Song song
           // chapters.removed_by/removed_reason_*. Xem
-          // migrations/20260908_add_book_moderation.sql.
+          // migrations/archive/20260908_add_book_moderation.sql.
           removed_by: string | null;
           removed_reason_group: string | null;
           removed_reason_detail: string | null;
           // not null = đã dọn nội dung nặng (cover/synopsis + content mọi
           // chương) do đã xoá quá 30 ngày — xem
-          // migrations/20260908_add_content_purge_retention.sql. Hàng vẫn
+          // migrations/archive/20260908_add_content_purge_retention.sql. Hàng vẫn
           // giữ nguyên (audit trail), chỉ rỗng nội dung.
           content_purged_at: string | null;
           // "Hoàn thiện" — Share bản thảo kiểu Drive (một chiều, trigger DB
@@ -452,11 +452,11 @@ export type Database = {
           // null -> not null, TỰ ĐỘNG khóa mọi manuscript_access_grants
           // đang hoạt động của book này (trigger
           // lock_manuscript_grants_on_finalize). Xem
-          // migrations/20260901_add_manuscript_share.sql.
+          // migrations/archive/20260901_add_manuscript_share.sql.
           finalized_at: string | null;
           // Module 5+6 đặc tả — luôn true nếu sách sinh ra từ 1 Order
           // ghostwriting (set bởi attach_order_book(), KHÔNG phụ thuộc
-          // author_display). Xem migrations/20260901_add_ghostwriting_authorship.sql.
+          // author_display). Xem migrations/archive/20260901_add_ghostwriting_authorship.sql.
           is_ghostwritten: boolean;
           // 'pen_name' (mặc định) | 'anonymous' | 'customer_name' |
           // 'co_authorship' — 2 giá trị sau CHỈ được set qua
@@ -504,29 +504,29 @@ export type Database = {
           // audio_narrations — cơ chế "Tự thu & gắn"/"Dán link chia sẻ" ở
           // ChapterAudioPanel) + giá niêm yết riêng cho bản audio đó, 0 =
           // miễn phí. CHƯA enforce chặn nghe theo giá này — chỉ lưu. Xem
-          // migrations/20260909_add_chapter_audio_url_and_price.sql.
+          // migrations/archive/20260909_add_chapter_audio_url_and_price.sql.
           audio_url: string | null;
           audio_price: number;
           // DEPRECATED — độc quyền giờ đọc/viết ở books.is_exclusive (cấp
           // truyện, không phải từng chương). Cột này vẫn còn trong DB
           // (không drop) nhưng app không đọc/viết nữa. Xem
-          // migrations/20260826_add_book_exclusivity.sql.
+          // migrations/archive/20260826_add_book_exclusivity.sql.
           is_exclusive: boolean;
           // Checkbox 1 chiều — tối đa 1 chương/sách, không đổi lại được
           // false sau khi lưu true (trigger DB chặn). Dùng để tính trạng
           // thái "Đã hoàn thành" ở trang giới thiệu truyện. Xem
-          // migrations/20260824_add_chapter_is_last.sql.
+          // migrations/archive/20260824_add_chapter_is_last.sql.
           is_last_chapter: boolean;
           // Trạng thái gỡ/khôi phục của ADMIN — tách biệt với `published`
           // (published=false do admin gỡ phải phân biệt được với tác giả tự
-          // để nháp). Xem migrations/20260908_add_chapter_moderation_and_notifications.sql
+          // để nháp). Xem migrations/archive/20260908_add_chapter_moderation_and_notifications.sql
           // + api/admin/chapters/[chapterId]/route.ts.
           removed_at: string | null;
           removed_by: string | null;
           removed_reason_group: string | null;
           removed_reason_detail: string | null;
           // not null = content đã bị rỗng hoá do gỡ/xoá quá 30 ngày — xem
-          // migrations/20260908_add_content_purge_retention.sql.
+          // migrations/archive/20260908_add_content_purge_retention.sql.
           content_purged_at: string | null;
           created_at: string;
         };
@@ -551,7 +551,7 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["chapters"]["Insert"]>;
         Relationships: [];
       };
-      // Xem migrations/20260919_add_characters.sql.
+      // Xem migrations/archive/20260919_add_characters.sql.
       characters: {
         Row: {
           id: string;
@@ -627,7 +627,7 @@ export type Database = {
           chapter_id: string;
           // null = chưa có/chưa cuộn qua đoạn nào — chỉ có ý nghĩa khi
           // khớp ĐÚNG chapter_id ở trên. Xem
-          // migrations/20260910_add_book_progress_paragraph.sql.
+          // migrations/archive/20260910_add_book_progress_paragraph.sql.
           last_paragraph_index: number | null;
           updated_at: string;
         };
@@ -662,16 +662,16 @@ export type Database = {
           recipient_id: string;
           body: string;
           // null = người nhận chưa đọc. Xem
-          // migrations/20260828_add_direct_messages.sql.
+          // migrations/archive/20260828_add_direct_messages.sql.
           read_at: string | null;
           // Mục 8 đặc tả — nghi ngờ trao đổi giao dịch ngoài nền tảng (regex
-          // ở route, xem migrations/20260901_add_trust_and_disputes.sql).
+          // ở route, xem migrations/archive/20260901_add_trust_and_disputes.sql).
           // KHÔNG chặn gửi, chỉ gắn nhãn cho chính người gửi thấy.
           flagged_off_platform: boolean;
           // "personal" | "moderation" — hòm thư riêng cho tin gỡ chương,
           // tách khỏi chat cá nhân dù cùng 1 admin gửi cả 2. Danh tính
           // người gửi vẫn hiển thị thật ở cả 2 context. Xem
-          // migrations/20260908_add_direct_message_context.sql.
+          // migrations/archive/20260908_add_direct_message_context.sql.
           context: "personal" | "moderation";
           created_at: string;
         };
@@ -718,7 +718,7 @@ export type Database = {
         Relationships: [];
       };
       // Hệ thống giao dịch commission (schema.sql phần 12) — xem
-      // migrations/20260901_add_order_system_core.sql. service_listings/
+      // migrations/archive/20260901_add_order_system_core.sql. service_listings/
       // service_samples viết trực tiếp qua .insert()/.update() (không RPC,
       // giống direct_messages — không phải ledger, không cần atomic đa
       // bảng); orders/order_events CHỈ ghi qua các RPC ở Functions bên
@@ -736,7 +736,7 @@ export type Database = {
           revisions_max: number | null;
           tags: Record<string, unknown>;
           default_usage_scope: string | null;
-          // null = seller chưa tự khai. Từ migrations/20260901_add_order_cancel_system.sql
+          // null = seller chưa tự khai. Từ migrations/archive/20260901_add_order_cancel_system.sql
           // PHẢI là object 4 key cố định: { before_draft, draft_pending,
           // draft_approved, delivered } (mỗi giá trị 0-100) — calculate_refund()
           // tra thẳng key này, không so khớp text tự do nữa (xem ghi chú
@@ -751,7 +751,7 @@ export type Database = {
           is_accepting_orders: boolean;
           // Mục 12, ĐỘC LẬP với is_accepting_orders/11 trường trên — null =
           // seller chưa đặt hạn mức nhận comm/tháng. Xem
-          // migrations/20260910_add_service_commission_status.sql.
+          // migrations/archive/20260910_add_service_commission_status.sql.
           monthly_commission_limit: number | null;
           // Chỉ được set true bởi route PATCH sau khi xác nhận
           // monthly_commission_limit khác null — không phải validate ở đây.
@@ -829,7 +829,7 @@ export type Database = {
           completed_at: string | null;
           cancelled_at: string | null;
           tos_snapshot: Record<string, unknown>;
-          // migrations/20260901_add_service_tag_catalog.sql — 1 đơn
+          // migrations/archive/20260901_add_service_tag_catalog.sql — 1 đơn
           // completed có được dùng làm sample tự động (Mục 2.2) hay đưa
           // vào bảng xếp hạng/gợi ý hay không. Toggle route chưa làm ở
           // Phase 2 (thuộc Module 4/6) — cột có sẵn để truy vấn "auto"
@@ -837,7 +837,7 @@ export type Database = {
           is_private: boolean;
           // Chỉ đơn ghostwriting mới gắn — biết đang viết cho đúng truyện
           // nào (route attach-book). Xem
-          // migrations/20260901_add_manuscript_share.sql.
+          // migrations/archive/20260901_add_manuscript_share.sql.
           book_id: string | null;
           created_at: string;
         };
@@ -865,7 +865,7 @@ export type Database = {
         Relationships: [];
       };
       // Danh mục tag cố định cho service_listings (Mục 2.2 đặc tả) — xem
-      // migrations/20260901_add_service_tag_catalog.sql.
+      // migrations/archive/20260901_add_service_tag_catalog.sql.
       service_tag_options: {
         Row: {
           id: string;
@@ -876,7 +876,7 @@ export type Database = {
           sort_order: number;
           created_at: string;
           // Đối chiếu TAG_GROUPS/VOICE_GROUPS trong Vịnh Cá nhân.dc.html —
-          // xem migrations/20260901_add_service_tag_option_metadata.sql.
+          // xem migrations/archive/20260901_add_service_tag_option_metadata.sql.
           tier: string | null;
           rule: string | null;
           multi: boolean;
@@ -913,7 +913,7 @@ export type Database = {
         Relationships: [];
       };
       // Share bản thảo kiểu Drive (yêu cầu bổ sung #1) — xem
-      // migrations/20260901_add_manuscript_share.sql. Tối đa 1 dòng ĐANG
+      // migrations/archive/20260901_add_manuscript_share.sql. Tối đa 1 dòng ĐANG
       // HOẠT ĐỘNG (revoked_at is null and locked_at is null) mỗi book_id,
       // ép bằng partial unique index — không phải check ở app.
       manuscript_access_grants: {
@@ -943,7 +943,7 @@ export type Database = {
         Relationships: [];
       };
       // Bàn giao illustration/voice (Mục 4.1-4.2) — xem
-      // migrations/20260901_add_order_delivery_assets.sql. ghostwriting
+      // migrations/archive/20260901_add_order_delivery_assets.sql. ghostwriting
       // dùng manuscript_access_grants (không cần asset ở đây).
       order_delivered_assets: {
         Row: {
@@ -974,7 +974,7 @@ export type Database = {
         Relationships: [];
       };
       // Tính hoàn tiền + hủy đơn (Mục 5.1) — xem
-      // migrations/20260901_add_order_cancel_system.sql.
+      // migrations/archive/20260901_add_order_cancel_system.sql.
       order_cancel_requests: {
         Row: {
           id: string;
@@ -991,7 +991,7 @@ export type Database = {
         Relationships: [];
       };
       // Đứng tên tác giả thay (Module 5 đặc tả) — xem
-      // migrations/20260901_add_ghostwriting_authorship.sql.
+      // migrations/archive/20260901_add_ghostwriting_authorship.sql.
       author_name_agreements: {
         Row: {
           id: string;
@@ -1016,7 +1016,7 @@ export type Database = {
         Relationships: [];
       };
       // Báo cáo vi phạm/Tranh chấp (Module 9 đặc tả) — xem
-      // migrations/20260901_add_trust_and_disputes.sql.
+      // migrations/archive/20260901_add_trust_and_disputes.sql.
       disputes: {
         Row: {
           id: string;
@@ -1037,7 +1037,7 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
-      // Xem migrations/20260907_add_content_protection_status.sql — chỉ
+      // Xem migrations/archive/20260907_add_content_protection_status.sql — chỉ
       // admin đọc được (RLS), ghi bằng service-role từ route upload
       // design/audio, không qua RPC.
       content_protection_status: {
@@ -1060,7 +1060,7 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["content_protection_status"]["Insert"]>;
         Relationships: [];
       };
-      // Xem migrations/20260908_add_chapter_moderation_and_notifications.sql —
+      // Xem migrations/archive/20260908_add_chapter_moderation_and_notifications.sql —
       // chỉ admin đọc được (RLS), ghi bằng service-role từ
       // api/admin/chapters/[chapterId]/route.ts.
       chapter_moderation_actions: {
@@ -1091,7 +1091,7 @@ export type Database = {
         Relationships: [];
       };
       // Song song chapter_moderation_actions ở trên, nhưng cấp TRUYỆN —
-      // xem migrations/20260908_add_book_moderation.sql, ghi bằng
+      // xem migrations/archive/20260908_add_book_moderation.sql, ghi bằng
       // service-role từ api/admin/books/[bookId]/route.ts.
       book_moderation_actions: {
         Row: {
@@ -1283,7 +1283,7 @@ export type Database = {
           active: boolean;
           // Quest System columns — NULL/'manual' for pre-existing daily
           // task rows, which are not part of the quest taxonomy. See
-          // migrations/20260827_extend_task_templates_for_quests.sql.
+          // migrations/archive/20260827_extend_task_templates_for_quests.sql.
           quest_type: QuestType | null;
           // {chapter_id, paragraph_index, char_start, char_end} — no FK,
           // paragraph_index is a client-computed split index, not a
@@ -1297,7 +1297,7 @@ export type Database = {
           auto_flag_reason: string | null;
           // Gate theo role sản phẩm THẬT đã đăng (không phải
           // profiles.creator_tags) — NULL = áp dụng chung/mặc định đọc
-          // giả. Xem migrations/20260908_add_task_template_role_gating.sql
+          // giả. Xem migrations/archive/20260908_add_task_template_role_gating.sql
           // và src/lib/quests/creator-roles.ts.
           for_role: CreatorRole | null;
           /** 'contest' = nhiệm vụ sự kiện cuộc thi (Slice 3.1) — chỉ vào ô sự kiện, quest_type NULL. */
@@ -1337,7 +1337,7 @@ export type Database = {
           created_at: string;
           // Fast counter for UI (disable reset button once exhausted) —
           // detailed history lives in quest_reset_events. See
-          // migrations/20260827_extend_task_templates_for_quests.sql.
+          // migrations/archive/20260827_extend_task_templates_for_quests.sql.
           reset_count: number;
         };
         // Rows are created/updated via increment_task_progress() and
@@ -1386,7 +1386,7 @@ export type Database = {
           unlock_condition: Record<string, unknown>;
           // Fixed amount the admin sets per campaign — not affected by
           // streak bonus, no shared rule table. See
-          // migrations/20260827_add_hidden_quests.sql.
+          // migrations/archive/20260827_add_hidden_quests.sql.
           reward_tokens: number;
           campaign_name: string;
           active_from: string;
@@ -1434,7 +1434,7 @@ export type Database = {
         };
         // Written only by reset_quest_pool_slot() (enforces the shared
         // 3/day budget + cooldown) — not a direct insert. See
-        // migrations/20260828_add_user_quest_pool.sql.
+        // migrations/archive/20260828_add_user_quest_pool.sql.
         Insert: never;
         Update: never;
         Relationships: [];
@@ -1454,7 +1454,7 @@ export type Database = {
         };
         // Rows are only created/updated via create_quest_pool_for_today()
         // and reset_quest_pool_slot() — not a direct insert/update. See
-        // migrations/20260828_add_user_quest_pool.sql.
+        // migrations/archive/20260828_add_user_quest_pool.sql.
         Insert: never;
         Update: never;
         Relationships: [];
@@ -1473,7 +1473,7 @@ export type Database = {
         // eventually, the chapter-publish route — not the TS wallet/quest
         // services. Kept typed here anyway so Next.js can read/debug via
         // the Supabase client if needed. See
-        // migrations/20260828_add_quest_generation_jobs.sql.
+        // migrations/archive/20260828_add_quest_generation_jobs.sql.
         Insert: never;
         Update: never;
         Relationships: [];
@@ -1500,7 +1500,7 @@ export type Database = {
         Relationships: [];
       };
       // Ghi DUY NHẤT qua record_reading_heartbeat() (service-role) — client chỉ
-      // SELECT phiên của mình. Xem migrations/20260926_add_reading_session_tracking.sql.
+      // SELECT phiên của mình. Xem migrations/archive/20260926_add_reading_session_tracking.sql.
       reading_sessions: {
         Row: {
           id: string;
@@ -1548,7 +1548,7 @@ export type Database = {
           quest_source: QuestSource | null;
           // not null = reply (1 cấp duy nhất — cha của 1 reply luôn có
           // parent_comment_id null, enforce ở route, không phải DB). Xem
-          // migrations/20260910_add_anchored_comment_replies.sql.
+          // migrations/archive/20260910_add_anchored_comment_replies.sql.
           parent_comment_id: string | null;
           created_at: string;
         };
@@ -1573,7 +1573,7 @@ export type Database = {
           streak_days: number;
           reward_token: number;
           // FK'd to achievement_templates.id since
-          // migrations/20260908_add_achievements.sql — the linked row (if
+          // migrations/archive/20260908_add_achievements.sql — the linked row (if
           // any) only supplies display metadata (title/icon/color_token),
           // it does NOT replace claim_streak_milestone()'s unlock logic.
           badge_id: string | null;
@@ -1605,7 +1605,7 @@ export type Database = {
       // Achievements (schema.sql section 10) — one framework for every
       // role, filtered/colored by for_role in the UI. NULL for_role =
       // shared/reader default, same convention as task_templates.for_role.
-      // See migrations/20260908_add_achievements.sql.
+      // See migrations/archive/20260908_add_achievements.sql.
       achievement_templates: {
         Row: {
           id: string;
@@ -1680,7 +1680,7 @@ export type Database = {
           illustrator_id: string;
           title: string;
           image_url: string;
-          // Xem migrations/20260901_add_design_item_gallery_metadata.sql.
+          // Xem migrations/archive/20260901_add_design_item_gallery_metadata.sql.
           category: DesignItemCategory | null;
           description: string | null;
           share_count: number;
@@ -1689,11 +1689,11 @@ export type Database = {
           // không bao giờ hiện ở view public_design_items.
           share_token: string;
           created_at: string;
-          // Xem migrations/20260919_add_design_albums_and_multi_upload.sql.
+          // Xem migrations/archive/20260919_add_design_albums_and_multi_upload.sql.
           album_id: string | null;
           alt_text: string | null;
           deleted_at: string | null;
-          // Xem migrations/20260921_add_design_item_publish_state.sql —
+          // Xem migrations/archive/20260921_add_design_item_publish_state.sql —
           // null = draft riêng của họa sĩ, có giá trị = đã công khai qua
           // public_design_items.
           published_at: string | null;
@@ -1715,7 +1715,7 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["design_items"]["Insert"]>;
         Relationships: [];
       };
-      // Xem migrations/20260919_add_design_albums_and_multi_upload.sql —
+      // Xem migrations/archive/20260919_add_design_albums_and_multi_upload.sql —
       // "board": name + art_style chia sẻ giữa mọi design_items cùng
       // album_id. Không có cột bí mật nào (khác design_items.share_token)
       // nên select công khai thẳng trên bảng gốc.
@@ -1746,7 +1746,7 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
-      // Xem migrations/20260917_add_design_audio_comments.sql.
+      // Xem migrations/archive/20260917_add_design_audio_comments.sql.
       design_comments: {
         Row: {
           id: string;
@@ -1780,7 +1780,7 @@ export type Database = {
           title: string;
           audio_url: string;
           duration_seconds: number | null;
-          // Xem migrations/20260901_add_audio_narration_hub_metadata.sql.
+          // Xem migrations/archive/20260901_add_audio_narration_hub_metadata.sql.
           genre: BookGenre | null;
           play_count: number;
           source: ContentSource;
@@ -1800,7 +1800,7 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["audio_narrations"]["Insert"]>;
         Relationships: [];
       };
-      // Xem migrations/20260917_add_design_audio_comments.sql.
+      // Xem migrations/archive/20260917_add_design_audio_comments.sql.
       audio_comments: {
         Row: {
           id: string;
@@ -1865,7 +1865,7 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
-      // --- Contest Engine (migrations/20260926_add_contest_engine_core.sql).
+      // --- Contest Engine (migrations/archive/20260926_add_contest_engine_core.sql).
       // Client KHÔNG ghi trực tiếp bảng nào dưới đây (quyền ghi bị REVOKE) —
       // mọi ghi qua route service-role + RPC. Insert/Update dưới đây dành cho
       // service-role.
@@ -2066,7 +2066,7 @@ export type Database = {
         };
         Relationships: [];
       };
-      // Bản chụp bài dự thi lúc đóng nhận bài (migrations/20260926_add_contest_snapshots.sql).
+      // Bản chụp bài dự thi lúc đóng nhận bài (migrations/archive/20260926_add_contest_snapshots.sql).
       // Chỉ service-role; ghi bởi trigger / snapshot_contest_submissions().
       contest_submission_snapshots: {
         Row: {
@@ -2120,7 +2120,7 @@ export type Database = {
         Relationships: [];
       };
       // Slice 2.5b — chỉ service-role; ghi phiếu chấm qua RPC. Xem
-      // migrations/20260926_add_contest_judging.sql.
+      // migrations/archive/20260926_add_contest_judging.sql.
       contest_scoring_configs: {
         Row: {
           contest_id: string;
@@ -2194,7 +2194,7 @@ export type Database = {
         Relationships: [];
       };
       // Slice 2.6a — chỉ service-role; ghi qua save_contest_score_run(). Xem
-      // migrations/20260926_add_final_scoring.sql.
+      // migrations/archive/20260926_add_final_scoring.sql.
       contest_score_runs: {
         Row: {
           id: string;
@@ -2253,7 +2253,7 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
-      // Slice 3.2 — chỉ service-role. Xem migrations/20260927_add_contest_passport.sql.
+      // Slice 3.2 — chỉ service-role. Xem migrations/archive/20260927_add_contest_passport.sql.
       contest_passport_reads: {
         Row: {
           user_id: string;
@@ -2282,7 +2282,7 @@ export type Database = {
         Relationships: [];
       };
       // Nhật ký đổi quyền — chỉ service-role, ghi qua admin_set_user_role().
-      // Xem migrations/20260928_add_role_change_logs.sql.
+      // Xem migrations/archive/20260928_add_role_change_logs.sql.
       role_change_logs: {
         Row: { id: string; target_id: string; actor_id: string | null; old_role: Role; new_role: Role; created_at: string };
         Insert: never;
@@ -2306,7 +2306,7 @@ export type Database = {
         Relationships: [];
       };
       // Contest Engine Phase 2 (Slice 2.2) — chỉ service-role. Xem
-      // migrations/20260926_add_contest_scores.sql.
+      // migrations/archive/20260926_add_contest_scores.sql.
       contest_fraud_signals: {
         Row: {
           id: string;
@@ -2391,7 +2391,7 @@ export type Database = {
           nickname: string;
           avatar_url: string | null;
           cover_image_url: string | null;
-          // Xem migrations/20260828_extend_author_public_profiles.sql.
+          // Xem migrations/archive/20260828_extend_author_public_profiles.sql.
           bio: string | null;
           created_at: string;
           creator_tags: CreatorTag[];
@@ -2415,12 +2415,12 @@ export type Database = {
         };
         Relationships: [];
       };
-      // Xem migrations/20260901_add_design_item_gallery_metadata.sql.
+      // Xem migrations/archive/20260901_add_design_item_gallery_metadata.sql.
       design_item_like_counts: {
         Row: { design_item_id: string; like_count: number };
         Relationships: [];
       };
-      // Xem migrations/20260917_add_design_audio_comments.sql.
+      // Xem migrations/archive/20260917_add_design_audio_comments.sql.
       design_comment_like_counts: {
         Row: { comment_id: string; like_count: number };
         Relationships: [];
@@ -2443,7 +2443,7 @@ export type Database = {
         };
         Relationships: [];
       };
-      // Xem migrations/20260831_add_book_read_counts_daily.sql. Ẩn danh
+      // Xem migrations/archive/20260831_add_book_read_counts_daily.sql. Ẩn danh
       // (không có user_id) — số lượt đọc mỗi sách theo từng ngày, dùng để
       // tính bảng xếp hạng tuần/tháng/quý thật ở /rankings
       // (src/lib/rankings/get-book-rankings.ts).
@@ -2462,15 +2462,26 @@ export type Database = {
         };
         Relationships: [];
       };
+      // migrations/20260929_add_ranking_aggregates.sql — chỉ chương đã
+      // publish của sách công khai (published, chưa xoá).
+      book_chapter_stats: {
+        Row: {
+          book_id: string;
+          published_chapter_count: number;
+          has_published_last_chapter: boolean;
+          latest_published_chapter_at: string;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
-      // migrations/20260926_fix_profiles_policy_recursion.sql — người gọi có
+      // migrations/archive/20260926_fix_profiles_policy_recursion.sql — người gọi có
       // phải admin/super_admin không (dùng trong policy của profiles).
       current_user_is_admin: {
         Args: Record<string, never>;
         Returns: boolean;
       };
-      // --- Contest Engine (migrations/20260926_add_contest_engine_core.sql).
+      // --- Contest Engine (migrations/archive/20260926_add_contest_engine_core.sql).
       // Lỗi nghiệp vụ trả qua `hint` của PostgrestError (vd 'already_submitted').
       contest_word_count: {
         Args: { p: string | null };
@@ -2738,12 +2749,12 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["contest_submissions"]["Row"];
       };
-      // migrations/20260916_add_realtime_signup_checks.sql
+      // migrations/archive/20260916_add_realtime_signup_checks.sql
       is_email_registered: {
         Args: { p_email: string };
         Returns: boolean;
       };
-      // migrations/20260916_add_unconfirmed_registration_purge.sql
+      // migrations/archive/20260916_add_unconfirmed_registration_purge.sql
       find_stale_unconfirmed_user_ids: {
         Args: { p_cutoff: string; p_limit?: number | null };
         Returns: string[];
@@ -2752,8 +2763,8 @@ export type Database = {
         Args: { p_book_id: string };
         Returns: void;
       };
-      // Xem migrations/20260901_add_design_item_gallery_metadata.sql /
-      // migrations/20260901_add_audio_narration_hub_metadata.sql.
+      // Xem migrations/archive/20260901_add_design_item_gallery_metadata.sql /
+      // migrations/archive/20260901_add_audio_narration_hub_metadata.sql.
       increment_design_item_share_count: {
         Args: { p_design_item_id: string };
         Returns: void;
@@ -2834,7 +2845,7 @@ export type Database = {
       };
       // Ghi đè progress (không cộng dồn) — dùng cho nhiệm vụ mà tiến trình
       // thật ra là 1 trạng thái ngoài (streak). Xem
-      // migrations/20260918_add_streak_quests_and_time_windows.sql.
+      // migrations/archive/20260918_add_streak_quests_and_time_windows.sql.
       set_task_progress: {
         Args: { p_user_id: string; p_task_code: string; p_progress: number };
         Returns: Database["public"]["Tables"]["user_daily_tasks"]["Row"];
@@ -2842,6 +2853,11 @@ export type Database = {
       claim_daily_task: {
         Args: { p_user_id: string; p_task_id: string };
         Returns: Database["public"]["Tables"]["transactions"]["Row"];
+      };
+      // migrations/20260929_add_ranking_aggregates.sql
+      book_read_counts_between: {
+        Args: { p_from: string; p_to: string };
+        Returns: { book_id: string; read_count: number }[];
       };
       recommend_books: {
         Args: { p_user_id: string; p_limit?: number };
@@ -2851,7 +2867,7 @@ export type Database = {
         Args: { p_chapter_id: string; p_audio_narration_id: string; p_share_token: string };
         Returns: Database["public"]["Tables"]["chapter_audio_links"]["Row"];
       };
-      // migrations/20260925_add_chapter_delete_and_reorder.sql
+      // migrations/archive/20260925_add_chapter_delete_and_reorder.sql
       reorder_book_chapters: {
         Args: { p_book_id: string; p_chapter_ids: string[] };
         Returns: void;
@@ -2881,7 +2897,7 @@ export type Database = {
         Returns: Database["public"]["Tables"]["profiles"]["Row"];
       };
       // Dedupe theo (user_id, chapter_id, ngày server) — trả null nếu đã
-      // ghi hôm nay. Xem migrations/20260917_add_reading_event_log.sql.
+      // ghi hôm nay. Xem migrations/archive/20260917_add_reading_event_log.sql.
       record_chapter_read: {
         Args: { p_user_id: string; p_book_id: string; p_chapter_id: string };
         Returns: Database["public"]["Tables"]["reading_history"]["Row"] | null;
@@ -2906,13 +2922,13 @@ export type Database = {
       };
       // Lazy-pull: cấp (+ thưởng nếu có) mọi achievement_templates
       // metric-based mà user vừa đủ điều kiện. Xem
-      // migrations/20260908_add_achievements.sql.
+      // migrations/archive/20260908_add_achievements.sql.
       sync_user_achievements: {
         Args: { p_user_id: string };
         Returns: Database["public"]["Tables"]["user_achievements"]["Row"][];
       };
       // Hệ thống giao dịch commission — xem
-      // migrations/20260901_add_order_system_core.sql (nguồn sự thật cho
+      // migrations/archive/20260901_add_order_system_core.sql (nguồn sự thật cho
       // thân hàm, không lặp lại logic ở đây).
       create_order: {
         Args: {
@@ -2994,7 +3010,7 @@ export type Database = {
           cancelled_by: string;
           // true = số này lấy từ bảng % sàn của Nền tảng (seller chưa tự
           // khai đủ cho mốc/vai trò này) — xem
-          // migrations/20260901_add_order_refund_minimum_table.sql.
+          // migrations/archive/20260901_add_order_refund_minimum_table.sql.
           used_platform_minimum: boolean;
         };
       };

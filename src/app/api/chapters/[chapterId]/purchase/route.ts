@@ -60,7 +60,7 @@ export async function POST(
   // cho trường hợp phổ biến "bấm mua lại chương đã mua"). Đây KHÔNG phải
   // chốt chặn race duy nhất — 2 request gần như đồng thời vẫn có thể cùng
   // lọt qua bước này; chốt thật là unique index
-  // purchase_transactions_buyer_chapter_key (migrations/20260909_add_purchase_transactions_unique_buyer_chapter.sql),
+  // purchase_transactions_buyer_chapter_key (migrations/archive/20260909_add_purchase_transactions_unique_buyer_chapter.sql),
   // bắt ở catch bên dưới qua mã lỗi 23505.
   const { data: existing } = await supabase
     .from("purchase_transactions")

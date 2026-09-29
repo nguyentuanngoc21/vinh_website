@@ -4,7 +4,7 @@ import type { Database } from "@/lib/supabase/types";
 type Client = SupabaseClient<Database>;
 
 /** Đứng tên tác giả thay (Module 5 đặc tả) — xem
- * migrations/20260901_add_ghostwriting_authorship.sql cho toàn bộ logic
+ * migrations/archive/20260901_add_ghostwriting_authorship.sql cho toàn bộ logic
  * (statement text sinh ở SQL, không phải ở đây — server DB là nguồn sự
  * thật duy nhất cho câu chữ đã hiển thị lúc xác nhận). */
 export const AuthorNameAgreementService = {

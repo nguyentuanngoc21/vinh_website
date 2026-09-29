@@ -8,7 +8,7 @@ export const COMMISSION_AGREEMENT_ID = "bo-quy-tac-commission";
  * Chặn bật service_listings.is_accepting_orders = true khi Người cung cấp
  * dịch vụ chưa xác nhận (hoặc xác nhận đã lỗi thời — văn bản có bản cập
  * nhật mới hơn) "Bộ quy tắc giao dịch Commission" (agreement_acceptances,
- * xem migrations/20260828_add_agreement_acceptances.sql). Cùng cơ chế với
+ * xem migrations/archive/20260828_add_agreement_acceptances.sql). Cùng cơ chế với
  * hasAcceptedExclusivityPolicy() (src/lib/authoring/exclusivity-agreement.ts)
  * cho Hợp đồng khai thác độc quyền — tách file riêng vì đây là 2 tính năng
  * độc lập (Nhận đơn commission ≠ đăng truyện độc quyền), không đáng gộp

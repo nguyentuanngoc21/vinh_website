@@ -1,7 +1,7 @@
 /**
  * Logic thuần cho các hàng khám phá dựa trên tín hiệu (Phase 2, Slice 2.3).
  * Số liệu (độc giả hợp lệ, độc giả mới 7 ngày) đến từ bảng điểm cache —
- * xem migrations/20260926_add_contest_scores.sql.
+ * xem migrations/archive/20260926_add_contest_scores.sql.
  */
 
 /** P5: tỷ lệ chọn từ nhóm "dưới ngưỡng độc giả hợp lệ"; phần còn lại từ nhóm "ngoài top 10 lượt xem". */

@@ -8,7 +8,7 @@ export const EXCLUSIVITY_AGREEMENT_ID = "chinh-sach-doc-quyen";
  * Chặn bật books.is_exclusive = true khi tác giả chưa xác nhận (hoặc xác
  * nhận đã lỗi thời — văn bản có bản cập nhật mới hơn) "Chính sách độc
  * quyền xuất bản" (agreement_acceptances, xem
- * migrations/20260828_add_agreement_acceptances.sql). Gọi từ:
+ * migrations/archive/20260828_add_agreement_acceptances.sql). Gọi từ:
  *   - POST /api/authoring/books (isExclusive === true)
  *   - PATCH /api/authoring/books/[bookId] (is_exclusive: true)
  * Không chặn chiều true -> false hay giữ nguyên false — chỉ chặn lúc BẬT.

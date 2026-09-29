@@ -226,11 +226,11 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
           <Textarea label="Nội dung thể lệ" rows={8} value={rulesContent} disabled={locked} onChange={(e) => setRulesContent(e.target.value)} />
         </div>
         <div className="mt-5 flex flex-col gap-3">
-          <div className="text-[13px] font-semibold text-slate">Cơ cấu giải (VND — quy đổi token khi trao)</div>
+          <div className="text-[13px] font-semibold text-slate">Cơ cấu giải (VNĐ — quy đổi token khi trao)</div>
           {prizes.map((p, i) => (
             <div key={i} className="grid grid-cols-1 gap-2 rounded-[10px] border border-cream-border p-3 sm:grid-cols-[1fr_160px_1.4fr_auto] sm:items-end">
               <Field label="Tên giải" value={p.name} disabled={locked} onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-              <Field label="Số tiền (VND)" type="number" min={0} inputMode="numeric" value={p.amount_vnd} disabled={locked}
+              <Field label="Số tiền (VNĐ)" type="number" min={0} inputMode="numeric" value={p.amount_vnd} disabled={locked}
                 onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, amount_vnd: e.target.value } : x)))} />
               <Field label="Quà kèm" value={p.extra} disabled={locked} onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, extra: e.target.value } : x)))} />
               {!locked && (

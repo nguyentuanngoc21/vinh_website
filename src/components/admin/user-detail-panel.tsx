@@ -146,7 +146,7 @@ export function UserDetailPanel({
           <div className="text-xl font-bold text-brand-ink">{user.nickname}</div>
           {user.cccdVerified && <CheckCircleIcon weight="fill" size={18} color="#2C7453" />}
           {user.screenshotPenaltyBanned && (
-            <span className="rounded-full bg-[#F8D7DA] px-2.5 py-0.5 text-[11px] font-semibold text-[#B02A37]">
+            <span className="rounded-full bg-[#F8D7DA] px-2.5 py-0.5 text-[11px] font-semibold text-error">
               Đã cấm do chụp màn hình
             </span>
           )}
@@ -179,7 +179,7 @@ export function UserDetailPanel({
             </>
           )}
           {roleSaved && <span className="text-[12.5px] font-medium text-[#2C7453]">Đã lưu</span>}
-          {roleError && <span className="text-[12.5px] font-medium text-[#B02A37]">{roleError}</span>}
+          {roleError && <span className="text-[12.5px] font-medium text-error">{roleError}</span>}
         </div>
 
         {roleHistory.length > 0 && (
@@ -253,7 +253,7 @@ export function UserDetailPanel({
           </button>
         </div>
         {bonusError && (
-          <div className="mt-2.5 flex items-center gap-1.5 text-[12.5px] font-medium text-[#B02A37]">
+          <div className="mt-2.5 flex items-center gap-1.5 text-[12.5px] font-medium text-error">
             <WarningCircleIcon /> {bonusError}
           </div>
         )}

@@ -12,7 +12,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const { contestId, awardId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const body = await readJson(request);
     const reason = optionalText(body.reason, 500);
@@ -30,7 +30,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   const { contestId, awardId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const contest = await getContestById(supabase, contestId);
     await deleteAward(supabase, { contest, awardId });

@@ -4,7 +4,7 @@
  * và src/components/reading/paragraph-comments-panel.tsx (UI). Reply
  * lồng CHỈ 1 CẤP: mọi ParagraphComment có parentCommentId khác null luôn
  * là reply của 1 bình luận GỐC (parentCommentId null), không có reply
- * của reply — xem migrations/20260910_add_anchored_comment_replies.sql.
+ * của reply — xem migrations/archive/20260910_add_anchored_comment_replies.sql.
  */
 
 export type ParagraphComment = {

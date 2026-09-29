@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { decodeSessionPayload, reissueSessionCookie, SESSION_COOKIE } from "@/lib/session";
 import type { Session } from "@/lib/auth";
+import { isAdminRole } from "@/lib/roles";
 
 /**
  * GET /api/auth/session — làm mới cookie vinh_session theo profiles.
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   const payload = await decodeSessionPayload((await cookies()).get(SESSION_COOKIE)?.value);
   if (!payload) {
     if (next) return redirectTo(request, `/dang-nhap?next=${encodeURIComponent(next)}`);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data: profile } = await createServiceRoleClient()
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
   if (!profile) {
     if (next) return redirectTo(request, "/");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const fresh: Session = { ...payload.session, name: profile.nickname, role: profile.role };
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   let response: NextResponse;
   if (next) {
-    const isAdmin = fresh.role === "admin" || fresh.role === "super_admin";
+    const isAdmin = isAdminRole(fresh.role);
     response = redirectTo(request, next.startsWith("/admin") && !isAdmin ? "/" : next);
   } else {
     response = NextResponse.json(fresh);

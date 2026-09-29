@@ -9,7 +9,7 @@ import { contestErrorResponse, readJson, requireUuid } from "@/lib/contests/rout
 export async function GET(_request: Request, { params }: { params: Promise<{ contestId: string }> }) {
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
-  if (!(await getAuthedAdminId(supabase))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await getAuthedAdminId(supabase))) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     return NextResponse.json({ judges: await listJudges(supabase, requireUuid(contestId, "contest_not_found")) });
   } catch (error) {
@@ -22,7 +22,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ con
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const contest = await getContestById(supabase, requireUuid(contestId, "contest_not_found"));
     const body = await readJson(request);

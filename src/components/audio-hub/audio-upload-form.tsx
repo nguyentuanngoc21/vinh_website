@@ -112,7 +112,7 @@ export function AudioUploadForm({ className }: { className?: string }) {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-[#B02A37]">
+        <div className="mt-4 rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-error">
           {error}
         </div>
       )}

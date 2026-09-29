@@ -2,14 +2,46 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileTabs } from "@/components/profile/profile-tabs";
-import { FollowingTab } from "@/components/profile/following-tab";
-import { ChatTab } from "@/components/profile/chat-tab";
 import { EditProfileTab } from "@/components/profile/edit-profile-tab";
-import { ServicesTab } from "@/components/profile/services-tab";
-import { AgreementsTab } from "@/components/profile/agreements-tab";
+import { Skeleton } from "@/components/ui";
 import { PROFILE_TABS, type ProfileTab } from "@/lib/profile";
+
+// Mỗi lúc chỉ hiện 1 tab, nên các tab không phải mặc định được tải lười
+// (next/dynamic) — ServicesTab (~1000 dòng), ChatTab, AgreementsTab (kéo
+// HTML văn bản pháp lý qua registry.ts)... không còn nằm trong bundle ban
+// đầu của /ca-nhan. EditProfileTab là tab mặc định nên giữ import tĩnh để
+// lần vào trang đầu tiên không bị nháy placeholder.
+function TabLoading() {
+  return (
+    <div aria-busy="true" aria-label="Đang tải" className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
+      <Skeleton className="mb-4 h-10 w-full max-w-[360px] rounded-[10px]" />
+      <div className="flex flex-col gap-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-[var(--radius-md)]" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const FollowingTab = dynamic(
+  () => import("@/components/profile/following-tab").then((m) => m.FollowingTab),
+  { loading: TabLoading },
+);
+const ChatTab = dynamic(() => import("@/components/profile/chat-tab").then((m) => m.ChatTab), {
+  loading: TabLoading,
+});
+const ServicesTab = dynamic(
+  () => import("@/components/profile/services-tab").then((m) => m.ServicesTab),
+  { loading: TabLoading },
+);
+const AgreementsTab = dynamic(
+  () => import("@/components/profile/agreements-tab").then((m) => m.AgreementsTab),
+  { loading: TabLoading },
+);
 
 function isProfileTab(value: string | null): value is ProfileTab {
   return !!value && PROFILE_TABS.some((t) => t.id === value);
@@ -28,7 +60,7 @@ export function ProfilePage() {
   // "?context=moderation" — chỉ dùng khi deep-link tới từ chuông Thông
   // báo (gỡ chương), xem link trong api/admin/chapters/[chapterId]/route.ts.
   // Mọi lối vào khác (Kết nối, Đang theo dõi) không truyền context, mặc
-  // định "personal". Xem migrations/20260908_add_direct_message_context.sql.
+  // định "personal". Xem migrations/archive/20260908_add_direct_message_context.sql.
   const contextParam = searchParams.get("context") === "moderation" ? "moderation" : "personal";
 
   const [tab, setTab] = useState<ProfileTab>(

@@ -86,7 +86,7 @@ export async function registerAccount(
 
   // Cùng lý do với username: chặn CCCD trùng TRƯỚC khi tạo auth.users —
   // partial unique index identity_verifications_cccd_number_active_idx
-  // (migrations/20260916_add_realtime_signup_checks.sql, bỏ qua status =
+  // (migrations/archive/20260916_add_realtime_signup_checks.sql, bỏ qua status =
   // 'rejected'). KHÔNG public real-time cho field này (xem
   // check-availability/route.ts) — chỉ xác nhận trùng ở đây, sau rate-limit.
   if (cccdSubmitted) {

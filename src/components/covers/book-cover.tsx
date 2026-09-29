@@ -18,9 +18,15 @@ export type BookCoverProps = {
   // data (không có gì để resolve).
   coverUrl?: string | null;
   className?: string;
+  // true cho bìa nằm trong màn hình đầu tiên (ảnh LCP, vd bìa đang active ở
+  // carousel trang chủ) — tải ngay với độ ưu tiên cao thay vì lazy. Mặc
+  // định false: mọi bìa khác (lưới, danh sách dài, nhất là trên mobile)
+  // chỉ tải khi sắp cuộn tới. Chỉ ảnh hưởng bìa ảnh thật, không ảnh hưởng
+  // bìa sinh tự động (SVG inline).
+  priority?: boolean;
 };
 
-export function BookCover({ id, title, author, genre, coverUrl, className }: BookCoverProps) {
+export function BookCover({ id, title, author, genre, coverUrl, className, priority = false }: BookCoverProps) {
   if (coverUrl) {
     return (
       // Ảnh tới từ bucket Supabase Storage của người dùng (project ref
@@ -31,6 +37,9 @@ export function BookCover({ id, title, author, genre, coverUrl, className }: Boo
       <img
         src={coverUrl}
         alt={title}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        fetchPriority={priority ? "high" : undefined}
         className={className}
         style={{ width: "100%", height: "100%", objectFit: "cover" }}
       />

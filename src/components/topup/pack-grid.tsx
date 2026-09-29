@@ -59,7 +59,7 @@ export function PackGrid({ packs, selectedId, customTokens, onSelectPack, onOpen
               {pack.bonus ? `${formatTokens(pack.amount)} + ${formatTokens(pack.bonus)} thưởng` : "Gói khởi đầu"}
             </div>
             <div className="mt-3 text-base font-bold text-ink">{formatVnd(pack.price)}</div>
-            <div className="mt-0.5 text-xs text-stone">{unitPrice}đ / token</div>
+            <div className="mt-0.5 text-xs text-stone">{unitPrice} VNĐ / token</div>
           </div>
         );
       })}

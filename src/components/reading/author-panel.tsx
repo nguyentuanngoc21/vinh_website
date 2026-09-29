@@ -102,7 +102,7 @@ export function AuthorPanel({
       onClick={onDeleteChapter}
       title="Gỡ chương này (kiểm duyệt)"
       aria-label="Gỡ chương này"
-      className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-[#B02A37] transition-colors hover:text-[#8a212b]"
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-error transition-colors hover:text-[#8a212b]"
     >
       <TrashIcon size={16} /> {variant === "rail" && "Xóa"}
     </button>

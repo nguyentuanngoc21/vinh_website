@@ -40,3 +40,30 @@ export async function resolveBookCoverUrl(
   const { data: urlData } = supabase.storage.from("design-images").getPublicUrl(data.image_url);
   return urlData.publicUrl;
 }
+
+/**
+ * Bản batch của resolveBookCoverUrl() cho trang danh sách (home, xếp
+ * hạng, tìm kiếm, /ket-noi, workspace tác giả...): 1 query `.in()` cho cả
+ * danh sách thay vì 1 query/sách. Trả về mảng URL cùng thứ tự với `books`
+ * (null = chưa gắn bìa thật, hoặc query lỗi — cùng ngữ nghĩa bản đơn).
+ */
+export async function resolveBookCoverUrls(
+  supabase: SupabaseClient<Database>,
+  books: readonly ResolvableBook[]
+): Promise<(string | null)[]> {
+  const ids = [...new Set(books.map((b) => b.cover_design_item_id).filter((id): id is string => !!id))];
+  if (ids.length === 0) return books.map(() => null);
+
+  const { data, error } = await supabase.from("public_design_items").select("id, image_url").in("id", ids);
+  if (error) {
+    console.error("[covers] resolveBookCoverUrls: query public_design_items failed:", error);
+    return books.map(() => null);
+  }
+
+  const bucket = supabase.storage.from("design-images");
+  const urlById = new Map<string, string>();
+  for (const row of data ?? []) {
+    if (row.id && row.image_url) urlById.set(row.id, bucket.getPublicUrl(row.image_url).data.publicUrl);
+  }
+  return books.map((b) => (b.cover_design_item_id ? urlById.get(b.cover_design_item_id) ?? null : null));
+}

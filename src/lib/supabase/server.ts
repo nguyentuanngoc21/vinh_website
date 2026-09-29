@@ -1,6 +1,7 @@
-import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import type { Database } from "./types";
 
 /**
@@ -69,4 +70,28 @@ export function createServiceRoleClient(): SupabaseClient<Database> {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
+}
+
+/**
+ * Lấy user đang đăng nhập từ client RLS-scoped (createClient()) — thay cho
+ * đoạn `auth.getUser()` + `if (!user) return 401` lặp lại ở nhiều route.
+ * Trả về `{ user }` khi đã đăng nhập, hoặc `{ response }` (401, body
+ * `{ error: message }`) để route trả thẳng về:
+ *
+ *   const auth = await requireSupabaseUser(supabase);
+ *   if ("response" in auth) return auth.response;
+ *   const { user } = auth;
+ *
+ * `message` mặc định "Vui lòng đăng nhập." — route nào đang trả thông báo
+ * khác thì truyền vào để giữ nguyên body cũ.
+ */
+export async function requireSupabaseUser(
+  supabase: { auth: SupabaseClient["auth"] },
+  message = "Vui lòng đăng nhập."
+): Promise<{ user: User } | { response: NextResponse }> {
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    return { response: NextResponse.json({ error: message }, { status: 401 }) };
+  }
+  return { user: data.user };
 }

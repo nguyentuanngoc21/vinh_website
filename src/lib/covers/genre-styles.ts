@@ -72,7 +72,7 @@ export type GenreStyle = {
 
 // Taxonomy CHÍNH THỨC của nền tảng (10 thể loại) — thay thế hoàn toàn 8
 // giá trị tạm ban đầu lấy từ mock data. Xem
-// migrations/20260825_update_book_genres.sql.
+// migrations/archive/20260825_update_book_genres.sql.
 export const GENRE_STYLES: Record<BookGenre, GenreStyle> = {
   "Linh dị": {
     font: "be-vietnam-pro",

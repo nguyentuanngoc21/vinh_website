@@ -7,7 +7,7 @@ import { getRequestContext, requestError } from "@/lib/mobile/request-context";
  * bỏ theo dõi). Cùng pattern select-rồi-branch với route vote chương. UI
  * đã ẩn nút Theo dõi trên sách của chính tác giả, nhưng vẫn tự chặn
  * userId === authorId ở đây (defense-in-depth, phòng gọi thẳng API) —
- * CHECK follower_id <> author_id ở DB (migrations/20260824_add_author_follows.sql)
+ * CHECK follower_id <> author_id ở DB (migrations/archive/20260824_add_author_follows.sql)
  * là chốt chặn cuối cùng nếu cả 2 lớp trên đều bị vượt qua.
  */
 export async function POST(

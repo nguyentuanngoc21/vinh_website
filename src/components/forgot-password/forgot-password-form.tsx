@@ -60,7 +60,7 @@ export function ForgotPasswordForm() {
   if (sent) {
     return (
       <div className="mx-auto w-full max-w-[400px]">
-        <CheckCircleIcon weight="fill" size={40} color="#2F7A4F" />
+        <CheckCircleIcon weight="fill" size={40} className="text-success-form" />
         <div className="mt-4 text-[24px] font-bold tracking-[-0.4px] text-brand-ink">
           Kiểm tra email của bạn
         </div>

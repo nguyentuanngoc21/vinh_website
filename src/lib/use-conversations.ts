@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRole } from "@/lib/role";
+import { startVisiblePolling } from "@/lib/hooks/visible-polling";
 
 export type MessageContext = "personal" | "moderation";
 
@@ -44,11 +46,14 @@ export function useConversations() {
     []
   );
 
+  // Hook này được mount ở root layout (ChatBubbleProvider) cho MỌI khách —
+  // chỉ poll khi đã đăng nhập (khách luôn nhận 401, gọi chỉ tốn function
+  // invocation) và khi tab đang hiện; quay lại tab thì tải ngay 1 lần.
+  const { isLogged } = useRole();
   useEffect(() => {
-    load();
-    const interval = setInterval(load, POLL_MS);
-    return () => clearInterval(interval);
-  }, [load]);
+    if (!isLogged) return;
+    return startVisiblePolling(load, POLL_MS);
+  }, [isLogged, load]);
 
   // Gọi ngay khi 1 luồng vừa được đọc (mở flyout row/bong bóng/thread) —
   // zero badge tức thời thay vì chờ vòng poll 15s tiếp theo, cùng cách
@@ -59,5 +64,11 @@ export function useConversations() {
     );
   }, []);
 
-  return { conversations, loaded, markThreadRead, reload: load };
+  // Đăng xuất: ẩn dữ liệu của phiên cũ ngay (không setState trong effect).
+  return {
+    conversations: isLogged ? conversations : [],
+    loaded: isLogged && loaded,
+    markThreadRead,
+    reload: load,
+  };
 }

@@ -338,7 +338,7 @@ export function AuthCluster() {
                   logout();
                   setMenuOpen(false);
                 }}
-                className="flex w-full cursor-pointer items-center gap-[11px] border-t border-[#f1efec] px-[18px] py-3 text-left text-sm font-medium text-[#B02A37] transition-colors hover:bg-cream-card"
+                className="flex w-full cursor-pointer items-center gap-[11px] border-t border-[#f1efec] px-[18px] py-3 text-left text-sm font-medium text-error transition-colors hover:bg-cream-card"
               >
                 <SignOutIcon size={18} /> Đăng xuất
               </button>

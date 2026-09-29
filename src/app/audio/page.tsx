@@ -26,7 +26,7 @@ const RESUME_TOTAL_LIMIT = 4; // 1 cho ContinueListening (hero) + 3 cho ResumeRo
 /**
  * Trước đây 100% mock (CATALOG/RESUME/NARRATORS, src/lib/audio-catalog.ts)
  * đứng sau <DevelopmentOverlay>. Giờ đọc public_audio_narrations thật
- * (genre/play_count, xem migrations/20260901_add_audio_narration_hub_metadata.sql
+ * (genre/play_count, xem migrations/archive/20260901_add_audio_narration_hub_metadata.sql
  * và src/lib/audio/get-audio-catalog.ts) — overlay đã gỡ. "Audio đang
  * nghe"/"Nghe tiếp" đọc audio_progress thật của người xem
  * (src/lib/audio/get-listening-progress.ts), phát bằng trình phát thật
@@ -35,11 +35,11 @@ const RESUME_TOTAL_LIMIT = 4; // 1 cho ContinueListening (hero) + 3 cho ResumeRo
  */
 export default async function AudioHubPage() {
   const supabase = await createClient();
-  const viewerId = await getAuthedUserId();
-
+  // Catalog không phụ thuộc viewer — chạy song song với chuỗi
+  // viewer → tiến trình nghe.
   const [tracks, progress] = await Promise.all([
     getAudioCatalog(supabase),
-    getListeningProgress(supabase, viewerId, RESUME_TOTAL_LIMIT),
+    getAuthedUserId().then((viewerId) => getListeningProgress(supabase, viewerId, RESUME_TOTAL_LIMIT)),
   ]);
   const narrators = getNarratorStats(tracks);
   const [hero, ...rest] = progress;
@@ -54,12 +54,12 @@ export default async function AudioHubPage() {
           <LibraryGrid tracks={tracks} />
           <NarratorsRow narrators={narrators} />
           <section className="px-4 pb-10 pt-[34px] sm:px-8 lg:px-11">
-            <div className="flex flex-col items-start justify-between gap-6 rounded-[20px] bg-[#F7EFD8] p-6 sm:flex-row sm:items-center sm:px-10 sm:py-8">
+            <div className="flex flex-col items-start justify-between gap-6 rounded-[20px] bg-cream-gold p-6 sm:flex-row sm:items-center sm:px-10 sm:py-8">
               <div>
                 <div className="text-xl font-bold text-brand-ink sm:text-[22px]">
                   Có giọng đọc hay?
                 </div>
-                <div className="mt-[5px] text-sm text-[#6b5f3a] sm:text-[14.5px]">
+                <div className="mt-[5px] text-sm text-cream-gold-text sm:text-[14.5px]">
                   Ghi âm tác phẩm và chia sẻ trên Vịnh — bản ghi được đăng
                   ký bảo hộ, tuyên bố không cho AI huấn luyện.
                 </div>

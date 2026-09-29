@@ -4,10 +4,10 @@ import { getUserContext, requestError } from '@/lib/mobile/request-context';
 import { mobileResponse } from '@/lib/mobile/response';
 import { forwardRequest, pick } from '@/lib/mobile/forward';
 import { getAuthorChapter } from '@/lib/authoring/workspace';
+import { isUuid } from '@/lib/validation/uuid';
 export { OPTIONS } from '@/lib/mobile/response';
 
 type Ctx = { params: Promise<{ chapterId: string }> };
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // A chapter for editing (drafts too — api/mobile/chapters/[id] only serves published ones).
 export function GET(request: Request, context: Ctx) {
@@ -16,7 +16,7 @@ export function GET(request: Request, context: Ctx) {
     try { auth = await getUserContext(request); } catch (e) { return requestError(e); }
     if (!auth.userId) return Response.json({ error: 'Vui lòng đăng nhập lại.' }, { status: 401 });
     const { chapterId } = await context.params;
-    const data = UUID.test(chapterId) ? await getAuthorChapter(auth.supabase, auth.userId, chapterId) : null;
+    const data = isUuid(chapterId) ? await getAuthorChapter(auth.supabase, auth.userId, chapterId) : null;
     if (!data) return Response.json({ error: 'Không tìm thấy chương.' }, { status: 404 });
     return Response.json(data);
   });

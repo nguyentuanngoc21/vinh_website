@@ -15,7 +15,7 @@ export type ContentBookRow = {
   deletedAt: string | null;
   /** not null = đã dọn nội dung nặng (cover/synopsis + content mọi
    * chương) do xoá quá 30 ngày — xem
-   * migrations/20260908_add_content_purge_retention.sql. "Khôi phục" vô
+   * migrations/archive/20260908_add_content_purge_retention.sql. "Khôi phục" vô
    * nghĩa với hàng này (nội dung đã rỗng), nên ẩn mặc định + tắt nút. */
   contentPurgedAt: string | null;
 };
@@ -128,7 +128,7 @@ export function ContentTable({
       </div>
 
       {error && (
-        <div className="mb-3.5 rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-[#B02A37]">
+        <div className="mb-3.5 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-error">
           {error}
         </div>
       )}
@@ -171,7 +171,7 @@ export function ContentTable({
           <div>
             <span
               className={`rounded-full px-[11px] py-1 text-[11px] font-semibold ${
-                r.published ? "bg-[#DBF3E8] text-[#2C7453]" : "bg-cream-card-alt text-stone-dark"
+                r.published ? "bg-success-form-border text-[#2C7453]" : "bg-cream-card-alt text-stone-dark"
               }`}
             >
               {r.published ? "Đã đăng" : "Bản nháp"}
@@ -194,7 +194,7 @@ export function ContentTable({
               <>
                 {new Date(r.deletedAt).toLocaleDateString("vi-VN")}
                 {r.contentPurgedAt && (
-                  <div className="mt-0.5 text-[10.5px] font-semibold text-[#B02A37]">Đã dọn nội dung</div>
+                  <div className="mt-0.5 text-[10.5px] font-semibold text-error">Đã dọn nội dung</div>
                 )}
               </>
             ) : (
@@ -228,7 +228,7 @@ export function ContentTable({
                 type="button"
                 disabled={pendingId === r.id}
                 onClick={() => setRemovingBook(r)}
-                className="flex items-center gap-1.5 rounded-lg border border-[#f3c6c6] px-3 py-1.5 text-[12.5px] font-semibold text-[#B02A37] disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-error-border px-3 py-1.5 text-[12.5px] font-semibold text-error disabled:opacity-50"
               >
                 <TrashIcon size={14} /> Xoá
               </button>

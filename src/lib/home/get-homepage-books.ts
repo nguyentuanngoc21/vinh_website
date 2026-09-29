@@ -1,13 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
-import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import { computeBookStatus, type BookStatus } from "@/lib/story/status";
 
 /**
  * Real, DB-backed shape for the homepage sections (BookCoverflow,
  * HeroTrending, NewWorksGrid, RankingGenres) — replaces the hardcoded
  * mock catalog that used to live in src/lib/books.ts (`books`, `rankings`,
- * `newWorks`). See migrations/20260824_add_book_tags_and_view_count.sql
+ * `newWorks`). See migrations/archive/20260824_add_book_tags_and_view_count.sql
  * for `view_count`.
  */
 export type HomepageBook = {
@@ -26,40 +26,41 @@ export type HomepageBook = {
 
 type BookRow = Database["public"]["Tables"]["books"]["Row"];
 
+/** Đúng các cột toHomepageBooks() cần — KHÔNG dùng select("*"): bảng
+ * books có cột `embedding vector(1536)` (~15-20 KB JSON/hàng) chỉ dùng
+ * cho recommend_books() trong SQL, không bao giờ cần gửi về app. */
+export const HOMEPAGE_BOOK_COLUMNS =
+  "id, slug, title, genre, view_count, author_id, synopsis, cover_design_item_id, created_at";
+export type HomepageBookRow = Pick<
+  BookRow,
+  "id" | "slug" | "title" | "genre" | "view_count" | "author_id" | "synopsis" | "cover_design_item_id" | "created_at"
+>;
+
 /** Exported for reuse by src/lib/recommendations/get-recommended-books.ts
  * — cùng join tác giả/chương/bìa, khác nguồn danh sách sách đầu vào. */
 export async function toHomepageBooks(
   supabase: SupabaseClient<Database>,
-  rows: BookRow[]
+  rows: HomepageBookRow[]
 ): Promise<HomepageBook[]> {
   if (rows.length === 0) return [];
 
   const authorIds = [...new Set(rows.map((r) => r.author_id))];
   const bookIds = rows.map((r) => r.id);
 
-  const [{ data: authors }, { data: chapters }, coverUrls] = await Promise.all([
+  const [{ data: authors }, { data: chapterStats }, coverUrls] = await Promise.all([
     supabase.from("author_public_profiles").select("id, nickname").in("id", authorIds),
+    // 1 hàng/sách (view gộp sẵn, migrations/20260929_add_ranking_aggregates.sql)
+    // thay vì mọi hàng chương — không bị giới hạn 1000 hàng của PostgREST cắt.
     supabase
-      .from("chapters")
-      .select("book_id, is_last_chapter, created_at")
-      .eq("published", true)
+      .from("book_chapter_stats")
+      .select("book_id, published_chapter_count, has_published_last_chapter, latest_published_chapter_at")
       .in("book_id", bookIds),
-    // 1 request/sách, tái dùng đúng logic resolve bìa thật đang chạy ở
-    // /truyen/[slug] (src/lib/covers/resolve-book-cover.ts) — số sách lên
-    // trang chủ nhỏ (top vài chục), không cần gộp thành 1 query IN() riêng.
-    Promise.all(rows.map((r) => resolveBookCoverUrl(supabase, r))),
+    // 1 query IN() cho cả danh sách (src/lib/covers/resolve-book-cover.ts).
+    resolveBookCoverUrls(supabase, rows),
   ]);
 
   const nicknameById = new Map((authors ?? []).map((a) => [a.id, a.nickname]));
-  const chapterCountByBook = new Map<string, number>();
-  const hasLastChapterByBook = new Set<string>();
-  const latestChapterAtByBook = new Map<string, string>();
-  for (const c of chapters ?? []) {
-    chapterCountByBook.set(c.book_id, (chapterCountByBook.get(c.book_id) ?? 0) + 1);
-    if (c.is_last_chapter) hasLastChapterByBook.add(c.book_id);
-    const latest = latestChapterAtByBook.get(c.book_id);
-    if (!latest || c.created_at > latest) latestChapterAtByBook.set(c.book_id, c.created_at);
-  }
+  const statsByBook = new Map((chapterStats ?? []).map((c) => [c.book_id, c]));
 
   return rows.map((r, i) => ({
     id: r.id,
@@ -68,12 +69,12 @@ export async function toHomepageBooks(
     genre: r.genre,
     viewCount: r.view_count,
     authorNickname: nicknameById.get(r.author_id) ?? null,
-    chapterCount: chapterCountByBook.get(r.id) ?? 0,
+    chapterCount: statsByBook.get(r.id)?.published_chapter_count ?? 0,
     coverUrl: coverUrls[i],
     synopsis: r.synopsis,
     status: computeBookStatus({
-      hasPublishedLastChapter: hasLastChapterByBook.has(r.id),
-      latestPublishedChapterCreatedAt: latestChapterAtByBook.get(r.id) ?? null,
+      hasPublishedLastChapter: statsByBook.get(r.id)?.has_published_last_chapter ?? false,
+      latestPublishedChapterCreatedAt: statsByBook.get(r.id)?.latest_published_chapter_at ?? null,
     }),
   }));
 }
@@ -102,15 +103,17 @@ export async function getHomepageData(
   const [{ data: byViews }, { data: byNewest }] = await Promise.all([
     supabase
       .from("books")
-      .select("*")
+      .select(HOMEPAGE_BOOK_COLUMNS)
       .eq("published", true)
+      .is("deleted_at", null)
       .order("view_count", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(FEATURED_LIMIT),
     supabase
       .from("books")
-      .select("*")
+      .select(HOMEPAGE_BOOK_COLUMNS)
       .eq("published", true)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(NEWEST_LIMIT),
   ]);
@@ -121,7 +124,7 @@ export async function getHomepageData(
   // Dedup trước khi resolve author/chapter/cover — 2 danh sách trên
   // thường lấn nhau (sách mới xuất bản cũng có thể đang trending), gộp
   // lại để mỗi sách chỉ resolve 1 lần.
-  const byId = new Map<string, BookRow>();
+  const byId = new Map<string, HomepageBookRow>();
   for (const row of [...trendingRows, ...newestRows]) byId.set(row.id, row);
   const resolved = await toHomepageBooks(supabase, [...byId.values()]);
   const resolvedById = new Map(resolved.map((b) => [b.id, b]));

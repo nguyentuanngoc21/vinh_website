@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import type { DesignItemCategory } from "@/lib/supabase/types";
 
@@ -19,10 +19,9 @@ const CATEGORY_LABEL: Record<DesignItemCategory, string> = Object.fromEntries(
  */
 export async function GET() {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const { data: rows, error } = await supabase
     .from("design_items")
@@ -33,7 +32,7 @@ export async function GET() {
     // sẽ mãi mãi là "Chưa công khai" dù không hề sai — gây hiểu lầm, nên
     // loại khỏi trang quản lý này ngay từ query.
     .eq("source", "independent")
-    .eq("illustrator_id", userData.user.id)
+    .eq("illustrator_id", user.id)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (error) {

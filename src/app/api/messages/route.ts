@@ -8,9 +8,9 @@ const RECENT_MESSAGE_LIMIT = 300;
  * hội thoại là 1 cặp (counterparty, context) — cùng 1 admin có thể xuất
  * hiện ở 2 dòng riêng biệt nếu vừa có hòm thư "personal" (chat bình
  * thường) vừa có hòm thư "moderation" (tin gỡ chương) với mình, xem
- * migrations/20260908_add_direct_message_context.sql. Danh tính người
+ * migrations/archive/20260908_add_direct_message_context.sql. Danh tính người
  * gửi LUÔN hiển thị thật ở cả 2 hòm thư. Không có bảng "conversations"
- * riêng (xem migrations/20260828_add_direct_messages.sql) nên tự suy ra
+ * riêng (xem migrations/archive/20260828_add_direct_messages.sql) nên tự suy ra
  * bằng cách lấy N tin gần nhất rồi group trong JS — cùng tinh thần "join
  * bằng JS" đã dùng ở src/app/author/layout.tsx.
  */
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const { data: rows, error } = await supabase
@@ -69,26 +69,32 @@ export async function GET(request: Request) {
   }
 
   const counterpartyIds = [...new Set(threads.map((t) => t.counterpartyId))];
-  const { data: profiles, error: profilesError } = await supabase
-    .from("author_public_profiles")
-    .select("id, nickname, username, avatar_url")
-    .in("id", counterpartyIds);
+  // Đối tác nào có ít nhất 1 đơn dịch vụ (bất kỳ trạng thái) với mình —
+  // dùng để lọc tab "Giao dịch" ở bong bóng chat header. Không có
+  // conversation_id trên orders (xem ghi chú ở api/orders/route.ts) nên
+  // suy luôn từ 1 lượt query "mọi đơn của mình" rồi rút counterpartyId
+  // trong JS, cùng tinh thần với cách threads được gộp ở trên — tránh
+  // N+1 gọi /api/orders?withUserId= cho từng hội thoại. Chạy song song với
+  // lookup profiles vì 2 query không phụ thuộc nhau.
+  const [
+    { data: profiles, error: profilesError },
+    { data: orderRows, error: ordersError },
+  ] = await Promise.all([
+    supabase
+      .from("author_public_profiles")
+      .select("id, nickname, username, avatar_url")
+      .in("id", counterpartyIds),
+    supabase
+      .from("orders")
+      .select("buyer_id, seller_id")
+      .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
+  ]);
   if (profilesError) {
     console.error("[messages] profiles lookup failed:", profilesError);
     return NextResponse.json({ error: "Không tải được danh sách hội thoại." }, { status: 500 });
   }
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-  // Đối tác nào có ít nhất 1 đơn dịch vụ (bất kỳ trạng thái) với mình —
-  // dùng để lọc tab "Giao dịch" ở bong bóng chat header. Không có
-  // conversation_id trên orders (xem ghi chú ở api/orders/route.ts) nên
-  // suy luôn từ 1 lượt query "mọi đơn của mình" rồi rút counterpartyId
-  // trong JS, cùng tinh thần với cách threads được gộp ở trên — tránh
-  // N+1 gọi /api/orders?withUserId= cho từng hội thoại.
-  const { data: orderRows, error: ordersError } = await supabase
-    .from("orders")
-    .select("buyer_id, seller_id")
-    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`);
   if (ordersError) {
     // Không chặn cả danh sách hội thoại chỉ vì tab "Giao dịch" lỗi — log
     // rồi coi như không đối tác nào có đơn (tab đó sẽ rỗng thay vì crash).

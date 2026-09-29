@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const failureReason = typeof body?.failureReason === "string" ? body.failureReason : undefined;
 
   if (!requestId) {
-    return NextResponse.json({ error: "Missing requestId" }, { status: 400 });
+    return NextResponse.json({ error: "Thiếu requestId." }, { status: 400 });
   }
 
   const supabase = createServiceRoleClient();
@@ -35,6 +35,6 @@ export async function POST(request: Request) {
     return NextResponse.json(updated);
   } catch (err) {
     console.error("[wallet] withdraw callback failed:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi hệ thống. Vui lòng thử lại sau." }, { status: 500 });
   }
 }

@@ -13,7 +13,7 @@ type GenreSelectProps = {
 /**
  * Picker genre dạng chip — TÁI DÙNG đúng style của
  * src/components/ranking-genres.tsx (rounded-full, active
- * bg-[#F7EFD8]/text-brand-gold-dark, inactive bg-neutral-bg/text-ink),
+ * bg-cream-gold/text-brand-gold-dark, inactive bg-neutral-bg/text-ink),
  * chỗ đó chỉ decorative (cursor-default, không onClick); ở đây có
  * onClick thật, single-select.
  *
@@ -66,7 +66,7 @@ export function GenreSelect({ value, onChange, className }: GenreSelectProps) {
             className={
               "cursor-pointer rounded-full px-[16px] py-2 text-[13.5px] font-medium transition-colors " +
               (active
-                ? "bg-[#F7EFD8] font-semibold text-brand-gold-dark"
+                ? "bg-cream-gold font-semibold text-brand-gold-dark"
                 : "bg-neutral-bg text-ink hover:text-brand-gold-dark")
             }
           >

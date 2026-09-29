@@ -92,7 +92,7 @@ export function BankInfoForm({ onSaved }: { onSaved?: (saved: boolean) => void }
   return (
     <div className="flex flex-col gap-3.5">
       {saved && (
-        <div className="flex items-center gap-2 rounded-[10px] border border-[#cfe8d9] bg-[#F4FAF6] px-[13px] py-2.5 text-[13px] font-medium text-[#2F7A4F]">
+        <div className="flex items-center gap-2 rounded-[10px] border border-[#cfe8d9] bg-success-form-bg px-[13px] py-2.5 text-[13px] font-medium text-success-form">
           <CheckCircleIcon weight="fill" size={16} /> Đã lưu thông tin ngân hàng
         </div>
       )}

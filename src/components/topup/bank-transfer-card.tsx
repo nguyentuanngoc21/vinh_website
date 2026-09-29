@@ -2,7 +2,7 @@ import { BankIcon } from "@phosphor-icons/react/dist/ssr";
 import { BANK_INFO } from "@/lib/topup";
 
 type BankTransferCardProps = {
-  /** Formatted VND amount for this order, e.g. "120.000đ". */
+  /** Formatted VND amount for this order, e.g. "120.000 VNĐ". */
   amount: string;
   /** Required transfer content so the top-up is matched automatically. */
   note: string;

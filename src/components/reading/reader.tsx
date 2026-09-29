@@ -1,6 +1,5 @@
 "use client";
 
-import { isCaptureShortcut, isEditableTarget } from "@/lib/reading/capture-detection";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { recallReadingSource } from "@/lib/reading/reading-source";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/reading/heartbeat-config";
@@ -36,6 +35,8 @@ import { VinhMark, useToast } from "@/components/ui";
 import { supportMailto } from "@/lib/support";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { useNowPlaying } from "@/lib/audio/now-playing-context";
+import { formatPenaltyMessage, useScreenshotPenalty } from "./use-screenshot-penalty";
+import { buildAuthorWatermarkTileDataUrl, WATERMARK_TILE_HEIGHT, WATERMARK_TILE_WIDTH } from "./watermark-tile";
 
 type ThemeName = "cream" | "sepia" | "dark";
 
@@ -110,34 +111,7 @@ const PARAGRAPHS = [
   "Nhưng có những đêm dài hơn một đời người. Và có những cái tên, biển giữ mãi không trả.",
 ];
 
-const PENALTY_STORAGE_KEY = "vinh_screenshot_penalty";
 const READER_PREFS_KEY = "vinh_reader_prefs";
-
-function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-const WATERMARK_TILE_WIDTH = 220;
-const WATERMARK_TILE_HEIGHT = 110;
-
-/** Ô SVG nhỏ chứa tên tác giả, xoay sẵn -22°, dùng làm `background-image`
- * lặp bằng `background-repeat: repeat` — kỹ thuật giống
- * `buildTiledWatermarkSvg` ở src/lib/orders/watermark.ts (ảnh giao đơn
- * Kết nối), chỉ khác là tile nhỏ để trình duyệt tự lặp vô hạn thay vì vẽ
- * hết mọi ô ra 1 SVG khổ lớn bằng đúng chiều cao nội dung — nhờ vậy phủ
- * kín được chương dài bao nhiêu cũng được, không cần biết trước chiều
- * cao thật của nó. */
-function buildAuthorWatermarkTileDataUrl(authorName: string, color: string): string {
-  const label = escapeXml(`${authorName} · Vịnh`);
-  const svg =
-    `<svg width="${WATERMARK_TILE_WIDTH}" height="${WATERMARK_TILE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">` +
-    `<text x="${WATERMARK_TILE_WIDTH / 2}" y="${WATERMARK_TILE_HEIGHT / 2}" ` +
-    `transform="rotate(-22 ${WATERMARK_TILE_WIDTH / 2} ${WATERMARK_TILE_HEIGHT / 2})" ` +
-    `text-anchor="middle" font-size="14" font-weight="600" font-family="sans-serif" ` +
-    `fill="${color}">${label}</text>` +
-    `</svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
 
 type ReaderPrefs = { fontSize: number; theme: ThemeName; lineHeight: number };
 
@@ -168,129 +142,6 @@ function saveReaderPrefs(prefs: ReaderPrefs) {
     localStorage.setItem(READER_PREFS_KEY, JSON.stringify(prefs));
   } catch {
     // ignore storage failures
-  }
-}
-
-type PenaltyRule = { percent: number; durationDays: number };
-type NextPenalty = PenaltyRule | { ban: true; durationDays: number } | { warning: true };
-
-// Đồng bộ TAY với src/app/api/penalty/route.ts (không import chung được —
-// route.ts chạy server-only, PENALTY_RULES ở đây chỉ dùng cho nhánh
-// fallback offline khi gọi server thất bại, xem applyPenalty bên dưới).
-// Lần vi phạm đầu tiên (count=0) = CẢNH BÁO, không nằm trong bảng này —
-// PENALTY_RULES[0] giờ ứng với lần vi phạm THỨ 2 (count=1), lệch 1 so với
-// trước đây.
-const PENALTY_RULES: ReadonlyArray<PenaltyRule> = [
-  { percent: 10, durationDays: 3 },
-  { percent: 10, durationDays: 7 },
-  { percent: 15, durationDays: 14 },
-  { percent: 15, durationDays: 30 },
-];
-
-type PenaltyState = {
-  count: number;
-  expiresAt: number | null;
-  banned: boolean;
-  lastOffenseAt: number | null;
-  deductedAmount: number | null;
-};
-
-function getPenaltyState(): PenaltyState {
-  try {
-    const raw = localStorage.getItem(PENALTY_STORAGE_KEY);
-    if (!raw) return { count: 0, expiresAt: null, banned: false, lastOffenseAt: null, deductedAmount: null };
-    const parsed = JSON.parse(raw) as PenaltyState;
-    if (parsed.banned) return parsed;
-    if (parsed.expiresAt && parsed.expiresAt <= Date.now()) {
-      return { ...parsed, expiresAt: null, deductedAmount: null };
-    }
-    return parsed;
-  } catch {
-    return { count: 0, expiresAt: null, banned: false, lastOffenseAt: null, deductedAmount: null };
-  }
-}
-
-function savePenaltyState(state: PenaltyState) {
-  try {
-    localStorage.setItem(PENALTY_STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore storage failures
-  }
-}
-
-function formatPenaltyMessage(penalty: PenaltyState) {
-  if (penalty.banned) {
-    return "Tài khoản này đã bị cấm vĩnh viễn vì vi phạm quy tắc chụp màn hình.";
-  }
-
-  // count=1 = lần cảnh báo đầu tiên (không có rule/expiresAt thật — xem
-  // getNextPenalty) -> rule ở đây luôn undefined cho count=1, trả về null
-  // là đúng (banner cảnh báo tức thời warningMessage đã lo phần hiển thị
-  // lúc đó, không cần banner thường trực này lặp lại).
-  const rule = PENALTY_RULES[penalty.count - 2];
-  if (!rule || !penalty.expiresAt) return null;
-  const expiry = new Date(penalty.expiresAt).toLocaleDateString("vi-VN");
-  const baseMessage = `Lần ${penalty.count}: tính thêm ${rule.percent}% token để mở khóa truyện đến ${expiry}.`;
-  if (penalty.deductedAmount) {
-    return `${baseMessage} Đã trừ ${penalty.deductedAmount} token cho lần vi phạm này.`;
-  }
-  return baseMessage;
-}
-
-// Phải khớp CHÍNH XÁC logic trong src/app/api/penalty/route.ts (đồng bộ
-// tay, xem comment PENALTY_RULES ở trên).
-function getNextPenalty(count: number): NextPenalty {
-  if (count === 0) return { warning: true };
-  if (count >= 5) return { ban: true, durationDays: 30 };
-  return PENALTY_RULES[count - 1];
-}
-
-function normalizePenaltyState(payload: {
-  screenshot_penalty_count?: number;
-  screenshot_penalty_expires_at?: string | null;
-  screenshot_penalty_banned?: boolean;
-  screenshot_penalty_last_offense_at?: string | null;
-  last_deducted_amount?: number | null;
-  lastDeductedAmount?: number | null;
-}): PenaltyState {
-  return {
-    count: payload.screenshot_penalty_count ?? 0,
-    expiresAt: payload.screenshot_penalty_expires_at
-      ? new Date(payload.screenshot_penalty_expires_at).getTime()
-      : null,
-    banned: Boolean(payload.screenshot_penalty_banned),
-    lastOffenseAt: payload.screenshot_penalty_last_offense_at
-      ? new Date(payload.screenshot_penalty_last_offense_at).getTime()
-      : null,
-    deductedAmount: payload.last_deducted_amount ?? payload.lastDeductedAmount ?? null,
-  };
-}
-
-async function fetchPenaltyStateFromServer(): Promise<PenaltyState | null> {
-  try {
-    const res = await fetch("/api/penalty");
-    if (!res.ok) return null;
-    const payload = await res.json();
-    if (typeof payload?.screenshot_penalty_count !== "number") return null;
-    return normalizePenaltyState(payload);
-  } catch {
-    return null;
-  }
-}
-
-async function postScreenshotPenaltyToServer(): Promise<{ state: PenaltyState; warningOnly: boolean } | null> {
-  try {
-    const res = await fetch("/api/penalty", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event: "screenshot" }),
-    });
-    if (!res.ok) return null;
-    const payload = await res.json();
-    if (typeof payload?.screenshot_penalty_count !== "number") return null;
-    return { state: normalizePenaltyState(payload), warningOnly: Boolean(payload?.warning_only) };
-  } catch {
-    return null;
   }
 }
 
@@ -346,11 +197,11 @@ export type ReaderProps = {
   /** Đoạn văn đã đọc dở lần trước, CHỈ khi đúng chương này (page.tsx đã
    * tự đối chiếu chapter_id) — null = bắt đầu từ đầu chương (chưa từng
    * đọc, hoặc lần trước dừng ở chương khác). Tự cuộn tới 1 lần lúc mount.
-   * Xem migrations/20260910_add_book_progress_paragraph.sql. */
+   * Xem migrations/archive/20260910_add_book_progress_paragraph.sql. */
   initialParagraphIndex?: number | null;
   /** Nhân vật đã gắn với chương này (tác giả gắn qua
    * chapter-characters-panel.tsx) — [] thì panel bình chọn tự ẩn, không
-   * bịa danh sách. Xem migrations/20260919_add_characters.sql. */
+   * bịa danh sách. Xem migrations/archive/20260919_add_characters.sql. */
   tropeCandidates?: TropeCandidate[];
   initialTropeVoteCharacterId?: string | null;
   /** Ảnh thiết kế chèn inline — page.tsx đã resolve sẵn từ marker
@@ -397,30 +248,7 @@ export function Reader({
   const [theme, setTheme] = useState<ThemeName>("cream");
   const [lineHeight, setLineHeight] = useState(DEFAULT_LINE_HEIGHT);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [penalty, setPenalty] = useState<PenaltyState>({ count: 0, expiresAt: null, banned: false, lastOffenseAt: null, deductedAmount: null });
-  // penalty ban đầu luôn count:0 (giá trị thật chỉ tới sau 1 lượt tải từ
-  // localStorage/server) — onKeyDown/onCopy bên dưới đăng ký 1 lần lúc
-  // mount (deps []), đọc qua ref này thay vì đóng closure lên `penalty`
-  // trực tiếp để đoán "lần đầu hay không" luôn dùng giá trị MỚI NHẤT tại
-  // thời điểm người dùng thật sự bấm, không phải giá trị lúc effect chạy.
-  const penaltyRef = useRef(penalty);
-  useEffect(() => {
-    penaltyRef.current = penalty;
-  }, [penalty]);
-  const [screenshotDetected, setScreenshotDetected] = useState(false);
-  const [warningMessage, setWarningMessage] = useState<string | null>(null);
-  const penaltyAppliedRef = useRef(false);
-  // "Giờ hiện tại" cho isPenaltyActive bên dưới — KHÔNG gọi Date.now() trực
-  // tiếp lúc render (react-hooks/purity: gọi hàm impure trong render có thể
-  // cho kết quả khác nhau giữa các lần render, gây lệch nếu React sau này
-  // render lại 1 lần build/commit nhiều lần — vd bật React Compiler).
-  // null lúc mount đầu (trước khi effect chạy) — coi như "chưa có phạt" cho
-  // tới khi có mốc giờ thật, khớp cách `penalty` cũng khởi tạo rỗng rồi mới
-  // nạp state thật ở effect bên dưới.
-  const [now, setNow] = useState<number | null>(null);
-
   const c = THEMES[theme];
-  const isPenaltyActive = penalty.banned || (!!penalty.expiresAt && now !== null && penalty.expiresAt > now);
 
   // content="" khi accessGate="purchase" (chương VIP chưa mua — page.tsx
   // cắt về rỗng, không có gì để hiện) — "".split("\n\n") vẫn ra [""], sẽ vẽ
@@ -460,6 +288,7 @@ export function Reader({
   const [listModalOpen, setListModalOpen] = useState(false);
   const [visibleParagraph, setVisibleParagraph] = useState(paragraphs[0] ?? "");
   const paragraphRefs = useRef<Array<HTMLParagraphElement | null>>([]);
+  const { penalty, isPenaltyActive, warningMessage } = useScreenshotPenalty(paragraphRefs);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Bình luận theo đoạn (tham khảo Wattpad) — 1 lần fetch TOÀN BỘ bình
@@ -732,7 +561,7 @@ export function Reader({
   // lúc mount, TRƯỚC effect ghi ở dưới nên không bị effect ghi đè lại giá
   // trị mặc định. setTimeout(0) thay vì gọi setState đồng bộ ngay trong
   // thân effect — react-hooks/set-state-in-effect, cùng cách xử lý với
-  // effect "now" ở dưới và reading-list-modal.tsx.
+  // effect "now" trong use-screenshot-penalty.ts và reading-list-modal.tsx.
   //
   // Nếu CHƯA từng lưu gì (lần đầu ghé trang đọc) — dùng theme tối làm mặc
   // định khi hệ điều hành/trình duyệt đang ở chế độ tối, thay vì luôn ép
@@ -770,160 +599,6 @@ export function Reader({
     return () => document.removeEventListener("keydown", onEscapeKeyDown);
   }, [panelOpen, chapterPickerOpen]);
 
-  useEffect(() => {
-    const loadPenalty = async () => {
-      const serverState = await fetchPenaltyStateFromServer();
-      if (serverState) {
-        savePenaltyState(serverState);
-        setPenalty(serverState);
-        return;
-      }
-
-      setPenalty(getPenaltyState());
-    };
-
-    loadPenalty();
-  }, []);
-
-  // Cấp "giờ hiện tại" cho isPenaltyActive từ effect (client-only), không
-  // gọi Date.now() lúc render. 30s/lần là đủ mịn — hạn phạt tính theo NGÀY
-  // (3/7/14/30 ngày, xem PENALTY_RULES), không cần chính xác tới giây; tick
-  // định kỳ giúp phạt tự hết hiệu lực trên UI mà không cần refresh trang.
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    // setTimeout(0) thay vì gọi tick() đồng bộ ngay dòng đầu effect —
-    // react-hooks/set-state-in-effect không cho setState đồng bộ ngay
-    // trong thân effect (xem cùng cách xử lý ở reading-list-modal.tsx).
-    const timeout = setTimeout(tick, 0);
-    const interval = setInterval(tick, 30_000);
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!screenshotDetected || penaltyAppliedRef.current) return;
-    penaltyAppliedRef.current = true;
-
-    const applyPenalty = async () => {
-      const result = await postScreenshotPenaltyToServer();
-      if (result) {
-        savePenaltyState(result.state);
-        setPenalty(result.state);
-        setWarningMessage(
-          result.warningOnly
-            ? "Đây là lần đầu hệ thống phát hiện — chưa trừ token lần này. Lần tới sẽ bị trừ token và khoá nội dung tạm thời."
-            : result.state.banned
-              ? "Bạn đã bị cấm vì chụp màn hình."
-              : `Đã áp dụng phạt. Số token trừ: ${result.state.deductedAmount ?? 0}`
-        );
-        return;
-      }
-
-      if (penalty.banned) {
-        return;
-      }
-
-      const now = Date.now();
-      const nextCount = penalty.count + 1;
-      const next = getNextPenalty(penalty.count);
-
-      if ("warning" in next) {
-        // Server không phản hồi được — vẫn cho qua với cảnh báo cục bộ,
-        // KHÔNG tự trừ token/khoá nội dung phía client (nguồn sự thật là
-        // server; chỉ ghi nhận count để lần sau không lặp lại cảnh báo).
-        const warnedState: PenaltyState = {
-          count: nextCount,
-          expiresAt: null,
-          banned: false,
-          lastOffenseAt: now,
-          deductedAmount: null,
-        };
-        savePenaltyState(warnedState);
-        setPenalty(warnedState);
-        setWarningMessage(
-          "Đây là lần đầu hệ thống phát hiện — chưa trừ token lần này. Lần tới sẽ bị trừ token và khoá nội dung tạm thời."
-        );
-        return;
-      }
-
-      setWarningMessage("Không thể cập nhật phạt đến server. Phạt vẫn được ghi cục bộ.");
-
-      if ("ban" in next && next.ban) {
-        const bannedState: PenaltyState = {
-          count: nextCount,
-          expiresAt: null,
-          banned: true,
-          lastOffenseAt: now,
-          deductedAmount: null,
-        };
-        savePenaltyState(bannedState);
-        setPenalty(bannedState);
-        return;
-      }
-
-      const expiresAt = now + next.durationDays * 24 * 60 * 60 * 1000;
-      const nextState: PenaltyState = {
-        count: nextCount,
-        expiresAt,
-        banned: false,
-        lastOffenseAt: now,
-        deductedAmount: Math.max(1, Math.ceil((1000 * ("percent" in next ? next.percent : 0)) / 100)),
-      };
-      savePenaltyState(nextState);
-      setPenalty(nextState);
-    };
-
-    applyPenalty();
-  }, [screenshotDetected, penalty]);
-
-  useEffect(() => {
-    // Thông điệp cảnh báo TỨC THỜI (trước khi biết chắc server trả lời gì)
-    // — đoán trước dựa trên penaltyRef.current.count (giá trị MỚI NHẤT tại
-    // thời điểm bấm, xem khai báo penaltyRef ở trên): count===0 nghĩa là
-    // lần vi phạm SẮP TỚI sẽ chỉ là cảnh báo (xem getNextPenalty), count>=1
-    // nghĩa là lần này sẽ bị trừ token/khoá thật. applyPenalty ở trên sẽ
-    // ghi đè thông điệp này bằng phản hồi thật từ server ngay sau đó — đây
-    // chỉ là phản hồi tức thời trong lúc chờ.
-    // Chỉ phím tắt chụp/lưu thật, bỏ qua ô nhập liệu — xem
-    // src/lib/reading/capture-detection.ts (lỗi Shift+S trước đây).
-    const isTyping = (target: EventTarget | null) => target instanceof HTMLElement && isEditableTarget(target);
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (isTyping(event.target)) return;
-      if (isCaptureShortcut(event)) {
-        setScreenshotDetected(true);
-        setWarningMessage(
-          penaltyRef.current.count === 0
-            ? "Hệ thống đã phát hiện hành vi chụp màn hình — đây là lần đầu nên chỉ cảnh báo."
-            : "Hệ thống đã phát hiện hành vi chụp màn hình và đang áp dụng phạt."
-        );
-      }
-    };
-
-    const onCopy = (event: ClipboardEvent) => {
-      // Chỉ tính khi sao chép NỘI DUNG CHƯƠNG — không tính chữ trong ô nhập
-      // liệu, bình luận hay phần giao diện khác của trang.
-      if (isTyping(event.target) || isTyping(document.activeElement)) return;
-      const selection = document.getSelection();
-      if (!selection || selection.isCollapsed) return;
-      if (!paragraphRefs.current.some((p) => p && selection.containsNode(p, true))) return;
-      setScreenshotDetected(true);
-      setWarningMessage(
-        penaltyRef.current.count === 0
-          ? "Hệ thống đã phát hiện hành vi sao chép/chụp màn hình — đây là lần đầu nên chỉ cảnh báo."
-          : "Hệ thống đã phát hiện hành vi sao chép/chụp màn hình và đang áp dụng phạt."
-      );
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("copy", onCopy);
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("copy", onCopy);
-    };
-  }, []);
 
   // Tự cuộn tới đoạn đã đọc dở lần trước (initialParagraphIndex, page.tsx
   // đã đối chiếu đúng chapter_id) — CHỈ 1 LẦN lúc mount, không lặp lại
@@ -946,12 +621,13 @@ export function Reader({
   // (không ghi mỗi lần đổi đoạn, tránh spam API lúc cuộn nhanh), qua
   // src/app/api/books/[bookId]/reading-progress/route.ts. Best-effort —
   // lỗi bỏ qua im lặng (mất 1 lần ghi tiến độ không phải sự cố nghiêm
-  // trọng), không cần đăng nhập cũng gọi được, route tự trả 401 và bị
-  // nuốt ở catch. Xem migrations/20260910_add_book_progress_paragraph.sql.
+  // trọng). Khách chưa đăng nhập thì bỏ qua hẳn (route chỉ trả 401, gọi
+  // cũng vô ích) — isLoggedIn do page.tsx tính sẵn (viewerId !== null).
+  // Xem migrations/archive/20260910_add_book_progress_paragraph.sql.
   const progressSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedParagraphRef = useRef<number | null>(null);
   const scheduleProgressSave = (idx: number) => {
-    if (!bookId || !chapterId || lastSavedParagraphRef.current === idx) return;
+    if (!isLoggedIn || !bookId || !chapterId || lastSavedParagraphRef.current === idx) return;
     if (progressSaveTimeoutRef.current) clearTimeout(progressSaveTimeoutRef.current);
     progressSaveTimeoutRef.current = setTimeout(() => {
       lastSavedParagraphRef.current = idx;
@@ -965,7 +641,7 @@ export function Reader({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chapterId, paragraphIndex: idx, isLastParagraph }),
       }).catch(() => {
-        // best-effort — bỏ qua lỗi mạng/401 (chưa đăng nhập)
+        // best-effort — bỏ qua lỗi mạng/401 (hết phiên đăng nhập)
       });
     }, 3000);
   };
@@ -976,7 +652,7 @@ export function Reader({
   // hay gửi dồn nhịp đều không tăng thời gian đọc. Nhịp đầu gửi ngay khi mở chương; quay lại
   // tab hoặc tương tác lại sau khi ngừng thì gửi ngay để bắt đầu đo lại. Chỉ khi đọc được toàn
   // bộ chương (accessGate "none") và đã đăng nhập. Nguồn truy cập lấy từ reading-source.ts.
-  // Xem migrations/20260926_add_reading_session_tracking.sql.
+  // Xem migrations/archive/20260926_add_reading_session_tracking.sql.
   const currentParagraphRef = useRef(0);
   useEffect(() => {
     if (!isLoggedIn || accessGate !== "none" || !bookId || !chapterId) return;
@@ -1418,7 +1094,7 @@ export function Reader({
           </div>
 
           {(warningMessage || penalty.banned || isPenaltyActive) && (
-            <div className="mb-6 rounded-[14px] border border-[#F3C6C6] bg-[#FBEDEC] px-4 py-3 text-sm text-[#B02A37]">
+            <div className="mb-6 rounded-[14px] border border-error-border bg-error-bg px-4 py-3 text-sm text-error">
               <div>
                 {warningMessage
                   ? warningMessage
@@ -1797,7 +1473,7 @@ export function Reader({
         />
       )}
       {removeError && (
-        <div className="fixed inset-x-4 bottom-20 z-[80] mx-auto max-w-[420px] rounded-lg border border-[#f3c6c6] bg-[#fdf1f1] px-4 py-2.5 text-center text-[13px] font-medium text-[#B02A37] shadow-[0_8px_24px_rgba(0,0,0,.15)] sm:bottom-6">
+        <div className="fixed inset-x-4 bottom-20 z-[80] mx-auto max-w-[420px] rounded-lg border border-error-border bg-[#fdf1f1] px-4 py-2.5 text-center text-[13px] font-medium text-error shadow-[0_8px_24px_rgba(0,0,0,.15)] sm:bottom-6">
           {removeError}
         </div>
       )}

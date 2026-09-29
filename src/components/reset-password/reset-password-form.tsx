@@ -69,7 +69,7 @@ export function ResetPasswordForm() {
   if (sessionCheck === "invalid") {
     return (
       <div className="mx-auto w-full max-w-[400px]">
-        <WarningCircleIcon weight="fill" size={40} color="#B02A37" />
+        <WarningCircleIcon weight="fill" size={40} className="text-error" />
         <div className="mt-4 text-[24px] font-bold tracking-[-0.4px] text-brand-ink">
           Liên kết không hợp lệ
         </div>
@@ -122,7 +122,7 @@ export function ResetPasswordForm() {
             ))}
           </div>
           <div
-            style={{ color: score >= 3 ? "#2F7A4F" : "var(--color-stone-light)" }}
+            style={{ color: score >= 3 ? "var(--color-success-form)" : "var(--color-stone-light)" }}
             className="mt-1.5 text-xs"
           >
             {PASSWORD_SCORE_LABELS[score] || "Ít nhất 8 ký tự"}

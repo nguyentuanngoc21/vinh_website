@@ -1,19 +1,40 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
+import { cache } from "react";
 import { Reader } from "@/components/reading/reader";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId, getAuthedAdminId } from "@/lib/wallet/session";
+import { getAuthedViewer } from "@/lib/wallet/session";
+import { isAdminRole } from "@/lib/roles";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 import { buildContentPreview } from "@/lib/reading/access-gate";
 import { extractAllDesignImageIds } from "@/lib/design/share-link";
 
+// Query chính (sách + chương) dùng chung cho generateMetadata và page —
+// cache() dedupe trong cùng 1 request, nên chỉ chạy 1 lần. Sách và chương
+// query SONG SONG (chương theo id, không lọc book_id), rồi kiểm lại
+// chapter.book_id === book.id — giữ đúng hành vi cũ (chương không thuộc
+// sách trong URL → 404). Trả null ở mọi trường hợp page phải notFound().
+const loadReadChapter = cache(async (bookSlug: string, chapterId: string) => {
+  const supabase = await createClient();
+  const [{ data: book }, { data: chapter }] = await Promise.all([
+    supabase.from("books").select("id, slug, title, synopsis, author_id, published").eq("slug", bookSlug).maybeSingle(),
+    supabase
+      .from("chapters")
+      .select("id, book_id, title, content, order_index, published, price")
+      .eq("id", chapterId)
+      .maybeSingle(),
+  ]);
+  if (!book || !book.published) return null;
+  if (!chapter || chapter.book_id !== book.id || !chapter.published) return null;
+  return { book, chapter };
+});
+
 export async function generateMetadata({
   params,
 }: PageProps<"/read/[bookSlug]/[chapterId]">): Promise<Metadata> {
-  const { chapterId } = await params;
-  const supabase = await createClient();
-  const { data: chapter } = await supabase.from("chapters").select("title").eq("id", chapterId).maybeSingle();
+  const { bookSlug, chapterId } = await params;
+  const chapter = (await loadReadChapter(bookSlug, chapterId))?.chapter;
 
   return {
     title: chapter ? `${chapter.title} — Vịnh` : "Đọc truyện — Vịnh",
@@ -35,26 +56,16 @@ export default async function ReadChapterPage({
   const supabase = await createClient();
   const serviceClient = createServiceRoleClient();
 
-  const { data: book } = await supabase
-    .from("books")
-    .select("id, slug, title, synopsis, author_id, published")
-    .eq("slug", bookSlug)
-    .maybeSingle();
-  if (!book || !book.published) notFound();
+  const loaded = await loadReadChapter(bookSlug, chapterId);
+  if (!loaded) notFound();
+  const { book, chapter } = loaded;
 
-  const { data: chapter } = await supabase
-    .from("chapters")
-    .select("id, title, content, order_index, published, price")
-    .eq("id", chapterId)
-    .eq("book_id", book.id)
-    .maybeSingle();
-  if (!chapter || !chapter.published) notFound();
-
-  // getAuthedUserId() thử cả session cookie tự ký VÀ Supabase Auth thật
+  // getAuthedViewer() thử cả session cookie tự ký VÀ Supabase Auth thật
   // (src/lib/wallet/session.ts) — nhất quán với các route khác trong repo
-  // (penalty, wallet), thay vì chỉ supabase.auth.getUser(). Resolve 1 lần,
-  // dùng lại cho cả render (vote/follow đã có chưa) và after() (book_progress).
-  const [{ data: authorProfile }, { data: siblings }, { data: voteCountRow }, viewerId, linkedAudio, adminId] =
+  // (penalty, wallet), thay vì chỉ supabase.auth.getUser(). Resolve 1 lần
+  // (id + role trong 1 query profiles), dùng lại cho cả render (vote/follow
+  // đã có chưa, nút "Xóa" kiểm duyệt) và after() (book_progress).
+  const [{ data: authorProfile }, { data: siblings }, { data: voteCountRow }, viewer, linkedAudio, tropeCandidates] =
     await Promise.all([
       supabase.from("author_public_profiles").select("nickname, avatar_url").eq("id", book.author_id).maybeSingle(),
       // Lấy luôn `title` — dùng chung cho tính prev/next VÀ danh sách chọn
@@ -66,12 +77,20 @@ export default async function ReadChapterPage({
         .eq("published", true)
         .order("order_index", { ascending: true }),
       supabase.from("chapter_vote_counts").select("vote_count").eq("chapter_id", chapter.id).maybeSingle(),
-      getAuthedUserId(serviceClient),
+      getAuthedViewer(serviceClient),
       getChapterAudio(supabase, chapter.id),
-      // Cho nút "Xóa" (kiểm duyệt) ở AuthorPanel — null nếu chưa đăng nhập
-      // hoặc không phải admin/super_admin, ẩn nút hoàn toàn khi đó.
-      getAuthedAdminId(serviceClient),
+      // Nhân vật gắn với CHƯƠNG NÀY — cho panel "Bình chọn mẫu hình nhân
+      // vật" (reader_vote_trope). Rỗng thì Reader tự ẩn panel, không bịa dữ
+      // liệu. 2 bước (không dùng embed characters(...)) — tránh phụ thuộc
+      // Relationships của generated types (xem cách achievement-service.ts
+      // đã làm cho reading_history/books). Bước 2 nối tiếp ngay trong
+      // promise này, không chờ các query khác trong Promise.all.
+      loadTropeCandidates(supabase, chapter.id),
     ]);
+  const viewerId = viewer?.id ?? null;
+  // Cho nút "Xóa" (kiểm duyệt) ở AuthorPanel — false nếu chưa đăng nhập
+  // hoặc không phải admin/super_admin, ẩn nút hoàn toàn khi đó.
+  const viewerIsAdmin = isAdminRole(viewer?.role);
 
   const ordered = siblings ?? [];
   const idx = ordered.findIndex((c) => c.id === chapter.id);
@@ -98,7 +117,7 @@ export default async function ReadChapterPage({
           // Tự cuộn tới đúng đoạn đã đọc dở — CHỈ áp dụng nếu chapter_id đã
           // lưu khớp đúng chương đang mở (mở chương khác, kể cả cùng sách,
           // thì bắt đầu từ đầu). Xem
-          // migrations/20260910_add_book_progress_paragraph.sql.
+          // migrations/archive/20260910_add_book_progress_paragraph.sql.
           serviceClient
             .from("book_progress")
             .select("chapter_id, last_paragraph_index")
@@ -108,21 +127,6 @@ export default async function ReadChapterPage({
           serviceClient.from("character_trope_votes").select("character_id").eq("user_id", viewerId).eq("chapter_id", chapter.id).maybeSingle(),
         ])
       : [{ data: null }, { data: null }, { data: null }, { data: null }, { data: null }];
-
-  // Nhân vật gắn với CHƯƠNG NÀY — cho panel "Bình chọn mẫu hình nhân vật"
-  // (reader_vote_trope). Rỗng thì Reader tự ẩn panel, không bịa dữ liệu.
-  // 2 bước (không dùng embed characters(...)) — tránh phụ thuộc
-  // Relationships của generated types (xem cách achievement-service.ts đã
-  // làm cho reading_history/books).
-  const { data: chapterCharacterRows } = await supabase
-    .from("chapter_characters")
-    .select("character_id")
-    .eq("chapter_id", chapter.id);
-  const taggedCharacterIds = (chapterCharacterRows ?? []).map((r) => r.character_id);
-  const { data: tropeCandidateRows } = taggedCharacterIds.length
-    ? await supabase.from("characters").select("id, name, role, trope").in("id", taggedCharacterIds)
-    : { data: [] as { id: string; name: string; role: "hero" | "villain" | "neutral"; trope: string | null }[] };
-  const tropeCandidates = tropeCandidateRows ?? [];
 
   const initialParagraphIndex =
     progressRow && progressRow.chapter_id === chapter.id ? progressRow.last_paragraph_index : null;
@@ -224,7 +228,7 @@ export default async function ReadChapterPage({
       initialVoted={!!votedRow}
       initialVoteCount={voteCountRow?.vote_count ?? 0}
       linkedAudio={linkedAudio}
-      viewerIsAdmin={!!adminId}
+      viewerIsAdmin={viewerIsAdmin}
       accessGate={accessGate}
       chapterPrice={chapter.price}
       isLoggedIn={viewerId !== null}
@@ -233,4 +237,23 @@ export default async function ReadChapterPage({
       initialTropeVoteCharacterId={myTropeVote?.character_id ?? null}
     />
   );
+}
+
+type TropeCandidate = { id: string; name: string; role: "hero" | "villain" | "neutral"; trope: string | null };
+
+async function loadTropeCandidates(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  chapterId: string
+): Promise<TropeCandidate[]> {
+  const { data: chapterCharacterRows } = await supabase
+    .from("chapter_characters")
+    .select("character_id")
+    .eq("chapter_id", chapterId);
+  const taggedCharacterIds = (chapterCharacterRows ?? []).map((r) => r.character_id);
+  if (!taggedCharacterIds.length) return [];
+  const { data: tropeCandidateRows } = await supabase
+    .from("characters")
+    .select("id, name, role, trope")
+    .in("id", taggedCharacterIds);
+  return tropeCandidateRows ?? [];
 }

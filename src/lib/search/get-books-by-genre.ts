@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
-import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import type { BookSearchResult } from "./search-books";
 
 const PAGE_SIZE = 24;
@@ -60,7 +60,7 @@ export async function getBooksByGenre(
   const authorIds = [...new Set(rows.map((r) => r.author_id))];
   const [{ data: authors }, coverUrls] = await Promise.all([
     supabase.from("author_public_profiles").select("id, nickname").in("id", authorIds),
-    Promise.all(rows.map((r) => resolveBookCoverUrl(supabase, r))),
+    resolveBookCoverUrls(supabase, rows),
   ]);
   const nicknameById = new Map((authors ?? []).map((a) => [a.id, a.nickname]));
 

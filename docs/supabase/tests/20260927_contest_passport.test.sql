@@ -1,6 +1,6 @@
--- Test cho migrations/20260927_add_contest_passport.sql.
+-- Test cho migrations/archive/20260927_add_contest_passport.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration (và
--- migrations/20260927_add_contest_quests.sql). KHÔNG chạy trên production.
+-- migrations/archive/20260927_add_contest_quests.sql). KHÔNG chạy trên production.
 --
 -- Cuộc thi đang nhận bài; 3 tác giả, 3 bài: A (2 chương), B, C (1 chương), mỗi chương
 -- 1000 chữ → ngưỡng đọc thật 96 giây. Người đọc r1 đi dần 7 cột mốc.

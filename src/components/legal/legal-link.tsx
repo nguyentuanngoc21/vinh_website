@@ -2,15 +2,18 @@
 
 import { useState, type ReactNode } from "react";
 import { LegalDocumentModal } from "./legal-document-modal";
-import { getAgreement } from "@/lib/legal/registry";
+import { AGREEMENT_META, loadAgreementHtml, type AgreementId } from "@/lib/legal/agreement-meta";
 
-// Alias sang registry.ts (nguồn sự thật chung với tab Cam kết & Thỏa thuận
-// ở /ca-nhan) — giữ nguyên 2 khoá "terms"/"privacy" cũ vì đã có nhiều nơi
-// gọi LegalLink với 2 khoá này (footer, register-form, login-form...).
-const DOCS = {
-  terms: getAgreement("dieu-khoan-su-dung")!,
-  privacy: getAgreement("chinh-sach-bao-mat")!,
-} as const;
+// Alias sang agreement-meta.ts (cùng nguồn với registry.ts / tab Cam kết &
+// Thỏa thuận ở /ca-nhan) — giữ nguyên 2 khoá "terms"/"privacy" cũ vì đã có
+// nhiều nơi gọi LegalLink với 2 khoá này (footer, register-form,
+// login-form...). CỐ Ý không import registry.ts: file đó import tĩnh HTML
+// của cả 6 văn bản (~160 KB) — LegalLink có mặt trên footer mọi trang công
+// khai, nên HTML chỉ được tải (dynamic import) khi người dùng mở popup.
+const DOCS: Record<"terms" | "privacy", AgreementId> = {
+  terms: "dieu-khoan-su-dung",
+  privacy: "chinh-sach-bao-mat",
+};
 
 type LegalLinkProps = {
   doc: keyof typeof DOCS;
@@ -31,11 +34,18 @@ type LegalLinkProps = {
  */
 export function LegalLink({ doc, className = "", children }: LegalLinkProps) {
   const [open, setOpen] = useState(false);
-  const target = DOCS[doc];
+  const [html, setHtml] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const id = DOCS[doc];
 
   const activate = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
     setOpen(true);
+    if (html !== null) return;
+    setError(null);
+    loadAgreementHtml(id)
+      .then(setHtml)
+      .catch(() => setError("Không tải được văn bản. Vui lòng kiểm tra kết nối và thử lại."));
   };
 
   return (
@@ -54,7 +64,7 @@ export function LegalLink({ doc, className = "", children }: LegalLinkProps) {
       >
         {children}
       </span>
-      <LegalDocumentModal open={open} onClose={() => setOpen(false)} title={target.name} html={target.html} />
+      <LegalDocumentModal open={open} onClose={() => setOpen(false)} title={AGREEMENT_META[id].name} html={html} error={error} />
     </>
   );
 }

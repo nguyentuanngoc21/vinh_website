@@ -1,6 +1,6 @@
 /**
  * Chấm giải (Slice 2.5b): cấu hình chấm có version, giám khảo, phiếu chấm.
- * Xem migrations/20260926_add_contest_judging.sql và
+ * Xem migrations/archive/20260926_add_contest_judging.sql và
  * docs/CONTEST_ENGINE_AUDIT_AND_PLAN.md XXI (J5–J7, J11).
  *
  *   - Admin: lưu version cấu hình (kiểm bằng parseFinalScoringConfig), gán / gỡ

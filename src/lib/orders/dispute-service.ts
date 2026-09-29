@@ -4,7 +4,7 @@ import type { Database, OrderStatus } from "@/lib/supabase/types";
 type Client = SupabaseClient<Database>;
 
 /** Báo cáo vi phạm/Tranh chấp (Module 9 đặc tả) — xem
- * migrations/20260901_add_trust_and_disputes.sql. */
+ * migrations/archive/20260901_add_trust_and_disputes.sql. */
 export const DisputeService = {
   async open(supabase: Client, params: { orderId: string; reporterId: string; reasonCategory: string; description: string }) {
     const { data, error } = await supabase.rpc("open_dispute", {

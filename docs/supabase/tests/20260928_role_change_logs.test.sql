@@ -1,4 +1,4 @@
--- Test cho migrations/20260928_add_role_change_logs.sql.
+-- Test cho migrations/archive/20260928_add_role_change_logs.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. KHÔNG chạy trên production.
 --
 -- 1 super_admin, 1 admin, 1 user thường. Kiểm admin_set_user_role(): chỉ

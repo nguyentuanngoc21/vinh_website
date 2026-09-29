@@ -3,12 +3,12 @@ import Link from "next/link";
 export function AuthorCta() {
   return (
     <section className="px-4 pb-11 sm:px-8 lg:px-11">
-      <div className="flex flex-col items-start justify-between gap-5 rounded-[20px] bg-[#F7EFD8] p-6 sm:flex-row sm:items-center sm:px-11 sm:py-9">
+      <div className="flex flex-col items-start justify-between gap-5 rounded-[20px] bg-cream-gold p-6 sm:flex-row sm:items-center sm:px-11 sm:py-9">
         <div>
           <div className="text-2xl font-bold text-brand-ink">
             Bạn là tác giả?
           </div>
-          <div className="mt-1.5 text-[15px] text-[#6b5f3a]">
+          <div className="mt-1.5 text-[15px] text-cream-gold-text">
             Đăng tác phẩm, theo dõi lượt đọc và nhận bảo hộ bản quyền tự động
             cho mỗi chương.
           </div>

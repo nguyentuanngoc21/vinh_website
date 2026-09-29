@@ -8,6 +8,7 @@ import type { MessageContext } from "@/lib/use-conversations";
 import { chatThreadHref } from "@/lib/chat-thread-href";
 import { autoGrowTextarea, resetTextareaHeight } from "@/lib/autogrow-textarea";
 import { OrderSummaryChip, type OrderSummary } from "@/components/messenger/order-summary-chip";
+import { startVisiblePolling } from "@/lib/hooks/visible-polling";
 
 type ThreadMessage = { id: string; body: string; createdAt: string; mine: boolean; flagged?: boolean };
 type OrderRow = {
@@ -69,11 +70,10 @@ export function ChatBubbleWindow({
           // ngay ở danh sách chia sẻ (MessengerBell/dock), không chờ poll.
           onThreadReadRef.current(conv.userId, conv.context);
         });
-    load();
-    const interval = setInterval(load, THREAD_POLL_MS);
+    const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stopPolling();
     };
   }, [conv.userId, conv.context]);
 
@@ -105,11 +105,10 @@ export function ChatBubbleWindow({
               : null
           );
         });
-    load();
-    const interval = setInterval(load, THREAD_POLL_MS);
+    const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stopPolling();
     };
   }, [conv.userId]);
 
@@ -186,7 +185,7 @@ export function ChatBubbleWindow({
             {m.mine && m.flagged && (
               <div
                 title="Tin nhắn có thể chứa thông tin liên hệ/giao dịch ngoài nền tảng — chỉ mình bạn thấy cảnh báo này."
-                className="mt-1 flex items-center gap-1 text-[9.5px] text-[#A9781A]"
+                className="mt-1 flex items-center gap-1 text-[9.5px] text-brand-gold-dark"
               >
                 <WarningCircleIcon weight="fill" size={10} /> Có thể chứa thông tin ngoài nền tảng
               </div>
@@ -198,7 +197,7 @@ export function ChatBubbleWindow({
         )}
         <div ref={messagesEndRef} />
       </div>
-      {sendError && <div className="px-3 pb-1.5 text-[11px] text-[#B02A37]">{sendError}</div>}
+      {sendError && <div className="px-3 pb-1.5 text-[11px] text-error">{sendError}</div>}
       {/* KHÔNG dùng Field/Button dùng chung — lỗi có sẵn từ trước (không
           phải mới đổi): Field chỉ áp className lên <input> bên trong,
           không lên <label> bọc ngoài (chính là flex item thật của hàng

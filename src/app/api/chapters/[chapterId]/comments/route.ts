@@ -11,7 +11,7 @@ const BODY_MAX = 2000;
 // nào, chỉ paragraph_index là cột mang ý nghĩa thật cho tính năng "bình
 // luận theo đoạn". Giữ 2 cột này vì chapters.check char_end>char_start
 // và cả 2 NOT NULL (bảng dùng chung shape neo với highlights, xem
-// migrations/20260827_add_anchored_comments.sql).
+// migrations/archive/20260827_add_anchored_comments.sql).
 const NOMINAL_CHAR_START = 0;
 const NOMINAL_CHAR_END = 1;
 

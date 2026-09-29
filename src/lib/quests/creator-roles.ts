@@ -16,7 +16,7 @@ type Client = SupabaseClient<Database>;
  * VĨNH VIỄN by construction, không cần cache trên profiles: hệ thống
  * không xoá hàng thật (soft-delete/purge chỉ rỗng nội dung, giữ nguyên
  * author_id/narrator_id/illustrator_id — xem
- * migrations/20260908_add_content_purge_retention.sql), nên một khi
+ * migrations/archive/20260908_add_content_purge_retention.sql), nên một khi
  * EXISTS true, nó mãi mãi true kể cả sau khi xoá/purge hết nội dung của
  * role đó.
  *

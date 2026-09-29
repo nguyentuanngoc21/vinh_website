@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 /**
  * GET /api/design/albums — album của CHÍNH người gọi, cho ô "Tên album"
@@ -11,15 +11,14 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function GET() {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const { data, error } = await supabase
     .from("design_albums")
     .select("id, name, art_style")
-    .eq("illustrator_id", userData.user.id)
+    .eq("illustrator_id", user.id)
     .order("updated_at", { ascending: false });
   if (error) {
     console.error("[api/design/albums GET] query failed:", error);

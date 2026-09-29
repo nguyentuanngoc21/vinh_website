@@ -20,3 +20,12 @@ export const AUTO_CONFIRM_DAYS = 7;
  * here so order-earning payout timing can be tuned independently of
  * chapter-purchase payout timing later without touching wallet config. */
 export const ORDER_EARNING_HOLD_DAYS = 4;
+
+/** Phạm vi sử dụng (usage_scope) cho đơn hàng/dịch vụ — dùng chung cho form
+ * tạo dịch vụ (services-tab) và thẻ đơn hàng (order-card). Giá trị khớp
+ * usage_scope của orders / default_usage_scope của service_listings. */
+export const SCOPE_OPTIONS = [
+  { value: "personal", label: "Cá nhân" },
+  { value: "commercial_limited", label: "Thương mại giới hạn" },
+  { value: "commercial_full", label: "Thương mại toàn phần" },
+];

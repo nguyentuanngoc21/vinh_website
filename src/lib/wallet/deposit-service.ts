@@ -100,10 +100,10 @@ export const DepositService = {
    */
   async handleWebhook(supabase: Client, gateway: string, rawBody: string, headers: Headers): Promise<WebhookResult> {
     const adapter = ADAPTERS[gateway];
-    if (!adapter) return { ok: false, error: `Unknown payment gateway: ${gateway}` };
+    if (!adapter) return { ok: false, error: `Cổng thanh toán không hợp lệ: ${gateway}` };
 
     const event = adapter.verifyAndParse(rawBody, headers);
-    if (!event) return { ok: false, error: "Invalid signature or payload" };
+    if (!event) return { ok: false, error: "Chữ ký hoặc dữ liệu không hợp lệ." };
 
     if (event.status === "failed") {
       const { data, error } = await supabase
@@ -124,7 +124,7 @@ export const DepositService = {
           .eq("payment_gateway", gateway)
           .eq("gateway_order_id", event.gatewayOrderId)
           .single();
-        if (!existing) return { ok: false, error: "Unknown order" };
+        if (!existing) return { ok: false, error: "Không tìm thấy đơn nạp." };
         return { ok: true, alreadyProcessed: true, deposit: existing };
       }
       return { ok: true, alreadyProcessed: false, deposit: data };
@@ -151,7 +151,7 @@ export const DepositService = {
         .eq("payment_gateway", gateway)
         .eq("gateway_order_id", event.gatewayOrderId)
         .single();
-      if (!existing) return { ok: false, error: "Unknown order" };
+      if (!existing) return { ok: false, error: "Không tìm thấy đơn nạp." };
       return { ok: true, alreadyProcessed: true, deposit: existing };
     }
 
@@ -166,7 +166,7 @@ export const DepositService = {
       // worth crediting (the money did arrive) but this should page
       // finance to check for a gateway-side discrepancy.
       console.error(
-        `[wallet] deposit ${deposit.id}: amount mismatch — order ${deposit.amount_vnd}đ, gateway reported ${event.amountVnd}đ`
+        `[wallet] deposit ${deposit.id}: amount mismatch — order ${deposit.amount_vnd} VNĐ, gateway reported ${event.amountVnd} VNĐ`
       );
     }
 

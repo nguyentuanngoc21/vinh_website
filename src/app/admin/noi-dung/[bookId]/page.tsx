@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Chương · Vịnh Admin" };
  * dẫn tới từ nút "Chương" ở content-table.tsx (/admin/noi-dung). Khác
  * hẳn khoá độc quyền/xoá TRUYỆN (đã có ở trang cha) — đây là hành động
  * CẤP CHƯƠNG, mới hoàn toàn (xem
- * migrations/20260908_add_chapter_moderation_and_notifications.sql +
+ * migrations/archive/20260908_add_chapter_moderation_and_notifications.sql +
  * api/admin/chapters/[chapterId]/route.ts).
  */
 export default async function AdminBookChaptersPage({

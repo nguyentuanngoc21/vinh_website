@@ -83,7 +83,7 @@ Quyết định 24/09/2026 (sau rà soát code đơn hàng):
 - Sửa lỗi chèn filter ở `GET /api/orders?withUserId=` trong 4a (đã làm).
 - Server cưỡng chế số tiền: lần trả đầu >= round(price × deposit_pct / 100), tổng đã trả
   không vượt price. Không bắt buộc trả đủ trước khi bàn giao. Migration
-  `migrations/20260924_enforce_order_payment_amounts.sql`, test
+  `migrations/archive/20260924_enforce_order_payment_amounts.sql`, test
   `docs/supabase/tests/20260924_order_payment_amounts.test.sql` — chạy dev/staging trước,
   kiểm tra đơn cũ lệch số tiền (câu truy vấn trong phần Notes) rồi mới lên production.
 - Thanh toán đơn bằng xu trên mobile: tạm khóa, hướng dẫn thanh toán trên web.

@@ -110,7 +110,7 @@ export function ReadingGate(props: ReadingGateProps) {
         </p>
 
         {purchaseError && (
-          <div className="rounded-[10px] border border-[#F3C6C6] bg-[#FBEDEC] px-3.5 py-2 text-[12.5px] text-[#B02A37]">
+          <div className="rounded-[10px] border border-error-border bg-error-bg px-3.5 py-2 text-[12.5px] text-error">
             {purchaseError}
           </div>
         )}

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
-import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 
 /**
  * Real, DB-backed ranking data for the "Truyện chữ" tab of /rankings
@@ -18,7 +18,7 @@ import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
  * genre-filterable rankings list.
  *
  * audio_narrations gained genre/play_count since the paragraph above was
- * written (migrations/20260901_add_audio_narration_hub_metadata.sql) —
+ * written (migrations/archive/20260901_add_audio_narration_hub_metadata.sql) —
  * the "Audio" tab COULD be wired to real all-time totals now the same way
  * "toanthoigian" ranks books by view_count. It isn't yet: play_count has
  * no day-bucketed history (no audio equivalent of book_read_counts_daily),
@@ -27,7 +27,7 @@ import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
  * future work rather than wiring one tab of four.
  *
  * "tuan"/"thang"/"quy" are real, day-bucketed windows over
- * book_read_counts_daily (see migrations/20260831_add_book_read_counts_daily.sql
+ * book_read_counts_daily (see migrations/archive/20260831_add_book_read_counts_daily.sql
  * — a public aggregate over reading_history's real read_at). "toanthoigian"
  * ranks by books.view_count, the all-time running total. Every period also
  * gets a real ▲/▼: books are ranked a second time using the equal-length
@@ -144,19 +144,36 @@ export async function getBookRankings(
 ): Promise<BookRankingsData> {
   const now = new Date();
   const windows = buildWindows(now);
-  const earliest = windows.quy.prevStart;
 
-  const [{ data: rows }, { data: dailyRows }] = await Promise.all([
+  // Tổng lượt đọc mỗi sách cho từng cửa sổ, gộp sẵn trong SQL
+  // (book_read_counts_between, migrations/20260929_add_ranking_aggregates.sql)
+  // — trước đây tải mọi hàng theo-ngày của ~6 tháng rồi cộng ở JS, vượt
+  // 1000 hàng là PostgREST cắt im lặng.
+  const readsBetween = async (from: Date, to: Date) => {
+    const { data, error } = await supabase.rpc("book_read_counts_between", {
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+    });
+    if (error) console.error("[rankings] book_read_counts_between failed:", error);
+    return new Map((data ?? []).map((r) => [r.book_id, r.read_count]));
+  };
+  const periodKeys = ["tuan", "thang", "quy"] as const;
+
+  const [{ data: rows }, periodReads] = await Promise.all([
     supabase
       .from("books")
       .select("id, slug, title, genre, author_id, view_count, created_at, cover_design_item_id")
       .eq("published", true)
+      .is("deleted_at", null)
       .order("view_count", { ascending: false })
       .order("created_at", { ascending: false }),
-    supabase
-      .from("book_read_counts_daily")
-      .select("book_id, read_date, read_count")
-      .gte("read_date", earliest.toISOString().slice(0, 10)),
+    Promise.all(
+      periodKeys.map(async (key) => {
+        const w = windows[key];
+        const [cur, prev] = await Promise.all([readsBetween(w.curStart, w.curEnd), readsBetween(w.prevStart, w.prevEnd)]);
+        return { cur, prev };
+      })
+    ),
   ]);
 
   const books = rows ?? [];
@@ -175,36 +192,20 @@ export async function getBookRankings(
 
   const [{ data: authors }, { data: chapters }, coverUrls] = await Promise.all([
     supabase.from("author_public_profiles").select("id, nickname").in("id", authorIds),
-    supabase.from("chapters").select("book_id").eq("published", true).in("book_id", bookIds),
-    // 1 request/sách — cùng lý do đã giải thích ở toHomepageBooks(): số
-    // sách publish còn nhỏ, không đáng gộp thành 1 query IN() riêng.
-    Promise.all(books.map((b) => resolveBookCoverUrl(supabase, b))),
+    supabase.from("book_chapter_stats").select("book_id, published_chapter_count").in("book_id", bookIds),
+    resolveBookCoverUrls(supabase, books),
   ]);
 
   const nicknameById = new Map((authors ?? []).map((a) => [a.id, a.nickname]));
-  const chapterCountByBook = new Map<string, number>();
-  for (const c of chapters ?? []) {
-    chapterCountByBook.set(c.book_id, (chapterCountByBook.get(c.book_id) ?? 0) + 1);
-  }
+  const chapterCountByBook = new Map((chapters ?? []).map((c) => [c.book_id, c.published_chapter_count]));
   const coverByBook = new Map(books.map((b, i) => [b.id, coverUrls[i]]));
 
   // sums[period].cur/prev: bookId -> reads within that window.
   const sums: Record<Exclude<RealPeriodId, "toanthoigian">, { cur: Map<string, number>; prev: Map<string, number> }> = {
-    tuan: { cur: new Map(), prev: new Map() },
-    thang: { cur: new Map(), prev: new Map() },
-    quy: { cur: new Map(), prev: new Map() },
+    tuan: periodReads[0],
+    thang: periodReads[1],
+    quy: periodReads[2],
   };
-  const bump = (m: Map<string, number>, bookId: string, count: number) =>
-    m.set(bookId, (m.get(bookId) ?? 0) + count);
-
-  for (const row of dailyRows ?? []) {
-    const d = new Date(row.read_date + "T00:00:00Z");
-    for (const key of ["tuan", "thang", "quy"] as const) {
-      const w = windows[key];
-      if (d >= w.curStart && d < w.curEnd) bump(sums[key].cur, row.book_id, row.read_count);
-      else if (d >= w.prevStart && d < w.prevEnd) bump(sums[key].prev, row.book_id, row.read_count);
-    }
-  }
 
   function buildBase() {
     return books.map((b) => ({

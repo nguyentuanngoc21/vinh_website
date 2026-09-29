@@ -26,7 +26,7 @@ export type AchievementView = {
  * Đọc + đồng bộ thành tựu của 1 user — 1 khung chung cho mọi loại thành
  * tựu (metric-based: author/narrator/designer, VÀ streak-linked qua
  * streak_milestones.badge_id), lọc/tô màu theo forRole ở tầng UI (NULL =
- * chung/đọc giả). Xem migrations/20260908_add_achievements.sql.
+ * chung/đọc giả). Xem migrations/archive/20260908_add_achievements.sql.
  */
 export const AchievementService = {
   async listForUser(supabase: Client, userId: string): Promise<AchievementView[]> {
@@ -177,7 +177,7 @@ function maxGenresWithinWindow(firstReadByGenre: Map<string, number>): number {
  * nơi tính cùng 1 công thức (SQL cho unlock thật, JS ở đây cho progress
  * bar hiển thị), đổi 1 bên nhớ đổi bên kia. Giờ-trong-ngày/ranh giới ngày
  * dùng server/UTC thống nhất, không theo timezone từng user (xem
- * migrations/20260917_add_reading_event_log.sql). */
+ * migrations/archive/20260917_add_reading_event_log.sql). */
 async function getMetricCounts(supabase: Client, userId: string): Promise<Record<AchievementMetric, number>> {
   const [booksRes, audioRes, designRes, readingHistoryRes, topupRes, readingListsRes, highlightsRes, followsRes] =
     await Promise.all([

@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { recordReadingProgress } from "@/lib/reading/record-progress";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "@/lib/validation/uuid";
 
 /**
  * POST /api/books/:bookId/reading-progress — ghi lại ĐOẠN VĂN cụ thể
@@ -21,7 +20,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * isLastParagraph (tuỳ chọn, reader.tsx gửi khi đoạn đang xem là đoạn cuối
  * chương) — kích hoạt ReadingEventService.recordChapterCompletion(), nguồn
  * duy nhất ghi reading_history/streak/tiến trình nhiệm vụ "hoàn thành
- * chương". Xem migrations/20260917_add_reading_event_log.sql.
+ * chương". Xem migrations/archive/20260917_add_reading_event_log.sql.
  *
  * Mọi kiểm tra (chương đã xuất bản + thuộc đúng truyện, quyền đọc chương
  * trả phí, chỉ số đoạn hợp lệ) nằm trong recordReadingProgress() — dùng
@@ -36,14 +35,14 @@ export async function POST(
   const supabase = createServiceRoleClient();
   const userId = await getAuthedUserId(supabase);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
   const chapterId = typeof body?.chapterId === "string" ? body.chapterId : "";
   const paragraphIndex = Number(body?.paragraphIndex);
   const isLastParagraph = body?.isLastParagraph === true;
-  if (!UUID.test(bookId) || !UUID.test(chapterId) || !Number.isInteger(paragraphIndex) || paragraphIndex < 0) {
+  if (!isUuid(bookId) || !isUuid(chapterId) || !Number.isInteger(paragraphIndex) || paragraphIndex < 0) {
     return NextResponse.json({ error: "Thiếu chapterId/paragraphIndex hợp lệ." }, { status: 400 });
   }
 

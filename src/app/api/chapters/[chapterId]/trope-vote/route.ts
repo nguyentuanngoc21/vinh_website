@@ -7,7 +7,7 @@ import { RewardEngine } from "@/lib/quests/reward-engine";
  * POST /api/chapters/:chapterId/trope-vote — bình chọn 1 nhân vật (mang 1
  * "trope"/mẫu hình) làm yêu thích trong chương đang đọc — nhiệm vụ
  * reader_vote_trope. 1 vote/chương/user (unique user_id+chapter_id, xem
- * migrations/20260919_add_characters.sql) — đổi ý thì UPDATE, không tính
+ * migrations/archive/20260919_add_characters.sql) — đổi ý thì UPDATE, không tính
  * lại tiến trình nhiệm vụ lần 2 (chỉ tăng ở lần vote ĐẦU cho chương này).
  */
 export async function POST(

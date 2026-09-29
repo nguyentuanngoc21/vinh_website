@@ -10,7 +10,7 @@ const TONE_CLASS: Record<Tone, string> = {
 
 /**
  * Inline banner for form errors and notices. Replaces the one-off
- *   rounded-[10px] border border-[#f3c6c6] bg-[#FBEDEC] ... text-[#B02A37]
+ *   rounded-[10px] border border-error-border bg-error-bg ... text-error
  * block duplicated in login-form, register-form, and the profile tabs.
  *
  * `icon` is optional — pass a Phosphor icon element for banners that need

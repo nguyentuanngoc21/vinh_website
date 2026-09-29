@@ -27,7 +27,7 @@ import {
   encodeFeedCursor,
   encodeRankingCursor,
 } from "@/lib/contests/ranking";
-import { toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-books";
+import { HOMEPAGE_BOOK_COLUMNS, toHomepageBooks, type HomepageBook } from "@/lib/home/get-homepage-books";
 import { freezeScores, getScoreState, getSubmissionScores } from "@/lib/contests/scores-service";
 import { getPublishedRun } from "@/lib/contests/final-scoring-service";
 import { HIDDEN_GEM_COUNT, pickHiddenGems, trendingGrowth, type TrendingGrowth } from "@/lib/contests/signals";
@@ -35,7 +35,6 @@ import type { RankChange } from "@/lib/contests/rank-change";
 import { loadRankChanges } from "@/lib/contests/rank-snapshot-service";
 
 type Client = SupabaseClient<Database>;
-type BookRow = Database["public"]["Tables"]["books"]["Row"];
 
 export type EntrySort = "new" | "discover" | "az";
 const MAX_LIMIT = 50;
@@ -81,9 +80,9 @@ function clampLimit(limit: number | undefined, fallback: number): number {
 /** Thẻ truyện theo đúng thứ tự bookIds; bỏ sách không còn đọc được. */
 async function cardsFor(client: Client, bookIds: string[]): Promise<Map<string, HomepageBook>> {
   if (bookIds.length === 0) return new Map();
-  const { data, error } = await client.from("books").select("*").in("id", bookIds);
+  const { data, error } = await client.from("books").select(HOMEPAGE_BOOK_COLUMNS).in("id", bookIds);
   throwIfError(error, "load entry books");
-  const cards = await toHomepageBooks(client, (data ?? []) as BookRow[]);
+  const cards = await toHomepageBooks(client, data ?? []);
   return new Map(cards.map((c) => [c.id, c]));
 }
 

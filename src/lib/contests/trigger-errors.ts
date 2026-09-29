@@ -1,6 +1,6 @@
 /**
  * Lỗi từ 2 trigger của Contest Engine trên bảng có sẵn (errcode
- * check_violation + hint riêng — migrations/20260926_add_contest_engine_core.sql):
+ * check_violation + hint riêng — migrations/archive/20260926_add_contest_engine_core.sql):
  *   - contest_paid_chapter (D8): chương của sách đang dự thi không được có giá;
  *   - contest_exclusive_lock (D11): không tắt độc quyền khi đang dự thi cuộc
  *     thi yêu cầu độc quyền.

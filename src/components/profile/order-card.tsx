@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { WalletIcon, ClockCountdownIcon, CheckCircleIcon, WarningOctagonIcon } from "@phosphor-icons/react/dist/ssr";
 import { Button, Alert } from "@/components/ui";
+import { SCOPE_OPTIONS } from "@/lib/orders/config";
 import { AuthorNameAgreementPanel } from "@/components/profile/author-name-agreement-panel";
+import { formatVnd } from "@/lib/format-currency";
 
 export type OrderRow = {
   id: string;
@@ -40,15 +42,6 @@ const STATUS_LABELS: Record<string, string> = {
   disputed: "Đang tranh chấp",
 };
 
-const SCOPE_OPTIONS = [
-  { value: "personal", label: "Cá nhân" },
-  { value: "commercial_limited", label: "Thương mại giới hạn" },
-  { value: "commercial_full", label: "Thương mại toàn phần" },
-];
-
-function formatVnd(n: number): string {
-  return n.toLocaleString("vi-VN") + "₫";
-}
 
 type OrderCardProps = { order: OrderRow; viewerId: string; onChanged: (order: OrderRow) => void };
 
@@ -523,16 +516,16 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
 
       {order.status === "completed" && (
         <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-[#1f5738]">
-          <CheckCircleIcon weight="fill" size={16} className="text-[#2F7A4F]" /> Đơn hàng đã hoàn tất.
+          <CheckCircleIcon weight="fill" size={16} className="text-success-form" /> Đơn hàng đã hoàn tất.
         </div>
       )}
 
       {order.status === "cancelled" && (
-        <div className="mt-3 text-xs font-semibold text-[#B02A37]">Đơn hàng đã hủy.</div>
+        <div className="mt-3 text-xs font-semibold text-error">Đơn hàng đã hủy.</div>
       )}
 
       {order.status === "disputed" && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#F3C3C3] bg-[#FDECEC] px-3 py-2.5 text-xs font-semibold text-[#B02A37]">
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#F3C3C3] bg-[#FDECEC] px-3 py-2.5 text-xs font-semibold text-error">
           <WarningOctagonIcon weight="fill" size={16} /> Đơn hàng đang được Nền tảng xem xét — thao tác tạm khóa.
         </div>
       )}
@@ -638,7 +631,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                 type="button"
                 disabled={pending}
                 onClick={confirmCancel}
-                className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-semibold text-[#B02A37] disabled:opacity-60"
+                className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-semibold text-error disabled:opacity-60"
               >
                 Xác nhận gửi yêu cầu hủy
               </button>
@@ -673,7 +666,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                     : "Cần nhắc phản hồi ít nhất 1 lần, đợi ≥7 ngày kể từ lần nhắc đầu và không ai nhắn thêm trong ≥72 giờ."
                 }
                 onClick={reportLostContact}
-                className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-medium text-[#B02A37] disabled:cursor-not-allowed disabled:opacity-40"
+                className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-medium text-error disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Báo cáo mất liên lạc
               </button>
@@ -703,7 +696,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                       type="button"
                       disabled={pending || !disputeReason || !disputeDescription.trim()}
                       onClick={submitDispute}
-                      className="cursor-pointer rounded-full bg-[#B02A37] px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                      className="cursor-pointer rounded-full bg-error px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-60"
                     >
                       Gửi tranh chấp
                     </button>
@@ -716,7 +709,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                 <button
                   type="button"
                   onClick={() => setDisputeOpen(true)}
-                  className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-medium text-[#B02A37]"
+                  className="cursor-pointer rounded-full border border-[#F3C3C3] px-3.5 py-1.5 text-xs font-medium text-error"
                 >
                   Mở tranh chấp
                 </button>

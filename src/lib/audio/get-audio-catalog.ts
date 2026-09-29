@@ -6,7 +6,7 @@ import type { BookGenre, Database } from "@/lib/supabase/types";
  * replaces the hardcoded CATALOG/NARRATORS mock in
  * src/lib/audio-catalog.ts. Reads public_audio_narrations (RLS-transparent
  * view over audio_narrations, now carrying genre/play_count — see
- * migrations/20260901_add_audio_narration_hub_metadata.sql) joined with
+ * migrations/archive/20260901_add_audio_narration_hub_metadata.sql) joined with
  * author_public_profiles for the narrator's display name/avatar.
  *
  * getAudioCatalog() itself only lists what /audio/new (independent
@@ -139,6 +139,24 @@ export async function getAudioCatalog(supabase: SupabaseClient<Database>): Promi
   const profileById = await fetchNarratorProfiles(supabase, [...new Set(tracks.map((t) => t.narrator_id))]);
 
   return tracks.map((t) => toAudioTrack(supabase, t, profileById.get(t.narrator_id)));
+}
+
+/** Bài nghe nhiều nhất (AudioSpotlight trang chủ) — 1 hàng thay vì tải cả
+ * kho như getAudioCatalog(). Hoà play_count thì bài mới hơn thắng, giống
+ * cách trang chủ từng sort lại danh sách (vốn đã DESC theo created_at). */
+export async function getTopAudioTrack(supabase: SupabaseClient<Database>): Promise<AudioTrack | null> {
+  const { data: row, error } = await supabase
+    .from("public_audio_narrations")
+    .select("id, narrator_id, title, audio_url, duration_seconds, genre, play_count, created_at")
+    .order("play_count", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) console.error("[audio] top track query failed:", error);
+  if (!row) return null;
+
+  const profileById = await fetchNarratorProfiles(supabase, [row.narrator_id]);
+  return toAudioTrack(supabase, row, profileById.get(row.narrator_id));
 }
 
 const NARRATOR_STATS_LIMIT = 5;

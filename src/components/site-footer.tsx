@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { FacebookLogoIcon, YoutubeLogoIcon, InstagramLogoIcon } from "@phosphor-icons/react/dist/ssr";
 import { LegalLink } from "@/components/legal/legal-link";

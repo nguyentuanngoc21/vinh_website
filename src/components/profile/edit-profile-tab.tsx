@@ -10,7 +10,7 @@ import { BankInfoForm } from "@/components/profile/bank-info-form";
 import { IdentityForm } from "@/components/profile/identity-form";
 import { useRole } from "@/lib/role";
 import { AGREEMENT_PARTY_INFO } from "@/lib/legal/contract-parties";
-import { getAgreement } from "@/lib/legal/registry";
+import { AGREEMENT_META, AGREEMENT_ORDER, type AgreementId } from "@/lib/legal/agreement-meta";
 import type { TransactionType } from "@/lib/supabase/types";
 
 type TransactionEntry = { id: string; type: TransactionType; amount: number; created_at: string; description?: string | null };
@@ -42,7 +42,12 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
     () => searchParams.get("missing")?.split(",").filter(Boolean) ?? [],
     [searchParams]
   );
-  const missingAgreementName = missingAgreementId ? getAgreement(missingAgreementId)?.name : null;
+  // agreement-meta.ts chứ không phải registry.ts — chỉ cần tên văn bản, không
+  // kéo HTML của cả 6 văn bản (~170 KB) vào first load của /ca-nhan.
+  const missingAgreementName =
+    missingAgreementId && AGREEMENT_ORDER.includes(missingAgreementId as AgreementId)
+      ? AGREEMENT_META[missingAgreementId as AgreementId].name
+      : null;
   const missingFieldLabels = useMemo(() => {
     if (!missingAgreementId || missingKeys.length === 0) return [];
     const authorFields = AGREEMENT_PARTY_INFO[missingAgreementId as keyof typeof AGREEMENT_PARTY_INFO]?.author ?? [];
@@ -366,7 +371,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
         <div
           ref={identityCardRef}
           className={`rounded-[18px] border p-[26px] ${
-            isMissing("cccdNumber") || isMissing("cccdIssuedAt") ? "border-[#B02A37]" : "border-cream"
+            isMissing("cccdNumber") || isMissing("cccdIssuedAt") ? "border-error" : "border-cream"
           }`}
         >
           <div className="text-[19px] font-bold text-brand-ink">Căn cước công dân</div>
@@ -422,7 +427,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
                   {txn.description ?? transactionTypeLabel(txn.type)} · {formatShortDate(txn.created_at)}
                 </div>
                 <div
-                  style={{ color: txn.amount >= 0 ? "#2F7A4F" : "#B02A37" }}
+                  style={{ color: txn.amount >= 0 ? "var(--color-success-form)" : "var(--color-error)" }}
                   className="text-[13px] font-bold"
                 >
                   {txn.amount >= 0 ? "+" : ""}

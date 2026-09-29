@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { AUDIO_GENRES } from "@/lib/audio/get-audio-catalog";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 
@@ -29,11 +29,9 @@ export async function POST(
 ) {
   const { chapterId } = await params;
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const { data: chapter } = await supabase
     .from("chapters")

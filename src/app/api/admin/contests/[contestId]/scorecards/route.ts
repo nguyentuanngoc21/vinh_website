@@ -8,7 +8,7 @@ import { contestErrorResponse, requireUuid } from "@/lib/contests/route-helpers"
 export async function GET(_request: Request, { params }: { params: Promise<{ contestId: string }> }) {
   const { contestId } = await params;
   const supabase = createServiceRoleClient();
-  if (!(await getAuthedAdminId(supabase))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await getAuthedAdminId(supabase))) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     return NextResponse.json(await getJudgingOverview(supabase, requireUuid(contestId, "contest_not_found")));
   } catch (error) {

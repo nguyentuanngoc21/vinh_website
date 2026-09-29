@@ -2,7 +2,7 @@
  * Nhãn tiếng Việt + ma trận chuyển trạng thái phía UI. Ma trận ở đây CHỈ để
  * vẽ nút; nguồn sự thật là contest_status_transition_allowed() /
  * contest_submission_transition_allowed() trong
- * migrations/20260926_add_contest_engine_core.sql (DB từ chối chuyển sai
+ * migrations/archive/20260926_add_contest_engine_core.sql (DB từ chối chuyển sai
  * dù UI có lệch). Sửa SQL thì sửa cả đây.
  */
 import type { ContestStatus, ContestSubmissionStatus } from "@/lib/supabase/types";

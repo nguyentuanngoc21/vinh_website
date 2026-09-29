@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, ReadingSource } from '@/lib/supabase/types';
 import { checkChapterAccess } from '@/lib/reading/chapter-access';
+import { isUuid } from '@/lib/validation/uuid';
 
 type Client = SupabaseClient<Database>;
 export type HeartbeatInput = { chapterId: string; sessionId: string | null; paragraphIndex: number; source: ReadingSource | null };
@@ -19,7 +20,7 @@ export function parseReadingSource(value: unknown): ReadingSource | null {
  * Kiểm quyền đọc như recordReadingProgress() (chương xuất bản, chưa gỡ; chương trả phí phải
  * là tác giả hoặc đã mua) rồi gọi record_reading_heartbeat(): server cộng khoảng thời gian
  * THẬT giữa 2 nhịp (≤ 90 giây), không tin số client gửi. `client` là service-role client.
- * Xem migrations/20260926_add_reading_session_tracking.sql.
+ * Xem migrations/archive/20260926_add_reading_session_tracking.sql.
  */
 export async function recordReadingHeartbeat(client: Client, userId: string, input: HeartbeatInput): Promise<HeartbeatResult> {
   const access = await checkChapterAccess(client, userId, input.chapterId);
@@ -42,8 +43,6 @@ export async function recordReadingHeartbeat(client: Client, userId: string, inp
   return { ok: true, sessionId: row.session_id, activeSeconds: row.active_seconds };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Đọc body chung cho route web + mobile; null = body không hợp lệ. */
 export function parseHeartbeatBody(body: unknown): HeartbeatInput | null {
   if (!body || typeof body !== 'object') return null;
@@ -51,7 +50,7 @@ export function parseHeartbeatBody(body: unknown): HeartbeatInput | null {
   const chapterId = typeof b.chapterId === 'string' ? b.chapterId : '';
   const sessionId = b.sessionId === undefined || b.sessionId === null ? null : typeof b.sessionId === 'string' ? b.sessionId : '';
   const paragraphIndex = b.paragraphIndex;
-  if (!UUID.test(chapterId) || (sessionId !== null && !UUID.test(sessionId))) return null;
+  if (!isUuid(chapterId) || (sessionId !== null && !isUuid(sessionId))) return null;
   if (typeof paragraphIndex !== 'number' || !Number.isInteger(paragraphIndex) || paragraphIndex < 0) return null;
   return { chapterId, sessionId, paragraphIndex, source: parseReadingSource(b.source) };
 }

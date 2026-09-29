@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import type { ConnectPerson } from "@/components/connect/connect-directory";
-import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import type { ConnectPerson } from "@/lib/connect/types";
+import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import { computeCommissionStatus } from "@/lib/orders/service-listing-service";
 import { loadProfileContests } from "@/lib/contests/profile-contests";
 
@@ -12,14 +12,30 @@ type Client = SupabaseClient<Database>;
 // sau nếu số user thật vượt xa mốc này).
 export const PEOPLE_LIMIT = 60;
 
+// Chạy trên server (Vercel = UTC) — getDate()/getMonth() sẽ lệch 1 ngày với
+// người dùng VN trong khoảng 00:00–07:00, nên luôn lấy ngày/tháng/năm theo
+// giờ Việt Nam (giống src/lib/contests/datetime.ts).
+const VN_DATE_PARTS = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Ho_Chi_Minh",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+function vnDateParts(iso: string): { day: string; month: string; year: string } {
+  const parts = VN_DATE_PARTS.formatToParts(new Date(iso));
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return { day: get("day"), month: get("month"), year: get("year") };
+}
+
 function formatJoined(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  const { month, year } = vnDateParts(iso);
+  return `${month}/${year}`;
 }
 
 function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const { day, month } = vnDateParts(iso);
+  return `${day}/${month}`;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -33,7 +49,7 @@ function formatDuration(seconds: number | null): string {
 /**
  * "Kết nối" — trước đây 100% mock (src/lib/connect-directory.ts). Giờ
  * đọc author_public_profiles (đã mở rộng thêm bio/created_at, xem
- * migrations/20260828_extend_author_public_profiles.sql) làm danh sách
+ * migrations/archive/20260828_extend_author_public_profiles.sql) làm danh sách
  * người dùng thật, author_follows làm follow count/trạng thái theo dõi
  * thật, và 3 nguồn nội dung thật đã có sẵn trong schema nhưng CHƯA từng
  * được list theo tác giả ở đâu cả: books (Truyện chữ),
@@ -57,7 +73,7 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
     .limit(PEOPLE_LIMIT);
   if (profilesError) {
     // Lỗi phổ biến nhất ở đây: chưa chạy
-    // migrations/20260828_extend_author_public_profiles.sql (view cũ
+    // migrations/archive/20260828_extend_author_public_profiles.sql (view cũ
     // chưa có cột bio/created_at) — select lỗi, data về null, trang vẫn
     // render bình thường nhưng hiện "Chưa có người dùng nào" dù profiles
     // rõ ràng có dữ liệu. Log ra để không im lặng nuốt lỗi như vậy nữa.
@@ -116,7 +132,7 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
           // Ẩn 2 chiều (yêu cầu bổ sung #2): truyện viết thuê chỉ lộ ra ở
           // list "Truyện chữ" của ghostwriter nếu ghostwriter_sample_visible,
           // và chỉ lộ dưới hồ sơ CUSTOMER nếu customer_profile_visible —
-          // xem migrations/20260901_add_ghostwriting_authorship.sql.
+          // xem migrations/archive/20260901_add_ghostwriting_authorship.sql.
           supabase
             .from("author_name_agreements")
             .select("book_id, ghostwriter_id, customer_id, ghostwriter_sample_visible, customer_profile_visible")
@@ -136,7 +152,7 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
     if (viewerId && row.follower_id === viewerId) followingByViewer.add(row.author_id);
   }
 
-  const bookCoverUrls = await Promise.all((bookRows ?? []).map((b) => resolveBookCoverUrl(supabase, b)));
+  const bookCoverUrls = await resolveBookCoverUrls(supabase, bookRows ?? []);
   // Mục "Cuộc thi" (Contest Engine Slice 3.3) — lỗi chỉ ghi log, mục rỗng.
   const contestsByPerson = await loadProfileContests(supabase, people.map((p) => p.id));
   const nameAgreementByBook = new Map((nameAgreementRows ?? []).map((r) => [r.book_id, r]));

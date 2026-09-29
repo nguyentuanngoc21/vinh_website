@@ -4,12 +4,30 @@ import { createClient as createCookieClient, createServiceRoleClient } from '@/l
 import { getAuthedUserId } from '@/lib/wallet/session';
 
 const noSession = { auth: { persistSession: false, autoRefreshToken: false } };
-/** Settings for the Supabase project the mobile app signs in to (may differ from the local web DB). */
-function mobileProject() {
+// Mobile can target production while the local website uses its development DB.
+function mobileProjectConfig() {
   const url = process.env.MOBILE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.MOBILE_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) throw new Error('Mobile server not configured');
+  return url && key ? { url, key } : null;
+}
+/** Settings for the Supabase project the mobile app signs in to (may differ from the local web DB). */
+function mobileProject() {
+  const config = mobileProjectConfig();
+  if (!config) throw new Error('Mobile server not configured');
+  const { url, key } = config;
   return { url, key, anon: () => createClient<Database>(url, key, noSession) };
+}
+/**
+ * Publishable-key client of the mobile project that forwards the caller's Authorization header
+ * unchanged (RLS applies as that user; anonymous when absent). null when the project isn't
+ * configured — callers answer 503 themselves. Does not validate the header's format.
+ */
+export function getMobileAnonClient(authorization: string | null): SupabaseClient<Database> | null {
+  const config = mobileProjectConfig();
+  if (!config) return null;
+  return createClient<Database>(config.url, config.key, {
+    ...noSession, global: { headers: authorization ? { Authorization: authorization } : {} },
+  });
 }
 // Created only when needed (after a token is verified, or for registration) — never up front.
 function mobileAdmin(url: string) {
@@ -33,15 +51,15 @@ export async function getRequestContext(request: Request) {
     return { client, userId: await getAuthedUserId(client) };
   }
   const match = /^Bearer (\S+)$/i.exec(authorization);
-  if (!match) throw new Error('Unauthorized');
+  if (!match) throw new Error('Vui lòng đăng nhập.');
   const project = mobileProject();
   const { data, error } = await project.anon().auth.getUser(match[1]);
-  if (error || !data.user) throw new Error('Unauthorized');
+  if (error || !data.user) throw new Error('Vui lòng đăng nhập.');
   return { client: mobileAdmin(project.url), userId: data.user.id };
 }
 
 export function requestError(error: unknown) {
-  const unauthorized = error instanceof Error && error.message === 'Unauthorized';
+  const unauthorized = error instanceof Error && error.message === 'Bạn không có quyền thực hiện thao tác này.';
   return Response.json({ error: unauthorized ? 'Vui lòng đăng nhập lại.' : 'Máy chủ chưa sẵn sàng. Vui lòng thử lại.' },
     { status: unauthorized ? 401 : 503, headers: { 'Cache-Control': 'private, no-store' } });
 }
@@ -55,14 +73,14 @@ export function requestError(error: unknown) {
 export async function getReadContext(request: Request) {
   const authorization = request.headers.get('authorization');
   const match = authorization ? /^Bearer (\S+)$/i.exec(authorization) : null;
-  if (authorization && !match) throw new Error('Unauthorized');
+  if (authorization && !match) throw new Error('Vui lòng đăng nhập.');
   const project = mobileProject();
   const client = createClient<Database>(project.url, project.key, {
     ...noSession, global: { headers: match ? { Authorization: `Bearer ${match[1]}` } : {} },
   });
   if (!match) return { client, userId: null };
   const { data, error } = await client.auth.getUser(match[1]);
-  if (error || !data.user) throw new Error('Unauthorized');
+  if (error || !data.user) throw new Error('Vui lòng đăng nhập.');
   return { client, userId: data.user.id };
 }
 
@@ -84,12 +102,12 @@ export async function getUserContext(request: Request): Promise<{
     return { supabase, userId: data.user?.id ?? null, admin: createServiceRoleClient };
   }
   const match = /^Bearer (\S+)$/i.exec(authorization);
-  if (!match) throw new Error('Unauthorized');
+  if (!match) throw new Error('Bạn không có quyền thực hiện thao tác này.');
   const project = mobileProject();
   const supabase = createClient<Database>(project.url, project.key, {
     ...noSession, global: { headers: { Authorization: `Bearer ${match[1]}` } },
   });
   const { data, error } = await supabase.auth.getUser(match[1]);
-  if (error || !data.user) throw new Error('Unauthorized');
+  if (error || !data.user) throw new Error('Vui lòng đăng nhập.');
   return { supabase, userId: data.user.id, admin: () => mobileAdmin(project.url) };
 }

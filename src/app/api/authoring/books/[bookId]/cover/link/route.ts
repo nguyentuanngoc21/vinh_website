@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 /**
  * POST /api/authoring/books/:bookId/cover/link — tác giả dán link chia sẻ
@@ -15,10 +15,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
 
   const body = await request.json().catch(() => null);
   const shareUrl = typeof body?.shareUrl === "string" ? body.shareUrl.trim() : "";

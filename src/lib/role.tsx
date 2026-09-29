@@ -7,6 +7,7 @@ import {
   register as registerRequest,
   resetPassword as resetPasswordRequest,
   verifySignupOtp as verifySignupOtpRequest,
+  isAdminRole,
   type RegisterPayload,
   type Session,
 } from "@/lib/auth";
@@ -197,7 +198,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         // nhận cả 2 role đúng. Đây chỉ là cờ hiện/ẩn UI, không phải lớp
         // bảo mật (xem REVIEW.md) — sửa ở đây không đổi gì về phân quyền
         // thật, chỉ để super_admin THẤY được các nút vốn dành cho họ.
-        isAdmin: session?.role === "admin" || session?.role === "super_admin",
+        isAdmin: isAdminRole(session?.role),
         login,
         register,
         verifySignupCode,

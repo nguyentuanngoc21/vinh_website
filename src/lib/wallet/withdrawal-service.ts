@@ -84,7 +84,7 @@ export const WithdrawalService = {
     // (api/profile/bank/route.ts) — cả hai cập nhật trong Thông tin cá
     // nhân, không phải điền lại mỗi lần rút. bank_account_name là người
     // dùng tự khai, KHÔNG ép khớp real_name (xem
-    // migrations/20260827_add_bank_account_name.sql) — chủ tài khoản có
+    // migrations/archive/20260827_add_bank_account_name.sql) — chủ tài khoản có
     // thể không phải chính người lập hồ sơ, và ngân hàng có thể in tên
     // không dấu khác real_name có dấu dù đúng người.
     if (

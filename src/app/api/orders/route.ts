@@ -8,14 +8,14 @@ import { OrderService, listOrdersForUser } from "@/lib/orders/order-service";
  * để hiển thị "thẻ đơn hàng" gắn với đúng hội thoại đang mở — không có
  * bảng conversations riêng, cặp (buyer_id, seller_id) của Order CHÍNH LÀ
  * hội thoại (đúng triết lý "không thêm bảng" đã dùng cho direct_messages/
- * author_follows, xem migrations/20260901_add_order_system_core.sql).
+ * author_follows, xem migrations/archive/20260901_add_order_system_core.sql).
  */
 export async function GET(request: Request) {
   let auth;
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const withUserId = new URL(request.url).searchParams.get("withUserId");
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId: buyerId } = auth;
   if (!buyerId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);

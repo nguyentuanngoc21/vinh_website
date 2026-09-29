@@ -18,11 +18,20 @@ Có 2 luồng, tuỳ thay đổi có đụng tới schema Supabase hay không.
 4. Chạy migration lên production
 ```
 
+### 0. Baseline theo tính năng (từ 29/09/2026)
+
+- `migrations/baseline/NN_<tính năng>.sql` là **trạng thái cuối** của schema, chia theo mảng tính năng (tài khoản, sách/chương, đọc, ví/thanh toán, nhiệm vụ, tin nhắn, thiết kế, audio, đơn dịch vụ, pháp lý, cuộc thi, lưu trữ, seed). Đầu mỗi file ghi rõ nó chứa gì, phụ thuộc file nào, gộp từ migration cũ nào — xem [migrations/baseline/README.md](../migrations/baseline/README.md).
+- **Chỉ dùng để dựng 1 project Supabase mới, trống**: chạy lần lượt 01 → 99 trong SQL Editor, rồi `scripts/audit_migrations.sql` để kiểm. Lỗi ở file nào thì chỉ cần debug file đó (các file trước đã chạy xong).
+- **Không bao giờ chạy baseline trên production** hay DB đã có dữ liệu — production đã có đủ mọi thứ; các file baseline không idempotent.
+- `docs/supabase/schema.sql` được **sinh tự động** từ các file baseline bằng `npm run build-schema` — không sửa tay. `npm run build-schema -- --check` báo lỗi nếu bị lệch.
+- Migration trước 29/09/2026 nằm ở `migrations/archive/` — chỉ để tra lịch sử, không chạy lại.
+- Kiểm tra production có lệch với baseline không: chạy [docs/supabase/inventory.sql](supabase/inventory.sql) (chỉ đọc) trên production và trên 1 project dựng từ baseline, tải CSV, so sánh.
+
 ### 1. Code + migration
 
 - Viết 1 file `.sql` mới trong `migrations/`, đặt tên theo ngày (`YYYYMMDD_mo_ta_ngan.sql`). Migration phải **idempotent** — dùng `IF EXISTS` / `IF NOT EXISTS` / `DROP ... IF EXISTS` rồi `CREATE` lại — để lỡ chạy 2 lần không lỗi.
 - Cập nhật **cùng lúc**:
-  - [docs/supabase/schema.sql](supabase/schema.sql) — thêm đúng đoạn SQL tương ứng, **đúng vị trí theo thứ tự phụ thuộc** (một cột/bảng phải được tạo trước khi có policy/GRANT nào tham chiếu tới nó — đặt sai chỗ sẽ khiến người chạy `schema.sql` từ đầu trên 1 project mới bị lỗi "column/table does not exist").
+  - File baseline đúng tính năng trong `migrations/baseline/` — thêm đoạn SQL tương ứng, **đúng vị trí theo thứ tự phụ thuộc** (một cột/bảng phải được tạo trước khi có policy/GRANT nào tham chiếu tới nó; nếu phụ thuộc bảng của file SAU thì đặt vào file sau đó). Rồi chạy `npm run build-schema` để sinh lại `docs/supabase/schema.sql`.
   - [src/lib/supabase/types.ts](../src/lib/supabase/types.ts) — thêm type/field tương ứng để code TypeScript có autocomplete/type-check đúng.
 - Cuối file migration, ghi rõ phần "Notes" liệt kê chính xác cần cập nhật gì ở 2 file trên + file code nào khác (route API, component) — để không quên bước nào.
 

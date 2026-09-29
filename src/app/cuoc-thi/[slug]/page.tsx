@@ -12,7 +12,8 @@ import { RandomPick } from "@/components/contests/random-pick";
 import { RankingBoard, type RankingKindTab } from "@/components/contests/ranking-board";
 import { genres } from "@/lib/books";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedAdminId, getAuthedUserId } from "@/lib/wallet/session";
+import { getAuthedViewer } from "@/lib/wallet/session";
+import { isAdminRole } from "@/lib/roles";
 import { formatVnDateTime } from "@/lib/contests/datetime";
 import { ContestError } from "@/lib/contests/errors";
 import {
@@ -35,6 +36,7 @@ import { CONTEST_STATUS_LABEL } from "@/lib/contests/labels";
 import { isFinished, PHASE_COPY, resolveTab, tabsFor, type TabKey } from "@/lib/contests/phase-copy";
 import type { LegacyStats } from "@/lib/contests/lifecycle-service";
 import { listPublicAwards, loadContestPage, type ContestPageData, type PublicAward } from "@/lib/contests/public-view";
+import { formatVnd } from "@/lib/format-currency";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -43,7 +45,7 @@ type Props = {
 
 const GENRE_LABELS = genres.map((g) => g.label);
 const SORTS: EntrySort[] = ["discover", "new", "az"];
-const vnd = (n: number) => `${n.toLocaleString("vi-VN")}đ`;
+const vnd = formatVnd;
 
 /** Lỗi một hàng tín hiệu không làm hỏng cả tab (đặc tả UX: lỗi từng hàng). */
 function rowOrEmpty(label: string, p: Promise<SignalCard[]>): Promise<SignalCard[]> {
@@ -69,8 +71,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ContestPage({ params, searchParams }: Props) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const supabase = createServiceRoleClient();
-  const viewerId = await getAuthedUserId(supabase);
-  const isAdmin = viewerId ? Boolean(await getAuthedAdminId(supabase)) : false;
+  // 1 lần resolve (id + role trong 1 query profiles) thay vì
+  // getAuthedUserId + getAuthedAdminId nối tiếp.
+  const viewer = await getAuthedViewer(supabase);
+  const viewerId = viewer?.id ?? null;
+  const isAdmin = isAdminRole(viewer?.role);
   const now = new Date();
 
   let data: ContestPageData;
@@ -177,21 +182,24 @@ async function TabContent({
       );
     }
     const feeds = capabilities.available_feeds;
-    // "Hành trình của bạn" (Slice 3.2) — lỗi không làm hỏng tab.
-    const journey =
+    // "Hành trình của bạn" (Slice 3.2) — lỗi không làm hỏng tab. Khởi chạy
+    // ngay (đã gắn .catch nên không bao giờ reject), await cùng các hàng
+    // feed bên dưới thay vì chờ riêng trước.
+    const journeyPromise =
       viewerId && PASSPORT_SEASON_STATUSES.includes(contest.status)
-        ? await Promise.all([
+        ? Promise.all([
             getPassport(supabase, { userId: viewerId, contestId: row.id }),
             getTodayEventQuest(supabase, { userId: viewerId, contestId: row.id }),
           ]).catch((error) => {
             console.error("[contests] passport block failed:", error);
             return null;
           })
-        : null;
+        : Promise.resolve(null);
     // Hàng tín hiệu đọc bảng điểm cache — làm mới trước (SQL bỏ qua nếu chưa quá 15 phút).
     if (feeds.includes("attention")) await ensureFreshScores(supabase, row.id);
     const none = Promise.resolve([] as SignalCard[]);
-    const [top, newest, discover, attention, trending, gems] = await Promise.all([
+    const [journey, top, newest, discover, attention, trending, gems] = await Promise.all([
+      journeyPromise,
       feeds.includes("top") ? getTopEntries(supabase, { contest: row, capabilities }) : Promise.resolve(null),
       getContestEntries(supabase, { contest: row, capabilities, sort: "new", limit: 10, viewerId, now }),
       getContestEntries(supabase, { contest: row, capabilities, sort: "discover", limit: 20, viewerId, now }),

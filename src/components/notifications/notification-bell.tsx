@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BellIcon } from "@phosphor-icons/react/dist/ssr";
+import { startVisiblePolling } from "@/lib/hooks/visible-polling";
 
 type Notification = {
   id: string;
@@ -55,9 +56,7 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       });
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, POLL_MS);
-    return () => clearInterval(interval);
+    return startVisiblePolling(load, POLL_MS);
   }, []);
 
   useEffect(() => {
@@ -105,7 +104,7 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       >
         <BellIcon size={21} />
         {unreadCount > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#B02A37] px-1 text-[10px] font-bold text-white">
+          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}

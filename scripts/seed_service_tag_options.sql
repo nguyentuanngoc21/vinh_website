@@ -1,5 +1,5 @@
 -- Seed dữ liệu cho service_tag_options — CHẠY LẠI file này sau khi đã
--- chạy migrations/20260901_add_service_tag_option_metadata.sql (thêm cột
+-- chạy migrations/archive/20260901_add_service_tag_option_metadata.sql (thêm cột
 -- tier/rule/multi/optional/warn_text). Idempotent nhờ
 -- unique(service_type, group_key, label) + ON CONFLICT DO UPDATE (cập
 -- nhật lại metadata nếu hàng đã tồn tại từ lần seed cũ thiếu cột).

@@ -54,8 +54,8 @@ export function CccdUploadTiles({ files, onFile }: CccdUploadTilesProps) {
           <label
             key={slot.key}
             style={{
-              borderColor: file ? "#2F7A4F" : "var(--color-border-light)",
-              background: file ? "#F4FAF6" : "#fdfdfc",
+              borderColor: file ? "var(--color-success-form)" : "var(--color-border-light)",
+              background: file ? "var(--color-success-form-bg)" : "#fdfdfc",
             }}
             className="flex min-h-[132px] cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] border-dashed p-[22px_16px] transition-colors hover:border-brand-gold hover:bg-[#FCFAF4]"
           >
@@ -67,7 +67,7 @@ export function CccdUploadTiles({ files, onFile }: CccdUploadTilesProps) {
               className="hidden"
             />
             {file ? (
-              <CheckCircleIcon weight="fill" size={26} color="#2F7A4F" />
+              <CheckCircleIcon weight="fill" size={26} className="text-success-form" />
             ) : (
               <IdentificationCardIcon size={26} color="var(--color-stone-light)" />
             )}

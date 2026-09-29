@@ -9,10 +9,10 @@ import { POST as followAuthor } from '@/app/api/authors/[authorId]/follow/route'
 import { getRequestContext, requestError } from '@/lib/mobile/request-context';
 import { mobileResponse } from '@/lib/mobile/response';
 import { getChapterInteractions } from '@/lib/reading/chapter-interactions';
+import { isUuid } from '@/lib/validation/uuid';
 export { OPTIONS } from '@/lib/mobile/response';
 
 type Ctx = { params: Promise<{ chapterId: string }> };
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const forward = (request: Request, method: string, body?: unknown) => new Request(request.url, {
   method, headers: new Headers({ Authorization: request.headers.get('authorization') ?? '', 'Content-Type': 'application/json' }),
   body: body === undefined ? undefined : JSON.stringify(body),
@@ -25,7 +25,7 @@ export function GET(request: Request, context: Ctx) {
     try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
     if (!auth.userId) return Response.json({ error: 'Vui lòng đăng nhập lại.' }, { status: 401 });
     const { chapterId } = await context.params;
-    if (!UUID.test(chapterId)) return Response.json({ error: 'Không tìm thấy chương.' }, { status: 404 });
+    if (!isUuid(chapterId)) return Response.json({ error: 'Không tìm thấy chương.' }, { status: 404 });
     const [state, comments, highlights] = await Promise.all([
       getChapterInteractions(auth.client, chapterId, auth.userId),
       listComments(forward(request, 'GET'), context).then(r => r.json()),

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ADMIN_NEXT_SUBMISSION_STATUSES, NEXT_CONTEST_STATUSES } from "@/lib/contests/labels";
 
 // Bản sao ma trận trong contest_status_transition_allowed() /
-// contest_submission_transition_allowed() (migrations/20260926_add_contest_engine_core.sql).
+// contest_submission_transition_allowed() (migrations/archive/20260926_add_contest_engine_core.sql).
 // Test này chỉ giữ ma trận UI không lệch khỏi bản SQL đã chốt.
 const SQL_CONTEST_TRANSITIONS = [
   "draft>announced", "announced>submission_open", "submission_open>submission_closed",

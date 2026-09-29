@@ -5,7 +5,7 @@
  * Admin API luôn lưu kết quả của normalize*() (đủ mọi khoá, đúng kiểu), nên
  * DB không cần bộ default thứ hai: trigger contests_guard_write chỉ kiểm đủ
  * khoá lúc rời 'draft', rồi RPC đọc thẳng jsonb (xem
- * migrations/20260926_add_contest_engine_core.sql). Khoá lạ bị từ chối để
+ * migrations/archive/20260926_add_contest_engine_core.sql). Khoá lạ bị từ chối để
  * lỗi đánh máy không âm thầm tắt một luật.
  */
 import { genres } from "@/lib/books";

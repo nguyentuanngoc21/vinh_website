@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ContestStatus, ContestSubmissionStatus } from "@/lib/supabase/types";
 import { ContestError } from "@/lib/contests/errors";
+import { isUuid } from "@/lib/validation/uuid";
 
 /** Lỗi nghiệp vụ → status + thông báo tiếng Việt; lỗi khác → 500 (log, không lộ chi tiết). */
 export function contestErrorResponse(error: unknown, context: string) {
@@ -45,10 +46,8 @@ export function optionalText(v: unknown, max = 2000): string | null {
   return t || null;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Id không phải UUID không khớp dòng nào — trả 404 thay vì để Postgres báo lỗi kiểu (500). */
 export function requireUuid(v: unknown, code: "book_not_found" | "submission_not_found" | "contest_not_found" | "award_not_found" | "signal_not_found" | "scorecard_not_found"): string {
-  if (typeof v !== "string" || !UUID.test(v)) throw new ContestError(code);
+  if (typeof v !== "string" || !isUuid(v)) throw new ContestError(code);
   return v;
 }

@@ -1,4 +1,4 @@
--- Test cho migrations/20260926_add_final_scoring.sql.
+-- Test cho migrations/archive/20260926_add_final_scoring.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. KHÔNG chạy
 -- trên production (docs/DEV_WORKFLOW.md, Luồng A bước 2).
 --

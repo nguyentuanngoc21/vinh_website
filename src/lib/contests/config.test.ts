@@ -9,7 +9,7 @@ import {
 } from "@/lib/contests/config";
 
 // Khoá mà DB đọc thẳng (contest_config_missing_key() trong
-// migrations/20260926_add_contest_engine_core.sql) — phải luôn có trong kết quả chuẩn hoá.
+// migrations/archive/20260926_add_contest_engine_core.sql) — phải luôn có trong kết quả chuẩn hoá.
 const DB_ELIGIBILITY_KEYS = ["allow_resubmit_after_withdraw", "require_exclusive", "allow_multi_contest", "max_entries_per_author"];
 const DB_VOTE_KEYS = ["min_account_age_days", "require_completed_chapter"];
 

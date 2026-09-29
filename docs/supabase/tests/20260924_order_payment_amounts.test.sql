@@ -1,4 +1,4 @@
--- Test cho migrations/20260924_enforce_order_payment_amounts.sql.
+-- Test cho migrations/archive/20260924_enforce_order_payment_amounts.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. Không chạy
 -- trên production (docs/DEV_WORKFLOW.md, Luồng A bước 2).
 --

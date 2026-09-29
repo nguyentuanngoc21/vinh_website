@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient, requireSupabaseUser } from "@/lib/supabase/server";
 
 /**
  * POST /api/design/resolve-link — validate + preview 1 link chia sẻ
@@ -20,10 +20,8 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
 
   const body = await request.json().catch(() => null);
   const shareUrl = typeof body?.shareUrl === "string" ? body.shareUrl.trim() : "";

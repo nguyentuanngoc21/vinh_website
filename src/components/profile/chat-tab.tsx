@@ -14,6 +14,7 @@ import { timeLabel, messageTimeLabel, isNewSession, sessionDividerLabel } from "
 import { autoGrowTextarea, resetTextareaHeight } from "@/lib/autogrow-textarea";
 import { Field, Alert, Skeleton } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
+import { startVisiblePolling } from "@/lib/hooks/visible-polling";
 
 type MessageContext = "personal" | "moderation";
 
@@ -28,7 +29,7 @@ type Conversation = {
   // vừa có hòm thư "personal" riêng nếu họ cũng tự chat bình thường với
   // cùng tác giả. Chỉ dùng để gắn 1 nhãn nhỏ cạnh tên — danh tính (tên/
   // avatar) LUÔN hiển thị thật, không che giấu. Xem
-  // migrations/20260908_add_direct_message_context.sql.
+  // migrations/archive/20260908_add_direct_message_context.sql.
   isModerationThread: boolean;
   lastMessage: { body: string; createdAt: string; mine: boolean };
   unreadCount: number;
@@ -132,9 +133,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
       });
 
   useEffect(() => {
-    loadConversations();
-    const interval = setInterval(loadConversations, CONVERSATIONS_POLL_MS);
-    return () => clearInterval(interval);
+    return startVisiblePolling(loadConversations, CONVERSATIONS_POLL_MS);
   }, []);
 
   // Chưa chọn ai (vào thẳng tab, không qua ?chat=) nhưng đã có hội thoại
@@ -171,11 +170,10 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
             )
           );
         });
-    load();
-    const interval = setInterval(load, THREAD_POLL_MS);
+    const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stopPolling();
     };
   }, [activeUserId, activeContext]);
 
@@ -189,11 +187,10 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
           if (cancelled || !data) return;
           setOrders(data.orders ?? []);
         });
-    load();
-    const interval = setInterval(load, THREAD_POLL_MS);
+    const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stopPolling();
     };
   }, [activeUserId]);
 
@@ -466,7 +463,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                       {m.mine && m.flagged && (
                         <div
                           title="Tin nhắn có thể chứa thông tin liên hệ/giao dịch ngoài nền tảng — chỉ mình bạn thấy cảnh báo này."
-                          className="mt-1 flex items-center gap-1 text-[10.5px] text-[#A9781A]"
+                          className="mt-1 flex items-center gap-1 text-[10.5px] text-brand-gold-dark"
                         >
                           <WarningCircleIcon weight="fill" size={11} /> Có thể chứa thông tin ngoài nền tảng
                         </div>

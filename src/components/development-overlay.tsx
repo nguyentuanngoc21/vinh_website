@@ -11,8 +11,8 @@ import { WrenchIcon } from "@phosphor-icons/react/dist/ssr";
  *
  * Audio and Thiết kế no longer use this — both read real data now
  * (src/lib/audio/get-audio-catalog.ts, src/lib/design/get-design-gallery.ts,
- * see migrations/20260901_add_audio_narration_hub_metadata.sql and
- * migrations/20260901_add_design_item_gallery_metadata.sql), same for Kết
+ * see migrations/archive/20260901_add_audio_narration_hub_metadata.sql and
+ * migrations/archive/20260901_add_design_item_gallery_metadata.sql), same for Kết
  * nối (src/app/ket-noi/page.tsx). Still wraps /blog (src/app/blog/page.tsx)
  * — no blog_posts table exists yet, see docs/supabase/schema.sql's header
  * comment.

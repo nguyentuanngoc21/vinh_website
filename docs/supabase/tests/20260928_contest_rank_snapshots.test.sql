@@ -1,4 +1,4 @@
--- Test cho migrations/20260928_add_contest_rank_snapshots.sql.
+-- Test cho migrations/archive/20260928_add_contest_rank_snapshots.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. KHÔNG chạy trên production.
 --
 -- Cuộc thi đang nhận bài, 3 bài A, B, C. Trending lấy readers_7d từ bảng điểm

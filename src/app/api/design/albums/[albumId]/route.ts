@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { ART_STYLES } from "@/lib/design/art-styles";
 import type { ArtStyle } from "@/lib/supabase/types";
 
@@ -15,10 +15,9 @@ const ART_STYLE_KEYS = ART_STYLES.map((s) => s.key);
 export async function PATCH(request: Request, { params }: { params: Promise<{ albumId: string }> }) {
   const { albumId } = await params;
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
-  }
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const body = await request.json().catch(() => null);
   const patch: { name?: string; art_style?: ArtStyle; updated_at: string } = {
@@ -44,7 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ al
     .from("design_albums")
     .update(patch)
     .eq("id", albumId)
-    .eq("illustrator_id", userData.user.id)
+    .eq("illustrator_id", user.id)
     .select("id")
     .maybeSingle();
   if (error) {

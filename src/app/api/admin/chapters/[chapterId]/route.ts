@@ -26,7 +26,7 @@ import {
  *      giấu dưới 1 tài khoản "hệ thống" riêng. context='moderation' chỉ
  *      để tách hòm thư này khỏi chat cá nhân nếu admin đó cũng tự nhắn
  *      tin bình thường với cùng tác giả — xem
- *      migrations/20260908_add_direct_message_context.sql. Nhờ vậy, ai
+ *      migrations/archive/20260908_add_direct_message_context.sql. Nhờ vậy, ai
  *      gỡ chương thì người đó (đúng, không phải "tài khoản dùng chung")
  *      nhận được phản hồi của tác giả — không cần thêm màn hình admin
  *      nào khác để "phát" lại cho người khác.
@@ -43,7 +43,7 @@ export async function PATCH(
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
   if (!adminId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);

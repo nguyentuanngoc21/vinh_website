@@ -52,9 +52,7 @@ export const TOPUP_HISTORY: TopupHistoryEntry[] = [
   { title: "Gói 100 token", meta: "28/06/2026 · Chuyển khoản Vietcombank", amount: "+100" },
 ];
 
-export function formatVnd(amount: number): string {
-  return amount.toLocaleString("vi-VN") + "đ";
-}
+export { formatVnd } from "@/lib/format-currency";
 
 export function formatTokens(amount: number): string {
   return amount.toLocaleString("vi-VN");

@@ -4,9 +4,9 @@ import { POPULAR_POSTS, TOPICS } from "@/lib/blog";
 export function BlogSidebar() {
   return (
     <div className="flex flex-col gap-[26px]">
-      <div className="rounded-[18px] bg-[#F7EFD8] p-6">
+      <div className="rounded-[18px] bg-cream-gold p-6">
         <div className="text-[17px] font-bold text-brand-ink">Bản tin Vịnh</div>
-        <div className="mt-[7px] text-[13.5px] leading-[1.55] text-[#6b5f3a]">
+        <div className="mt-[7px] text-[13.5px] leading-[1.55] text-cream-gold-text">
           Mỗi thứ Năm: một tác phẩm mới, một bài viết về nghề, một mẹo bảo vệ
           bản quyền.
         </div>

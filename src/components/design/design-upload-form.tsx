@@ -265,7 +265,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
   const hasUploading = items.some((it) => it.uploading);
 
   // Ảnh chèn qua POST /api/design luôn ở trạng thái draft (published_at
-  // NULL, xem migrations/20260921_add_design_item_publish_state.sql) —
+  // NULL, xem migrations/archive/20260921_add_design_item_publish_state.sql) —
   // chỉ chính họa sĩ xem được, chưa hiện ở /thiet-ke. "Hoàn tất" phải gọi
   // /api/design/publish để công khai chúng TRƯỚC khi điều hướng đi, nếu
   // không ảnh sẽ mãi ở trạng thái draft không ai thấy được (kể cả chính
@@ -298,7 +298,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="hidden" />
 
       {formError && (
-        <div className="mb-4 rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-[#B02A37]">{formError}</div>
+        <div className="mb-4 rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-error">{formError}</div>
       )}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_1.1fr_260px]">
@@ -410,7 +410,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
               </div>
 
               {selected.error && (
-                <div className="rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-[#B02A37]">
+                <div className="rounded-lg bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-error">
                   {selected.error}
                 </div>
               )}
@@ -477,7 +477,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
                 type="button"
                 onClick={deleteChecked}
                 disabled={bulkDeletePending}
-                className="mt-2.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#FDECEC] py-2 text-[12.5px] font-semibold text-[#B02A37] disabled:opacity-60"
+                className="mt-2.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#FDECEC] py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
               >
                 <TrashIcon size={14} /> Xóa ({checkedKeys.size})
               </button>
@@ -517,7 +517,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
                         deleteOne(item.key);
                       }}
                       title="Xóa ảnh này"
-                      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone transition-colors hover:bg-[#FDECEC] hover:text-[#B02A37]"
+                      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone transition-colors hover:bg-[#FDECEC] hover:text-error"
                     >
                       <TrashIcon size={14} />
                     </button>

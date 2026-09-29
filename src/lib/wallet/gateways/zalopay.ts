@@ -70,7 +70,7 @@ export async function createZalopayOrder(params: CreateOrderParams): Promise<Cre
   const item = "[]";
   const amount = Math.round(params.amountVnd);
 
-  if (amount <= 0) return { ok: false, error: "Invalid amount" };
+  if (amount <= 0) return { ok: false, error: "Số tiền không hợp lệ." };
 
   // Mac formula per ZaloPay docs: HMAC-SHA256(key1, app_id|app_trans_id|
   // app_user|amount|app_time|embed_data|item) — field order matters.
@@ -95,7 +95,7 @@ export async function createZalopayOrder(params: CreateOrderParams): Promise<Cre
       }),
     });
   } catch (err) {
-    return { ok: false, error: `ZaloPay request failed: ${(err as Error).message}` };
+    return { ok: false, error: `Gọi ZaloPay thất bại: ${(err as Error).message}` };
   }
 
   const json = await res.json().catch(() => null);

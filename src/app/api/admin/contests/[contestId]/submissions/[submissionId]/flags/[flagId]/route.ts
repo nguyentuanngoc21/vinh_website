@@ -15,7 +15,7 @@ export async function PATCH(
   const { contestId, submissionId, flagId } = await params;
   const supabase = createServiceRoleClient();
   const adminId = await getAuthedAdminId(supabase);
-  if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminId) return NextResponse.json({ error: "Bạn không có quyền thực hiện thao tác này." }, { status: 401 });
   try {
     const body = await readJson(request);
     const resolution = RESOLUTIONS.find((r) => r === body.resolution);

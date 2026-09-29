@@ -1,4 +1,5 @@
 export type Role = "user" | "admin" | "super_admin";
+export { isAdminRole } from "@/lib/roles";
 export type Session = {
   email: string;
   name: string;

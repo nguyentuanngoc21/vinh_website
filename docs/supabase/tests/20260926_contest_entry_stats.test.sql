@@ -1,4 +1,4 @@
--- Test cho migrations/20260926_add_contest_entry_stats.sql.
+-- Test cho migrations/archive/20260926_add_contest_entry_stats.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. KHÔNG chạy
 -- trên production (docs/DEV_WORKFLOW.md, Luồng A bước 2).
 --
@@ -76,7 +76,7 @@ begin
     (v_u1, v_book, v_ch3, now() - interval '1 day'),
     (v_author, v_book, v_ch3, now()),
     (v_u4, v_book, v_ch3, now() - interval '25 days');
-  -- Trigger anchored_comments_server_time (migrations/20260926_add_scoring_tracking.sql)
+  -- Trigger anchored_comments_server_time (migrations/archive/20260926_add_scoring_tracking.sql)
   -- ép created_at = now(); tắt tạm để dựng bình luận cũ. Tắt/bật nằm trong giao
   -- dịch của test nên cũng bị hoàn tác khi test kết thúc.
   if exists (select 1 from pg_trigger where tgname = 'anchored_comments_server_time') then

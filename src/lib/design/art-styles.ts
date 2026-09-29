@@ -7,7 +7,7 @@ import type { ArtStyle } from "@/lib/supabase/types";
  * do BOOK_GENRES là nguồn duy nhất cho thể loại — xem
  * src/lib/covers/genre-styles.ts). Dùng cho design_albums.art_style — mỗi
  * album 1 giá trị, chia sẻ giữa mọi ảnh trong album đó. Xem
- * migrations/20260919_add_design_albums_and_multi_upload.sql.
+ * migrations/archive/20260919_add_design_albums_and_multi_upload.sql.
  */
 export const ART_STYLES: { key: ArtStyle; label: string }[] = [
   { key: "anime_manga", label: "Anime / manga" },

@@ -53,7 +53,7 @@ const EVENT_LABELS: Record<string, string> = {
 export function eventLabel(type: string) { return EVENT_LABELS[type] ?? 'Cập nhật đơn hàng'; }
 
 export function depositAmount(order: Pick<Order, 'price' | 'deposit_pct'>) {
-  // Same rounding as the web card and record_order_payment() (migrations/20260924_enforce_order_payment_amounts.sql).
+  // Same rounding as the web card and record_order_payment() (migrations/archive/20260924_enforce_order_payment_amounts.sql).
   return Math.round((order.price * order.deposit_pct) / 100);
 }
 /** What the buyer still has to pay, and when — payment itself happens on the web for now. */

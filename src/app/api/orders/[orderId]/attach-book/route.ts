@@ -5,14 +5,14 @@ import { OrderService } from "@/lib/orders/order-service";
 
 /** POST /api/orders/:orderId/attach-book — seller (ghostwriter) gắn 1
  * truyện của mình vào đơn viết thuê này; buyer được cấp quyền xem ngay
- * (xem attach_order_book() trong migrations/20260901_add_manuscript_share.sql). */
+ * (xem attach_order_book() trong migrations/archive/20260901_add_manuscript_share.sql). */
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
   let auth;
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Vui lòng đăng nhập." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);
