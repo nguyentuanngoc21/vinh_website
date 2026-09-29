@@ -125,7 +125,7 @@ export function ContestAwardsPanel({
                 {!a.revoked_at && (
                   <div className="flex shrink-0 gap-2">
                     {resultsVisible && !a.paid_at && a.prize_tokens > 0 && (
-                      <Button type="button" variant="dark" fullWidth={false} className="px-4 py-2 text-xs" disabled={pending}
+                      <Button type="button" variant="dark" fullWidth={false} size="sm" disabled={pending}
                         onClick={() => {
                           if (window.confirm(`Chi ${a.prize_tokens.toLocaleString("vi-VN")} token vào ví của ${a.author_name}? Không hoàn tác được.`)) {
                             void request(`/api/admin/contests/${contestId}/awards/${a.id}/pay`, "POST");
@@ -135,10 +135,10 @@ export function ContestAwardsPanel({
                       </Button>
                     )}
                     {!resultsVisible && !a.paid_at && status !== "archived" ? (
-                      <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2 text-xs" disabled={pending}
+                      <Button type="button" variant="danger-outline" fullWidth={false} size="sm" disabled={pending}
                         onClick={() => request(`/api/admin/contests/${contestId}/awards/${a.id}`, "DELETE")}>Xoá</Button>
                     ) : (
-                      <Button type="button" variant="ghost" fullWidth={false} className="px-4 py-2 text-xs" onClick={() => setRevokeId(a.id)}>Thu hồi</Button>
+                      <Button type="button" variant="danger-outline" fullWidth={false} size="sm" onClick={() => setRevokeId(a.id)}>Thu hồi</Button>
                     )}
                   </div>
                 )}
@@ -155,7 +155,7 @@ export function ContestAwardsPanel({
                   <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end">
                     <Field label="Lý do thu hồi (hiển thị ở trang lưu trữ)" wrapperClassName="flex-1" value={revokeReason}
                       onChange={(e) => setRevokeReason(e.target.value)} maxLength={500} />
-                    <Button type="button" variant="dark" fullWidth={false} className="px-4 py-3 text-sm" disabled={pending || !revokeReason.trim()}
+                    <Button type="button" variant="danger" fullWidth={false} className="px-4 py-3 text-sm" disabled={pending || !revokeReason.trim()}
                       onClick={async () => {
                         if (await request(`/api/admin/contests/${contestId}/awards/${a.id}`, "PATCH", { revoke: true, reason: revokeReason.trim() })) {
                           setRevokeId(null);

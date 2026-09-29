@@ -234,15 +234,16 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
                 onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, amount_vnd: e.target.value } : x)))} />
               <Field label="Quà kèm" value={p.extra} disabled={locked} onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, extra: e.target.value } : x)))} />
               {!locked && (
-                <button type="button" onClick={() => setPrizes((ps) => ps.filter((_, j) => j !== i))}
-                  className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] border border-cream-border px-3 text-sm text-error" aria-label="Xoá giải">
+                // h-11 py-0 — cao bằng ô Field (md) cùng hàng items-end.
+                <Button type="button" variant="danger-outline" size="sm" fullWidth={false} onClick={() => setPrizes((ps) => ps.filter((_, j) => j !== i))}
+                  className="h-11 gap-1.5 px-3 py-0" aria-label="Xoá giải">
                   <TrashIcon size={16} /> <span className="sm:hidden">Xoá giải</span>
-                </button>
+                </Button>
               )}
             </div>
           ))}
           {!locked && (
-            <Button type="button" variant="ghost" fullWidth={false} className="self-start px-4 py-2.5 text-sm"
+            <Button type="button" variant="ghost" fullWidth={false} size="sm" className="self-start"
               onClick={() => setPrizes((ps) => [...ps, { name: "", amount_vnd: "0", extra: "" }])}>
               <PlusIcon size={15} weight="bold" /> Thêm giải
             </Button>

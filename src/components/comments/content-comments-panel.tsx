@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { XIcon, TrashIcon, ArrowBendUpLeftIcon, HeartIcon } from "@phosphor-icons/react/dist/ssr";
+import { Alert } from "@/components/ui";
 import type { ContentComment, ContentCommentThread } from "@/lib/comments/content-comments";
 import { groupContentComments } from "@/lib/comments/content-comments";
 
@@ -244,9 +245,9 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
         </div>
 
         {error && (
-          <div className="mx-6 mb-2 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2 text-[12.5px] font-medium text-error">
+          <Alert tone="error" className="mx-6 mb-2 rounded-lg px-3 py-2 text-[12.5px] font-medium">
             {error}
-          </div>
+          </Alert>
         )}
 
         <div className="flex items-center gap-2.5 border-t border-cream-border px-6 py-4">

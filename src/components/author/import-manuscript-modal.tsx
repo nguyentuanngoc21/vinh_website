@@ -318,7 +318,7 @@ export function ImportManuscriptModal({
               </label>
             ) : (
               <div>
-                {/* resize-none! — class `resize-y` của kit sinh sau trong CSS nên phải dùng `!` mới đè được */}
+                {/* resize-none đè được `resize-y` của kit vì className ghép qua cn() */}
                 <Textarea
                   label={null}
                   value={pastedText}
@@ -326,7 +326,7 @@ export function ImportManuscriptModal({
                   placeholder={
                     'Dán toàn bộ bản thảo vào đây… Dùng "Chương 1", "Chương 2" ở đầu mỗi chương để hệ thống tự tách.'
                   }
-                  className="h-[220px] resize-none! leading-[1.7]"
+                  className="h-[220px] resize-none leading-[1.7]"
                 />
                 <div className="mt-3 flex justify-end">
                   <Button

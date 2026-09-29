@@ -47,7 +47,7 @@ export function WithdrawButton({
           {error && <Alert tone="error">{error}</Alert>}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="ghost" fullWidth={false} className="px-5 py-2.5 text-sm" onClick={() => setOpen(false)}>Giữ bài</Button>
-            <Button type="button" variant="dark" fullWidth={false} className="px-5 py-2.5 text-sm" disabled={pending} onClick={confirm}>
+            <Button type="button" variant="danger" fullWidth={false} className="px-5 py-2.5 text-sm" disabled={pending} onClick={confirm}>
               {pending ? "Đang rút…" : "Xác nhận rút bài"}
             </Button>
           </div>

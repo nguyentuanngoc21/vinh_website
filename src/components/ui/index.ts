@@ -8,6 +8,8 @@ export { Skeleton } from "./skeleton";
 export { Tabs } from "./tabs";
 export { ToastProvider, useToast } from "./toast";
 export { Checkbox } from "./checkbox";
+export { Switch } from "./switch";
+export { RadioGroup, type RadioOption } from "./radio-group";
 export { Breadcrumbs, type BreadcrumbItem } from "./breadcrumbs";
 export { GenreSelect } from "./genre-select";
 export { BankSelect } from "./bank-select";

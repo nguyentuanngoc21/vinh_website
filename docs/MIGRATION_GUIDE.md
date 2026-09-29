@@ -12,18 +12,19 @@ Bổ sung vào kit trong đợt này:
 - `size="sm"` cho `Field`/`Textarea`/`Select` — bản gọn cho bảng admin, thẻ đơn hàng, hàng giá.
 - `className` trên kit giờ **luôn thắng** class mặc định cùng thuộc tính (ghép qua `cn()` = `tailwind-merge`, [src/lib/cn.ts](../src/lib/cn.ts)). Trước đây Tailwind v4 xếp thứ tự CSS theo nội bộ nên `<Button className="py-2 text-xs">` bị `py-[14px] text-[15px]` đè mất. Không cần hậu tố `!` nữa (các chỗ đã dùng `!` vẫn chạy đúng).
 - `Alert` nhận `className` (margin ngoài không cần wrapper div).
+- `Switch` (công tắc bật/tắt, `role="switch"`, `size="sm"|"md"`) và `RadioGroup` (1-trong-N, dùng radio gốc ẩn nên giữ phím mũi tên).
+- `Button`: biến thể `danger` (đỏ đặc — gỡ/xoá/tranh chấp) và `danger-outline` (viền đỏ — nút phụ), cùng `size="sm"` cho nút gọn trong bảng/thẻ.
+- `Field` nhận `start`/`end`: nội dung cùng hàng trong khung viền (nhãn ngắn, icon xu, đơn vị "token"/"VNĐ"/"%"). Khác `suffix` (icon đặt tuyệt đối).
 
 ## Còn dùng thẻ thủ công — có chủ đích
 
 Đếm bằng grep `<input`/`<select`/`<textarea` ngoài `src/components/ui/` (không tính `type="file"`/`range`/`radio`/`hidden`):
 
-- [publish-panel.tsx](../src/components/author/publish-panel.tsx) (2) — ô giá nằm trong hàng có icon xu + hậu tố "token"; `Field` chưa có "prefix/suffix text" để dựng lại đúng hàng đó.
-- [author-name-agreement-panel.tsx](../src/components/profile/author-name-agreement-panel.tsx) — 2 lựa chọn `type="radio"`: kit chưa có `Radio`.
 - [chapter-editor.tsx](../src/components/author/chapter-editor.tsx) — khung viết nội dung chương toàn trang (không viền, font riêng, cần ref chèn tại con trỏ).
 - Ô nhập "inline" kiểu riêng (khung soạn tin/bình luận, ô tìm kiếm, tag input): [chat-tab.tsx](../src/components/profile/chat-tab.tsx), [chat-bubble-window.tsx](../src/components/messenger/chat-bubble-window.tsx), [paragraph-comments-panel.tsx](../src/components/reading/paragraph-comments-panel.tsx), [content-comments-panel.tsx](../src/components/comments/content-comments-panel.tsx), [nav-bar-content.tsx](../src/components/nav-bar-content.tsx), [user-table.tsx](../src/components/admin/user-table.tsx), [content-table.tsx](../src/components/admin/content-table.tsx), [agreements-tab.tsx](../src/components/profile/agreements-tab.tsx), [tag-input.tsx](../src/components/author/tag-input.tsx), [reading-list-modal.tsx](../src/components/reading/reading-list-modal.tsx).
 - Thanh trượt `type="range"`: [now-playing.tsx](../src/components/audio/now-playing.tsx), [mini-player-bar.tsx](../src/components/audio-hub/mini-player-bar.tsx).
 
-Còn thiếu trong kit nếu muốn chuyển nốt: `Radio`, `Switch` (nút bật/tắt "Nhận đơn" ở services-tab), biến thể `Button` màu lỗi (nút "Gỡ"/"Tranh chấp"), và `Field` có prefix/suffix dạng chữ.
+Kit hiện đã đủ cho mọi form nhập liệu; các chỗ trên là ô nhập kiểu riêng, giữ thủ công có chủ đích.
 
 ## Nguyên tắc refactor chung
 

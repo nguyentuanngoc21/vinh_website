@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwiseIcon, BookOpenTextIcon } from "@phosphor-icons/react/dist/ssr";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
-import { Alert, Checkbox } from "@/components/ui";
+import { Alert, Button, Checkbox } from "@/components/ui";
 
 export type ContentBookRow = {
   id: string;
@@ -207,23 +207,29 @@ export function ContentTable({
                 Không thể khôi phục
               </span>
             ) : r.deletedAt ? (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
                 disabled={pendingId === r.id}
                 onClick={() => patch(r.id, { deleted: false })}
-                className="flex items-center gap-1.5 rounded-lg border border-cream-border px-3 py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:opacity-50"
+                className="gap-1.5"
               >
                 <ArrowCounterClockwiseIcon size={14} /> Khôi phục
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="danger-outline"
+                size="sm"
+                fullWidth={false}
                 disabled={pendingId === r.id}
                 onClick={() => setRemovingBook(r)}
-                className="flex items-center gap-1.5 rounded-lg border border-error-border px-3 py-1.5 text-[12.5px] font-semibold text-error disabled:opacity-50"
+                className="gap-1.5"
               >
                 <TrashIcon size={14} /> Xoá
-              </button>
+              </Button>
             )}
           </div>
         </div>

@@ -16,7 +16,7 @@ import {
   PauseIcon,
   CopyIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Field, Alert, Checkbox, Skeleton, Textarea } from "@/components/ui";
+import { Field, Alert, Checkbox, Skeleton, Switch, Textarea } from "@/components/ui";
 import { computeMissingFields } from "@/lib/orders/service-listing-service";
 import { SCOPE_OPTIONS } from "@/lib/orders/config";
 import type { Database } from "@/lib/supabase/types";
@@ -422,8 +422,10 @@ export function ServicesTab() {
                     bên trái. Xám mờ + không bấm được nếu chưa đặt hạn
                     mức (mục 12), title giải thích lý do. */}
                 <div className="flex flex-col items-center gap-1 pt-0.5">
-                  <button
-                    type="button"
+                  <Switch
+                    size="sm"
+                    aria-label="Nhận comm"
+                    checked={l.is_accepting_commissions}
                     title={
                       l.monthly_commission_limit == null
                         ? "Đặt \"Số lượng comm nhận/tháng\" ở mục 12 trước khi bật"
@@ -432,15 +434,8 @@ export function ServicesTab() {
                           : "Bật nhận comm"
                     }
                     disabled={l.monthly_commission_limit == null && !l.is_accepting_commissions}
-                    onClick={() => toggleCommissionsFor(l)}
-                    style={{ background: l.is_accepting_commissions ? "var(--color-brand-ink)" : "#dcdcdc" }}
-                    className="h-5 w-9 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <div
-                      className="h-4 w-4 rounded-full bg-white transition-transform"
-                      style={{ transform: l.is_accepting_commissions ? "translateX(16px)" : "translateX(0)" }}
-                    />
-                  </button>
+                    onChange={() => toggleCommissionsFor(l)}
+                  />
                   <span className="text-[10px] text-stone-light">Nhận comm</span>
                 </div>
                 <div className="relative">
@@ -605,23 +600,14 @@ export function ServicesTab() {
             </div>
           </div>
         </div>
-        <button
-          type="button"
+        <Switch
+          aria-label="Nhận đơn"
+          checked={selected.is_accepting_orders}
           title={toggleTip}
           disabled={pending || !canToggleOn}
-          onClick={() => patch({ isAcceptingOrders: !selected.is_accepting_orders })}
-          style={{
-            background: selected.is_accepting_orders ? "var(--color-brand-ink)" : "#dcdcdc",
-            cursor: canToggleOn ? "pointer" : "not-allowed",
-            opacity: canToggleOn ? 1 : 0.6,
-          }}
-          className="h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors"
-        >
-          <div
-            className="h-5 w-5 rounded-full bg-white transition-transform"
-            style={{ transform: selected.is_accepting_orders ? "translateX(20px)" : "translateX(0)" }}
-          />
-        </button>
+          onChange={(next) => patch({ isAcceptingOrders: next })}
+          className="shrink-0"
+        />
       </div>
 
       {missing.length > 0 && (

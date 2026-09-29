@@ -11,7 +11,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDurationShort, type AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { readDurationSeconds } from "@/lib/audio/read-duration";
-import { Alert, Field } from "@/components/ui";
+import { Alert, Button, Field } from "@/components/ui";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
 
@@ -218,24 +218,29 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
             size="sm"
           />
           <div className="mt-2.5 flex gap-2">
-            <button
+            <Button
               type="button"
+              size="sm"
+              fullWidth={false}
               onClick={submitRecord}
               disabled={pending}
-              className="flex-1 cursor-pointer rounded-[9px] bg-brand-gold py-2.5 text-[12.5px] font-bold text-brand-ink disabled:opacity-60"
+              className="flex-1 rounded-[9px] py-2.5 text-[12.5px]"
             >
               {pending ? "Đang gắn…" : "Gắn vào chương"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
               onClick={() => {
                 setMode(null);
                 setError(null);
               }}
-              className="cursor-pointer rounded-[9px] border border-cream-border px-3 text-[12.5px] font-semibold text-stone-alt"
+              className="rounded-[9px] border-cream-border px-3 text-[12.5px] font-semibold text-stone-alt"
             >
               Huỷ
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -250,24 +255,29 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
             size="sm"
           />
           <div className="mt-2.5 flex gap-2">
-            <button
+            <Button
               type="button"
+              size="sm"
+              fullWidth={false}
               onClick={submitLink}
               disabled={pending}
-              className="flex-1 cursor-pointer rounded-[9px] bg-brand-gold py-2.5 text-[12.5px] font-bold text-brand-ink disabled:opacity-60"
+              className="flex-1 rounded-[9px] py-2.5 text-[12.5px]"
             >
               {pending ? "Đang gắn…" : "Gắn vào chương"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
               onClick={() => {
                 setMode(null);
                 setError(null);
               }}
-              className="cursor-pointer rounded-[9px] border border-cream-border px-3 text-[12.5px] font-semibold text-stone-alt"
+              className="rounded-[9px] border-cream-border px-3 text-[12.5px] font-semibold text-stone-alt"
             >
               Huỷ
-            </button>
+            </Button>
           </div>
         </div>
       )}

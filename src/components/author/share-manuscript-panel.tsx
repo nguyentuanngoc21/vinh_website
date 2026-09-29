@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShareNetworkIcon, LockSimpleIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
-import { Field, Alert } from "@/components/ui";
+import { Field, Alert, Button } from "@/components/ui";
 
 export type ManuscriptGrant = { username: string; nickname: string; grantedAt: string };
 
@@ -87,9 +87,9 @@ export function ShareManuscriptPanel({ bookId, finalized: initialFinalized, init
       </div>
 
       {error && (
-        <div className="mt-3">
-          <Alert tone="error">{error}</Alert>
-        </div>
+        <Alert tone="error" className="mt-3">
+          {error}
+        </Alert>
       )}
 
       <div className="mt-3.5">
@@ -103,14 +103,17 @@ export function ShareManuscriptPanel({ bookId, finalized: initialFinalized, init
               </div>
             </div>
             {!finalized && (
-              <button
+              <Button
                 type="button"
+                variant="danger-outline"
+                size="sm"
+                fullWidth={false}
                 onClick={revoke}
                 disabled={pending}
-                className="flex shrink-0 items-center gap-1 rounded-full border border-error-border px-3 py-1.5 text-xs font-semibold text-error disabled:opacity-60"
+                className="shrink-0 gap-1 rounded-full px-3 py-1.5 text-xs font-semibold"
               >
                 <XIcon size={13} /> Gỡ share
-              </button>
+              </Button>
             )}
           </div>
         ) : finalized ? (
@@ -122,16 +125,18 @@ export function ShareManuscriptPanel({ bookId, finalized: initialFinalized, init
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="@tên tài khoản cần share"
-              className="flex-1"
+              wrapperClassName="min-w-0 flex-1"
             />
-            <button
+            <Button
               type="button"
+              size="sm"
+              fullWidth={false}
               onClick={share}
               disabled={pending || !username.trim()}
-              className="shrink-0 rounded-[10px] bg-brand-gold px-4 py-2 text-[13.5px] font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
+              className="shrink-0 rounded-[10px] text-[13.5px]"
             >
               Share
-            </button>
+            </Button>
           </div>
         )}
       </div>

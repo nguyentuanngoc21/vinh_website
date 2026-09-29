@@ -453,14 +453,16 @@ export function DesignUploadForm({ className }: { className?: string }) {
             </p>
 
             {checkedKeys.size > 0 && (
-              <button
+              <Button
                 type="button"
+                variant="danger-outline"
+                size="sm"
                 onClick={deleteChecked}
                 disabled={bulkDeletePending}
-                className="mt-2.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-error-bg py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
+                className="mt-2.5 gap-1.5 text-[12.5px] font-semibold"
               >
                 <TrashIcon size={14} /> Xóa ({checkedKeys.size})
-              </button>
+              </Button>
             )}
 
             <div className="mt-3 flex flex-col gap-2">

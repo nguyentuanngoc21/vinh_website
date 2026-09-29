@@ -288,8 +288,8 @@ export function ChapterEditor({
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Tên chương"
-            // p-0!/text-[32px]! — Tailwind v4 không đảm bảo className đè được padding/cỡ chữ gốc của Field, nên dùng `!`
-            className="mb-1.5 border-none bg-transparent p-0! font-[family-name:var(--font-lora)] text-[32px]! font-semibold text-brand-ink outline-none"
+            // className ghép qua cn() (tailwind-merge) nên p-0/text-[32px] đè được padding/cỡ chữ gốc của Field
+            className="mb-1.5 border-none bg-transparent p-0 font-[family-name:var(--font-lora)] text-[32px] font-semibold text-brand-ink outline-none"
           />
           <div className="mb-[22px] flex items-center gap-3.5 text-[13px] text-stone-alt">
             <span>{wordCount} chữ</span>
@@ -377,7 +377,7 @@ export function ChapterEditor({
                   onClick={insertDesignImage}
                   disabled={imageLinkPending}
                   fullWidth={false}
-                  className="shrink-0 px-4 py-0! text-[13px]!"
+                  className="shrink-0 px-4 py-0 text-[13px]"
                 >
                   {imageLinkPending ? "Đang kiểm tra…" : "Chèn"}
                 </Button>

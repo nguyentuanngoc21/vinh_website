@@ -63,7 +63,7 @@ export function ContestStatusPanel({ contest, events }: { contest: ContestRow; e
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {next.map((s) => (
               <Button key={s} type="button" variant="dark" fullWidth={false}
-                className="w-full px-5 py-2.5 text-sm sm:w-auto" onClick={() => { setTarget(s); setError(null); }}>
+                size="sm" className="w-full sm:w-auto" onClick={() => { setTarget(s); setError(null); }}>
                 Chuyển sang: {CONTEST_STATUS_LABEL[s]}
               </Button>
             ))}
@@ -107,8 +107,8 @@ export function ContestStatusPanel({ contest, events }: { contest: ContestRow; e
             <Field label="Ghi chú (không bắt buộc)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
             {error && <Alert tone="error">{error}</Alert>}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="ghost" fullWidth={false} className="px-5 py-2.5 text-sm" onClick={() => setTarget(null)}>Huỷ</Button>
-              <Button type="button" variant="dark" fullWidth={false} className="px-5 py-2.5 text-sm" disabled={pending} onClick={confirm}>
+              <Button type="button" variant="ghost" fullWidth={false} size="sm" onClick={() => setTarget(null)}>Huỷ</Button>
+              <Button type="button" variant="dark" fullWidth={false} size="sm" disabled={pending} onClick={confirm}>
                 {pending ? "Đang chuyển…" : "Xác nhận"}
               </Button>
             </div>

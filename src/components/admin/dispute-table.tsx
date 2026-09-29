@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, Field, Select, Textarea } from "@/components/ui";
+import { Alert, Button, Field, Select, Textarea } from "@/components/ui";
 
 export type DisputeRow = {
   id: string;
@@ -138,14 +138,17 @@ export function DisputeTable({ rows: initialRows }: { rows: DisputeRow[] }) {
                 rows={3}
                 className="bg-white"
               />
-              <button
+              <Button
                 type="button"
+                variant="dark"
+                size="sm"
+                fullWidth={false}
                 disabled={pending}
                 onClick={() => resolve(row)}
-                className="mt-3 cursor-pointer rounded-full bg-brand-ink px-5 py-2 text-xs font-bold text-white disabled:opacity-60"
+                className="mt-3"
               >
                 {pending ? "Đang xử lý…" : "Xác nhận xử lý"}
-              </button>
+              </Button>
             </div>
           )}
         </div>

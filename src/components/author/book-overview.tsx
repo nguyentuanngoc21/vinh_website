@@ -18,7 +18,7 @@ import { ImportManuscriptModal } from "@/components/author/import-manuscript-mod
 import { BookCoverUpload } from "@/components/author/book-cover-upload";
 import { ShareManuscriptPanel, type ManuscriptGrant } from "@/components/author/share-manuscript-panel";
 import { CharacterManager, type ManagedCharacter } from "@/components/author/character-manager";
-import { Textarea } from "@/components/ui";
+import { Button, Textarea } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type OverviewChapter = {
@@ -271,8 +271,11 @@ export function BookOverview({
           </div>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <button
+          <Button
             type="button"
+            variant="danger-outline"
+            size="sm"
+            fullWidth={false}
             onClick={handleDelete}
             disabled={!canDelete || deleting}
             title={
@@ -280,25 +283,30 @@ export function BookOverview({
                 ? "Không thể xoá tác phẩm đã xuất bản ở dạng độc quyền — chuyển sang tự do trước, hoặc liên hệ quản trị viên."
                 : undefined
             }
-            className="flex items-center gap-1.5 rounded-[9px] border border-error-border bg-white px-4 py-2.5 text-[13.5px] font-semibold text-error disabled:cursor-not-allowed disabled:opacity-45"
+            className="gap-1.5 rounded-[9px] py-2.5 text-[13.5px] font-semibold disabled:opacity-45"
           >
             <TrashIcon size={16} /> {deleting ? "Đang xoá…" : "Xoá truyện"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
+            fullWidth={false}
             onClick={() => setShowImport(true)}
-            className="flex items-center gap-1.5 rounded-[9px] border border-cream-border bg-white px-4 py-2.5 text-[13.5px] font-semibold text-brand-ink"
+            className="gap-1.5 rounded-[9px] border-cream-border bg-white py-2.5 text-[13.5px] font-semibold"
           >
             <UploadSimpleIcon size={16} /> Nhập bản thảo
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
+            fullWidth={false}
             onClick={handleNewChapter}
             disabled={creatingChapter}
-            className="flex items-center gap-1.5 rounded-[9px] bg-brand-gold px-4 py-2.5 text-[13.5px] font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
+            className="gap-1.5 rounded-[9px] py-2.5 text-[13.5px]"
           >
             <PlusIcon size={16} weight="fill" /> {creatingChapter ? "Đang tạo…" : "Chương mới"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -318,7 +326,7 @@ export function BookOverview({
 
         {editingSynopsis ? (
           <div>
-            {/* Cỡ gọn size="sm"; resize-none! vì `resize-y` của kit sinh sau trong CSS nên phải dùng `!` mới đè được */}
+            {/* Cỡ gọn size="sm"; className ghép qua cn() nên `resize-none` đè được `resize-y` của kit */}
             <Textarea
               label={null}
               value={synopsisDraft}
@@ -327,25 +335,23 @@ export function BookOverview({
               rows={4}
               autoFocus
               size="sm"
-              className="resize-none!"
+              className="resize-none"
             />
             <div className="mt-2.5 flex gap-2">
-              <button
-                type="button"
-                onClick={saveSynopsis}
-                disabled={savingSynopsis}
-                className="cursor-pointer rounded-[9px] bg-brand-gold px-4 py-2 text-[13px] font-bold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
-              >
+              <Button type="button" size="sm" fullWidth={false} onClick={saveSynopsis} disabled={savingSynopsis} className="rounded-[9px]">
                 {savingSynopsis ? "Đang lưu…" : "Lưu"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
                 onClick={cancelEditSynopsis}
                 disabled={savingSynopsis}
-                className="cursor-pointer rounded-[9px] border border-cream-border bg-white px-4 py-2 text-[13px] font-semibold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
+                className="rounded-[9px] border-cream-border bg-white font-semibold"
               >
                 Hủy
-              </button>
+              </Button>
             </div>
           </div>
         ) : synopsis ? (
@@ -379,22 +385,20 @@ export function BookOverview({
         <div className="text-xs font-bold tracking-wide text-stone-alt">DANH SÁCH CHƯƠNG</div>
         {order ? (
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={saveOrder}
-              disabled={savingOrder}
-              className="min-h-10 rounded-[9px] bg-brand-gold px-4 py-2 text-[13px] font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
-            >
+            <Button type="button" size="sm" fullWidth={false} onClick={saveOrder} disabled={savingOrder} className="min-h-10 rounded-[9px]">
               {savingOrder ? "Đang lưu…" : "Lưu thứ tự"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
               onClick={() => setOrder(null)}
               disabled={savingOrder}
-              className="min-h-10 rounded-[9px] border border-cream-border bg-white px-4 py-2 text-[13px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+              className="min-h-10 rounded-[9px] border-cream-border bg-white font-semibold"
             >
               Hủy
-            </button>
+            </Button>
           </div>
         ) : (
           chapters.length > 1 && (

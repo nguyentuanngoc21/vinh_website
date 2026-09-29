@@ -30,7 +30,7 @@ import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/par
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { splitParagraphAroundDesignImages } from "@/lib/design/share-link";
 import { shareOrCopy } from "@/lib/share";
-import { VinhMark, useToast } from "@/components/ui";
+import { Alert, VinhMark, useToast } from "@/components/ui";
 import { supportMailto } from "@/lib/support";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { useNowPlaying } from "@/lib/audio/now-playing-context";
@@ -1104,7 +1104,7 @@ export function Reader({
           </div>
 
           {(warningMessage || penalty.banned || isPenaltyActive) && (
-            <div className="mb-6 rounded-[14px] border border-error-border bg-error-bg px-4 py-3 text-sm text-error">
+            <Alert tone="error" className="mb-6 rounded-[14px] text-sm">
               <div>
                 {warningMessage
                   ? warningMessage
@@ -1125,7 +1125,7 @@ export function Reader({
                   Liên hệ hỗ trợ →
                 </a>
               )}
-            </div>
+            </Alert>
           )}
 
           {isPenaltyActive && (
