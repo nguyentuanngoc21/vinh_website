@@ -210,4 +210,11 @@ union all
 select '20260929_add_ranking_aggregates',
   exists(select 1 from pg_proc where proname='book_read_counts_between' and pronamespace='public'::regnamespace)
   and exists(select 1 from information_schema.views where table_schema='public' and table_name='book_chapter_stats')
+union all
+-- Sửa dữ liệu: bìa đang gắn vào sách phải có published_at.
+select '20260929_publish_book_cover_design_items',
+  not exists(
+    select 1 from public.books b join public.design_items d on d.id = b.cover_design_item_id
+    where d.published_at is null and d.deleted_at is null
+  )
 order by 1;

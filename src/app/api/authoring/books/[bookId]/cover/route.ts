@@ -104,6 +104,11 @@ export async function POST(
       title: `Bìa — ${book.title}`,
       image_url: path,
       source: "story_upload",
+      // Công khai ngay: ảnh này sinh ra để làm bìa truyện, không phải draft
+      // của họa sĩ. Thiếu published_at thì view public_design_items bỏ qua
+      // nó và thẻ truyện rơi về bìa sinh tự động (lỗi từ 21/09/2026 — xem
+      // migrations/20260929_publish_book_cover_design_items.sql).
+      published_at: new Date().toISOString(),
     })
     .select("id, share_token")
     .single();
