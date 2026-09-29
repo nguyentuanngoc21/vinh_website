@@ -22,6 +22,8 @@ export type RegisterPayload = {
   realname?: string;
   phone?: string;
   cccd?: string;
+  /** "Cấp ngày" CCCD, dạng yyyy-mm-dd — tùy chọn, chỉ gửi kèm khi có cccd. */
+  cccdIssuedAt?: string;
   cccdFront?: File;
   cccdBack?: File;
   /** Trang cần quay lại sau khi xác nhận đăng ký xong (đọc ?next= ở
@@ -94,6 +96,7 @@ export async function register(payload: RegisterPayload): Promise<RegisterResult
   if (payload.next) body.set("next", payload.next);
   if (payload.cccd && payload.cccdFront && payload.cccdBack) {
     body.set("cccd", payload.cccd);
+    if (payload.cccdIssuedAt) body.set("cccdIssuedAt", payload.cccdIssuedAt);
     body.set("cccdFront", payload.cccdFront);
     body.set("cccdBack", payload.cccdBack);
   }

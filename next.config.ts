@@ -1,5 +1,48 @@
 import type { NextConfig } from "next";
 
+// Danh sách file tesseract.js cần ép đóng gói cho mọi route gọi src/lib/ocr.ts
+// — xem comment ở outputFileTracingIncludes bên dưới để biết vì sao phải ép.
+//
+// tesseract.js-core có 6 biến thể wasm core (thường/simd/relaxedsimd ×
+// full/lstm-only). Dù src/lib/ocr.ts gọi createWorker("vie", 1, ...) (OEM=1 =
+// LSTM_ONLY), tesseract.js 7.0.0 phía Node có bug: worker-script/index.js gọi
+// adapter.getCore(lstmOnly, ...) với lstmOnly là BOOLEAN, còn
+// worker-script/node/getCore.js lại so tham số đó với số OEM
+// ([OEM.DEFAULT, OEM.LSTM_ONLY].includes(oem)) — không bao giờ khớp, nên Node
+// LUÔN require() biến thể KHÔNG-lstm (tesseract-core{,-simd,-relaxedsimd}),
+// chọn simd/relaxedsimd lúc runtime qua wasm-feature-detect. Bản trước chỉ giữ
+// 3 biến thể *-lstm (tưởng Node chỉ dùng chúng) → production báo "Cannot find
+// module 'tesseract.js-core/tesseract-core-relaxedsimd'" và đăng ký thất bại
+// (29/09/2026). Giữ CẢ 6 biến thể (.js + .wasm) để không vỡ lại nếu bản vá
+// upstream sửa getCore.js mà `^7.0.0` tự nâng lên. Mỗi *.js (Emscripten glue)
+// tự fs.readFileSync(__dirname + "/*.wasm") lúc runtime — nft không theo dõi
+// được nên phải liệt kê cả .wasm. Không cần *.wasm.js (bản nhúng base64 cho
+// nhánh browser).
+const TESSERACT_CORE_VARIANTS = [
+  "tesseract-core",
+  "tesseract-core-simd",
+  "tesseract-core-relaxedsimd",
+  "tesseract-core-lstm",
+  "tesseract-core-simd-lstm",
+  "tesseract-core-relaxedsimd-lstm",
+];
+
+const TESSERACT_TRACE_INCLUDES = [
+  "./node_modules/tesseract.js/**/*",
+  "./node_modules/tesseract.js-core/package.json",
+  "./node_modules/tesseract.js-core/index.js",
+  ...TESSERACT_CORE_VARIANTS.flatMap((v) => [
+    `./node_modules/tesseract.js-core/${v}.js`,
+    `./node_modules/tesseract.js-core/${v}.wasm`,
+  ]),
+  "./node_modules/wasm-feature-detect/**/*",
+  "./node_modules/bmp-js/**/*",
+  "./node_modules/is-url/**/*",
+  "./node_modules/node-fetch/**/*",
+  "./node_modules/regenerator-runtime/**/*",
+  "./node_modules/zlibjs/**/*",
+];
+
 const nextConfig: NextConfig = {
   // tesseract.js spawn worker_threads bằng path tính từ __dirname lúc chạy
   // (xem node_modules/tesseract.js/src/worker/node/defaultOptions.js). Nếu để
@@ -26,54 +69,10 @@ const nextConfig: NextConfig = {
   // không được require() lúc runtime).
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
   outputFileTracingIncludes: {
-    "/api/auth/register": [
-      "./node_modules/tesseract.js/**/*",
-      // tesseract.js-core (44MB cả gói) đóng gói 6 biến thể wasm core
-      // (thường/simd/relaxedsimd × full/lstm-only) cho CẢ trình duyệt lẫn
-      // Node, nhưng src/lib/ocr.ts gọi createWorker("vie", 1, ...) — OEM=1
-      // = LSTM_ONLY cố định — nên getCoreNode.js (xem
-      // node_modules/tesseract.js/src/worker/node/getCoreNode.js) chỉ bao
-      // giờ require() 1 trong 3 biến thể "*-lstm" (simd/relaxedsimd chọn
-      // lúc runtime qua wasm-feature-detect), không đụng tới 3 biến thể
-      // không-lstm. Mỗi biến thể *-lstm.js (Emscripten glue) tự
-      // fs.readFileSync(__dirname + "/*-lstm.wasm") lúc runtime — nft không
-      // theo dõi được (cùng lý do phải ép include thủ công như comment
-      // trên) nên phải liệt kê rõ .js lẫn .wasm; KHÔNG cần *-lstm.wasm.js
-      // (bản wasm nhúng base64 chỉ dùng cho nhánh browser/blob-worker, xem
-      // getCore.js, không được getCoreNode.js đụng tới — xem
-      // worker-script/node/getCore.js, file getCore thật sự được
-      // worker-script/node/index.js require(), khác file worker/node/getCore.js
-      // cùng tên ở thư mục khác dùng global.importScripts()). Giữ nguyên
-      // hành vi, chỉ bớt 3 biến thể không-lstm (.js+.wasm, ~14MB) khỏi
-      // bundle route này — xoá glob "**/*" cũ nếu bump version
-      // tesseract.js-core và logic getCore.js đổi cách chọn file.
-      //
-      // Còn 3 file "*-lstm.wasm.js" (~13.5MB, bản wasm nhúng base64 cho
-      // nhánh browser — KHÔNG được getCore.js phía Node đụng tới) vẫn lọt
-      // vào bundle dù không khai báo ở đây: đã thử outputFileTracingExcludes
-      // (xem next.config.ts git history) nhưng build bằng Turbopack không
-      // áp dụng exclude cho các file này — có vẻ bước
-      // collect-build-traces.js áp include/exclude dựa trên
-      // buildTraceContext.chunksTrace (đường Webpack), Turbopack không đi
-      // qua cùng đường nên exclude bị bỏ qua trong thực tế (đã build sạch,
-      // xoá .next, kiểm tra .next/server/app/api/auth/register/route.js.nft.json
-      // để xác nhận). Còn lại ~19MB cho tesseract.js-core/route này (từ 44MB
-      // gốc) — không cố ép giảm tiếp để tránh xoá nhầm file thật sự cần.
-      "./node_modules/tesseract.js-core/package.json",
-      "./node_modules/tesseract.js-core/index.js",
-      "./node_modules/tesseract.js-core/tesseract-core-lstm.js",
-      "./node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
-      "./node_modules/tesseract.js-core/tesseract-core-simd-lstm.js",
-      "./node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
-      "./node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.js",
-      "./node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm",
-      "./node_modules/wasm-feature-detect/**/*",
-      "./node_modules/bmp-js/**/*",
-      "./node_modules/is-url/**/*",
-      "./node_modules/node-fetch/**/*",
-      "./node_modules/regenerator-runtime/**/*",
-      "./node_modules/zlibjs/**/*",
-    ],
+    "/api/auth/register": TESSERACT_TRACE_INCLUDES,
+    // Route cập nhật CCCD cũng gọi verifyCccdAgainstImages() (src/lib/ocr.ts)
+    // — thiếu include ở đây thì lỗi y hệt register khi deploy.
+    "/api/profile/identity": TESSERACT_TRACE_INCLUDES,
     // src/lib/covers/fonts.ts đọc font vendor qua fs.readFileSync(process.cwd()
     // + "/public/fonts/covers/...") lúc runtime (cho next/og's ImageResponse ở
     // route này) — `public/` thường được Vercel phục vụ qua CDN riêng, KHÔNG
