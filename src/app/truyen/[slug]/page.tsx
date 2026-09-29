@@ -11,6 +11,7 @@ import { Pill } from "@/components/ui";
 import { StoryCtaButtons } from "@/components/story/story-cta-buttons";
 import { StoryTabs } from "@/components/story/story-tabs";
 import { StoryContestCards } from "@/components/contests/story-contest-cards";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import { ReadingSourceMarker } from "@/components/reading/reading-source-marker";
 import { readingSourceFromParam } from "@/lib/reading/reading-source";
 import { getStoryContestCards } from "@/lib/contests/public-view";
@@ -33,7 +34,7 @@ const getBookBySlug = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("books")
-    .select("id, slug, title, synopsis, genre, tags, view_count, author_id, cover_design_item_id, published")
+    .select("id, slug, title, synopsis, genre, tags, view_count, author_id, cover_design_item_id, published, is_exclusive")
     .eq("slug", slug)
     .maybeSingle();
   return data;
@@ -174,6 +175,11 @@ export default async function StoryPage({
                 {book.title}
               </h1>
               {authorProfile?.nickname && <p className="mt-1 text-sm text-stone-alt">bởi {authorProfile.nickname}</p>}
+              {book.is_exclusive && (
+                <div className="mt-2.5">
+                  <ExclusiveBadge />
+                </div>
+              )}
 
               <div className="mt-3.5 flex flex-wrap items-center gap-3.5 text-sm text-stone-alt sm:gap-5">
                 <span className="flex items-center gap-1.5">

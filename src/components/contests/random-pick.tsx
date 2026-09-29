@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { DiceFiveIcon, ShuffleIcon } from "@phosphor-icons/react/dist/ssr";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
 /**
@@ -37,7 +38,10 @@ export function RandomPick({ pool, variant = "card" }: { pool: HomepageBook[]; v
         <BookCover id={pick.id} title={pick.title} genre={pick.genre} coverUrl={pick.coverUrl} className="h-full w-full" />
       </div>
       <div className="min-w-0">
-        <div className="truncate text-[14.5px] font-semibold text-ink">{pick.title}</div>
+        <div className="flex items-center gap-2 text-[14.5px] font-semibold text-ink">
+          <span className="truncate">{pick.title}</span>
+          {pick.isExclusive && <ExclusiveBadge variant="pill" />}
+        </div>
         <div className="truncate text-[12.5px] text-stone-alt">{pick.authorNickname ?? "Ẩn danh"}{pick.genre ? ` · ${pick.genre}` : ""}</div>
         <div className="mt-1 text-[12.5px] font-semibold text-brand-gold-dark">Đọc ngay →</div>
       </div>

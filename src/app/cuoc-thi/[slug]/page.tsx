@@ -5,6 +5,7 @@ import { DiamondIcon, EyeIcon, EyeSlashIcon, FireIcon, InfoIcon, SparkleIcon, Tr
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import { ContestHero } from "@/components/contests/contest-hero";
 import { EntryGrid } from "@/components/contests/entry-grid";
 import { EntryRow } from "@/components/contests/entry-row";
@@ -499,8 +500,9 @@ function Results({ awards, publishedAt, visible }: { awards: PublicAward[]; publ
 
   const cover = (a: PublicAward, size: string) =>
     a.book ? (
-      <div className={`${size} overflow-hidden rounded-xl shadow-[0_14px_30px_rgb(0_0_0/.2)]`}>
+      <div className={`${size} relative overflow-hidden rounded-xl shadow-[0_14px_30px_rgb(0_0_0/.2)]`}>
         <BookCover id={a.book.id} title={a.book.title} genre={a.book.genre} coverUrl={a.book.coverUrl} className="h-full w-full" />
+        {a.book.isExclusive && <ExclusiveBadge variant="overlay" />}
       </div>
     ) : (
       <div className={`${size} flex items-center justify-center rounded-xl bg-neutral-bg p-3 text-center text-xs text-stone-alt`}>Tác phẩm không còn khả dụng</div>

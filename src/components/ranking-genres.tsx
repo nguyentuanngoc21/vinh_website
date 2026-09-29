@@ -3,6 +3,7 @@ import { BookmarkSimpleIcon, FingerprintIcon } from "@phosphor-icons/react/dist/
 import { genres } from "@/lib/books";
 import { AdminModerationCallout } from "@/components/home/admin-moderation-callout";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
 const RANK_COLORS = ["var(--color-brand-gold)", "#C9A86A", "#f0b429", "#9a9a9a"];
@@ -47,7 +48,10 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
                   />
                 </div>
                 <div className="flex-1">
-                  <div className="text-base font-semibold text-ink">{book.title}</div>
+                  <div className="flex items-center gap-2 text-base font-semibold text-ink">
+                    <span className="min-w-0">{book.title}</span>
+                    {book.isExclusive && <ExclusiveBadge variant="pill" />}
+                  </div>
                   <div className="text-[13px] text-[#9a9a9a]">
                     {book.authorNickname ?? "Ẩn danh"} · {book.viewCount.toLocaleString("vi-VN")} đọc
                     {book.genre ? ` · ${book.genre}` : ""}

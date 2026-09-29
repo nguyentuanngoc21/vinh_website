@@ -16,6 +16,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { NavBarContent } from "@/components/nav-bar-content";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import { formatCount } from "@/lib/design/get-design-gallery";
 import { BOOK_STATUS_LABEL, type BookStatus } from "@/lib/story/status";
 import { truncateWords } from "@/lib/story/truncate-words";
@@ -188,6 +189,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                   coverUrl={current.coverUrl}
                   priority
                 />
+                {current.isExclusive && <ExclusiveBadge variant="overlay" />}
               </Link>
             </div>
 
@@ -295,6 +297,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                         coverUrl={book.coverUrl}
                         priority={nearView}
                       />
+                      {book.isExclusive && <ExclusiveBadge variant="overlay" />}
                       {book.genre && (
                         <div className="absolute top-3 right-3 max-w-[calc(100%-24px)] truncate rounded-full bg-black/[0.34] px-2.5 py-1 text-[10.5px] font-semibold tracking-[.4px] text-white">
                           {book.genre}

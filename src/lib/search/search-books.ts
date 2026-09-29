@@ -9,10 +9,12 @@ export type BookSearchResult = {
   genre: BookGenre | null;
   authorNickname: string | null;
   coverUrl: string | null;
+  /** books.is_exclusive — hiện tag "Độc quyền" trên card. */
+  isExclusive: boolean;
 };
 
 const SEARCH_LIMIT = 24;
-const BOOK_SEARCH_COLUMNS = "id, slug, title, genre, tags, author_id, cover_design_item_id, view_count, created_at";
+const BOOK_SEARCH_COLUMNS = "id, slug, title, genre, tags, author_id, cover_design_item_id, view_count, created_at, is_exclusive";
 
 type BookSearchRow = {
   id: string;
@@ -24,6 +26,7 @@ type BookSearchRow = {
   cover_design_item_id: string | null;
   view_count: number;
   created_at: string;
+  is_exclusive: boolean;
 };
 
 /** Tìm truyện theo tên, tag, hoặc tên tác giả — chưa có full-text index
@@ -79,5 +82,6 @@ export async function searchBooks(supabase: SupabaseClient<Database>, query: str
     genre: r.genre,
     authorNickname: nicknameById.get(r.author_id) ?? null,
     coverUrl: coverUrls[i],
+    isExclusive: r.is_exclusive,
   }));
 }

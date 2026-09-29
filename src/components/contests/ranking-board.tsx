@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FireIcon, InfoIcon, LockSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import type { RankingEntry, RankingPage } from "@/lib/contests/feeds";
 import { growthLabel } from "@/lib/contests/signals";
 import { rankChangeAria, rankChangeText, type RankChange } from "@/lib/contests/rank-change";
@@ -183,7 +184,10 @@ export function RankingBoard({
                 <BookCover id={r.book.id} title={r.book.title} genre={r.book.genre} coverUrl={r.book.coverUrl} className="h-full w-full" />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-[15px] font-semibold text-ink">{r.book.title}</div>
+                <div className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+                  <span className="truncate">{r.book.title}</span>
+                  {r.book.isExclusive && <ExclusiveBadge variant="pill" />}
+                </div>
                 <div className="truncate text-[12.5px] text-stone-light">{r.book.authorNickname ?? "Ẩn danh"}{r.book.genre ? ` · ${r.book.genre}` : ""}</div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-brand-ink sm:hidden">
                   {metricText(loadable, r, false)}

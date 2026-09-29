@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import { getCachedBooksByGenre } from "@/lib/cache/public-data";
 import { BOOK_GENRES, GENRE_SLUGS, slugToGenre } from "@/lib/covers/genre-styles";
 
@@ -78,7 +79,7 @@ export default async function TruyenPage({
                   href={`/truyen/${b.slug}`}
                   className="no-underline transition-transform duration-[250ms] hover:-translate-y-1"
                 >
-                  <div className="aspect-[2/3] overflow-hidden rounded-[10px] bg-neutral-bg">
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-[10px] bg-neutral-bg">
                     <BookCover
                       id={b.id}
                       title={b.title}
@@ -87,6 +88,7 @@ export default async function TruyenPage({
                       coverUrl={b.coverUrl}
                       className="h-full w-full"
                     />
+                    {b.isExclusive && <ExclusiveBadge variant="overlay" />}
                   </div>
                   <div className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold text-brand-ink">
                     {b.title}

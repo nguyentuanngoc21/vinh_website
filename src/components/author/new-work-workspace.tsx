@@ -30,14 +30,15 @@ export function NewWorkWorkspace() {
   const [price, setPrice] = useState(0);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioPrice, setAudioPrice] = useState(0);
-  const [isExclusive, setIsExclusive] = useState(true);
+  // Mặc định Tự do — chỉ độc quyền khi tác giả chủ động chọn.
+  const [isExclusive, setIsExclusive] = useState(false);
   const [genre, setGenre] = useState<BookGenre | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [isLastChapter, setIsLastChapter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Server chặn tạo sách mới ở chế độ độc quyền (isExclusive mặc định
-  // true ở trang này) khi chưa xác nhận Hợp đồng khai thác tác phẩm độc
+  // Server chặn tạo sách mới ở chế độ độc quyền (khi tác giả chọn Độc
+  // quyền) khi chưa xác nhận Hợp đồng khai thác tác phẩm độc
   // quyền — 403 kèm missingAgreementIds, xem
   // src/lib/authoring/exclusivity-agreement.ts và author-workspace.tsx
   // (cùng pattern). Giữ lại `published` của lần bấm bị chặn để bấm lại

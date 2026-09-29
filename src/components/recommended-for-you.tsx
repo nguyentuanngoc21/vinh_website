@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
 /**
@@ -26,7 +27,7 @@ export function RecommendedForYou({ books }: { books: HomepageBook[] }) {
             href={`/truyen/${book.slug}?from=goi-y`}
             className="cursor-pointer overflow-hidden rounded-xl no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,.12)]"
           >
-            <div className="aspect-[2/3] overflow-hidden rounded-xl">
+            <div className="relative aspect-[2/3] overflow-hidden rounded-xl">
               <BookCover
                 id={book.id}
                 title={book.title}
@@ -35,6 +36,7 @@ export function RecommendedForYou({ books }: { books: HomepageBook[] }) {
                 coverUrl={book.coverUrl}
                 className="h-full w-full"
               />
+              {book.isExclusive && <ExclusiveBadge variant="overlay" />}
             </div>
             <div className="px-1 py-3">
               <div className="line-clamp-2 min-h-[2.5rem] text-[15px] font-semibold text-ink">{book.title}</div>
