@@ -3802,8 +3802,10 @@ grant update (title, description, category, alt_text, album_id, deleted_at) on p
 -- migrations/archive/20260921_add_design_item_publish_state.sql) — null = draft
 -- riêng của họa sĩ (chưa hiện qua public_design_items bên dưới), có giá trị
 -- = đã công khai. POST /api/design (đăng ảnh) không set cột này, mặc
--- định NULL; POST /api/design/publish (bấm "Hoàn tất") là nơi duy nhất
--- set = now(). ---
+-- định NULL; POST /api/design/publish (bấm "Hoàn tất") set = now().
+-- Ngoại lệ: ảnh bìa tác giả tự tải lên (POST
+-- /api/authoring/books/[bookId]/cover) set published_at ngay lúc tạo — xem
+-- migrations/20260929_publish_book_cover_design_items.sql. ---
 alter table public.design_items
   add column published_at timestamptz;
 
