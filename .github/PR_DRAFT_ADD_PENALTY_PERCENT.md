@@ -9,7 +9,7 @@ Summary
 
 Files changed (key)
 - docs/supabase/schema.sql — updated function and schema notes
-- migrations/20260806_add_penalty_percent.sql — migration SQL
+- migrations/archive/20260806_add_penalty_percent.sql — migration SQL
 - src/lib/supabase/types.ts — added `penalty_percent` to types
 - src/app/api/penalty/route.ts — pass `p_penalty_percent`, fallback for old signature
 - src/components/reading/reader.tsx — UI + local fallback updates
@@ -17,7 +17,7 @@ Files changed (key)
 - scripts/test_apply_transaction.mjs, scripts/test_penalty_route.mjs — test updates
 
 Migration
-1. Run the SQL in `migrations/20260806_add_penalty_percent.sql` in Supabase SQL editor (or via psql).
+1. Run the SQL in `migrations/archive/20260806_add_penalty_percent.sql` in Supabase SQL editor (or via psql).
 2. Redeploy the app server so server code can call the new RPC signature. (The server uses a fallback if the DB hasn't been migrated yet.)
 
 Rollout notes
@@ -28,7 +28,7 @@ How to create the PR locally
 ```bash
 # from repo root
 git checkout -b feature/add-penalty-percent
-git add docs/supabase/schema.sql migrations/20260806_add_penalty_percent.sql src/lib/supabase/types.ts src/app/api/penalty/route.ts src/components/reading/reader.tsx src/components/audio/chapter-queue.tsx scripts/test_apply_transaction.mjs scripts/test_penalty_route.mjs
+git add docs/supabase/schema.sql migrations/archive/20260806_add_penalty_percent.sql src/lib/supabase/types.ts src/app/api/penalty/route.ts src/components/reading/reader.tsx src/components/audio/chapter-queue.tsx scripts/test_apply_transaction.mjs scripts/test_penalty_route.mjs
 git commit -m "Add penalty_percent column, update apply_transaction RPC, pass penalty_percent in routes/tests, update types and UI, add migration"
 git push -u origin feature/add-penalty-percent
 

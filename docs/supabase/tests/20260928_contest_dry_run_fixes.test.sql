@@ -1,4 +1,4 @@
--- Test cho migrations/20260928_contest_dry_run_fixes.sql.
+-- Test cho migrations/archive/20260928_contest_dry_run_fixes.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. KHÔNG chạy trên production.
 --
 -- Cuộc thi đang nhận bài, 3 bài A, B, C (chương 1000 chữ → ngưỡng đọc thật 96 giây).

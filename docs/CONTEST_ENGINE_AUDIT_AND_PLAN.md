@@ -99,7 +99,7 @@ Quy ước: SQL chữ thường, **idempotent** (`if not exists`, `drop policy i
 
 **Cấu hình không đặt default nghiệp vụ trong DB**: `eligibility_rules`, `vote_rules`, `scoring_config` mặc định `'{}'`; giá trị mặc định và kiểm tra khoá hợp lệ nằm **một chỗ duy nhất** ở `src/lib/contests/config.ts` (parse + validate khi admin lưu, khoá lạ bị từ chối). `config.ts` luôn ghi **đủ mọi khoá** (đã chuẩn hoá). DB kiểm cấu hình đủ khoá đúng kiểu lúc cuộc thi rời `draft` (trigger), rồi các RPC (`submit_contest_entry`, `cast_contest_vote`) đọc thẳng khoá trong jsonb — không nhận tham số cấu hình từ TS, không có bộ default thứ hai trong SQL. Khoá DB đọc: `eligibility_rules.{allow_resubmit_after_withdraw, require_exclusive, allow_multi_contest, max_entries_per_author}`, `vote_rules.{min_account_age_days, require_completed_chapter}`.
 
-### 1. Migration Phase 1 — `migrations/20260926_add_contest_engine_core.sql`
+### 1. Migration Phase 1 — `migrations/archive/20260926_add_contest_engine_core.sql`
 
 ```sql
 -- ---------- Enums ----------
@@ -830,7 +830,7 @@ Mỗi slice chỉ xong khi: migration + SQL test chạy trên dev/staging, `npm 
 ## XV. DANH SÁCH FILE
 
 ### Tạo mới — Phase 1
-- **DB**: `migrations/20260926_add_contest_engine_core.sql`, `docs/supabase/tests/20260926_contest_engine_core.test.sql`, `migrations/2026xxxx_add_contest_submission_snapshots.sql` + test (Slice 1.6, D3).
+- **DB**: `migrations/archive/20260926_add_contest_engine_core.sql`, `docs/supabase/tests/20260926_contest_engine_core.test.sql`, `migrations/2026xxxx_add_contest_submission_snapshots.sql` + test (Slice 1.6, D3).
 - **Domain** `src/lib/contests/`: `types.ts`, `config.ts` (parse/validate + default), `capabilities.ts`, `eligibility/` (engine + `rules/*.ts`), `contest-service.ts`, `submission-service.ts`, `vote-service.ts`, `ranking-service.ts`, `feeds.ts`, `scoring/formulas/popular-v1.ts`, `snapshot-service.ts`.
 - **API công khai**: `src/app/api/contests/route.ts`, `[slug]/route.ts`, `[slug]/eligibility/route.ts`, `[slug]/submissions/route.ts` (GET feed, POST nộp), `[slug]/submissions/[submissionId]/withdraw/route.ts`, `[slug]/submissions/[submissionId]/vote/route.ts` (POST/DELETE), `[slug]/rankings/route.ts`, `cron/advance/route.ts`.
 - **API tác giả**: `src/app/api/authoring/contests/route.ts`, `src/app/api/authoring/books/[bookId]/cuoc-thi/route.ts` (khớp cấu trúc thư mục `api/authoring` khi code).
@@ -1086,9 +1086,9 @@ Nếu không có "Cần bổ sung", mọi thiếu sót chỉ có hai lựa chọ
 
 ### 5. Slice 2.1–2.2 — đã triển khai (26/09/2026)
 
-**2.1 — Phiên đọc ở server** (`migrations/20260926_add_reading_session_tracking.sql`): reader gửi nhịp 60 giây (`POST /api/reading/heartbeat`, mobile `/api/mobile/reading/heartbeat`) chỉ khi tab hiển thị và có tương tác trong 120 giây; server cộng khoảng thật giữa 2 nhịp (≤ 90 giây mới cộng). Client chỉ còn quyền SELECT phiên của mình. Nguồn truy cập: `?from=cuoc-thi` / `?from=goi-y` ở trang truyện, nhớ 30 phút theo sách (chỉ cho analytics).
+**2.1 — Phiên đọc ở server** (`migrations/archive/20260926_add_reading_session_tracking.sql`): reader gửi nhịp 60 giây (`POST /api/reading/heartbeat`, mobile `/api/mobile/reading/heartbeat`) chỉ khi tab hiển thị và có tương tác trong 120 giây; server cộng khoảng thật giữa 2 nhịp (≤ 90 giây mới cộng). Client chỉ còn quyền SELECT phiên của mình. Nguồn truy cập: `?from=cuoc-thi` / `?from=goi-y` ở trang truyện, nhớ 30 phút theo sách (chỉ cho analytics).
 
-**2.2 — Tín hiệu hợp lệ + bảng điểm** (`migrations/20260926_add_contest_scores.sql`):
+**2.2 — Tín hiệu hợp lệ + bảng điểm** (`migrations/archive/20260926_add_contest_scores.sql`):
 
 | Khái niệm | Định nghĩa đã triển khai |
 |---|---|
@@ -1103,7 +1103,7 @@ Nếu không có "Cần bổ sung", mọi thiếu sót chỉ có hai lựa chọ
 - Admin (tab Bài dự thi) luôn thấy phiếu thô, phiếu đã lọc, độc giả hợp lệ, độc giả mới 7 ngày — để xét gian lận và trao giải.
 - Chưa làm ở 2.2: return reader / completion (Slice 2.7), phát hiện gian lận tự động + màn xét (Slice 2.4), hàng Trending / Viên ngọc ẩn công khai (Slice 2.3 — `get_contest_score_ranking('trending')` đã có sẵn).
 
-**2.3 — Hàng khám phá dựa trên tín hiệu** (`migrations/20260926_add_contest_signal_feeds.sql`, `src/lib/contests/signals.ts`) — chỉ khi cuộc thi có bài và chưa công bố kết quả:
+**2.3 — Hàng khám phá dựa trên tín hiệu** (`migrations/archive/20260926_add_contest_signal_feeds.sql`, `src/lib/contests/signals.ts`) — chỉ khi cuộc thi có bài và chưa công bố kết quả:
 
 | Hàng / bảng | Cách chọn |
 |---|---|
@@ -1113,7 +1113,7 @@ Nếu không có "Cần bổ sung", mọi thiếu sót chỉ có hai lựa chọ
 
 Mỗi hàng lỗi riêng không làm hỏng tab Khám phá. Hub `/cuoc-thi` chưa có các hàng này.
 
-**2.4 — Tín hiệu gian lận + admin xét** (`migrations/20260926_add_contest_fraud_detection.sql`, `src/lib/contests/fraud-service.ts`, tab "Gian lận" ở `/admin/cuoc-thi/[id]`):
+**2.4 — Tín hiệu gian lận + admin xét** (`migrations/archive/20260926_add_contest_fraud_detection.sql`, `src/lib/contests/fraud-service.ts`, tab "Gian lận" ở `/admin/cuoc-thi/[id]`):
 
 | Tín hiệu | Điều kiện (ngưỡng ở `FRAUD_THRESHOLDS`) |
 |---|---|
@@ -1124,7 +1124,7 @@ Mỗi hàng lỗi riêng không làm hỏng tab Khám phá. Hub `/cuoc-thi` chư
 - Admin: Xác nhận gian lận (loại mọi phiếu + lượt đọc của tài khoản khỏi điểm cuộc thi này, tính lại ngay), Bỏ qua, Mở lại; có ghi chú. Khoá sau khi công bố kết quả.
 - Không có tín hiệu "phiếu không đọc thật" (đã tự lọc ở 2.2) và chưa có tín hiệu theo bài (vd phiếu dồn về 1 bài) — cần thêm khi có dữ liệu thật để đặt ngưỡng.
 
-**2.7 — Thống kê bài dự thi cho tác giả** (`migrations/20260926_add_contest_entry_stats.sql`, `src/lib/contests/stats-view.ts`, `/author/contests/[slug]/stats`, link "Thống kê" trên thẻ bài dự thi):
+**2.7 — Thống kê bài dự thi cho tác giả** (`migrations/archive/20260926_add_contest_entry_stats.sql`, `src/lib/contests/stats-view.ts`, `/author/contests/[slug]/stats`, link "Thống kê" trên thẻ bài dự thi):
 
 Tính từ `submission_start`, không tính tác giả, không dùng lượt xem trang. "Người đọc" = có phiên đọc với thời gian đọc thật > 0.
 
@@ -1257,8 +1257,8 @@ Kết quả chốt 26/09/2026:
 
 ### 11. Đã triển khai (26/09/2026)
 
-- **2.5a** (`migrations/20260926_add_scoring_tracking.sql`): `reading_sessions.words_reached` (server tính theo đoạn xa nhất, chỉ tăng); trigger ép thời gian server cho `anchored_comments`, `chapter_votes`, `character_trope_votes`, `reading_list_items`.
-- **2.5b** (`migrations/20260926_add_contest_judging.sql`, `src/lib/contests/final-scoring/config.ts`, `src/lib/contests/judging-service.ts`):
+- **2.5a** (`migrations/archive/20260926_add_scoring_tracking.sql`): `reading_sessions.words_reached` (server tính theo đoạn xa nhất, chỉ tăng); trigger ép thời gian server cho `anchored_comments`, `chapter_votes`, `character_trope_votes`, `reading_list_items`.
+- **2.5b** (`migrations/archive/20260926_add_contest_judging.sql`, `src/lib/contests/final-scoring/config.ts`, `src/lib/contests/judging-service.ts`):
   - `contests.official_scoring_start/_end` (sau khi đóng nhận bài; khung bình chọn nằm trong khung chấm — J2; khoá khi bắt đầu) — nhập ở tab "Thông tin & thể lệ".
   - `contest_scoring_configs` bất biến theo version; lý do bắt buộc từ lúc khung chấm bắt đầu (J11); rubric khoá khi đã có phiếu chấm. Tab admin "Chấm điểm" sửa trọng số, chuẩn hoá, J3 (chờ chốt — mặc định `absolute`), C Bayesian, ngưỡng đọc thật / trần tốc độ / lượt ghé, hành động tương tác, nhãn + điểm tối đa rubric; phá hoà và giải chỉ hiển thị (theo mặc định J8, J9).
   - Giám khảo gán theo username; gỡ cần lý do. Phiếu chấm: nháp (thiếu tiêu chí được) → chốt (đủ tiêu chí, tổng do DB tính) → admin mở lại / huỷ (lý do bắt buộc), nhật ký trước → sau.
@@ -1285,7 +1285,7 @@ Pipeline: RAW METRIC → điều chỉnh độ tin cậy (Bayesian cho tỷ lệ
 
 ### 13. Slice 2.6a — đã triển khai (27/09/2026)
 
-- `migrations/20260926_add_final_scoring.sql`: `get_contest_scoring_metrics()` (số liệu thô trong khung chấm theo XXI.3, mẫu số = bản chụp), `contest_score_runs` + `contest_score_snapshots` (bất biến, lưu mọi tầng J3 mục 16 + đề xuất giải), `save_contest_score_run()` (chỉ version đang áp dụng; `final` chỉ sau khung chấm).
+- `migrations/archive/20260926_add_final_scoring.sql`: `get_contest_scoring_metrics()` (số liệu thô trong khung chấm theo XXI.3, mẫu số = bản chụp), `contest_score_runs` + `contest_score_snapshots` (bất biến, lưu mọi tầng J3 mục 16 + đề xuất giải), `save_contest_score_run()` (chỉ version đang áp dụng; `final` chỉ sau khung chấm).
 - Engine `src/lib/contests/final-scoring/engine.ts` (thuần, tất định): điều chỉnh → chuẩn hoá trên cohort → điểm → xếp hạng (FinalScore + chuỗi J8; đồng hạng thật = cùng hạng) → đề xuất giải J9. Cờ: không có bài, 1 bài, chưa gán giám khảo, thiếu phiếu chốt, thiếu bản chụp, đồng hạng thật ở ranh giới giải, giải đặc biệt không trao được.
 - `input_digest` = sha256(version + cấu hình + số liệu thô) để kiểm lại tính tái lập.
 - Tab admin "Chấm điểm" → "Kết quả chấm": Tính thử / Tính chính thức, danh sách lượt tính + cảnh báo "Cần tính lại" (version mới, phiếu chấm hoặc tín hiệu gian lận đổi sau lượt tính), bảng điểm mở từng tầng.
@@ -1294,7 +1294,7 @@ Pipeline: RAW METRIC → điều chỉnh độ tin cậy (Bayesian cho tỷ lệ
 
 ### 14. Slice 2.6b — đã triển khai (27/09/2026)
 
-- `migrations/20260926_add_score_run_publish.sql`: `publish_contest_score_run()` — chỉ lượt `final` dùng version cấu hình đang áp dụng; mỗi cuộc thi tối đa 1 lượt đang công bố; thay kết quả cần lý do, lượt cũ giữ lại (đánh dấu thay thế, không công bố lại được); nội dung lượt tính bất biến (trigger).
+- `migrations/archive/20260926_add_score_run_publish.sql`: `publish_contest_score_run()` — chỉ lượt `final` dùng version cấu hình đang áp dụng; mỗi cuộc thi tối đa 1 lượt đang công bố; thay kết quả cần lý do, lượt cũ giữ lại (đánh dấu thay thế, không công bố lại được); nội dung lượt tính bất biến (trigger).
 - Admin: "Kết quả chấm" có nút "Công bố lượt này làm kết quả" + nhãn Đang công bố / Đã thay thế. Tab "Giải thưởng" có "Đề xuất từ kết quả chấm đã công bố" — tiền thưởng lấy theo tên giải trong `prizes_summary`, admin sửa rồi "Xác nhận" → `contest_awards` (luồng chi trả cũ giữ nguyên — J10).
 - Cuộc thi đã lưu cấu hình chấm chỉ chuyển sang "Đã có kết quả" khi đã có lượt công bố (`score_run_not_published`).
 - Microsite (sau công bố): BXH "Chung cuộc" (hạng đã lưu) và "Ban giám khảo" (điểm BGK, đồng điểm cùng hạng) từ lượt đang công bố; tab Kết quả mở sẵn Chung cuộc. Cuộc thi không chấm chung cuộc vẫn hiện "công bố qua danh sách giải".
@@ -1342,7 +1342,7 @@ Kết quả chốt 27/09/2026:
 
 ### 4. Slice 3.1 — đã triển khai (27/09/2026)
 
-- `migrations/20260927_add_contest_quests.sql`: `task_templates.quest_pool` / `contest_action`; `user_quest_pool.slot_kind` / `contest_id` / `reroll_count` + unique 1 ô sự kiện/ngày; `reset_quest_pool_slot` định nghĩa lại (từ chối ô / mẫu sự kiện); `add_event_quest_slot`, `reset_event_quest_slot` (K3: 1 lần/ngày), `record_contest_activity`; 5 mẫu seed (thưởng 6–12 token — admin chỉnh).
+- `migrations/archive/20260927_add_contest_quests.sql`: `task_templates.quest_pool` / `contest_action`; `user_quest_pool.slot_kind` / `contest_id` / `reroll_count` + unique 1 ô sự kiện/ngày; `reset_quest_pool_slot` định nghĩa lại (từ chối ô / mẫu sự kiện); `add_event_quest_slot`, `reset_event_quest_slot` (K3: 1 lần/ngày), `record_contest_activity`; 5 mẫu seed (thưởng 6–12 token — admin chỉnh).
 - Mẫu nhiệm vụ sự kiện là mẫu chung; cuộc thi của ngày nằm trên ô pool (bốc theo K4). Mẫu seed có `quest_type` NULL → code cũ không bốc nhầm vào pool thường.
 - Ghi tiến độ: đọc hết chương (`reading-event-service`), bình luận, thêm vào danh sách đọc, bình chọn → `src/lib/contests/activity-service.ts`. Chỉ tính bài hợp lệ của đúng cuộc thi, không phải tác giả; đọc cần đạt ngưỡng đọc thật (K7); "Viên ngọc ẩn" cùng tiêu chí với hàng khám phá.
 - `/nhiem-vu`: ô sự kiện có nhãn "Sự kiện" + tên cuộc thi (link), đổi bằng lượt riêng. API `/api/quests/pool` thêm `slotKind`, `contest`, `eventRerollsLeft` (app mobile cũ bỏ qua được).
@@ -1350,7 +1350,7 @@ Kết quả chốt 27/09/2026:
 
 ### 5. Slice 3.2 — đã triển khai (27/09/2026)
 
-- `migrations/20260927_add_contest_passport.sql`: `contest_passport_reads` (đọc thật, idempotent theo người × cuộc thi × chương × ngày VN, ghi cờ "Viên ngọc ẩn" lúc đọc), `contest_passports` (huy hiệu "Người đi hết mùa thi" — chỉ huy hiệu, K6), `contest_passport_state()` (nguồn duy nhất của 7 mốc K5 + mục tiêu). `record_contest_activity()` định nghĩa lại: ghi Passport cho mọi cuộc thi trong mùa có bài đó, rồi nhiệm vụ sự kiện như 3.1.
+- `migrations/archive/20260927_add_contest_passport.sql`: `contest_passport_reads` (đọc thật, idempotent theo người × cuộc thi × chương × ngày VN, ghi cờ "Viên ngọc ẩn" lúc đọc), `contest_passports` (huy hiệu "Người đi hết mùa thi" — chỉ huy hiệu, K6), `contest_passport_state()` (nguồn duy nhất của 7 mốc K5 + mục tiêu). `record_contest_activity()` định nghĩa lại: ghi Passport cho mọi cuộc thi trong mùa có bài đó, rồi nhiệm vụ sự kiện như 3.1.
 - Bình luận / bình chọn đếm thẳng từ dữ liệu (rút phiếu → mốc tự trừ; huy hiệu đã đạt vẫn giữ). Mùa thi = `submission_open` → `judging`.
 - Microsite tab Khám phá: khối "Hành trình của bạn" (7 mốc + nhiệm vụ sự kiện hôm nay nếu thuộc cuộc thi này). Hub `/cuoc-thi`: tóm tắt x/7 mốc hoặc huy hiệu theo từng cuộc thi trong mùa.
 
@@ -1363,7 +1363,7 @@ Kết quả chốt 27/09/2026:
 
 ### 7. Slice 3.4 — đã triển khai (28/09/2026)
 
-- `migrations/20260928_add_contest_rank_snapshots.sql`: `contest_rank_snapshots` (hạng theo ngày giờ VN, chỉ service-role) + `snapshot_contest_ranks(contest, day)`. Hạng lấy từ đúng RPC của BXH công khai, phân trang theo cursor → khớp hạng người xem thấy. Mỗi ngày / bảng chụp 1 lần; đã có thì bỏ qua. Bảng phiếu chỉ chụp lúc `community_voting`; Trending chụp từ `submission_open` đến `judging`. Chung cuộc / Ban giám khảo đã chốt nên không có cột này.
+- `migrations/archive/20260928_add_contest_rank_snapshots.sql`: `contest_rank_snapshots` (hạng theo ngày giờ VN, chỉ service-role) + `snapshot_contest_ranks(contest, day)`. Hạng lấy từ đúng RPC của BXH công khai, phân trang theo cursor → khớp hạng người xem thấy. Mỗi ngày / bảng chụp 1 lần; đã có thì bỏ qua. Bảng phiếu chỉ chụp lúc `community_voting`; Trending chụp từ `submission_open` đến `judging`. Chung cuộc / Ban giám khảo đã chốt nên không có cột này.
 - Cron `api/contests/cron/advance` (00:05 giờ VN) gọi `snapshotAllRanks()` sau khi tính lại điểm.
 - BXH so hạng hiện tại với bản chụp mới nhất của hôm nay (cron chưa chạy thì dùng hôm qua): ▲ n / ▼ n / — / "Mới" (bài chưa có trong bản chụp). Chưa có bản chụp → ẩn cột. Chỉ so hạng, không lộ số phiếu (K9, Q3).
 - API `/api/contests/:slug/rankings` thêm `changes_visible` và `change` cho từng dòng. Web mobile bỏ cột này theo đặc tả UX mục 6.
@@ -1380,7 +1380,7 @@ Chạy thử tự động trên dev theo `docs/CONTEST_DRY_RUN.md` (7 tài kho�
 | L3 | Thu hồi giải đã chi trả | **Admin xử lý tay**; trang admin cảnh báo khi thu hồi |
 | L4 | Admin đóng nhận bài sớm | **Chặn rút bài ngay** từ lúc đóng |
 
-- `migrations/20260928_contest_dry_run_fixes.sql`: `snapshot_contest_ranks` chụp bảng phiếu theo phiếu đã lọc; `set_contest_submission_status` chỉ cho tác giả rút khi `submission_open`.
+- `migrations/archive/20260928_contest_dry_run_fixes.sql`: `snapshot_contest_ranks` chụp bảng phiếu theo phiếu đã lọc; `set_contest_submission_status` chỉ cho tác giả rút khi `submission_open`.
 - Bảng phiếu, "Top truyện", "Cuộc thi của tôi", thống kê tác giả dùng chung `popularRankingRows` → phiếu đã lọc từ bảng điểm (popular-v2; popular-v1 vẫn phiếu thô). **Giữ P8:** bảng điểm tính lại khi có người xem, tối đa 1 lần / 15 phút, cộng cron 0h — không đếm theo từng phiếu (đã thử trigger đếm ngay rồi bỏ: dễ nghẽn khi nhiều người bầu cùng 1 bài; lúc bình chọn số phiếu đang ẩn nên chỉ hạng trễ tối đa 15 phút). Admin chuyển sang đóng nhận bài / bình chọn / chấm → ép tính lại 1 lần. Tab Dấu ấn đếm phiếu đã lọc.
 - Sửa nhỏ: ô đếm ngược vỡ dòng trên điện thoại; "0 ngày tuổi"; ghi chú số phiếu ẩn sau kết quả; truyện đã dự thi ghi "Đã gửi vào cuộc thi này"; dòng số chữ lặp; `legacy_stats` trả về khi lưu trữ; lỗi hydration của Toast trên mọi trang.
 - Bổ sung sau đó: lịch sử ví hiện "Giải … — <cuộc thi>" cho khoản chi trả giải (tra `contest_awards.payout_transaction_id`, không dùng ghi chú lý do chung của admin); menu avatar có mục "Chấm giải" (`/giam-khao`) cho người đang được gán chấm (`GET /api/judging/me`, hỏi 1 lần khi mở menu).

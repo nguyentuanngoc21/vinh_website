@@ -1,5 +1,5 @@
 // Script tay kiểm tra luồng viết truyện (src/lib/authoring/slugify.ts +
-// migrations/20260819_add_book_genre.sql + 20260820_add_chapter_price.sql)
+// migrations/archive/20260819_add_book_genre.sql + 20260820_add_chapter_price.sql)
 // — theo đúng convention scripts/test_*.mjs khác trong repo.
 //
 // Chạy: npx tsx scripts/test_authoring_flow.mjs
@@ -64,7 +64,7 @@ if (!url || !key) {
       .single();
 
     if (bookError?.code === "42703") {
-      console.log("  (bỏ qua — cột books.genre chưa tồn tại, chạy migrations/20260819_add_book_genre.sql trước)");
+      console.log("  (bỏ qua — cột books.genre chưa tồn tại, chạy migrations/archive/20260819_add_book_genre.sql trước)");
     } else if (bookError || !book) {
       check("tạo book test", false);
       console.error(bookError);
@@ -79,7 +79,7 @@ if (!url || !key) {
 
       if (chapterError?.code === "42703") {
         console.log(
-          "  (bỏ qua — cột chapters.price/is_exclusive chưa tồn tại, chạy migrations/20260820_add_chapter_price.sql trước)"
+          "  (bỏ qua — cột chapters.price/is_exclusive chưa tồn tại, chạy migrations/archive/20260820_add_chapter_price.sql trước)"
         );
       } else if (chapterError || !chapter) {
         check("tạo chapter test", false);

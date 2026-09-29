@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "convert-legal-docs": "node scripts/convert-legal-docs.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build-schema": "node scripts/build-schema.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

@@ -1,4 +1,4 @@
--- Test cho migrations/20260925_add_chapter_delete_and_reorder.sql.
+-- Test cho migrations/archive/20260925_add_chapter_delete_and_reorder.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. Không chạy
 -- trên production (docs/DEV_WORKFLOW.md, Luồng A bước 2).
 --

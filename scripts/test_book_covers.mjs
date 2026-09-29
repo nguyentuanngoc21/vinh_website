@@ -124,15 +124,15 @@ if (!url || !key) {
     .limit(5);
 
   if (error?.code === "42703") {
-    // Cột genre chưa tồn tại — migrations/20260819_add_book_genre.sql
+    // Cột genre chưa tồn tại — migrations/archive/20260819_add_book_genre.sql
     // chưa được chạy trên project này. Không phải lỗi code, chỉ là
     // chưa migrate — không tính là FAIL.
-    console.log("  (bỏ qua — cột books.genre chưa tồn tại, chạy migrations/20260819_add_book_genre.sql trước)");
+    console.log("  (bỏ qua — cột books.genre chưa tồn tại, chạy migrations/archive/20260819_add_book_genre.sql trước)");
   } else if (error) {
     check("query books", false);
     console.error(error);
   } else if (!books || books.length === 0) {
-    console.log("  (chưa có sách nào trong DB — chạy migrations/20260819_add_book_genre.sql rồi tạo thử 1 book để test đầy đủ)");
+    console.log("  (chưa có sách nào trong DB — chạy migrations/archive/20260819_add_book_genre.sql rồi tạo thử 1 book để test đầy đủ)");
   } else {
     for (const book of books) {
       const coverUrl = await resolveBookCoverUrl(supabase, book);

@@ -1,4 +1,4 @@
--- Test cho migrations/20260926_add_score_run_publish.sql.
+-- Test cho migrations/archive/20260926_add_score_run_publish.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. KHÔNG chạy
 -- trên production (docs/DEV_WORKFLOW.md, Luồng A bước 2).
 -- Một khối DO, kết thúc bằng RAISE EXCEPTION có chủ đích → không lưu dữ liệu giả.

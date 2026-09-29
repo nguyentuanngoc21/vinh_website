@@ -1,4 +1,4 @@
--- Test cho migrations/20260927_add_contest_quests.sql.
+-- Test cho migrations/archive/20260927_add_contest_quests.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration. KHÔNG chạy
 -- trên production (docs/DEV_WORKFLOW.md, Luồng A bước 2).
 --

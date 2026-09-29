@@ -1,4 +1,4 @@
--- Test cho migrations/20260926_add_contest_review_flags.sql.
+-- Test cho migrations/archive/20260926_add_contest_review_flags.sql.
 -- Chạy trong SQL Editor của dev/staging SAU KHI đã chạy migration (và
 -- migration core 20260926_add_contest_engine_core.sql). Không chạy trên
 -- production (docs/DEV_WORKFLOW.md, Luồng A bước 2).

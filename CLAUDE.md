@@ -26,6 +26,7 @@ npm run start             # run a production build
 npm run lint               # eslint (flat config, eslint-config-next)
 npx tsc --noEmit           # typecheck
 npm run test               # Vitest — unit tests for pure logic only (src/**/*.test.ts, no Supabase)
+npm run build-schema        # regenerate docs/supabase/schema.sql from migrations/baseline/*.sql
 npm run convert-legal-docs  # regenerate src/lib/legal/*.ts from the .docx sources in docs/ (mammoth)
 ```
 
@@ -85,11 +86,17 @@ docs/SUPABASE_SETUP.md §5 for the full state machine before touching `/quen-mat
 - Most API routes use the **service-role client** (bypasses RLS/GRANT) rather than the user's own
   session, so RLS policies in `docs/supabase/schema.sql` are largely defense-in-depth, not the
   primary access check — authorization logic lives in the route handler / `lib` service module.
+- Schema source of truth is `migrations/baseline/NN_<domain>.sql` (accounts, books/chapters,
+  reading, wallet/payments, quests, messaging, design, audio, orders, legal, contests, retention,
+  seed) — run in order ONLY to bootstrap a new empty project, never on production (see
+  `migrations/baseline/README.md`). `docs/supabase/schema.sql` is GENERATED from them by
+  `npm run build-schema` (`-- --check` to verify) — never hand-edit it. The pre-2026-09-29
+  migrations live in `migrations/archive/` for history only.
 - Schema changes are hand-written SQL files in `migrations/` (`YYYYMMDD_description.sql`,
   idempotent — `IF EXISTS`/`IF NOT EXISTS`), applied to dev/staging first and RLS-tested there
   (see docs/DEV_WORKFLOW.md for the exact test-in-a-transaction recipe) before production. Every
-  migration must be mirrored into `docs/supabase/schema.sql` (in dependency order) and
-  `src/lib/supabase/types.ts` in the same change.
+  migration must be mirrored into the matching `migrations/baseline/` domain file (then
+  `npm run build-schema`) and `src/lib/supabase/types.ts` in the same change.
 - Sensitive data is deliberately split off the hot `profiles` table: `identity_verifications`
   (CCCD number + private-bucket image paths) is a separate table so the frequently-queried
   `profiles` row never carries it. CCCD images live in a **private** Supabase Storage bucket,
