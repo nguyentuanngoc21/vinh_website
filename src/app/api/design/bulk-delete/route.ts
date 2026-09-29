@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
+import { revalidatePublicBooks } from "@/lib/cache/public-data";
 
 const MAX_IDS = 100;
 
@@ -34,6 +35,9 @@ export async function POST(request: Request) {
     console.error("[api/design/bulk-delete] update failed:", error);
     return NextResponse.json({ error: "Xoá thất bại." }, { status: 500 });
   }
+
+  // Làm mới cache trang công khai (lib/cache/public-data.ts) — ảnh có thể đang là bìa truyện.
+  revalidatePublicBooks();
 
   return NextResponse.json({ ok: true });
 }

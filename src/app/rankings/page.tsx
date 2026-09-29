@@ -3,8 +3,7 @@ import { Lora } from "next/font/google";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { RankingsBoard } from "@/components/rankings/rankings-board";
-import { createClient } from "@/lib/supabase/server";
-import { getBookRankings } from "@/lib/rankings/get-book-rankings";
+import { getCachedBookRankings } from "@/lib/cache/public-data";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -17,8 +16,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RankingsPage() {
-  const supabase = await createClient();
-  const bookRankings = await getBookRankings(supabase);
+  // Công khai, giống nhau với mọi người xem — cache 5 phút (lib/cache/public-data.ts).
+  const bookRankings = await getCachedBookRankings();
 
   return (
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>

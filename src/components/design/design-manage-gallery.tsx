@@ -10,7 +10,7 @@ import {
   CheckIcon,
   CopyIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { Checkbox } from "@/components/ui";
+import { Field, Textarea, Alert, Checkbox } from "@/components/ui";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { useOrigin } from "@/lib/use-origin";
 import type { DesignItemCategory } from "@/lib/supabase/types";
@@ -133,7 +133,7 @@ export function DesignManageGallery() {
   const editing = items?.find((it) => it.id === editingId) ?? null;
 
   if (loadError) {
-    return <p className="text-sm text-error">{loadError}</p>;
+    return <Alert tone="error">{loadError}</Alert>;
   }
 
   if (items === null) {
@@ -146,7 +146,7 @@ export function DesignManageGallery() {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#e2ded7] px-8 py-14 text-center">
+      <div className="rounded-2xl border border-dashed border-border-light px-8 py-14 text-center">
         <p className="text-sm text-stone-dark">Bạn chưa đăng ảnh nào.</p>
         <Link
           href="/thiet-ke/new"
@@ -165,7 +165,7 @@ export function DesignManageGallery() {
           type="button"
           onClick={deleteChecked}
           disabled={bulkDeletePending}
-          className="mb-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#FDECEC] px-4 py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
+          className="mb-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-error-bg px-4 py-2 text-[12.5px] font-semibold text-error disabled:opacity-60"
         >
           <TrashIcon size={14} /> Xóa ({checkedIds.size})
         </button>
@@ -173,7 +173,7 @@ export function DesignManageGallery() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
         {items.map((item) => (
-          <div key={item.id} className="relative overflow-hidden rounded-2xl border border-[#e2ded7] bg-neutral-bg">
+          <div key={item.id} className="relative overflow-hidden rounded-2xl border border-border-light bg-neutral-bg">
             <span className="absolute left-2.5 top-2.5 z-10">
               <Checkbox checked={checkedIds.has(item.id)} onChange={() => toggleChecked(item.id)}>
                 <span className="sr-only">Chọn ảnh</span>
@@ -199,7 +199,7 @@ export function DesignManageGallery() {
               <div className="mt-1 flex items-center gap-1.5 text-[11px] text-stone">
                 <span
                   className={`rounded-full px-2 py-0.5 font-semibold ${
-                    item.published ? "bg-[#E8F5E9] text-[#2E7D32]" : "bg-[#fdf2d8] text-brand-gold-dark"
+                    item.published ? "bg-success-form-bg text-success-form" : "bg-cream-gold text-brand-gold-dark"
                   }`}
                 >
                   {item.published ? "Đã công khai" : "Chưa công khai"}
@@ -210,7 +210,7 @@ export function DesignManageGallery() {
                 <button
                   type="button"
                   onClick={() => setEditingId(item.id)}
-                  className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2ded7] py-1.5 text-[12px] font-semibold text-stone-dark transition-colors hover:border-brand-gold hover:bg-[#fdf8ec]"
+                  className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-light py-1.5 text-[12px] font-semibold text-stone-dark transition-colors hover:border-brand-gold hover:bg-cream-card"
                 >
                   Sửa
                 </button>
@@ -219,7 +219,7 @@ export function DesignManageGallery() {
                   onClick={() => deleteOne(item.id)}
                   disabled={deletePendingId === item.id}
                   title="Xóa"
-                  className="flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2ded7] px-2.5 py-1.5 text-[12px] font-semibold text-stone-dark transition-colors hover:bg-[#FDECEC] hover:text-error disabled:opacity-60"
+                  className="flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-light px-2.5 py-1.5 text-[12px] font-semibold text-stone-dark transition-colors hover:bg-error-bg hover:text-error disabled:opacity-60"
                 >
                   <TrashIcon size={13} /> {deletePendingId === item.id ? "…" : ""}
                 </button>
@@ -244,7 +244,7 @@ export function DesignManageGallery() {
               <div className="flex items-center justify-between gap-3">
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    editing.published ? "bg-[#E8F5E9] text-[#2E7D32]" : "bg-[#fdf2d8] text-brand-gold-dark"
+                    editing.published ? "bg-success-form-bg text-success-form" : "bg-cream-gold text-brand-gold-dark"
                   }`}
                 >
                   {editing.published ? "Đã công khai" : "Chưa công khai"}
@@ -258,31 +258,27 @@ export function DesignManageGallery() {
                 </button>
               </div>
 
-              <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Tên tác phẩm</label>
-                <input
-                  value={editing.title}
-                  onChange={(e) => patchEditing({ title: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-[#e2ded7] px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
-                />
-              </div>
+              <Field
+                label="Tên tác phẩm"
+                value={editing.title}
+                onChange={(e) => patchEditing({ title: e.target.value })}
+                placeholder="Nhập tên tác phẩm…"
+              />
+
+              <Textarea
+                label="Mô tả"
+                value={editing.description ?? ""}
+                onChange={(e) => patchEditing({ description: e.target.value })}
+                rows={3}
+                placeholder="Chất liệu, cảm hứng, hoặc bối cảnh sáng tác…"
+              />
 
               <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Mô tả</label>
-                <textarea
-                  value={editing.description ?? ""}
-                  onChange={(e) => patchEditing({ description: e.target.value })}
-                  rows={3}
-                  className="mt-1.5 w-full resize-none rounded-xl border border-[#e2ded7] px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Loại sản phẩm</label>
+                <label className="mb-[7px] block text-[13px] font-semibold text-slate">Loại sản phẩm</label>
                 <select
                   value={editing.category ?? ""}
                   onChange={(e) => patchEditing({ category: e.target.value as DesignItemCategory })}
-                  className="mt-1.5 w-full rounded-xl border border-[#e2ded7] bg-white px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
+                  className="w-full rounded-[10px] border border-border-light bg-white px-[15px] py-3 text-[14.5px] text-ink focus:border-brand-ink focus:outline-none"
                 >
                   {DESIGN_CATEGORIES.map((c) => (
                     <option key={c.key} value={c.key}>
@@ -292,16 +288,14 @@ export function DesignManageGallery() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-[13px] font-semibold text-brand-ink">Alt text</label>
-                <input
-                  value={editing.altText ?? ""}
-                  onChange={(e) => patchEditing({ altText: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-[#e2ded7] px-4 py-3 text-sm text-ink outline-none focus:border-brand-gold"
-                />
-              </div>
+              <Field
+                label="Alt text"
+                value={editing.altText ?? ""}
+                onChange={(e) => patchEditing({ altText: e.target.value })}
+                placeholder="Mô tả ngắn cho người dùng máy đọc màn hình"
+              />
 
-              <div className="rounded-xl border border-[#e2ded7] p-3.5">
+              <div className="rounded-xl border border-border-light p-3.5">
                 <button
                   type="button"
                   onClick={regenerateShareToken}
@@ -332,7 +326,7 @@ export function DesignManageGallery() {
                 type="button"
                 onClick={() => deleteOne(editing.id)}
                 disabled={deletePendingId === editing.id}
-                className="mt-auto flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2ded7] py-2.5 text-[13px] font-semibold text-stone-dark transition-colors hover:bg-[#FDECEC] hover:text-error disabled:opacity-60"
+                className="mt-auto flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-light py-2.5 text-[13px] font-semibold text-stone-dark transition-colors hover:bg-error-bg hover:text-error disabled:opacity-60"
               >
                 <TrashIcon size={14} /> {deletePendingId === editing.id ? "Đang xoá…" : "Xóa ảnh này"}
               </button>

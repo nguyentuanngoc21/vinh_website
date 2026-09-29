@@ -133,7 +133,18 @@ export const ${updatedAtExport} = ${JSON.stringify(utd.iso)};
 `;
 
   await mkdir(OUT_DIR, { recursive: true });
-  await writeFile(path.join(OUT_DIR, outFile), contents, "utf8");
+  const outPath = path.join(OUT_DIR, outFile);
+  // Git (core.autocrlf=true) checks these files out with CRLF, but the
+  // template above is LF — rewriting an unchanged file would flip every line
+  // ending and show it as modified. Skip unchanged files; otherwise keep the
+  // existing file's line-ending style.
+  const existing = await readFile(outPath, "utf8").catch(() => null);
+  if (existing !== null && existing.replace(/\r\n/g, "\n") === contents) {
+    console.log(`Unchanged src/lib/legal/${outFile} (updated: ${utd.label})`);
+    return;
+  }
+  const output = existing?.includes("\r\n") ? contents.replace(/\n/g, "\r\n") : contents;
+  await writeFile(outPath, output, "utf8");
   console.log(`Wrote src/lib/legal/${outFile} (updated: ${utd.label})`);
 }
 

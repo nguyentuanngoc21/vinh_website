@@ -5,7 +5,7 @@ import { CaretDownIcon, CheckCircleIcon, CoinsIcon } from "@phosphor-icons/react
 import { CopyrightSettings } from "@/components/author/copyright-settings";
 import { TagInput } from "@/components/author/tag-input";
 import { ChapterAudioPanel } from "@/components/author/chapter-audio-panel";
-import { Field, GenreSelect } from "@/components/ui";
+import { Field, Textarea, Alert, GenreSelect } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 
@@ -161,11 +161,7 @@ export function PublishPanel({
       </div>
 
       <div className="px-[22px]">
-        {error && (
-          <div className="mt-4 rounded-lg border border-error-border bg-[#fdf1f1] px-3 py-2.5 text-[12.5px] font-medium text-error">
-            {error}
-          </div>
-        )}
+        {error && <Alert tone="error" className="mt-4">{error}</Alert>}
 
         <ChecklistSection
           id="info"
@@ -188,13 +184,13 @@ export function PublishPanel({
 
             <div>
               <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tóm tắt truyện</div>
-              <textarea
+              <Textarea
+                label={null}
                 value={synopsis}
                 onChange={(e) => onSynopsisChange(e.target.value)}
                 onBlur={onSynopsisCommit}
                 placeholder="Vài dòng giới thiệu nội dung truyện cho độc giả..."
                 rows={4}
-                className="w-full resize-none rounded-lg border border-cream-border px-3 py-2.5 text-sm text-brand-ink outline-none focus:border-brand-ink"
               />
             </div>
           </div>

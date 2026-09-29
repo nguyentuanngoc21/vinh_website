@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Lora } from "next/font/google";
 import { NowPlaying } from "@/components/audio/now-playing";
 import { AudioQueue } from "@/components/audio/audio-queue";
-import { getAudioCatalog } from "@/lib/audio/get-audio-catalog";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedAudioCatalog } from "@/lib/cache/public-data";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -22,8 +21,7 @@ export const metadata: Metadata = {
  * server-fetch lại toàn bộ catalog để AudioQueue lọc "cùng giọng đọc".
  */
 export default async function AudioPlayerPage() {
-  const supabase = await createClient();
-  const tracks = await getAudioCatalog(supabase);
+  const tracks = await getCachedAudioCatalog();
 
   return (
     <div className={`${lora.variable} grid flex-1 grid-cols-1 bg-brand-ink-dark lg:grid-cols-[1fr_360px]`}>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
+import { revalidatePublicBooks } from "@/lib/cache/public-data";
 
 /**
  * POST /api/authoring/books/:bookId/cover/link — tác giả dán link chia sẻ
@@ -47,6 +48,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ boo
     // hữu sách này" / "Share link không đúng hoặc đã bị thu hồi").
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  // Làm mới cache trang công khai (lib/cache/public-data.ts).
+  revalidatePublicBooks();
 
   // design_items (bảng gốc) chỉ chủ sở hữu select được (RLS) — tác giả
   // đang gọi route này thường KHÔNG phải hoạ sĩ vẽ ảnh, nên phải đọc qua

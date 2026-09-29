@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { AUDIO_GENRES } from "@/lib/audio/get-audio-catalog";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { revalidatePublicAudio } from "@/lib/cache/public-data";
 
 const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
 const ALLOWED_MIME_EXT: Record<string, string> = {
@@ -129,6 +130,9 @@ export async function POST(
   if (!questResult.ok) {
     console.error("[chapter audio/record] incrementTaskProgress failed:", questResult.error);
   }
+
+  // Làm mới cache trang công khai (lib/cache/public-data.ts).
+  revalidatePublicAudio();
 
   return NextResponse.json({ ok: true });
 }

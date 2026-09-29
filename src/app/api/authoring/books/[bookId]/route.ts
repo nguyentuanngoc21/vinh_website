@@ -9,6 +9,7 @@ import {
   EXCLUSIVITY_AGREEMENT_ID,
 } from "@/lib/authoring/exclusivity-agreement";
 import type { BookGenre } from "@/lib/supabase/types";
+import { revalidatePublicBooks } from "@/lib/cache/public-data";
 
 function isBookGenre(value: unknown): value is BookGenre {
   return typeof value === "string" && (BOOK_GENRES as readonly string[]).includes(value);
@@ -148,6 +149,11 @@ export async function PATCH(
     );
   }
 
+  // Làm mới cache trang công khai (lib/cache/public-data.ts) — chỉ khi đổi field thẻ truyện hiển thị.
+  if (update.title !== undefined || update.synopsis !== undefined || update.genre !== undefined) {
+    revalidatePublicBooks();
+  }
+
   return NextResponse.json(data);
 }
 
@@ -231,6 +237,9 @@ export async function DELETE(
     console.error("[authoring] soft-delete book failed:", deleteError);
     return NextResponse.json({ error: "Xoá thất bại. Vui lòng thử lại." }, { status: 500 });
   }
+
+  // Làm mới cache trang công khai (lib/cache/public-data.ts).
+  if (book.published) revalidatePublicBooks();
 
   return NextResponse.json({ ok: true });
 }

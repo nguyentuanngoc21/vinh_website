@@ -8,6 +8,7 @@ import {
 } from "@/lib/authoring/exclusivity-agreement";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 import { MAX_CHAPTER_CONTENT_LENGTH } from "@/lib/authoring/chapter-limits";
+import { revalidatePublicBooks } from "@/lib/cache/public-data";
 
 /**
  * PATCH /api/authoring/chapters/:chapterId — dùng cho cả "Lưu nháp"
@@ -213,6 +214,14 @@ export async function PATCH(
       taskCode: "author_publish_chapter",
     });
     if (!result.ok) console.error("[authoring] incrementTaskProgress failed:", result.error);
+  }
+
+  // Làm mới cache trang công khai (lib/cache/public-data.ts) — khi đổi trạng thái xuất bản/chương cuối.
+  if (
+    (update.published !== undefined && update.published !== wasPublished) ||
+    (update.is_last_chapter !== undefined && data.published)
+  ) {
+    revalidatePublicBooks();
   }
 
   return NextResponse.json(data);

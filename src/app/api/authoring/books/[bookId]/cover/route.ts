@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { applyPublicAssetWatermark } from "@/lib/copyright/public-asset-watermark";
+import { revalidatePublicBooks } from "@/lib/cache/public-data";
 
 const COVER_MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME_EXT: Record<string, string> = {
@@ -132,6 +133,9 @@ export async function POST(
     return NextResponse.json({ error: `Gắn ảnh bìa thất bại: ${linkError.message}` }, { status: 500 });
   }
 
+  // Làm mới cache trang công khai (lib/cache/public-data.ts).
+  revalidatePublicBooks();
+
   const { data: urlData } = supabase.storage.from("design-images").getPublicUrl(path);
   return NextResponse.json({ ok: true, coverUrl: urlData.publicUrl });
 }
@@ -174,5 +178,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Gỡ ảnh bìa thất bại." }, { status: 500 });
   }
 
+  // Làm mới cache trang công khai (lib/cache/public-data.ts).
+  revalidatePublicBooks();
   return NextResponse.json({ ok: true, coverUrl: null });
 }

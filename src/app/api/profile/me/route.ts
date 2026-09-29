@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
+import { revalidatePublicAudio, revalidatePublicBooks } from "@/lib/cache/public-data";
 
 const NICKNAME_MAX = 40;
 const BIO_MAX = 280;
@@ -155,6 +156,12 @@ export async function POST(request: Request) {
   if (error) {
     console.error("[profile/me] update failed:", error);
     return NextResponse.json({ error: "Lưu thông tin thất bại." }, { status: 500 });
+  }
+
+  // Làm mới cache trang công khai (lib/cache/public-data.ts) — thẻ truyện/audio hiện nickname.
+  if (update.nickname !== undefined) {
+    revalidatePublicBooks();
+    revalidatePublicAudio();
   }
 
   return NextResponse.json({ ok: true, nickname: update.nickname ?? current.nickname });
