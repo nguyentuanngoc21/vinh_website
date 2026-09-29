@@ -5,6 +5,7 @@ import { recallReadingSource } from "@/lib/reading/reading-source";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/reading/heartbeat-config";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -22,11 +23,9 @@ import {
 import { ChapterPicker, type ReaderChapterSummary } from "./chapter-picker";
 import { VoteButton } from "./vote-button";
 import { AuthorPanel } from "./author-panel";
-import { ReadingListModal } from "./reading-list-modal";
-import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
+import type { RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { ReadingGate } from "./reading-gate";
 import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
-import { ParagraphCommentsPanel } from "./paragraph-comments-panel";
 import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { splitParagraphAroundDesignImages } from "@/lib/design/share-link";
@@ -37,6 +36,17 @@ import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { useNowPlaying } from "@/lib/audio/now-playing-context";
 import { formatPenaltyMessage, useScreenshotPenalty } from "./use-screenshot-penalty";
 import { buildAuthorWatermarkTileDataUrl, WATERMARK_TILE_HEIGHT, WATERMARK_TILE_WIDTH } from "./watermark-tile";
+
+// Modal/panel chỉ mở khi người đọc bấm (và modal gỡ chương chỉ dành cho
+// admin) — tải chunk riêng lúc mở thay vì nhét vào bundle trang đọc của
+// MỌI độc giả. Cả 3 đều chỉ mount khi đang mở.
+const ReadingListModal = dynamic(() => import("./reading-list-modal").then((m) => m.ReadingListModal));
+const RemoveChapterModal = dynamic(() =>
+  import("@/components/admin/remove-chapter-modal").then((m) => m.RemoveChapterModal)
+);
+const ParagraphCommentsPanel = dynamic(() =>
+  import("./paragraph-comments-panel").then((m) => m.ParagraphCommentsPanel)
+);
 
 type ThemeName = "cream" | "sepia" | "dark";
 
@@ -1451,7 +1461,7 @@ export function Reader({
         )}
       </nav>
 
-      {bookId && (
+      {bookId && listModalOpen && (
         <ReadingListModal
           open={listModalOpen}
           onClose={() => setListModalOpen(false)}
