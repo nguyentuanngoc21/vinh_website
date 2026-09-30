@@ -1,3 +1,5 @@
+"use client";
+
 import { type ImgHTMLAttributes, type SyntheticEvent } from "react";
 import { cn } from "@/lib/cn";
 
@@ -16,6 +18,11 @@ import { cn } from "@/lib/cn";
  * `wrapperClassName` áp cho khung bọc (đặt kích thước/vị trí ở đây khi ảnh
  * cần lấp đầy 1 ô: vd `h-full w-full`); `className`/`style` áp cho <img>.
  * Khung là <span className="block"> để đặt được cả bên trong <a>/<button>.
+ *
+ * "use client" BẮT BUỘC: component gắn onContextMenu/onDragStart/onCopy, mà
+ * BookCover và /tim-kiem là Server Component — thiếu directive thì server
+ * không serialize được hàm xử lý sự kiện và trang lỗi ngay khi có ảnh thật
+ * (sự cố production 30/09/2026).
  */
 type ProtectedImageProps = ImgHTMLAttributes<HTMLImageElement> & {
   wrapperClassName?: string;
