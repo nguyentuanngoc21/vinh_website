@@ -62,3 +62,6 @@ mobile-vinh/web-build
 
 # File khoá tạm của Microsoft Office (tự sinh khi đang mở .docx/.xlsx)
 ~$*
+
+# Thư viện/ảnh tạm của các script kiểm thử (scripts/test-character-*.mjs)
+.tmp/
