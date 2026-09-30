@@ -316,26 +316,29 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                     </div>
                   </>
                 );
-                // Mọi thẻ đều là <Link> (cùng loại phần tử) — nếu thẻ đổi
+                // Mọi thẻ đều là <button> (cùng loại phần tử) — nếu thẻ đổi
                 // loại khi thành "đang chọn", React tạo lại nó và thẻ nhảy
-                // thẳng vào chỗ thay vì trượt. Thẻ chưa chọn: bấm = chuyển tới.
+                // thẳng vào chỗ thay vì trượt. Bấm = đưa tác phẩm lên khối
+                // nổi bật phía trên, KHÔNG chuyển trang (muốn đọc thì bấm bìa/
+                // tên/nút "Đọc" ở khối trên). Không dùng <Link> + preventDefault:
+                // NavigationOverlay bắt click vào <a> ở pha capture nên vẫn bật
+                // màn hình loading và chờ mãi một lần chuyển trang không xảy ra.
                 return (
-                  <Link
+                  <button
                     key={j}
-                    href={`/truyen/${book.slug}`}
-                    aria-label={isActive ? `Đọc ${book.title}` : `Xem ${book.title}`}
+                    type="button"
+                    aria-label={isActive ? `${book.title} (đang hiển thị)` : `Hiển thị ${book.title}`}
+                    aria-pressed={isActive}
                     aria-hidden={!inView}
                     tabIndex={inView ? 0 : -1}
-                    onClick={(e) => {
-                      if (isActive) return;
-                      e.preventDefault();
-                      step(d);
+                    onClick={() => {
+                      if (!isActive) step(d);
                     }}
-                    className="absolute top-0 left-0 block cursor-pointer no-underline"
+                    className="absolute top-0 left-0 block cursor-pointer border-0 bg-transparent p-0 text-left"
                     style={style}
                   >
                     {inner}
-                  </Link>
+                  </button>
                 );
               })}
 
