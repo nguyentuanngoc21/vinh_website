@@ -1,3 +1,4 @@
+import { CHARACTER_FIELDS } from "@/lib/characters";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
@@ -64,7 +65,7 @@ export default async function AuthorBookOverviewPage({
       .eq("book_id", bookId)
       .is("revoked_at", null)
       .maybeSingle(),
-    supabase.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
+    supabase.from("characters").select(CHARACTER_FIELDS).eq("book_id", bookId).order("created_at", { ascending: true }),
     // Service-role: bảng cuộc thi không cho client đọc trạng thái xử lý / cuộc
     // thi khác. Quyền sở hữu đã kiểm ở trên (book.author_id === user).
     getBookContestPanel(createServiceRoleClient(), { bookId, viewerId: userData.user.id }),

@@ -1,3 +1,4 @@
+import { CHARACTER_FIELDS } from "@/lib/characters";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
@@ -65,7 +66,7 @@ export default async function AuthorChapterPage({
 
   const [linkedAudio, { data: bookCharacters }, { data: taggedRows }, contestLock] = await Promise.all([
     getChapterAudio(supabase, chapter.id),
-    supabase.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
+    supabase.from("characters").select(CHARACTER_FIELDS).eq("book_id", bookId).order("created_at", { ascending: true }),
     supabase.from("chapter_characters").select("character_id").eq("chapter_id", chapterId),
     // D8 / D11 — cùng điều kiện với 2 trigger trong DB (DB vẫn là chốt chặn thật).
     getBookContestLocks(createServiceRoleClient(), bookId),

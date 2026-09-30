@@ -13,6 +13,12 @@ function load(file, imports = {}, globals = {}) {
   const exports = {};
   new Function('require', 'exports', ...Object.keys(globals), code)(name => {
     if (name in imports) return imports[name];
+    // Pure shared validators are real implementations; database/network dependencies stay mocked.
+    if (name === '@/lib/characters') return load('src/lib/characters.ts');
+    if (name === '@/lib/validation/uuid') return load('src/lib/validation/uuid.ts');
+    if (name === '@/lib/contests/trigger-errors') return load('src/lib/contests/trigger-errors.ts', {
+      'next/server': { NextResponse: Response }, '@/lib/contests/errors': load('src/lib/contests/errors.ts'),
+    });
     throw new Error(`unexpected import ${name}`);
   }, exports, ...Object.values(globals));
   return exports;
@@ -87,6 +93,7 @@ function chapterRoute(db, userId = ME) {
     '@/lib/authoring/exclusivity-agreement': { hasAcceptedExclusivityPolicy: async () => true, EXCLUSIVITY_AGREEMENT_ERROR: 'e', EXCLUSIVITY_AGREEMENT_ID: 'chinh-sach-doc-quyen' },
     '@/lib/quests/reward-engine': { RewardEngine: { incrementTaskProgress: async () => ({ ok: true }) } },
     '@/lib/authoring/chapter-limits': limits,
+    '@/lib/cache/public-data': { revalidatePublicBooks: () => {} },
   });
 }
 const params = (chapterId) => ({ params: Promise.resolve({ chapterId }) });

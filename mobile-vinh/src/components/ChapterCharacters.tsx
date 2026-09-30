@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { setChapterCharacters, type Character } from '../services/authoring';
+import { ApiError } from '../services/api';
 
 /**
  * The web ChapterCharactersPanel: tap to tag/untag the book's characters in this chapter. Each change
@@ -19,8 +20,11 @@ export function ChapterCharacters({ userId, chapterId, bookId, characters, initi
     const previous = tagged;
     const next = previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id];
     lock.current = true; setBusy(true); setError(''); setTagged(next);
-    try { await setChapterCharacters(userId, chapterId, next); }
-    catch (e) { setTagged(previous); setError(e instanceof Error ? e.message : 'Chưa lưu được nhân vật.'); }
+    try { const result = await setChapterCharacters(userId, chapterId, next, previous); setTagged(result.characterIds); }
+    catch (e) {
+      setTagged(e instanceof ApiError && e.status === 409 && Array.isArray(e.data.characterIds) ? e.data.characterIds as string[] : previous);
+      setError(e instanceof Error ? e.message : 'Chưa lưu được nhân vật.');
+    }
     finally { lock.current = false; setBusy(false); }
   }
   return <View className="mb-4">
@@ -28,11 +32,11 @@ export function ChapterCharacters({ userId, chapterId, bookId, characters, initi
     {!characters.length ? <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/sang-tac/[bookId]', params: { bookId } })} className="min-h-11 justify-center">
       <Text className="text-stone">Truyện chưa có nhân vật — thêm ở trang tác phẩm →</Text></Pressable>
       : <View className="flex-row flex-wrap gap-2">
-        {characters.map(c => {
+        {characters.filter(c => !c.archived_at || tagged.includes(c.id)).map(c => {
           const on = tagged.includes(c.id);
           return <Pressable key={c.id} accessibilityRole="checkbox" accessibilityState={{ checked: on, disabled: busy || !!disabled }} disabled={busy || disabled}
             onPress={() => void toggle(c.id)} className={`min-h-11 justify-center rounded-full border px-4 ${on ? 'border-brand-ink bg-brand-ink' : 'border-cream-border bg-white'}`}>
-            <Text className={on ? 'font-bold text-white' : 'text-brand-ink'}>{on ? '✓ ' : ''}{c.name}</Text>
+            <Text className={on ? 'font-bold text-white' : 'text-brand-ink'}>{on ? '✓ ' : ''}{c.name}{c.archived_at ? ' · Đã lưu trữ' : c.is_public === false ? ' · Riêng tư' : ''}</Text>
           </Pressable>;
         })}
       </View>}

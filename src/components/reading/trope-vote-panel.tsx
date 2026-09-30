@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { CharacterRole } from "@/lib/supabase/types";
 import type { ThemeColors } from "./reader";
 
-export type TropeCandidate = { id: string; name: string; role: CharacterRole; trope: string | null };
+export type TropeCandidate = { id: string; name: string; role: CharacterRole | null; trope: string | null };
 
 const ROLE_LABEL: Record<CharacterRole, string> = { hero: "Chính diện", villain: "Phản diện", neutral: "Trung lập" };
 
@@ -66,6 +66,7 @@ export function TropeVotePanel({
             key={cand.id}
             type="button"
             disabled={pending}
+            aria-pressed={votedId === cand.id}
             onClick={() => vote(cand.id)}
             style={
               votedId === cand.id
@@ -77,7 +78,7 @@ export function TropeVotePanel({
             }`}
           >
             {cand.name}
-            {cand.trope ? ` — ${cand.trope}` : ` (${ROLE_LABEL[cand.role]})`}
+            {cand.trope ? ` — ${cand.trope}` : cand.role ? ` (${ROLE_LABEL[cand.role]})` : ""}
           </button>
         ))}
       </div>
