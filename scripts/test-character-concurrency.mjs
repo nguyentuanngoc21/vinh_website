@@ -55,6 +55,7 @@ try {
   const baseline = await readFile(`${REPO}/migrations/baseline/02_books_and_chapters.sql`, "utf8");
   await admin.query(baseline.slice(baseline.indexOf("create table public.characters ("), baseline.indexOf("-- --- Tags")));
   await admin.query(await readFile(`${REPO}/migrations/20260930_character_management.sql`, "utf8"));
+  await admin.query(await readFile(`${REPO}/migrations/20260930_character_delete_recent.sql`, "utf8"));
 
   const author = randomUUID(), other = randomUUID(), book = randomUUID(), otherBook = randomUUID();
   await admin.query("insert into auth.users(id) values ($1),($2)", [author, other]);
@@ -175,6 +176,28 @@ try {
     check(!codes.includes("ok"), `all 60 forbidden writes rejected (${[...new Set(codes)]})`);
     check(same(await current(ch), [chars[0]]), "chapter state unchanged");
     await Promise.all(intruders.map(c => c.end()));
+  }
+
+  // 7. Permanent delete racing itself and chapter tagging.
+  console.log("\n[7] concurrent permanent delete");
+  {
+    const victim = (await admin.query("insert into characters(book_id, name) values ($1,'Tmp') returning id", [book])).rows[0].id;
+    const res = await Promise.allSettled(pool.slice(0, 30).map(c => c.query("select delete_recent_character($1, $2)", [book, victim])));
+    const ok = res.filter(r => r.status === "fulfilled").length;
+    const codes = new Set(res.filter(r => r.status === "rejected").map(r => r.reason.code));
+    check(ok === 1 && [...codes].every(c => c === "42501"), `30 simultaneous deletes: ${ok} succeeded, others ${[...codes]}`);
+    const racer = (await admin.query("insert into characters(book_id, name) values ($1,'Race') returning id", [book])).rows[0].id;
+    const ch = chapters[6];
+    await rpc(pool[0], ch, []);
+    const mixed = await Promise.allSettled([
+      ...pool.slice(0, 40).map(c => rpc(c, ch, [racer])),
+      pool[40].query("select delete_recent_character($1, $2)", [book, racer]),
+      ...pool.slice(41, 80).map(c => rpc(c, ch, [racer])),
+    ]);
+    const unexpected = mixed.filter(r => r.status === "rejected" && !["22023", "23503"].includes(r.reason.code));
+    const orphans = (await admin.query("select count(*)::int n from chapter_characters cc left join characters c on c.id = cc.character_id where c.id is null")).rows[0].n;
+    check(mixed[40].status === "fulfilled" && !(await current(ch)).includes(racer) && orphans === 0 && unexpected.length === 0,
+      `delete during 79 concurrent tag saves: deleted=${mixed[40].status}, orphan tags=${orphans}, unexpected errors=${unexpected.map(r => r.reason.code)}`);
   }
 
   await Promise.all(pool.map(c => c.end()));

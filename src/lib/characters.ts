@@ -5,9 +5,11 @@ export const ROLE_LABEL: Record<CharacterRole, string> = { hero: "Chính diện"
 export const STORY_ROLE_LABEL = { main: "Nhân vật chính", supporting: "Nhân vật phụ", cameo: "Khách mời" } as const;
 export type StoryRole = keyof typeof STORY_ROLE_LABEL;
 export type { CharacterProfile } from "@/lib/supabase/types";
-export const CHARACTER_FIELDS = "id, name, role, trope, archived_at, is_public, show_role, story_role, aliases, avatar_url, description, private_notes";
+export const CHARACTER_FIELDS = "id, name, role, trope, archived_at, is_public, show_role, story_role, aliases, avatar_url, description, private_notes, created_at";
+/** Mirrors delete_recent_character: hard delete only shortly after creation. */
+export const DELETE_WINDOW_MS = 15 * 60 * 1000;
 export const CHARACTER_INPUT_KEYS = ["name", "role", "trope", "is_public", "show_role", "story_role", "aliases", "avatar_url", "description", "private_notes", "archived"];
-type CharacterInput = Partial<Omit<CharacterProfile, "id" | "archived_at">> & { archived_at?: string | null };
+type CharacterInput = Partial<Omit<CharacterProfile, "id" | "archived_at" | "created_at">> & { archived_at?: string | null };
 const FIELD_LABELS: Record<string, string> = { name: "Tên nhân vật", trope: "Mẫu hình", aliases: "Biệt danh", avatar_url: "Ảnh đại diện", description: "Mô tả", private_notes: "Ghi chú riêng", is_public: "Trạng thái công khai", show_role: "Hiển thị chính/phản diện", archived: "Trạng thái lưu trữ" };
 
 export function parseCharacterInput(body: unknown, creating: boolean): { data: CharacterInput; error?: never } | { error: string; data?: never } {

@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Field } from "@/components/ui";
 import { CharacterForm, type CharacterDraft } from "./character-form";
-import { ROLE_LABEL, STORY_ROLE_LABEL, type CharacterProfile } from "@/lib/characters";
+import { DELETE_WINDOW_MS, ROLE_LABEL, STORY_ROLE_LABEL, type CharacterProfile } from "@/lib/characters";
 
 export type ManagedCharacter = CharacterProfile;
 type Appearance = { id: string; title: string; order_index: number; published: boolean };
@@ -22,6 +22,17 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
   const [sort, setSort] = useState("created");
   const [appearances, setAppearances] = useState<Record<string, Appearance[]>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Client clock only decides whether to offer the button; the RPC enforces the window.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0), timer = setInterval(tick, 30_000);
+    return () => { clearTimeout(first); clearInterval(timer); };
+  }, []);
+  const minutesLeft = (c: ManagedCharacter) => {
+    const left = now === null ? 0 : DELETE_WINDOW_MS - (now - Date.parse(c.created_at));
+    return left > 0 ? Math.ceil(left / 60_000) : 0;
+  };
   const url = (id?: string) => `/api/authoring/books/${bookId}/characters${id ? `/${id}` : ""}`;
   const mutate = async (body: CharacterDraft | { archived: boolean }, id?: string, message = "Đã lưu nhân vật.") => {
     if (lock.current) return false;
@@ -34,6 +45,18 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
       setStatus(message);
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Không kết nối được máy chủ."); return false; }
+    finally { lock.current = false; setBusy(false); }
+  };
+  const remove = async (c: ManagedCharacter) => {
+    if (lock.current || !window.confirm(`Xoá vĩnh viễn “${c.name}”? Chỉ dùng khi tạo nhầm: nhân vật và các liên kết chương sẽ bị xoá, không thể khôi phục.`)) return;
+    lock.current = true; setBusy(true); setError(null); setStatus("");
+    try {
+      const res = await fetch(`${url(c.id)}/permanent`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Không xoá được nhân vật.");
+      setCharacters(prev => prev.filter(x => x.id !== c.id));
+      setStatus(`Đã xoá “${c.name}”.`);
+    } catch (e) { setError(e instanceof Error ? e.message : "Không kết nối được máy chủ."); }
     finally { lock.current = false; setBusy(false); }
   };
   const loadAppearances = async (id: string) => {
@@ -60,7 +83,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
       <button type="button" disabled={busy || editing !== null} onClick={() => { setEditing("new"); setError(null); }} className="rounded-lg bg-brand-gold px-3 py-2 text-sm font-semibold disabled:opacity-50">Thêm nhân vật</button></div>
     {error && <p role="alert" className="mb-3 text-sm text-error">{error}</p>}
     <p role="status" className="mb-3 text-sm text-stone-alt">{busy ? "Đang xử lý…" : status}</p>
-    {editing !== null && <div className="mb-4"><CharacterForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing}
+    {editing !== null && <div className="mb-4"><CharacterForm bookId={bookId} key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing}
       names={characters.filter(c => editing === "new" || c.id !== editing.id).map(c => c.name)} busy={busy}
       onCancel={() => setEditing(null)} onSave={async draft => { const ok = await mutate(draft, editing === "new" ? undefined : editing.id); if (ok) setEditing(null); return ok; }} /></div>}
     <div className="mb-4 grid gap-3 sm:grid-cols-2">
@@ -91,6 +114,8 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
           if (!c.archived_at && !window.confirm(`Lưu trữ “${c.name}”? Nhân vật sẽ ẩn với độc giả. Liên kết chương, lượt theo dõi và bình chọn được giữ nguyên; bạn có thể khôi phục sau.`)) return;
           await mutate({ archived: !c.archived_at }, c.id, c.archived_at ? `Đã khôi phục “${c.name}”.` : `Đã lưu trữ “${c.name}”. Chọn “Đã lưu trữ” ở bộ lọc Trạng thái để khôi phục.`);
         }} className="disabled:opacity-50">{c.archived_at ? "Khôi phục" : "Lưu trữ"}</button>
+        {minutesLeft(c) > 0 && <button type="button" disabled={busy || editing !== null} onClick={() => remove(c)}
+          className="text-error disabled:opacity-50">Xoá (còn {minutesLeft(c)} phút)</button>}
         <button type="button" disabled={busy} aria-expanded={expanded === c.id} onClick={() => loadAppearances(c.id)} className="disabled:opacity-50">{appearances[c.id] ? `${appearances[c.id].length} chương xuất hiện` : "Xem chương xuất hiện"}</button>
       </div>
       {expanded === c.id && <div className="mt-3 border-t pt-3 text-sm">

@@ -11,7 +11,10 @@ import assert from "node:assert/strict";
 if (!process.argv[2]) throw new Error("Pass the path to playwright/index.mjs");
 const { chromium } = await import(pathToFileURL(path.resolve(process.argv[2])).href);
 const profile = { id: "00000000-0000-4000-8000-000000000002", name: "An Nhiên", role: "hero", trope: null,
-  archived_at: null, is_public: true, show_role: false, story_role: "main", aliases: "An", avatar_url: null, description: "Người kể chuyện", private_notes: "Ghi chú bí mật" };
+  archived_at: null, is_public: true, show_role: false, story_role: "main", aliases: "An", avatar_url: null, description: "Người kể chuyện", private_notes: "Ghi chú bí mật", created_at: new Date().toISOString() };
+const OLD = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+// 1x1 PNG for the upload → crop → signed-URL flow.
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const entry = `
   import React from 'react'; import { createRoot } from 'react-dom/client';
   import { CharacterManager } from './src/components/author/character-manager';
@@ -29,6 +32,9 @@ const bundle = await build({ stdin: { contents: entry, resolveDir: process.cwd()
   plugins: [{ name: "test-adapters", setup(builder) {
     builder.onResolve({ filter: /^next\/link$/ }, () => ({ path: "link", namespace: "test" }));
     builder.onLoad({ filter: /.*/, namespace: "test" }, () => ({ contents: 'import React from "react"; export default function Link({href,children,...props}) {return React.createElement("a",{href,...props},children)}', resolveDir: process.cwd() }));
+    // Storage upload is recorded instead of hitting Supabase.
+    builder.onResolve({ filter: /^@\/lib\/supabase\/client$/ }, () => ({ path: "supabase", namespace: "test-supabase" }));
+    builder.onLoad({ filter: /.*/, namespace: "test-supabase" }, () => ({ contents: 'export function createClient() { return { storage: { from: bucket => ({ uploadToSignedUrl: async (path, token, file) => { window.__uploads = [...(window.__uploads || []), { bucket, path, token, type: file.type }]; return { error: null }; } }) } }; }' }));
     builder.onResolve({ filter: /^@\/components\/ui$/ }, () => ({ path: "ui", namespace: "test-ui" }));
     builder.onLoad({ filter: /.*/, namespace: "test-ui" }, () => ({ contents: 'export { Field } from "./src/components/ui/field"; export { Textarea } from "./src/components/ui/textarea";', resolveDir: process.cwd() }));
   } }],
@@ -48,7 +54,7 @@ try {
   page.setDefaultTimeout(10000);
   const errors = []; page.on("pageerror", e => errors.push(e.message));
   page.on("dialog", dialog => dialog.accept());
-  let stored = { ...profile }; let conflict = true; let created;
+  let stored = { ...profile }; let conflict = true; let created; let deleted = false;
   await page.route("**/api/**", async route => {
     const req = route.request(); const url = req.url(); const body = req.postDataJSON();
     let status = 200; let data;
@@ -58,7 +64,9 @@ try {
       if (conflict) { conflict = false; status = 409; data = { error: "Danh sách đã thay đổi ở nơi khác.", characterIds: [] }; }
       else data = { characterIds: body.characterIds };
     } else if (req.method() === "GET") data = { chapters: [{ id: "ch", title: "Chương đầu", order_index: 1, published: false }] };
-    else if (req.method() === "POST") { created = body; data = { character: { ...profile, ...body, id: "new", archived_at: null } }; }
+    else if (url.endsWith("/characters/avatar")) data = { path: "author/character-book-1.jpg", token: "t", publicUrl: "https://cdn.test/avatars/author/character-book-1.jpg" };
+    else if (req.method() === "DELETE") { assert.ok(url.endsWith(`/${profile.id}/permanent`)); deleted = true; data = { ok: true }; }
+    else if (req.method() === "POST") { created = body; data = { character: { ...profile, ...body, id: "new", archived_at: null, created_at: OLD } }; }
     else { stored = { ...stored, ...body, ...(body.archived === undefined ? {} : { archived_at: body.archived ? new Date().toISOString() : null }) }; data = { character: stored }; }
     await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
   });
@@ -70,9 +78,17 @@ try {
   await manager.getByText("Đã có nhân vật cùng tên", { exact: false }).waitFor();
   await manager.getByLabel(/^Tên nhân vật/).fill("Bình Minh");
   await manager.getByLabel("Ghi chú riêng — chỉ bạn xem được").fill("Bí mật mới");
+  await manager.locator('input[type="file"]').setInputFiles({ name: "a.png", mimeType: "image/png", buffer: PNG });
+  await page.getByRole("button", { name: "Xong", exact: true }).click();
+  await manager.getByRole("img", { name: "Ảnh đại diện hiện tại" }).waitFor();
+  const uploads = await page.evaluate(() => window.__uploads);
+  assert.equal(uploads.length, 1); assert.equal(uploads[0].bucket, "avatars");
   await manager.locator('button[type="submit"]').click();
   await manager.getByRole("heading", { name: "Bình Minh", exact: true }).waitFor();
   assert.equal(created.is_public, false);
+  assert.equal(created.avatar_url, "https://cdn.test/avatars/author/character-book-1.jpg");
+  const second = manager.locator("article").filter({ has: page.getByRole("heading", { name: "Bình Minh", exact: true }) });
+  assert.equal(await second.getByRole("button", { name: /^Xoá/ }).count(), 0, "Delete offered after 15 minutes");
   const first = manager.locator("article").filter({ has: page.getByRole("heading", { name: "An Nhiên", exact: true }) });
   await first.getByRole("button", { name: "Lưu trữ", exact: true }).click();
   // Archived characters leave the default list; the shortcut must lead back to them.
@@ -88,6 +104,9 @@ try {
   await manager.getByLabel("Tìm nhân vật", { exact: true }).fill("Bình Minh");
   assert.equal(await manager.locator("article").count(), 1);
   await manager.getByLabel("Tìm nhân vật", { exact: true }).fill("");
+  await first.getByRole("button", { name: "Xoá (còn 15 phút)" }).click();
+  await manager.getByText("Đã xoá “An Nhiên”.", { exact: true }).waitFor();
+  assert.ok(deleted); assert.equal(await manager.locator("article").count(), 1);
   const chapter = page.getByRole("region", { name: "Gắn vào chương" });
   await chapter.getByRole("button", { name: "An Nhiên", exact: false }).click();
   await chapter.getByRole("alert").waitFor();
@@ -107,5 +126,5 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "Mobile viewport overflows");
   await page.screenshot({ path: ".tmp/character-mobile.png", fullPage: true });
   assert.deepEqual(errors, []);
-  console.log("PASS browser: create/edit, private default, duplicate warning, search, archive/restore, appearances, quick create, stale-write recovery, follow login, hidden role, 390px layout.");
+  console.log("PASS browser: create/edit, private default, duplicate warning, search, avatar upload+crop, archive/restore, 15-minute delete, appearances, quick create, stale-write recovery, follow login, hidden role, 390px layout.");
 } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }

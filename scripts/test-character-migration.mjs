@@ -36,5 +36,12 @@ try {
   const existing = await db.query("select is_public from public.characters where name = 'Existing character'");
   if (existing.rows[0]?.is_public !== true) throw new Error("Migration changed existing visibility");
   await db.exec(await readFile("docs/supabase/tests/20260930_character_management.test.sql", "utf8"));
-  console.log("PASS migration applied twice; existing visibility preserved; SQL regression completed in isolated PostgreSQL.");
+  const deleteMigration = await readFile("migrations/20260930_character_delete_recent.sql", "utf8");
+  await db.exec(deleteMigration);
+  await db.exec(deleteMigration);
+  // This test always ends in an exception so the SQL Editor rolls it back; only "ALL PASS" is success.
+  const deleteTest = await db.exec(await readFile("docs/supabase/tests/20260930_character_delete_recent.test.sql", "utf8")).then(() => null, e => e);
+  if (!deleteTest?.message?.startsWith("ALL PASS")) throw deleteTest ?? new Error("Delete test did not report ALL PASS");
+  console.log(deleteTest.message);
+  console.log("PASS migrations applied twice; existing visibility preserved; SQL regression completed in isolated PostgreSQL.");
 } finally { await db.close(); }

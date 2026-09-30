@@ -91,7 +91,7 @@ export function ChapterCharactersPanel({
         <button type="button" disabled={saving || creating} onClick={() => setCreating(true)} className="font-semibold text-brand-gold-dark disabled:opacity-50">Thêm nhân vật tại đây</button>
         <Link href={`/author/${bookId}`} className="underline">Quản lý hồ sơ</Link>
       </div>
-      {creating && <div className="mb-3"><CharacterForm compact busy={saving} names={characters.map(c => c.name)} onSave={create} onCancel={() => setCreating(false)} /></div>}
+      {creating && <div className="mb-3"><CharacterForm bookId={bookId} compact busy={saving} names={characters.map(c => c.name)} onSave={create} onCancel={() => setCreating(false)} /></div>}
       <label className="mb-3 block text-sm">Tìm nhân vật<input value={search} onChange={e => setSearch(e.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
       {!characters.length && <p className="mb-3 text-sm text-stone-alt">Truyện chưa có nhân vật. Thêm nhân vật để bắt đầu.</p>}
       <p role="status" className="mb-2 text-xs text-stone-alt">{saving ? "Đang lưu…" : `Đã gắn ${tagged.size} nhân vật`}</p>
