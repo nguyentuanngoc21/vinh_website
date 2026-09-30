@@ -6,7 +6,7 @@ export type ParagraphComment = {
   authorId: string; authorName?: string; authorAvatarUrl?: string | null; isOwn: boolean;
 };
 export type Highlight = { id: string; paragraphIndex: number | null; charStart: number; charEnd: number };
-export type TropeCandidate = { id: string; name: string; role: string; trope: string | null };
+export type TropeCandidate = { id: string; name: string; role: string | null; trope: string | null };
 export type ChapterInteractions = {
   bookId: string; bookSlug: string; bookTitle: string; voteCount: number; voted: boolean; tropeCandidates: TropeCandidate[]; myTropeCharacterId: string | null;
   author: { id: string; nickname: string | null; avatarUrl: string | null }; isOwnBook: boolean; followingAuthor: boolean;
@@ -26,7 +26,7 @@ export function interact<T = unknown>(userId: string, chapterId: string, action:
 
 // Same role labels as the web (characters.role).
 export const ROLE_LABELS: Record<string, string> = { hero: 'Chính diện', villain: 'Phản diện', neutral: 'Trung lập' };
-export function tropeLabel(c: TropeCandidate) { return c.trope ? `${c.name} — ${c.trope}` : `${c.name} (${ROLE_LABELS[c.role] ?? c.role})`; }
+export function tropeLabel(c: TropeCandidate) { return c.trope ? `${c.name} — ${c.trope}` : c.role ? `${c.name} (${ROLE_LABELS[c.role] ?? c.role})` : c.name; }
 
 /** Top-level threads per paragraph with their replies; the count includes replies, like the web. */
 export function groupComments(comments: ParagraphComment[]) {

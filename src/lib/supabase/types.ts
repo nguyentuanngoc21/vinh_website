@@ -113,6 +113,12 @@ export type AchievementMetric =
 // characters.role — phân loại rộng, KHÁC characters.trope (free-text, tác
 // giả tự gõ). Xem migrations/archive/20260919_add_characters.sql.
 export type CharacterRole = "hero" | "villain" | "neutral";
+export type CharacterProfile = {
+  id: string; name: string; role: CharacterRole; trope: string | null;
+  archived_at: string | null; is_public: boolean; show_role: boolean;
+  story_role: "main" | "supporting" | "cameo"; aliases: string | null; avatar_url: string | null;
+  description: string | null; private_notes: string | null; created_at: string;
+};
 
 export type TransactionType =
   | "signup_bonus"
@@ -553,21 +559,9 @@ export type Database = {
       };
       // Xem migrations/archive/20260919_add_characters.sql.
       characters: {
-        Row: {
-          id: string;
-          book_id: string;
-          name: string;
-          role: CharacterRole;
-          trope: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          book_id: string;
-          name: string;
-          role?: CharacterRole;
-          trope?: string | null;
-        };
+        Row: CharacterProfile & { book_id: string };
+        // created_at is always set by the character_created_at_guard trigger.
+        Insert: { id?: string; book_id: string; name: string } & Partial<Omit<CharacterProfile, "id" | "name" | "created_at">>;
         Update: Partial<Database["public"]["Tables"]["characters"]["Insert"]>;
         Relationships: [];
       };
@@ -2392,6 +2386,12 @@ export type Database = {
       };
     };
     Views: {
+      public_characters: {
+        Row: { id: string; book_id: string; name: string; role: CharacterRole | null; trope: string | null;
+          story_role: CharacterProfile["story_role"]; aliases: string | null; avatar_url: string | null;
+          description: string | null; created_at: string };
+        Relationships: [];
+      };
       // security_invoker: chỉ thấy giải của cuộc thi đã công bố kết quả.
       contest_award_details: {
         Row: Database["public"]["Tables"]["contest_awards"]["Row"] & {
@@ -2493,6 +2493,14 @@ export type Database = {
       };
     };
     Functions: {
+      set_chapter_characters: {
+        Args: { p_chapter_id: string; p_character_ids: string[]; p_expected_character_ids?: string[] };
+        Returns: string[];
+      };
+      delete_recent_character: {
+        Args: { p_book_id: string; p_character_id: string };
+        Returns: void;
+      };
       // migrations/archive/20260926_fix_profiles_policy_recursion.sql — người gọi có
       // phải admin/super_admin không (dùng trong policy của profiles).
       current_user_is_admin: {

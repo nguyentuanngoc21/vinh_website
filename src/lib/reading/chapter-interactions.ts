@@ -27,7 +27,7 @@ export async function getChapterInteractions(client: Client, chapterId: string, 
   ]);
   const ids = (tagged.data ?? []).map(t => t.character_id);
   const { data: characters } = ids.length
-    ? await client.from('characters').select('id,name,role,trope').in('id', ids)
+    ? await client.from('public_characters').select('id,name,role,trope').in('id', ids)
     : { data: [] as { id: string; name: string; role: string; trope: string | null }[] };
   return {
     bookId: book.id, bookSlug: book.slug, bookTitle: book.title,

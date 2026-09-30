@@ -239,7 +239,7 @@ export default async function ReadChapterPage({
   );
 }
 
-type TropeCandidate = { id: string; name: string; role: "hero" | "villain" | "neutral"; trope: string | null };
+type TropeCandidate = import("@/components/reading/trope-vote-panel").TropeCandidate;
 
 async function loadTropeCandidates(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -252,7 +252,7 @@ async function loadTropeCandidates(
   const taggedCharacterIds = (chapterCharacterRows ?? []).map((r) => r.character_id);
   if (!taggedCharacterIds.length) return [];
   const { data: tropeCandidateRows } = await supabase
-    .from("characters")
+    .from("public_characters")
     .select("id, name, role, trope")
     .in("id", taggedCharacterIds);
   return tropeCandidateRows ?? [];

@@ -1,3 +1,4 @@
+import { CHARACTER_FIELDS } from "@/lib/characters";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { resolveBookCoverUrl, resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
@@ -69,7 +70,7 @@ export async function getAuthorBook(client: Client, userId: string, bookId: stri
       .eq("book_id", bookId)
       .order("order_index", { ascending: true }),
     resolveBookCoverUrl(client, book),
-    client.from("characters").select("id, name, role, trope").eq("book_id", bookId).order("created_at", { ascending: true }),
+    client.from("characters").select(CHARACTER_FIELDS).eq("book_id", bookId).order("created_at", { ascending: true }),
     // Tối đa 1 lượt chia sẻ bản thảo đang hoạt động/sách (partial unique index) — như author/[bookId]/page.tsx.
     client
       .from("manuscript_access_grants")
@@ -134,7 +135,7 @@ export async function getAuthorChapter(client: Client, userId: string, chapterId
   if (!book) return null;
   const [linkedAudio, { data: characters }, { data: tagged }] = await Promise.all([
     getChapterAudio(client, chapter.id),
-    client.from("characters").select("id, name, role, trope").eq("book_id", book.id).order("created_at", { ascending: true }),
+    client.from("characters").select(CHARACTER_FIELDS).eq("book_id", book.id).order("created_at", { ascending: true }),
     client.from("chapter_characters").select("character_id").eq("chapter_id", chapter.id),
   ]);
   return {

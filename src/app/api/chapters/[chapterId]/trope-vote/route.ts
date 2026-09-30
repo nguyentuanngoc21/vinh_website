@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { checkChapterAccess } from "@/lib/reading/chapter-access";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { isUuid } from "@/lib/validation/uuid";
 
 /**
  * POST /api/chapters/:chapterId/trope-vote — bình chọn 1 nhân vật (mang 1
@@ -15,6 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ chapterId: string }> }
 ) {
   const { chapterId } = await params;
+  if (!isUuid(chapterId)) return NextResponse.json({ error: "Chương không hợp lệ." }, { status: 400 });
   let auth;
   try { auth = await getRequestContext(request); } catch (e) { return requestError(e); }
   const { client: supabase, userId } = auth;
@@ -30,9 +32,13 @@ export async function POST(
 
   const body = await request.json().catch(() => null);
   const characterId = typeof body?.characterId === "string" ? body.characterId : "";
-  if (!characterId) {
-    return NextResponse.json({ error: "Thiếu nhân vật cần bình chọn." }, { status: 400 });
+  if (!isUuid(characterId)) {
+    return NextResponse.json({ error: "Nhân vật cần bình chọn không hợp lệ." }, { status: 400 });
   }
+
+  const { data: visible, error: visibilityError } = await supabase.from("public_characters").select("id").eq("id", characterId).eq("book_id", access.chapter.book_id).maybeSingle();
+  if (visibilityError) return NextResponse.json({ error: "Không kiểm tra được nhân vật." }, { status: 500 });
+  if (!visible) return NextResponse.json({ error: "Nhân vật chưa công khai hoặc đã lưu trữ." }, { status: 404 });
 
   const { data: tagged } = await supabase
     .from("chapter_characters")

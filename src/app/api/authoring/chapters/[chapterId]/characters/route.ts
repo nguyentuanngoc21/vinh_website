@@ -1,74 +1,34 @@
+import { parseCharacterIds } from "@/lib/characters";
+import { isUuid } from "@/lib/validation/uuid";
 import { NextResponse } from "next/server";
 import { getUserContext, requestError } from "@/lib/mobile/request-context";
 
-/**
- * PUT /api/authoring/chapters/:chapterId/characters — thay TOÀN BỘ tập
- * nhân vật gắn với chương này bằng đúng danh sách gửi lên (xoá hết rồi
- * chèn lại — đơn giản hơn diff thêm/bớt, số nhân vật/chương nhỏ). RLS
- * "authors tag characters in their own chapters" chặn sửa chương của
- * sách người khác qua cả DELETE lẫn INSERT.
- */
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ chapterId: string }> }
-) {
+/** Atomic replacement; expectedCharacterIds enables stale-write detection. */
+export async function PUT(request: Request, { params }: { params: Promise<{ chapterId: string }> }) {
   const { chapterId } = await params;
   const body = await request.json().catch(() => null);
-  const rawIds: unknown[] = Array.isArray(body?.characterIds) ? body.characterIds : [];
-  const characterIds: string[] | null = Array.isArray(body?.characterIds)
-    ? [...new Set(rawIds.filter((id): id is string => typeof id === "string"))]
-    : null;
-  if (!characterIds) {
+  const ids = parseCharacterIds(body?.characterIds);
+  const expected = body?.expectedCharacterIds === undefined ? undefined : parseCharacterIds(body.expectedCharacterIds);
+  if (!isUuid(chapterId) || !ids || expected === null) {
     return NextResponse.json({ error: "Danh sách nhân vật không hợp lệ." }, { status: 400 });
   }
-
   let auth;
-  try {
-    auth = await getUserContext(request);
-  } catch (e) {
-    return requestError(e);
-  }
-  const { supabase, userId } = auth;
-  if (!userId) {
-    return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
-  }
-
-  const { data: chapter } = await supabase.from("chapters").select("id, book_id").eq("id", chapterId).maybeSingle();
-  if (!chapter) {
-    return NextResponse.json({ error: "Không tìm thấy chương." }, { status: 404 });
-  }
-
-  // Chặn gắn nhân vật của SÁCH KHÁC vào chương này (FK character_id chỉ
-  // đảm bảo nhân vật tồn tại, không đảm bảo cùng sách).
-  if (characterIds.length > 0) {
-    const { count } = await supabase
-      .from("characters")
-      .select("id", { count: "exact", head: true })
-      .eq("book_id", chapter.book_id)
-      .in("id", characterIds);
-    if ((count ?? 0) !== characterIds.length) {
-      return NextResponse.json({ error: "1 hoặc nhiều nhân vật không thuộc sách này." }, { status: 400 });
+  try { auth = await getUserContext(request); } catch (e) { return requestError(e); }
+  if (!auth.userId) return NextResponse.json({ error: "Vui lòng đăng nhập lại." }, { status: 401 });
+  const { data, error } = await auth.supabase.rpc("set_chapter_characters", {
+    p_chapter_id: chapterId, p_character_ids: ids,
+    ...(expected === undefined ? {} : { p_expected_character_ids: expected }),
+  });
+  if (error) {
+    if (error.code === "40001") {
+      const { data: current, error: readError } = await auth.supabase.from("chapter_characters").select("character_id").eq("chapter_id", chapterId);
+      return NextResponse.json({ error: "Danh sách đã thay đổi ở nơi khác. Vui lòng kiểm tra danh sách mới và chọn lại thay đổi của bạn.",
+        ...(readError ? {} : { characterIds: (current ?? []).map(c => c.character_id) }) }, { status: 409 });
     }
+    if (error.code === "42501") return NextResponse.json({ error: "Bạn không có quyền sửa chương này." }, { status: 403 });
+    if (["22023", "23514"].includes(error.code)) return NextResponse.json({ error: "Nhân vật không thuộc truyện, đã lưu trữ hoặc không còn tồn tại." }, { status: 400 });
+    console.error("[chapter-characters] transaction failed:", error);
+    return NextResponse.json({ error: "Không lưu được danh sách. Dữ liệu cũ vẫn được giữ nguyên." }, { status: 500 });
   }
-
-  const { error: deleteError } = await supabase.from("chapter_characters").delete().eq("chapter_id", chapterId);
-  if (deleteError) {
-    console.error("[chapter-characters] clear failed:", deleteError);
-    return NextResponse.json({ error: "Lưu thất bại. Vui lòng thử lại." }, { status: 500 });
-  }
-
-  if (characterIds.length > 0) {
-    const { error: insertError } = await supabase
-      .from("chapter_characters")
-      .insert(characterIds.map((characterId) => ({ chapter_id: chapterId, character_id: characterId })));
-    if (insertError) {
-      console.error("[chapter-characters] insert failed:", insertError);
-      return NextResponse.json(
-        { error: "Lưu thất bại — kiểm tra bạn có phải tác giả sách này không." },
-        { status: 403 }
-      );
-    }
-  }
-
-  return NextResponse.json({ ok: true, characterIds });
+  return NextResponse.json({ ok: true, characterIds: data });
 }

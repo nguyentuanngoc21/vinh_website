@@ -2,6 +2,7 @@ import { PATCH as updateBook, DELETE as deleteBook } from '@/app/api/authoring/b
 import { POST as addChapters } from '@/app/api/authoring/books/[bookId]/chapters/route';
 import { PUT as reorderChapters } from '@/app/api/authoring/books/[bookId]/chapters/order/route';
 import { POST as addCharacter } from '@/app/api/authoring/books/[bookId]/characters/route';
+import { CHARACTER_INPUT_KEYS } from '@/lib/characters';
 import { PATCH as updateCharacter, DELETE as deleteCharacter } from '@/app/api/authoring/books/[bookId]/characters/[characterId]/route';
 import { POST as shareManuscript, DELETE as unshareManuscript } from '@/app/api/authoring/books/[bookId]/share/route';
 import { POST as finalizeBook } from '@/app/api/authoring/books/[bookId]/finalize/route';
@@ -45,9 +46,9 @@ export function POST(request: Request, context: Ctx) {
       case 'reorder':
         return reorderChapters(forwardRequest(request, 'PUT', { chapterIds: body.chapterIds }), context);
       case 'add-character':
-        return addCharacter(forwardRequest(request, 'POST', pick(body, ['name', 'role', 'trope'])), context);
+        return addCharacter(forwardRequest(request, 'POST', pick(body, CHARACTER_INPUT_KEYS)), context);
       case 'update-character':
-        return updateCharacter(forwardRequest(request, 'PATCH', pick(body, ['name', 'role', 'trope'])), withCharacter(context, body.characterId));
+        return updateCharacter(forwardRequest(request, 'PATCH', pick(body, CHARACTER_INPUT_KEYS)), withCharacter(context, body.characterId));
       case 'delete-character':
         return deleteCharacter(forwardRequest(request, 'DELETE'), withCharacter(context, body.characterId));
       case 'share':

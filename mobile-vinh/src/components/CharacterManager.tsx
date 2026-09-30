@@ -6,8 +6,7 @@ import { addCharacter, CHARACTER_ROLES, deleteCharacter, updateCharacter, type C
 const roleLabel = (role: string) => CHARACTER_ROLES.find(([id]) => id === role)?.[1] ?? role;
 
 /**
- * The web CharacterManager on the book overview: add, edit and delete a book's characters
- * (name ≤ 60, role, optional trope ≤ 40). Deleting also removes chapter tags, follows and trope votes.
+ * Basic mobile character editing, visibility and reversible archiving.
  */
 export function CharacterManager({ userId, bookId, characters, onChanged }: {
   userId: string; bookId: string; characters: Character[]; onChanged: () => void;
@@ -17,12 +16,15 @@ export function CharacterManager({ userId, bookId, characters, onChanged }: {
   const [name, setName] = useState('');
   const [role, setRole] = useState('neutral');
   const [trope, setTrope] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [showRole, setShowRole] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const lock = useRef(false);
 
   const open = (c?: Character) => {
     setEditing(c ? c.id : ''); setName(c?.name ?? ''); setRole(c?.role ?? 'neutral'); setTrope(c?.trope ?? ''); setError('');
+    setIsPublic(c?.is_public ?? false); setShowRole(c?.show_role ?? true);
   };
   async function run(task: () => Promise<unknown>) {
     if (lock.current) return;
@@ -33,12 +35,12 @@ export function CharacterManager({ userId, bookId, characters, onChanged }: {
   }
   const save = () => {
     if (!name.trim()) { setError('Hãy nhập tên nhân vật.'); return; }
-    const fields = { name: name.trim(), role, trope: trope.trim() || null };
+    const fields = { name: name.trim(), role, trope: trope.trim() || null, is_public: isPublic, show_role: showRole };
     void run(() => editing ? updateCharacter(userId, bookId, editing, fields) : addCharacter(userId, bookId, fields));
   };
-  const remove = (c: Character) => Alert.alert(`Xoá nhân vật “${c.name}”?`, 'Nhân vật sẽ bị gỡ khỏi mọi chương, kèm lượt theo dõi và bình chọn trope.', [
+  const remove = (c: Character) => Alert.alert(`Lưu trữ nhân vật “${c.name}”?`, 'Nhân vật sẽ ẩn với độc giả. Liên kết chương, lượt theo dõi và bình chọn được giữ nguyên. Bạn có thể khôi phục sau.', [
     { text: 'Hủy', style: 'cancel' },
-    { text: 'Xoá', style: 'destructive', onPress: () => void run(() => deleteCharacter(userId, bookId, c.id)) },
+    { text: 'Lưu trữ', onPress: () => void run(() => deleteCharacter(userId, bookId, c.id)) },
   ]);
 
   return <View>
@@ -46,12 +48,13 @@ export function CharacterManager({ userId, bookId, characters, onChanged }: {
     {characters.map(c => <View key={c.id} className="mb-2 flex-row items-center gap-2 rounded-2xl border border-cream-border bg-white p-3">
       <View className="flex-1">
         <Text className="font-bold text-brand-ink">{c.name}</Text>
-        <Text className="text-sm text-stone">{roleLabel(c.role)}{c.trope ? ` · ${c.trope}` : ''}</Text>
+        <Text className="text-sm text-stone">{roleLabel(c.role)}{c.trope ? ` · ${c.trope}` : ''} · {c.archived_at ? 'Đã lưu trữ' : c.is_public ? 'Công khai' : 'Riêng tư'}</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Sửa ${c.name}`} disabled={busy} onPress={() => open(c)} className="min-h-11 justify-center px-2">
+      <Pressable accessibilityRole="button" accessibilityLabel={`Sửa ${c.name}`} disabled={busy || editing !== null} onPress={() => open(c)} className="min-h-11 justify-center px-2">
         <Text className="text-brand-ink">Sửa</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Xoá ${c.name}`} disabled={busy} onPress={() => remove(c)} className="min-h-11 justify-center px-2">
-        <Text className="text-red-700">Xoá</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${c.archived_at ? 'Khôi phục' : 'Lưu trữ'} ${c.name}`} disabled={busy || editing !== null}
+        onPress={() => c.archived_at ? void run(() => updateCharacter(userId, bookId, c.id, { name: c.name, role: c.role, trope: c.trope, archived: false })) : remove(c)} className="min-h-11 justify-center px-2">
+        <Text className="text-brand-ink">{c.archived_at ? 'Khôi phục' : 'Lưu trữ'}</Text></Pressable>
     </View>)}
     {editing === null ? <Button label="+ Thêm nhân vật" secondary disabled={busy} onPress={() => open()} />
       : <View className="mt-2 rounded-2xl border border-cream-border bg-white p-4">
@@ -64,6 +67,8 @@ export function CharacterManager({ userId, bookId, characters, onChanged }: {
           </Pressable>)}
         </View>
         <Field label="Trope (tùy chọn)" value={trope} onChangeText={setTrope} maxLength={40} editable={!busy} placeholder="vd: Ma vương, Trượng nghĩa" autoCorrect />
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: isPublic }} disabled={busy} onPress={() => setIsPublic(v => !v)} className="min-h-11 justify-center"><Text>{isPublic ? '✓ ' : '○ '}Công khai cho độc giả khi truyện đã xuất bản</Text></Pressable>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: showRole }} disabled={busy} onPress={() => setShowRole(v => !v)} className="min-h-11 justify-center"><Text>{showRole ? '✓ ' : '○ '}Hiển thị chính/phản diện</Text></Pressable>
         <Notice message={error} />
         <Button label={busy ? 'Đang lưu…' : editing ? 'Lưu nhân vật' : 'Thêm nhân vật'} disabled={busy} onPress={save} />
         <Button label="Hủy" secondary disabled={busy} onPress={() => setEditing(null)} />

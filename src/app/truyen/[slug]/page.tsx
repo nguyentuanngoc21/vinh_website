@@ -248,8 +248,8 @@ async function loadCharacters(
   viewerId: string | null
 ) {
   const { data: characterRows } = await supabase
-    .from("characters")
-    .select("id, name, role, trope")
+    .from("public_characters")
+    .select("id, name, role, trope, story_role, aliases, avatar_url, description")
     .eq("book_id", bookId)
     .order("created_at", { ascending: true });
   const characterIds = (characterRows ?? []).map((c) => c.id);
@@ -263,6 +263,7 @@ async function loadCharacters(
     name: c.name,
     role: c.role,
     trope: c.trope,
+    story_role: c.story_role, aliases: c.aliases, avatar_url: c.avatar_url, description: c.description,
     followedByViewer: followedCharacterIds.has(c.id),
   }));
 }

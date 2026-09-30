@@ -10,7 +10,7 @@ export const MAX_TAGS = 20;
 export const EXCLUSIVITY_AGREEMENT_ID = 'chinh-sach-doc-quyen';
 
 export type MyBook = { id: string; title: string; genre: string | null; published: boolean; isExclusive: boolean; coverUrl: string | null; chapterCount: number; publishedCount: number };
-export type Character = { id: string; name: string; role: string; trope: string | null };
+export type Character = { id: string; name: string; role: string; trope: string | null; archived_at?: string | null; is_public?: boolean; show_role?: boolean };
 export type ChapterRow = { id: string; title: string; orderIndex: number; published: boolean; price: number; isLastChapter: boolean; removed: boolean; removedReason: string | null; sold: boolean };
 export type BookDetail = {
   id: string; title: string; synopsis: string | null; genre: string | null; tags: string[]; slug: string; published: boolean;
@@ -48,15 +48,15 @@ export const deleteChapter = (userId: string, chapterId: string) => mobileApi(ch
 
 // Characters (same limits as /api/authoring/books/[bookId]/characters): name ≤ 60, trope ≤ 40.
 export const CHARACTER_ROLES = [['hero', 'Chính diện'], ['villain', 'Phản diện'], ['neutral', 'Trung lập']] as const;
-export type CharacterFields = { name: string; role: string; trope: string | null };
+export type CharacterFields = { name: string; role: string; trope: string | null; is_public?: boolean; show_role?: boolean; archived?: boolean };
 export const addCharacter = (userId: string, bookId: string, fields: CharacterFields) =>
   mobileApi<{ character: Character }>(bookPath(bookId), userId, { action: 'add-character', ...fields });
 export const updateCharacter = (userId: string, bookId: string, characterId: string, fields: CharacterFields) =>
   mobileApi<{ character: Character }>(bookPath(bookId), userId, { action: 'update-character', characterId, ...fields });
 export const deleteCharacter = (userId: string, bookId: string, characterId: string) =>
   mobileApi(bookPath(bookId), userId, { action: 'delete-character', characterId });
-export const setChapterCharacters = (userId: string, chapterId: string, characterIds: string[]) =>
-  mobileApi<{ characterIds: string[] }>(chapterPath(chapterId), userId, { action: 'set-characters', characterIds });
+export const setChapterCharacters = (userId: string, chapterId: string, characterIds: string[], expectedCharacterIds?: string[]) =>
+  mobileApi<{ characterIds: string[] }>(chapterPath(chapterId), userId, { action: 'set-characters', characterIds, expectedCharacterIds });
 
 // Manuscript sharing: one account at a time until Hoàn thiện (irreversible — locks the grant).
 export const shareManuscript = (userId: string, bookId: string, username: string) => mobileApi(bookPath(bookId), userId, { action: 'share', username });

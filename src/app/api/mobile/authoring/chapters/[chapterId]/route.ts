@@ -33,7 +33,7 @@ export function POST(request: Request, context: Ctx) {
       case 'delete':
         return deleteChapter(forwardRequest(request, 'DELETE'), context);
       case 'set-characters':
-        return setCharacters(forwardRequest(request, 'PUT', { characterIds: body.characterIds }), context);
+        return setCharacters(forwardRequest(request, 'PUT', { characterIds: body.characterIds, expectedCharacterIds: body.expectedCharacterIds }), context);
       default:
         return Response.json({ error: 'Thao tác không hợp lệ.' }, { status: 400 });
     }
