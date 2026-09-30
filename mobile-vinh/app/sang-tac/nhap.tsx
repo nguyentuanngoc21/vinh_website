@@ -34,7 +34,7 @@ function Importer({ userId, bookId }: { userId: string; bookId: string | null })
   const [mode, setMode] = useState<Mode>('chuong');
   const [pasted, setPasted] = useState('');
   const [title, setTitle] = useState('');
-  const [isExclusive, setIsExclusive] = useState(true);
+  const [isExclusive, setIsExclusive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');

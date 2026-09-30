@@ -1117,6 +1117,24 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Lịch sử độc quyền — chỉ trigger log_book_exclusivity_event ghi (tạo
+      // truyện + mỗi lần đổi is_exclusive). from_exclusive null = lúc tạo.
+      // Xem migrations/20260930_book_exclusivity_default_and_history.sql.
+      book_exclusivity_events: {
+        Row: {
+          id: string;
+          book_id: string;
+          from_exclusive: boolean | null;
+          to_exclusive: boolean;
+          actor_id: string | null;
+          actor_kind: "author" | "admin" | "system";
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       // "Mục Thông báo" — lớp (A) ngắn gọn (title + link), nội dung đầy đủ
       // (lớp B) nằm ở direct_messages. Đọc/đánh dấu đã đọc qua RLS trực
       // tiếp (auth.uid() = user_id) — giống direct_messages, không qua RPC.
@@ -2503,6 +2521,10 @@ export type Database = {
       book_has_active_exclusive_contest_entry: {
         Args: { p_book_id: string };
         Returns: boolean;
+      };
+      admin_set_book_exclusive: {
+        Args: { p_book_id: string; p_admin_id: string; p_exclusive: boolean; p_reason: string };
+        Returns: Database["public"]["Tables"]["books"]["Row"];
       };
       transition_contest_status: {
         Args: { p_contest_id: string; p_to: ContestStatus; p_actor_id: string | null; p_reason?: string | null };

@@ -4,11 +4,13 @@ import { HeadphonesIcon } from "@phosphor-icons/react/dist/ssr";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import { createClient } from "@/lib/supabase/server";
 import { searchBooks } from "@/lib/search/search-books";
 import { searchAudio } from "@/lib/search/search-audio";
 import { searchDesign } from "@/lib/search/search-design";
 import type { SearchType } from "@/components/nav-bar-content";
+import { ProtectedImage } from "@/components/ui/protected-image";
 
 export const metadata: Metadata = { title: "Tìm kiếm — Vịnh" };
 
@@ -101,7 +103,7 @@ export default async function SearchPage({
                       href={`/truyen/${b.slug}`}
                       className="no-underline transition-transform duration-[250ms] hover:-translate-y-1"
                     >
-                      <div className="aspect-[2/3] overflow-hidden rounded-[10px] bg-neutral-bg">
+                      <div className="relative aspect-[2/3] overflow-hidden rounded-[10px] bg-neutral-bg">
                         <BookCover
                           id={b.id}
                           title={b.title}
@@ -110,6 +112,7 @@ export default async function SearchPage({
                           coverUrl={b.coverUrl}
                           className="h-full w-full"
                         />
+                        {b.isExclusive && <ExclusiveBadge variant="overlay" />}
                       </div>
                       <div className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold text-brand-ink">{b.title}</div>
                       <div className="truncate text-xs text-stone-alt">{b.authorNickname ?? "—"}</div>
@@ -146,8 +149,7 @@ export default async function SearchPage({
                   {design.map((d) => (
                     <Link key={d.id} href="/thiet-ke" className="no-underline">
                       <div className="aspect-square overflow-hidden rounded-[10px] bg-neutral-bg">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={d.imageUrl} alt={d.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <ProtectedImage src={d.imageUrl} alt={d.title} wrapperClassName="h-full w-full" className="h-full w-full object-cover" />
                       </div>
                       <div className="mt-2 truncate text-sm font-semibold text-brand-ink">{d.title}</div>
                       <div className="truncate text-xs text-stone-alt">{d.illustratorNickname ?? "—"}</div>

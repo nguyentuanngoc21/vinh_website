@@ -61,6 +61,8 @@ export type RankedBook = {
   reads: number;
   delta: number | null;
   isNew: boolean;
+  /** books.is_exclusive — tag "Độc quyền" trên card. */
+  isExclusive: boolean;
 };
 
 export type RankingLeader = { name: string; meta: string; color: string };
@@ -162,7 +164,7 @@ export async function getBookRankings(
   const [{ data: rows }, periodReads] = await Promise.all([
     supabase
       .from("books")
-      .select("id, slug, title, genre, author_id, view_count, created_at, cover_design_item_id")
+      .select("id, slug, title, genre, author_id, view_count, created_at, cover_design_item_id, is_exclusive")
       .eq("published", true)
       .is("deleted_at", null)
       .order("view_count", { ascending: false })
@@ -219,6 +221,7 @@ export async function getBookRankings(
       coverUrl: coverByBook.get(b.id) ?? null,
       viewCount: b.view_count,
       createdAtMs: new Date(b.created_at).getTime(),
+      isExclusive: b.is_exclusive,
     }));
   }
 
@@ -271,6 +274,7 @@ export async function getBookRankings(
         chapterCount: b.chapterCount,
         coverUrl: b.coverUrl,
         viewCount: b.viewCount,
+        isExclusive: b.isExclusive,
         reads: curReads(b.id),
         delta: (prevRank.get(b.id) ?? 0) - (curRank.get(b.id) ?? 0),
         isNew: b.createdAtMs >= w.curStart.getTime(),
@@ -294,6 +298,7 @@ export async function getBookRankings(
         chapterCount: b.chapterCount,
         coverUrl: b.coverUrl,
         viewCount: b.viewCount,
+        isExclusive: b.isExclusive,
         reads: b.viewCount,
         delta: null,
         isNew: now.getTime() - b.createdAtMs < NEW_WINDOW_MS,

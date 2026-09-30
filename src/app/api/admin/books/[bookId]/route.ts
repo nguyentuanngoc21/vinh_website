@@ -26,10 +26,12 @@ import {
  * admin thực hiện) — xem migrations/archive/20260908_add_book_moderation.sql.
  * Trước đây route này chỉ set deleted_at, không có lý do/thông báo gì cả.
  *
- * `deleted: false` (khôi phục) và `is_exclusive` (bật/tắt độc quyền) vẫn
- * là override đơn giản, không cần lý do — is_exclusive có thể đi kèm
- * cùng lúc với deleted trong 1 request (dù UI hiện tại luôn gọi tách
- * riêng), nhưng CHỈ deleted=true đòi hỏi reasonGroup hợp lệ.
+ * `is_exclusive` (bật/tắt độc quyền) đi qua RPC admin_set_book_exclusive,
+ * bắt buộc `exclusiveReason` — trigger ghi book_exclusivity_events (ai, khi
+ * nào, lý do). Xem migrations/20260930_book_exclusivity_default_and_history.sql.
+ * Gửi riêng, không kèm `deleted` trong cùng request.
+ *
+ * `deleted: false` (khôi phục) vẫn là override đơn giản, không cần lý do.
  */
 export async function PATCH(
   request: Request,
@@ -43,17 +45,47 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => null);
+
+  if (typeof body?.is_exclusive === "boolean") {
+    if (body?.deleted !== undefined) {
+      return NextResponse.json({ error: "Đổi độc quyền và xoá/khôi phục phải gửi riêng." }, { status: 400 });
+    }
+    const reason = typeof body?.exclusiveReason === "string" ? body.exclusiveReason.trim() : "";
+    if (!reason) {
+      return NextResponse.json({ error: "Vui lòng nhập lý do đổi độc quyền." }, { status: 400 });
+    }
+    const { data: book, error } = await supabase.rpc("admin_set_book_exclusive", {
+      p_book_id: bookId,
+      p_admin_id: adminId,
+      p_exclusive: body.is_exclusive,
+      p_reason: reason,
+    });
+    if (error) {
+      // D11 chặn cả admin: muốn tắt độc quyền thì loại bài dự thi trước (có lý do, có nhật ký).
+      const locked = contestLockResponse(error);
+      if (locked) return locked;
+      console.error("[admin] set book exclusive failed:", error);
+      return NextResponse.json({ error: "Cập nhật thất bại. Vui lòng thử lại." }, { status: 500 });
+    }
+    if (!book?.id) {
+      return NextResponse.json({ error: "Không tìm thấy truyện." }, { status: 404 });
+    }
+    revalidatePublicBooks();
+    return NextResponse.json({
+      id: book.id,
+      title: book.title,
+      author_id: book.author_id,
+      is_exclusive: book.is_exclusive,
+      deleted_at: book.deleted_at,
+    });
+  }
+
   const update: {
-    is_exclusive?: boolean;
     deleted_at?: string | null;
     removed_by?: string | null;
     removed_reason_group?: string | null;
     removed_reason_detail?: string | null;
   } = {};
-
-  if (typeof body?.is_exclusive === "boolean") {
-    update.is_exclusive = body.is_exclusive;
-  }
 
   const isDeleting = body?.deleted === true;
   const isRestoring = body?.deleted === false;
@@ -101,9 +133,6 @@ export async function PATCH(
     .maybeSingle();
 
   if (error) {
-    // D11 chặn cả admin: muốn tắt độc quyền thì loại bài dự thi trước (có lý do, có nhật ký).
-    const locked = contestLockResponse(error);
-    if (locked) return locked;
     console.error("[admin] update book failed:", error);
     return NextResponse.json({ error: "Cập nhật thất bại. Vui lòng thử lại." }, { status: 500 });
   }
@@ -111,8 +140,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Không tìm thấy truyện." }, { status: 404 });
   }
 
-  // Chỉ gỡ/khôi phục mới có audit trail + thông báo — bật/tắt độc quyền
-  // đơn thuần (is_exclusive-only request) không đụng gì ở dưới.
   if (isDeleting || isRestoring) {
     await supabase.from("book_moderation_actions").insert({
       book_id: book.id,
@@ -158,6 +185,7 @@ export async function PATCH(
     ]);
     if (notifError) console.error("[admin/books] notification insert failed:", notifError);
     if (messageError) console.error("[admin/books] system message insert failed:", messageError);
+
 
     // Làm mới cache trang công khai (lib/cache/public-data.ts).
     revalidatePublicBooks();

@@ -4,7 +4,7 @@ import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import type { BookSearchResult } from "./search-books";
 
 const PAGE_SIZE = 24;
-const BOOK_COLUMNS = "id, slug, title, genre, author_id, cover_design_item_id, view_count, created_at";
+const BOOK_COLUMNS = "id, slug, title, genre, author_id, cover_design_item_id, view_count, created_at, is_exclusive";
 
 type BookRow = {
   id: string;
@@ -15,6 +15,7 @@ type BookRow = {
   cover_design_item_id: string | null;
   view_count: number;
   created_at: string;
+  is_exclusive: boolean;
 };
 
 export type GenreBooksPage = {
@@ -73,6 +74,7 @@ export async function getBooksByGenre(
       genre: r.genre,
       authorNickname: nicknameById.get(r.author_id) ?? null,
       coverUrl: coverUrls[i],
+      isExclusive: r.is_exclusive,
     })),
   };
 }

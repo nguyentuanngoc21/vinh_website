@@ -1,6 +1,7 @@
 import type { BookGenre } from "@/lib/supabase/types";
 import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import { GeneratedBookCover } from "./generated-book-cover";
+import { ProtectedImage } from "@/components/ui/protected-image";
 
 export type BookCoverProps = {
   // Seed cho biến thể (hash deterministic) — dùng book id THẬT khi có
@@ -33,13 +34,15 @@ export function BookCover({ id, title, author, genre, coverUrl, className, prior
       // khác nhau giữa dev/production, xem docs/SUPABASE_SETUP.md) —
       // không đưa wildcard domain Supabase vào next.config.ts
       // remotePatterns chỉ để dùng next/image cho 1 chỗ này.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      // Bìa thật là ảnh họa sĩ vẽ (design item) — chặn lưu/kéo/sao chép như
+      // ảnh thiết kế (ProtectedImage).
+      <ProtectedImage
         src={coverUrl}
         alt={title}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         fetchPriority={priority ? "high" : undefined}
+        wrapperClassName="h-full w-full"
         className={className}
         style={{ width: "100%", height: "100%", objectFit: "cover" }}
       />

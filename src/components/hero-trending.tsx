@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FireIcon, HeadphonesIcon, FingerprintIcon } from "@phosphor-icons/react/dist/ssr";
 import { BookCover } from "@/components/covers/book-cover";
+import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import type { HomepageBook } from "@/lib/home/get-homepage-books";
 
 /** Hash tên tác giả để chọn màu từ palette có sẵn — mỗi tên ra một màu
@@ -87,7 +88,7 @@ export function HeroTrending({ book }: { book: HomepageBook | null }) {
           </div>
         </div>
         <div className="relative mx-auto w-[180px] sm:w-auto">
-          <div className="h-[260px] sm:h-[340px] overflow-hidden rounded-2xl shadow-[0_24px_48px_rgba(0,0,0,.45)]">
+          <div className="relative h-[260px] sm:h-[340px] overflow-hidden rounded-2xl shadow-[0_24px_48px_rgba(0,0,0,.45)]">
             <BookCover
               id={book.id}
               title={book.title}
@@ -96,6 +97,7 @@ export function HeroTrending({ book }: { book: HomepageBook | null }) {
               coverUrl={book.coverUrl}
               className="h-full w-full"
             />
+            {book.isExclusive && <ExclusiveBadge variant="overlay" />}
           </div>
           <div className="absolute -right-2.5 -top-2.5 flex h-14 w-14 sm:h-16 sm:w-16 flex-col items-center justify-center rounded-full bg-brand-ink text-center text-[10px] sm:text-[11px] font-bold leading-tight text-brand-gold-light shadow-[0_6px_16px_rgba(0,0,0,.3)]">
             <FingerprintIcon weight="fill" size={20} className="sm:hidden" />

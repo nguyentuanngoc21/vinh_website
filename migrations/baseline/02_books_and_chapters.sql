@@ -8,10 +8,12 @@
 -- Đối tượng tạo trong file này:
 --   Bảng:
 --     books, chapters, character_follows, character_trope_votes,
---     chapter_moderation_actions, book_moderation_actions
+--     chapter_moderation_actions, book_moderation_actions,
+--     book_exclusivity_events
 --   Hàm:
 --     increment_book_view_count, set_book_published_at,
---     reorder_book_chapters
+--     reorder_book_chapters, log_book_exclusivity_event,
+--     admin_set_book_exclusive
 --
 -- Gộp từ migration (migrations/archive/):
 --   20260819_add_book_genre.sql, 20260820_add_chapter_price.sql,
@@ -25,6 +27,7 @@
 --   20260909_add_chapter_audio_url_and_price.sql,
 --   20260919_add_characters.sql, 20260925_add_chapter_delete_and_reorder.sql
 --   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--   + migrations/20260930_book_exclusivity_default_and_history.sql
 --
 -- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql
 -- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
@@ -313,9 +316,11 @@ grant execute on function public.increment_book_view_count(uuid) to anon, authen
 -- (không phải CHECK/trigger — CHECK không re-evaluate theo now() khi
 -- thời gian trôi qua, và admin override qua service-role phải bypass
 -- được rule này mà service-role không bypass trigger/constraint).
--- Xem migrations/archive/20260826_add_book_exclusivity.sql. ---
+-- Xem migrations/archive/20260826_add_book_exclusivity.sql.
+-- Mặc định false (Tự do) từ migrations/20260930_book_exclusivity_default_and_history.sql
+-- — chỉ độc quyền khi tác giả chủ động chọn. ---
 alter table public.books
-  add column is_exclusive boolean not null default true;
+  add column is_exclusive boolean not null default false;
 
 alter table public.books
   add column published_at timestamptz;
@@ -452,6 +457,124 @@ create policy "admins view book moderation actions"
 
 create index book_moderation_actions_book_idx
   on public.book_moderation_actions (book_id, created_at);
+
+-- --- Lịch sử độc quyền: trigger ghi mọi lần tạo truyện + đổi is_exclusive;
+-- admin đổi qua RPC admin_set_book_exclusive (bắt buộc lý do, đặt biến phiên
+-- vinh.exclusivity_actor/_reason cho trigger đọc). Xem
+-- migrations/20260930_book_exclusivity_default_and_history.sql. ---
+create table public.book_exclusivity_events (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  -- null = sự kiện tạo truyện (trạng thái ban đầu).
+  from_exclusive boolean,
+  to_exclusive boolean not null,
+  actor_id uuid references auth.users (id) on delete set null,
+  actor_kind text not null check (actor_kind in ('author', 'admin', 'system')),
+  reason text,
+  created_at timestamptz not null default now()
+);
+
+create index book_exclusivity_events_book_idx
+  on public.book_exclusivity_events (book_id, created_at);
+
+alter table public.book_exclusivity_events enable row level security;
+
+create policy "admins view book exclusivity events"
+  on public.book_exclusivity_events for select
+  using (exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin')
+  ));
+
+revoke insert, update, delete on public.book_exclusivity_events from anon, authenticated;
+
+create function public.log_book_exclusivity_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_setting text := nullif(current_setting('vinh.exclusivity_actor', true), '');
+  v_actor uuid;
+  v_kind text;
+  v_reason text := nullif(current_setting('vinh.exclusivity_reason', true), '');
+begin
+  if tg_op = 'UPDATE' and old.is_exclusive is not distinct from new.is_exclusive then
+    return new;
+  end if;
+
+  if v_setting is not null and exists (
+    select 1 from public.profiles where id = v_setting::uuid and role in ('admin', 'super_admin')
+  ) then
+    v_actor := v_setting::uuid;
+    v_kind := 'admin';
+  elsif auth.uid() is not null and auth.uid() = new.author_id then
+    v_actor := auth.uid();
+    v_kind := 'author';
+    v_reason := null;
+  else
+    v_actor := auth.uid();
+    v_kind := 'system';
+    v_reason := null;
+  end if;
+
+  insert into public.book_exclusivity_events (book_id, from_exclusive, to_exclusive, actor_id, actor_kind, reason)
+  values (
+    new.id,
+    case when tg_op = 'UPDATE' then old.is_exclusive end,
+    new.is_exclusive,
+    v_actor,
+    v_kind,
+    v_reason
+  );
+  return new;
+end;
+$$;
+
+revoke execute on function public.log_book_exclusivity_event() from public, anon, authenticated;
+
+create trigger log_book_exclusivity_event
+  after insert or update of is_exclusive on public.books
+  for each row execute function public.log_book_exclusivity_event();
+
+create function public.admin_set_book_exclusive(
+  p_book_id uuid,
+  p_admin_id uuid,
+  p_exclusive boolean,
+  p_reason text
+) returns public.books
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_book public.books;
+begin
+  -- Kiểm lại ở DB vì service-role bỏ qua RLS.
+  if not exists (select 1 from public.profiles where id = p_admin_id and role in ('admin', 'super_admin')) then
+    raise exception 'Not an admin' using errcode = 'insufficient_privilege';
+  end if;
+  if v_reason is null then
+    raise exception 'Reason is required' using errcode = 'check_violation', hint = 'exclusivity_reason_required';
+  end if;
+
+  perform set_config('vinh.exclusivity_actor', p_admin_id::text, true);
+  perform set_config('vinh.exclusivity_reason', left(v_reason, 500), true);
+
+  update public.books set is_exclusive = p_exclusive where id = p_book_id returning * into v_book;
+
+  -- Xoá biến phiên ngay — không để lọt sang câu lệnh khác cùng transaction.
+  perform set_config('vinh.exclusivity_actor', '', true);
+  perform set_config('vinh.exclusivity_reason', '', true);
+
+  return v_book; -- null nếu không có truyện
+end;
+$$;
+
+revoke execute on function public.admin_set_book_exclusive(uuid, uuid, boolean, text) from public, anon, authenticated;
+grant execute on function public.admin_set_book_exclusive(uuid, uuid, boolean, text) to service_role;
 -- --- Xoá chương nháp + sắp xếp thứ tự chương (tác giả, web + mobile).
 -- Xem migrations/archive/20260925_add_chapter_delete_and_reorder.sql. ---
 drop policy if exists "authors delete draft chapters on their own books" on public.chapters;

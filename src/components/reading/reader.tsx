@@ -10,11 +10,9 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   BookmarkSimpleIcon,
-  ChatCircleTextIcon,
   HeadphonesIcon,
   HighlighterIcon,
   ListBulletsIcon,
-  PlusCircleIcon,
   ShareNetworkIcon,
   TextAaIcon,
   ShieldCheckIcon,
@@ -26,7 +24,11 @@ import { AuthorPanel } from "./author-panel";
 import type { RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { ReadingGate } from "./reading-gate";
 import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
-import { groupParagraphComments, type ParagraphComment } from "@/lib/reading/paragraph-comments";
+import {
+  groupParagraphComments,
+  PARAGRAPH_COMMENTS_PANEL_WIDTH,
+  type ParagraphComment,
+} from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { splitParagraphAroundDesignImages } from "@/lib/design/share-link";
 import { shareOrCopy } from "@/lib/share";
@@ -36,6 +38,7 @@ import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { useNowPlaying } from "@/lib/audio/now-playing-context";
 import { formatPenaltyMessage, useScreenshotPenalty } from "./use-screenshot-penalty";
 import { buildAuthorWatermarkTileDataUrl, WATERMARK_TILE_HEIGHT, WATERMARK_TILE_WIDTH } from "./watermark-tile";
+import { ProtectedImage } from "@/components/ui/protected-image";
 
 // Modal/panel chỉ mở khi người đọc bấm (và modal gỡ chương chỉ dành cho
 // admin) — tải chunk riêng lúc mở thay vì nhét vào bundle trang đọc của
@@ -298,7 +301,8 @@ export function Reader({
   const [listModalOpen, setListModalOpen] = useState(false);
   const [visibleParagraph, setVisibleParagraph] = useState(paragraphs[0] ?? "");
   const paragraphRefs = useRef<Array<HTMLParagraphElement | null>>([]);
-  const { penalty, isPenaltyActive, warningMessage } = useScreenshotPenalty(paragraphRefs);
+  // Admin/super_admin được miễn phạt chụp màn hình (cần chụp để làm hướng dẫn).
+  const { penalty, isPenaltyActive, warningMessage } = useScreenshotPenalty(paragraphRefs, { exempt: viewerIsAdmin });
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Bình luận theo đoạn (tham khảo Wattpad) — 1 lần fetch TOÀN BỘ bình
@@ -307,6 +311,51 @@ export function Reader({
   // + api/chapters/[chapterId]/comments/route.ts.
   const [paragraphComments, setParagraphComments] = useState<ParagraphComment[]>([]);
   const [openCommentsParagraph, setOpenCommentsParagraph] = useState<number | null>(null);
+  const commentsOpen = openCommentsParagraph !== null;
+  // Điện thoại không có hover: NHẤN GIỮ 1 đoạn (~450ms, không kéo) để tô sáng
+  // đoạn đó + hiện nút "Bình luận". Chạm nhanh/cuộn thì huỷ.
+  const [pressedParagraph, setPressedParagraph] = useState<number | null>(null);
+  const longPressRef = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const cancelLongPress = () => {
+    if (longPressRef.current) clearTimeout(longPressRef.current.timer);
+    longPressRef.current = null;
+  };
+  const startLongPress = (i: number, e: React.TouchEvent) => {
+    cancelLongPress();
+    const t = e.touches[0];
+    longPressRef.current = {
+      x: t.clientX,
+      y: t.clientY,
+      timer: setTimeout(() => {
+        longPressRef.current = null;
+        setPressedParagraph(i);
+      }, 450),
+    };
+  };
+  const moveLongPress = (e: React.TouchEvent) => {
+    const lp = longPressRef.current;
+    const t = e.touches[0];
+    if (lp && (Math.abs(t.clientX - lp.x) > 10 || Math.abs(t.clientY - lp.y) > 10)) cancelLongPress();
+  };
+  const openParagraphComments = (i: number) => {
+    setPressedParagraph(null);
+    setOpenCommentsParagraph(i);
+  };
+  // Đang hiện nút sau khi nhấn giữ: chạm ra ngoài nút hoặc cuộn trang thì ẩn.
+  useEffect(() => {
+    if (pressedParagraph === null) return;
+    const dismiss = (e: Event) => {
+      if (e.target instanceof Element && e.target.closest("[data-comment-pill]")) return;
+      setPressedParagraph(null);
+    };
+    const onScroll = () => setPressedParagraph(null);
+    document.addEventListener("touchstart", dismiss, { capture: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", dismiss, { capture: true });
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [pressedParagraph]);
   const { countByParagraph, threadsByParagraph } = useMemo(
     () => groupParagraphComments(paragraphComments),
     [paragraphComments]
@@ -760,8 +809,79 @@ export function Reader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content]);
 
+  // ---- Bình luận theo đoạn ("Chú thích đoạn văn") ----
+  // Khung mỗi đoạn: tô sáng khi hover (desktop), khi đang nhấn giữ (điện
+  // thoại) hoặc khi đang mở cột bình luận của chính đoạn đó. -mx/px để nền
+  // tô sáng tràn nhẹ ra 2 bên chữ, không làm lệch dòng.
+  const paragraphShellProps = (i: number) => {
+    const active = openCommentsParagraph === i || pressedParagraph === i;
+    return {
+      className: `group relative -mx-3 mb-[1.5em] rounded-lg px-3 transition-colors ${
+        active ? "bg-info/10" : "sm:hover:bg-info/10"
+      }`,
+      onTouchStart: (e: React.TouchEvent) => startLongPress(i, e),
+      onTouchMove: moveLongPress,
+      onTouchEnd: cancelLongPress,
+      onTouchCancel: cancelLongPress,
+    };
+  };
+
+  // Nút "Bình luận" nổi GIỮA cột chữ, ngay trên đoạn: desktop hiện khi hover
+  // đoạn (group-hover), điện thoại hiện sau khi nhấn giữ. Lớp pb-2 trong suốt
+  // nối nút với đoạn để di chuột từ đoạn lên nút không bị mất hover.
+  const renderCommentPill = (i: number) => {
+    const shownOnTouch = pressedParagraph === i;
+    return (
+      <div
+        data-comment-pill
+        className={`absolute bottom-full left-1/2 z-10 -translate-x-1/2 pb-2 transition-opacity ${
+          shownOnTouch
+            ? "opacity-100"
+            : "pointer-events-none opacity-0 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => openParagraphComments(i)}
+          className="relative cursor-pointer whitespace-nowrap rounded-full bg-brand-ink-dark px-9 py-2.5 font-sans text-[12px] font-semibold tracking-[.6px] text-white shadow-[0_8px_20px_rgba(0,0,0,.22)] transition-colors hover:bg-brand-ink"
+        >
+          BÌNH LUẬN
+          <span
+            aria-hidden
+            className="absolute left-1/2 top-full size-0 -translate-x-1/2 border-x-[7px] border-t-[7px] border-x-transparent border-t-brand-ink-dark"
+          />
+        </button>
+      </div>
+    );
+  };
+
+  // Huy hiệu số bình luận ở cuối đoạn — select-none để không lẫn vào chữ khi
+  // bôi đen/sao chép. stopPropagation onMouseUp: không kích hoạt luồng bôi
+  // đen (handleParagraphSelect) của <p> cha.
+  const renderCommentCount = (i: number, count: number) =>
+    count > 0 ? (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          openParagraphComments(i);
+        }}
+        onMouseUp={(e) => e.stopPropagation()}
+        aria-label={`${count} bình luận cho đoạn này`}
+        className="ml-1.5 inline-flex h-[1.35em] min-w-[1.35em] cursor-pointer select-none items-center justify-center rounded-full bg-stone-light/45 px-1.5 align-[0.1em] font-sans text-[max(11px,0.62em)] font-semibold leading-none text-white transition-colors hover:bg-brand-gold-dark"
+      >
+        {count}
+      </button>
+    ) : null;
+
   return (
-    <div style={{ background: c.pageBg }} className="min-h-screen">
+    <div
+      style={{ background: c.pageBg, ["--comments-w" as string]: `${PARAGRAPH_COMMENTS_PANEL_WIDTH}px` }}
+      // Mở "Chú thích đoạn văn" trên desktop: chừa chỗ bên phải cho cột bình
+      // luận để trang truyện dồn sang trái (không bị che) — điện thoại thì
+      // panel đè lên (xem paragraph-comments-panel.tsx).
+      className={`min-h-screen transition-[padding] duration-300 ${commentsOpen ? "lg:pr-[var(--comments-w)]" : ""}`}
+    >
       {/* Bọc header + progress bar + 2 panel nổi trong 1 wrapper sticky
           chung: panel định vị bằng "absolute top-full" thay vì toạ độ px
           cứng (top-[58px] cũ) — tự khớp chiều cao thật của header trên mọi
@@ -1018,8 +1138,13 @@ export function Reader({
         onTouchStart={handleContentTouchStart}
         onTouchEnd={handleContentTouchEnd}
       >
-        <div className="grid grid-cols-1 xl:grid-cols-[220px_720px_220px] xl:justify-center xl:gap-8">
-          <aside className="hidden xl:block">
+        {/* Khi cột bình luận mở, bỏ bố cục 3 cột (rail tác giả 2 bên) — không
+            đủ chỗ cho 220+720+220 cạnh cột 400px; AuthorPanel dạng inline
+            bên dưới hiện thay. */}
+        <div
+          className={`grid grid-cols-1 ${commentsOpen ? "" : "xl:grid-cols-[220px_720px_220px] xl:justify-center xl:gap-8"}`}
+        >
+          <aside className={commentsOpen ? "hidden" : "hidden xl:block"}>
             <div className="sticky top-[90px]">
               <AuthorPanel
                 variant="rail"
@@ -1039,7 +1164,7 @@ export function Reader({
           </aside>
 
           <div className="relative mx-auto max-w-[720px] overflow-hidden px-5 py-8 pb-24 sm:px-8 sm:py-[54px] sm:pb-20">
-        <div className="relative z-[2] mb-6 xl:hidden">
+        <div className={`relative z-[2] mb-6 ${commentsOpen ? "" : "xl:hidden"}`}>
           <AuthorPanel
             variant="inline"
             authorName={authorName}
@@ -1166,7 +1291,8 @@ export function Reader({
                   // mọi đoạn khác.
                   const count = countByParagraph.get(i) ?? 0;
                   return (
-                    <div key={i} className="group relative mb-[1.5em]">
+                    <div key={i} {...paragraphShellProps(i)}>
+                      {renderCommentPill(i)}
                       {parts.map((part, pi) => {
                         if (part.type === "text") {
                           return part.text ? (
@@ -1182,32 +1308,16 @@ export function Reader({
                         if (!image) return <p key={pi}>{part.raw}</p>;
                         return (
                           <div key={pi} className="mb-[1.5em]">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <ProtectedImage
                               src={image.imageUrl}
                               alt={image.altText ?? ""}
-                              className="mx-auto max-w-full rounded-xl"
+                              wrapperClassName="mx-auto w-fit max-w-full"
+                              className="max-w-full rounded-xl"
                             />
                           </div>
                         );
                       })}
-                      <button
-                        type="button"
-                        onClick={() => setOpenCommentsParagraph(i)}
-                        aria-label={count > 0 ? `${count} bình luận cho đoạn này` : "Bình luận đoạn này"}
-                        style={{ color: c.inkSoft }}
-                        className={`mt-1 flex items-center gap-1 text-xs transition-opacity hover:text-brand-gold-dark ${
-                          count > 0 ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                        }`}
-                      >
-                        {count > 0 ? (
-                          <>
-                            <ChatCircleTextIcon size={15} /> {count}
-                          </>
-                        ) : (
-                          <PlusCircleIcon size={15} />
-                        )}
-                      </button>
+                      {renderCommentCount(i, count)}
                     </div>
                   );
                 }
@@ -1215,7 +1325,8 @@ export function Reader({
                 const count = countByParagraph.get(i) ?? 0;
                 const segments = buildHighlightSegments(p, highlightsByParagraph.get(i) ?? []);
                 return (
-                  <div key={i} className="group relative mb-[1.5em]">
+                  <div key={i} {...paragraphShellProps(i)}>
+                    {renderCommentPill(i)}
                     <p
                       ref={(el) => {
                         paragraphRefs.current[i] = el;
@@ -1253,30 +1364,8 @@ export function Reader({
                           <span key={si}>{seg.text}</span>
                         )
                       )}
+                      {renderCommentCount(i, count)}
                     </p>
-                    {/* Icon bình luận theo đoạn (tham khảo Wattpad) — luôn
-                        hiện nếu đã có bình luận (count>0), chỉ hiện khi
-                        hover ở desktop nếu chưa có (tránh rợp icon "+" dày
-                        đặc khi chưa cần) — group-hover không có tác dụng
-                        trên cảm ứng nên luôn hiện trên mobile qua
-                        sm:opacity-0. */}
-                    <button
-                      type="button"
-                      onClick={() => setOpenCommentsParagraph(i)}
-                      aria-label={count > 0 ? `${count} bình luận cho đoạn này` : "Bình luận đoạn này"}
-                      style={{ color: c.inkSoft }}
-                      className={`mt-1 flex items-center gap-1 text-xs transition-opacity hover:text-brand-gold-dark ${
-                        count > 0 ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                      }`}
-                    >
-                      {count > 0 ? (
-                        <>
-                          <ChatCircleTextIcon size={15} /> {count}
-                        </>
-                      ) : (
-                        <PlusCircleIcon size={15} />
-                      )}
-                    </button>
                   </div>
                 );
               })}

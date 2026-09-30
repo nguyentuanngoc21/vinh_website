@@ -22,6 +22,8 @@ export type HomepageBook = {
   synopsis: string | null;
   // Cùng quy tắc với trang /truyen/[slug] (src/lib/story/status.ts).
   status: BookStatus;
+  /** books.is_exclusive — tag "Độc quyền" trên card. */
+  isExclusive: boolean;
 };
 
 type BookRow = Database["public"]["Tables"]["books"]["Row"];
@@ -30,10 +32,19 @@ type BookRow = Database["public"]["Tables"]["books"]["Row"];
  * books có cột `embedding vector(1536)` (~15-20 KB JSON/hàng) chỉ dùng
  * cho recommend_books() trong SQL, không bao giờ cần gửi về app. */
 export const HOMEPAGE_BOOK_COLUMNS =
-  "id, slug, title, genre, view_count, author_id, synopsis, cover_design_item_id, created_at";
+  "id, slug, title, genre, view_count, author_id, synopsis, cover_design_item_id, created_at, is_exclusive";
 export type HomepageBookRow = Pick<
   BookRow,
-  "id" | "slug" | "title" | "genre" | "view_count" | "author_id" | "synopsis" | "cover_design_item_id" | "created_at"
+  | "id"
+  | "slug"
+  | "title"
+  | "genre"
+  | "view_count"
+  | "author_id"
+  | "synopsis"
+  | "cover_design_item_id"
+  | "created_at"
+  | "is_exclusive"
 >;
 
 /** Exported for reuse by src/lib/recommendations/get-recommended-books.ts
@@ -76,6 +87,7 @@ export async function toHomepageBooks(
       hasPublishedLastChapter: statsByBook.get(r.id)?.has_published_last_chapter ?? false,
       latestPublishedChapterCreatedAt: statsByBook.get(r.id)?.latest_published_chapter_at ?? null,
     }),
+    isExclusive: r.is_exclusive,
   }));
 }
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwiseIcon, BookOpenTextIcon } from "@phosphor-icons/react/dist/ssr";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { Alert, Button, Checkbox } from "@/components/ui";
+import { ExclusivityModal } from "@/components/admin/exclusivity-modal";
 
 export type ContentBookRow = {
   id: string;
@@ -47,6 +48,10 @@ export function ContentTable({
   // "Khôi phục" vẫn gọi patch() thẳng, không mở modal (đối xứng với
   // chapter-moderation-table.tsx: restore không cần modal).
   const [removingBook, setRemovingBook] = useState<ContentBookRow | null>(null);
+  // Đổi độc quyền <-> tự do: xác nhận trước (pill trông như nhãn, dễ bấm
+  // nhầm). Admin/super_admin bỏ qua khoá 3 ngày của tác giả; chỉ trigger
+  // cuộc thi (D11) còn chặn — lỗi đó hiện ở Alert phía trên bảng.
+  const [togglingBook, setTogglingBook] = useState<ContentBookRow | null>(null);
   // Mặc định ẩn — hàng đã dọn nội dung (quá 30 ngày) không còn thao tác gì
   // được nữa (Khôi phục vô nghĩa), giữ khỏi làm rối bảng hàng ngày; vẫn có
   // thể bật lên để đối chiếu/audit.
@@ -91,6 +96,12 @@ export function ContentTable({
     } finally {
       setPendingId(null);
     }
+  };
+
+  const confirmToggleExclusive = async (reason: string) => {
+    if (!togglingBook) return;
+    const data = await patch(togglingBook.id, { is_exclusive: !togglingBook.isExclusive, exclusiveReason: reason });
+    if (data) setTogglingBook(null);
   };
 
   const confirmRemove = async (payload: RemoveChapterPayload) => {
@@ -173,7 +184,11 @@ export function ContentTable({
             <button
               type="button"
               disabled={pendingId === r.id}
-              onClick={() => patch(r.id, { is_exclusive: !r.isExclusive })}
+              onClick={() => {
+                setError(null);
+                setTogglingBook(r);
+              }}
+              title={r.isExclusive ? "Bấm để bỏ độc quyền" : "Bấm để đặt độc quyền"}
               className={`rounded-full px-[11px] py-1 text-[11px] font-semibold transition-opacity disabled:opacity-50 ${
                 r.isExclusive ? "bg-brand-ink text-white" : "border border-cream-border text-stone-dark"
               }`}
@@ -238,6 +253,19 @@ export function ContentTable({
 
       {filtered.length === 0 && (
         <div className="px-2.5 py-6 text-center text-sm text-stone-light">Không có truyện nào khớp.</div>
+      )}
+
+      {togglingBook && (
+        <ExclusivityModal
+          book={togglingBook}
+          pending={pendingId === togglingBook.id}
+          error={error}
+          onCancel={() => {
+            setTogglingBook(null);
+            setError(null);
+          }}
+          onConfirm={confirmToggleExclusive}
+        />
       )}
 
       {removingBook && (

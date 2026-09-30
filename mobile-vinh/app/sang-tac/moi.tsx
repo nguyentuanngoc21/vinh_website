@@ -20,8 +20,8 @@ export default function NewWork() {
 }
 
 function Editor({ userId }: { userId: string }) {
-  // Exclusive by default, as on the web.
-  const [info, setInfo] = useState<BookInfo>({ title: '', genre: null, synopsis: '', tags: '', isExclusive: true });
+  // Tự do by default, as on the web — exclusive only when the author ticks it.
+  const [info, setInfo] = useState<BookInfo>({ title: '', genre: null, synopsis: '', tags: '', isExclusive: false });
   const [chapterTitle, setChapterTitle] = useState('Chương 1');
   const [content, setContent] = useState('');
   const [price, setPrice] = useState('0');

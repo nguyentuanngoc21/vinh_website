@@ -63,3 +63,10 @@ export function groupParagraphComments(comments: ParagraphComment[]): {
 
   return { countByParagraph, threadsByParagraph };
 }
+
+/** Chiều rộng (px) cột "Chú thích đoạn văn" trên desktop (lg+) — reader.tsx
+ * chừa đúng khoảng này bằng padding phải để trang truyện bị ĐẨY sang trái
+ * thay vì bị che (paragraph-comments-panel.tsx). Ở đây (module thuần) chứ
+ * không ở file panel: panel được tải động, import hằng số từ đó sẽ kéo cả
+ * panel vào bundle trang đọc. */
+export const PARAGRAPH_COMMENTS_PANEL_WIDTH = 400;

@@ -53,3 +53,21 @@ export function sessionDividerLabel(iso: string): string {
   });
   return `${datePart} ${time}`;
 }
+
+/** Thời gian tương đối ngắn cho bình luận (tham khảo các app đọc truyện):
+ * "Vừa xong", "5 phút", "3 giờ", "2 ngày", "4 tuần"; từ 1 năm trở lên thì
+ * hiện ngày/tháng/năm. `now` truyền vào để test được và để caller dùng
+ * chung 1 mốc cho cả danh sách. */
+export function relativeTimeLabel(iso: string, now: number = Date.now()): string {
+  const diffSec = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+  if (diffSec < 60) return "Vừa xong";
+  const min = Math.floor(diffSec / 60);
+  if (min < 60) return `${min} phút`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours} giờ`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} ngày`;
+  const weeks = Math.floor(days / 7);
+  if (days < 365) return weeks < 5 ? `${weeks} tuần` : `${Math.floor(days / 30)} tháng`;
+  return new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+}

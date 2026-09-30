@@ -84,7 +84,9 @@ export async function POST(request: Request) {
     (typeof body?.synopsis === "string" ? body.synopsis.trim().slice(0, MAX_SYNOPSIS_LENGTH) : "") || null;
   const genre = isBookGenre(body?.genre) ? body.genre : null;
   const tags = parseTags(body?.tags);
-  const isExclusive = typeof body?.isExclusive === "boolean" ? body.isExclusive : true;
+  // Mặc định Tự do — chỉ độc quyền khi client gửi rõ isExclusive: true
+  // (luồng "Nhập bản thảo" chỉ gửi { title }, trước đây bị gán độc quyền).
+  const isExclusive = body?.isExclusive === true;
 
   const chapterTitle = (typeof body?.chapterTitle === "string" ? body.chapterTitle.trim() : "") || "Chương 1";
   const chapterContent = typeof body?.chapterContent === "string" ? body.chapterContent : "";
