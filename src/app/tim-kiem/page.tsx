@@ -10,6 +10,7 @@ import { searchBooks } from "@/lib/search/search-books";
 import { searchAudio } from "@/lib/search/search-audio";
 import { searchDesign } from "@/lib/search/search-design";
 import type { SearchType } from "@/components/nav-bar-content";
+import { ProtectedImage } from "@/components/ui/protected-image";
 
 export const metadata: Metadata = { title: "Tìm kiếm — Vịnh" };
 
@@ -148,8 +149,7 @@ export default async function SearchPage({
                   {design.map((d) => (
                     <Link key={d.id} href="/thiet-ke" className="no-underline">
                       <div className="aspect-square overflow-hidden rounded-[10px] bg-neutral-bg">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={d.imageUrl} alt={d.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <ProtectedImage src={d.imageUrl} alt={d.title} wrapperClassName="h-full w-full" className="h-full w-full object-cover" />
                       </div>
                       <div className="mt-2 truncate text-sm font-semibold text-brand-ink">{d.title}</div>
                       <div className="truncate text-xs text-stone-alt">{d.illustratorNickname ?? "—"}</div>

@@ -19,6 +19,7 @@ import { AVATAR_TONES } from "@/lib/profile";
 import type { CreatorTag } from "@/lib/supabase/types";
 import type { ConnectPerson } from "@/lib/connect/types";
 import { formatVnd } from "@/lib/format-currency";
+import { ProtectedImage } from "@/components/ui/protected-image";
 
 const SECTION_KEYS = ["truyen", "audio", "design", "cuoc_thi"] as const;
 type SectionKey = (typeof SECTION_KEYS)[number];
@@ -453,11 +454,11 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                             const row = (
                               <div className="flex items-center gap-3.5 border-t border-[#f4f2ef] px-[18px] py-3.5 transition-colors hover:bg-cream-card">
                                 {it.imageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
+                                  <ProtectedImage
                                     src={it.imageUrl}
                                     alt={it.title}
-                                    className="h-11 w-11 shrink-0 rounded-[9px] object-cover"
+                                    wrapperClassName="h-11 w-11 shrink-0"
+                                    className="h-11 w-11 rounded-[9px] object-cover"
                                   />
                                 ) : (
                                   <div

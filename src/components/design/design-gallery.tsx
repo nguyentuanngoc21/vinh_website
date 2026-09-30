@@ -14,6 +14,7 @@ import {
   type GalleryDesignItem,
 } from "@/lib/design/get-design-gallery";
 import type { DesignItemCategory } from "@/lib/supabase/types";
+import { ProtectedImage } from "@/components/ui/protected-image";
 
 const AVATAR_COLORS = [
   "var(--color-brand-ink)",
@@ -201,15 +202,7 @@ export function DesignGallery({
                   onClick={() => setOpenId(p.id)}
                   className="group relative mb-[18px] block cursor-pointer break-inside-avoid overflow-hidden rounded-2xl bg-neutral-bg"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={p.imageUrl}
-                    alt={p.title}
-                    className="no-copy-image block w-full"
-                    loading="lazy"
-                    draggable={false}
-                    onContextMenu={(e) => e.preventDefault()}
-                  />
+                  <ProtectedImage src={p.imageUrl} alt={p.title} className="block w-full" loading="lazy" />
 
                   {showRank && (
                     <div className="absolute left-3 top-3 rounded-full bg-brand-gold px-2.5 py-1 text-[11px] font-bold tracking-[.5px] text-brand-ink">
@@ -294,13 +287,11 @@ export function DesignGallery({
             onClick={(e) => e.stopPropagation()}
             className="grid w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-white shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1.15fr_minmax(0,1fr)]"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <ProtectedImage
               src={open.imageUrl}
               alt={open.title}
-              className="no-copy-image min-h-[220px] w-full object-cover sm:min-h-[460px]"
-              draggable={false}
-              onContextMenu={(e) => e.preventDefault()}
+              wrapperClassName="min-h-[220px] w-full sm:min-h-[460px]"
+              className="h-full min-h-[220px] w-full object-cover sm:min-h-[460px]"
             />
             <div className="flex flex-col p-[34px] pb-[30px]">
               <div className="text-[11.5px] font-semibold tracking-[1.2px] text-brand-gold-dark">
