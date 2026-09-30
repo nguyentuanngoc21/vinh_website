@@ -194,5 +194,10 @@ export async function PATCH(
   // Làm mới cache trang công khai (lib/cache/public-data.ts).
   revalidatePublicBooks();
 
+  // Bảng chương hiện "gỡ bởi @username" — trả kèm để client khỏi reload.
+  if (action === "remove") {
+    const { data: remover } = await supabase.from("profiles").select("username").eq("id", adminId).maybeSingle();
+    return NextResponse.json({ ok: true, removed_by_username: remover?.username ?? "—" });
+  }
   return NextResponse.json({ ok: true });
 }

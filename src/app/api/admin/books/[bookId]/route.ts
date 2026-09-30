@@ -129,7 +129,7 @@ export async function PATCH(
     .from("books")
     .update(update)
     .eq("id", bookId)
-    .select("id, title, author_id, is_exclusive, deleted_at")
+    .select("id, title, author_id, is_exclusive, deleted_at, removed_by, removed_reason_group, removed_reason_detail")
     .maybeSingle();
 
   if (error) {
@@ -191,5 +191,12 @@ export async function PATCH(
     revalidatePublicBooks();
   }
 
-  return NextResponse.json(book);
+  // Bảng "Nội dung" hiện "xoá bởi @username" — trả kèm để client khỏi reload.
+  let removedByUsername: string | null = null;
+  if (book.removed_by) {
+    const { data: remover } = await supabase.from("profiles").select("username").eq("id", book.removed_by).maybeSingle();
+    removedByUsername = remover?.username ?? "—";
+  }
+
+  return NextResponse.json({ ...book, removed_by_username: removedByUsername });
 }

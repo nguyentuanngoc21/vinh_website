@@ -6,6 +6,7 @@ import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwi
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { Alert, Button, Checkbox } from "@/components/ui";
 import { ExclusivityModal } from "@/components/admin/exclusivity-modal";
+import { reasonGroupLabel, type ReasonGroupId } from "@/lib/moderation/chapter-removal-templates";
 
 export type ContentBookRow = {
   id: string;
@@ -15,6 +16,11 @@ export type ContentBookRow = {
   published: boolean;
   isExclusive: boolean;
   deletedAt: string | null;
+  /** Username admin đã xoá (books.removed_by). null khi đã xoá = tác giả tự
+   * xoá (route tác giả chỉ set deleted_at, không ghi removed_by). */
+  removedByUsername: string | null;
+  removedReasonGroup: string | null;
+  removedReasonDetail: string | null;
   /** not null = đã dọn nội dung nặng (cover/synopsis + content mọi
    * chương) do xoá quá 30 ngày — xem
    * migrations/archive/20260908_add_content_purge_retention.sql. "Khôi phục" vô
@@ -22,7 +28,7 @@ export type ContentBookRow = {
   contentPurgedAt: string | null;
 };
 
-const GRID_COLS = "grid-cols-[1fr_160px_110px_130px_150px_100px_190px]";
+const GRID_COLS = "grid-cols-[1fr_160px_110px_130px_230px_100px_190px]";
 
 /**
  * Bảng quản lý truyện cho src/app/admin/noi-dung/page.tsx. Tìm kiếm lọc
@@ -81,12 +87,25 @@ export function ContentTable({
         setError((data && typeof data.error === "string" && data.error) || "Không cập nhật được.");
         return null;
       }
-      // Route admin luôn select("... is_exclusive, deleted_at") nên data
-      // luôn có 2 field này với giá trị THẬT sau khi ghi — không cần
-      // check field nào có mặt, chỉ cần gán lại từ response.
+      // Route admin luôn trả is_exclusive + deleted_at với giá trị THẬT sau
+      // khi ghi. Thông tin người xoá/lý do chỉ có ở nhánh xoá/khôi phục
+      // (nhánh đổi độc quyền đi qua RPC, không trả removed_by_username) —
+      // giữ nguyên giá trị cũ khi thiếu.
+      const hasRemoval = "removed_by_username" in data;
       setRows((prev) =>
         prev.map((r) =>
-          r.id === id ? { ...r, isExclusive: data.is_exclusive, deletedAt: data.deleted_at } : r
+          r.id === id
+            ? {
+                ...r,
+                isExclusive: data.is_exclusive,
+                deletedAt: data.deleted_at,
+                ...(hasRemoval && {
+                  removedByUsername: data.removed_by_username,
+                  removedReasonGroup: data.removed_reason_group,
+                  removedReasonDetail: data.removed_reason_detail,
+                }),
+              }
+            : r
         )
       );
       return data;
@@ -142,7 +161,7 @@ export function ContentTable({
           "Chương" (và cả Xoá/Khôi phục) sẽ bị cắt mất hẳn, không cách nào
           xem/bấm được, đúng như bug đã xảy ra khi thêm cột thứ 7. */}
       <div className="overflow-x-auto">
-      <div className={`grid ${GRID_COLS} min-w-[900px] gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
+      <div className={`grid ${GRID_COLS} min-w-[980px] gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
         <div>Truyện</div>
         <div>Tác giả</div>
         <div>Trạng thái</div>
@@ -155,7 +174,7 @@ export function ContentTable({
       {filtered.map((r) => (
         <div
           key={r.id}
-          className={`grid ${GRID_COLS} min-w-[900px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
+          className={`grid ${GRID_COLS} min-w-[980px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
         >
           <div className="flex items-center gap-1.5 truncate">
             <span className="truncate">{r.title}</span>
@@ -200,6 +219,12 @@ export function ContentTable({
             {r.deletedAt ? (
               <>
                 {new Date(r.deletedAt).toLocaleDateString("vi-VN")}
+                <div className="mt-0.5 truncate font-semibold text-stone-dark">
+                  {r.removedByUsername ? `bởi @${r.removedByUsername}` : "Tác giả tự xoá"}
+                </div>
+                {r.removedReasonGroup && (
+                  <RemovalReason group={r.removedReasonGroup} detail={r.removedReasonDetail} />
+                )}
                 {r.contentPurgedAt && (
                   <div className="mt-0.5 text-[10.5px] font-semibold text-error">Đã dọn nội dung</div>
                 )}
@@ -276,6 +301,16 @@ export function ContentTable({
           onConfirm={confirmRemove}
         />
       )}
+    </div>
+  );
+}
+
+/** Lý do xoá — cắt 2 dòng trong ô; bản đầy đủ ở tooltip (title). */
+function RemovalReason({ group, detail }: { group: string; detail: string | null }) {
+  const text = `${reasonGroupLabel(group as ReasonGroupId)}${detail ? ` — ${detail}` : ""}`;
+  return (
+    <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug" title={text}>
+      {text}
     </div>
   );
 }

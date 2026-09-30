@@ -33,10 +33,16 @@ export default async function AdminBookChaptersPage({
   const { data: chapterRows } = await supabase
     .from("chapters")
     .select(
-      "id, title, order_index, published, removed_at, removed_reason_group, removed_reason_detail, content_purged_at, created_at"
+      "id, title, order_index, published, removed_at, removed_by, removed_reason_group, removed_reason_detail, content_purged_at, created_at"
     )
     .eq("book_id", bookId)
     .order("order_index", { ascending: true });
+
+  const removerIds = Array.from(new Set((chapterRows ?? []).flatMap((c) => (c.removed_by ? [c.removed_by] : []))));
+  const { data: removerRows } = removerIds.length
+    ? await supabase.from("profiles").select("id, username").in("id", removerIds)
+    : { data: [] as { id: string; username: string }[] };
+  const usernameById = new Map((removerRows ?? []).map((p) => [p.id, p.username]));
 
   const rows: ChapterModerationRow[] = (chapterRows ?? []).map((c) => ({
     id: c.id,
@@ -44,6 +50,7 @@ export default async function AdminBookChaptersPage({
     orderIndex: c.order_index,
     published: c.published,
     removedAt: c.removed_at,
+    removedByUsername: c.removed_by ? (usernameById.get(c.removed_by) ?? "—") : null,
     removedReasonGroup: c.removed_reason_group,
     removedReasonDetail: c.removed_reason_detail,
     contentPurgedAt: c.content_purged_at,
