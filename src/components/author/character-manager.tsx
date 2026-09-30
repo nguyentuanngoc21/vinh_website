@@ -23,7 +23,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
   const [appearances, setAppearances] = useState<Record<string, Appearance[]>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const url = (id?: string) => `/api/authoring/books/${bookId}/characters${id ? `/${id}` : ""}`;
-  const mutate = async (body: CharacterDraft | { archived: boolean }, id?: string) => {
+  const mutate = async (body: CharacterDraft | { archived: boolean }, id?: string, message = "Đã lưu nhân vật.") => {
     if (lock.current) return false;
     lock.current = true; setBusy(true); setError(null); setStatus("");
     try {
@@ -31,7 +31,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
       const data = await res.json();
       if (!res.ok || !data.character) throw new Error(data.error || "Không lưu được nhân vật.");
       setCharacters(prev => id ? prev.map(c => c.id === id ? data.character : c) : [...prev, data.character]);
-      setStatus("Đã lưu nhân vật.");
+      setStatus(message);
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Không kết nối được máy chủ."); return false; }
     finally { lock.current = false; setBusy(false); }
@@ -52,6 +52,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
     return match && (role === "all" || c.role === role || c.story_role === role)
       && (filter === "all" || (filter === "archived" ? !!c.archived_at : filter === "public" ? !c.archived_at && c.is_public : filter === "private" ? !c.archived_at && !c.is_public : !c.archived_at));
   });
+  const archivedCount = characters.filter(c => c.archived_at).length;
   if (sort === "name") shown.sort((a, b) => a.name.localeCompare(b.name, "vi"));
   if (sort === "role") shown.sort((a, b) => ["main", "supporting", "cameo"].indexOf(a.story_role) - ["main", "supporting", "cameo"].indexOf(b.story_role));
   return <section aria-label="Quản lý nhân vật" className="mb-6 rounded-xl border border-cream-border bg-white p-5">
@@ -65,13 +66,15 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
     <div className="mb-4 grid gap-3 sm:grid-cols-2">
       <Field label="Tìm nhân vật" placeholder="Tên, biệt danh, mẫu hình…" value={search} onChange={e => setSearch(e.target.value)} />
       <label className="text-sm">Trạng thái<select aria-label="Trạng thái" value={filter} onChange={e => setFilter(e.target.value)} className="mt-2 block w-full rounded-lg border p-3">
-        <option value="active">Đang sử dụng</option><option value="public">Công khai</option><option value="private">Riêng tư</option><option value="archived">Đã lưu trữ</option><option value="all">Tất cả</option>
+        <option value="active">Đang sử dụng</option><option value="public">Công khai</option><option value="private">Riêng tư</option><option value="archived">Đã lưu trữ ({archivedCount})</option><option value="all">Tất cả</option>
       </select></label>
       <label className="text-sm">Vai trò<select aria-label="Lọc vai trò" value={role} onChange={e => setRole(e.target.value)} className="mt-2 block w-full rounded-lg border p-3"><option value="all">Tất cả vai trò</option>
         {Object.entries({ ...STORY_ROLE_LABEL, ...ROLE_LABEL }).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select></label>
       <label className="text-sm">Sắp xếp<select aria-label="Sắp xếp" value={sort} onChange={e => setSort(e.target.value)} className="mt-2 block w-full rounded-lg border p-3"><option value="created">Thứ tự tạo</option><option value="name">Tên A–Z</option><option value="role">Chính → phụ → khách mời</option></select></label>
     </div>
+    {filter === "active" && archivedCount > 0 && <button type="button" onClick={() => setFilter("archived")}
+      className="mb-3 min-h-11 text-sm font-semibold text-brand-gold-dark underline">Xem {archivedCount} nhân vật đã lưu trữ để khôi phục</button>}
     {!shown.length && <p className="text-sm text-stone-alt">{characters.length ? "Không có nhân vật phù hợp bộ lọc." : "Chưa có nhân vật. Thêm hồ sơ để quản lý và gắn vào chương."}</p>}
     <div className="flex flex-col gap-3">{shown.map(c => <article key={c.id} className="rounded-xl border border-cream-border p-4">
       <div className="flex items-start gap-3">
@@ -86,7 +89,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
         <button type="button" disabled={busy || editing !== null} onClick={() => setEditing(c)} className="font-semibold text-brand-gold-dark disabled:opacity-50">Sửa</button>
         <button type="button" disabled={busy || editing !== null} onClick={async () => {
           if (!c.archived_at && !window.confirm(`Lưu trữ “${c.name}”? Nhân vật sẽ ẩn với độc giả. Liên kết chương, lượt theo dõi và bình chọn được giữ nguyên; bạn có thể khôi phục sau.`)) return;
-          await mutate({ archived: !c.archived_at }, c.id);
+          await mutate({ archived: !c.archived_at }, c.id, c.archived_at ? `Đã khôi phục “${c.name}”.` : `Đã lưu trữ “${c.name}”. Chọn “Đã lưu trữ” ở bộ lọc Trạng thái để khôi phục.`);
         }} className="disabled:opacity-50">{c.archived_at ? "Khôi phục" : "Lưu trữ"}</button>
         <button type="button" disabled={busy} aria-expanded={expanded === c.id} onClick={() => loadAppearances(c.id)} className="disabled:opacity-50">{appearances[c.id] ? `${appearances[c.id].length} chương xuất hiện` : "Xem chương xuất hiện"}</button>
       </div>

@@ -75,7 +75,8 @@ try {
   assert.equal(created.is_public, false);
   const first = manager.locator("article").filter({ has: page.getByRole("heading", { name: "An Nhiên", exact: true }) });
   await first.getByRole("button", { name: "Lưu trữ", exact: true }).click();
-  await manager.getByLabel("Trạng thái", { exact: true }).selectOption("archived");
+  // Archived characters leave the default list; the shortcut must lead back to them.
+  await manager.getByRole("button", { name: "Xem 1 nhân vật đã lưu trữ để khôi phục" }).click();
   await manager.getByRole("button", { name: "Khôi phục", exact: true }).click();
   await manager.getByLabel("Trạng thái", { exact: true }).selectOption("active");
   await first.getByRole("button", { name: "Xem chương xuất hiện" }).click();
