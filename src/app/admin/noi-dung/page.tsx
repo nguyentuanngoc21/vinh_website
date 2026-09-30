@@ -25,16 +25,21 @@ export default async function AdminContentPage() {
 
   const { data: bookRows } = await supabase
     .from("books")
-    .select("id, title, slug, author_id, published, is_exclusive, deleted_at, content_purged_at, created_at")
+    .select(
+      "id, title, slug, author_id, published, is_exclusive, deleted_at, removed_by, removed_reason_group, removed_reason_detail, content_purged_at, created_at"
+    )
     .order("created_at", { ascending: false })
     .limit(FETCH_LIMIT + 1);
 
   const truncated = (bookRows?.length ?? 0) > FETCH_LIMIT;
   const books = (bookRows ?? []).slice(0, FETCH_LIMIT);
 
-  const authorIds = Array.from(new Set(books.map((b) => b.author_id)));
-  const { data: profileRows } = authorIds.length
-    ? await supabase.from("profiles").select("id, username").in("id", authorIds)
+  // Tác giả + admin đã xoá (removed_by) — tra username chung 1 query.
+  const profileIds = Array.from(
+    new Set(books.flatMap((b) => (b.removed_by ? [b.author_id, b.removed_by] : [b.author_id])))
+  );
+  const { data: profileRows } = profileIds.length
+    ? await supabase.from("profiles").select("id, username").in("id", profileIds)
     : { data: [] as { id: string; username: string }[] };
   const usernameById = new Map((profileRows ?? []).map((p) => [p.id, p.username]));
 
@@ -46,6 +51,9 @@ export default async function AdminContentPage() {
     published: b.published,
     isExclusive: b.is_exclusive,
     deletedAt: b.deleted_at,
+    removedByUsername: b.removed_by ? (usernameById.get(b.removed_by) ?? "—") : null,
+    removedReasonGroup: b.removed_reason_group,
+    removedReasonDetail: b.removed_reason_detail,
     contentPurgedAt: b.content_purged_at,
   }));
 

@@ -12,6 +12,8 @@ export type ChapterModerationRow = {
   orderIndex: number;
   published: boolean;
   removedAt: string | null;
+  /** Username admin đã gỡ (chapters.removed_by). */
+  removedByUsername: string | null;
   removedReasonGroup: string | null;
   removedReasonDetail: string | null;
   /** not null = content đã bị rỗng hoá do gỡ quá 30 ngày (trực tiếp, HOẶC
@@ -21,7 +23,7 @@ export type ChapterModerationRow = {
   contentPurgedAt: string | null;
 };
 
-const GRID_COLS = "grid-cols-[60px_1fr_150px_220px_160px]";
+const GRID_COLS = "grid-cols-[60px_1fr_150px_260px_160px]";
 
 /**
  * Bảng chương cho src/app/admin/noi-dung/[bookId]/page.tsx. "Gỡ chương"
@@ -57,7 +59,7 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
       setRows((prev) =>
         prev.map((r) =>
           r.id === id
-            ? { ...r, published: true, removedAt: null, removedReasonGroup: null, removedReasonDetail: null }
+            ? { ...r, published: true, removedAt: null, removedByUsername: null, removedReasonGroup: null, removedReasonDetail: null }
             : r
         )
       );
@@ -91,6 +93,7 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
                 ...r,
                 published: false,
                 removedAt: new Date().toISOString(),
+                removedByUsername: data?.removed_by_username ?? null,
                 removedReasonGroup: payload.reasonGroup,
                 removedReasonDetail: payload.detail || null,
               }
@@ -122,18 +125,18 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
           không cách nào bấm được (xem bug tương tự đã xảy ra ở
           content-table.tsx). */}
       <div className="overflow-x-auto">
-      <div className={`grid ${GRID_COLS} min-w-[700px] gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
+      <div className={`grid ${GRID_COLS} min-w-[740px] gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
         <div>#</div>
         <div>Chương</div>
         <div>Trạng thái</div>
-        <div>Lý do gỡ</div>
+        <div>Gỡ bởi / lý do</div>
         <div />
       </div>
 
       {visibleRows.map((r) => (
         <div
           key={r.id}
-          className={`grid ${GRID_COLS} min-w-[700px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
+          className={`grid ${GRID_COLS} min-w-[740px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
         >
           <div className="text-stone-alt">{r.orderIndex}</div>
           <div className="truncate">{r.title}</div>
@@ -150,12 +153,22 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
               {r.removedAt ? "Đã gỡ (admin)" : r.published ? "Đã đăng" : "Bản nháp"}
             </span>
           </div>
-          <div className="truncate text-xs text-stone-alt">
-            {r.removedAt
-              ? `${reasonGroupLabel(r.removedReasonGroup as ReasonGroupId)}${
-                  r.removedReasonDetail ? ` — ${r.removedReasonDetail}` : ""
-                }${r.contentPurgedAt ? " · Đã dọn nội dung" : ""}`
-              : "—"}
+          <div className="min-w-0 text-xs text-stone-alt">
+            {r.removedAt ? (
+              <>
+                <div className="truncate font-semibold text-stone-dark">
+                  {new Date(r.removedAt).toLocaleDateString("vi-VN")}
+                  {r.removedByUsername && ` · bởi @${r.removedByUsername}`}
+                </div>
+                <RemovalReasonText
+                  text={`${reasonGroupLabel(r.removedReasonGroup as ReasonGroupId)}${
+                    r.removedReasonDetail ? ` — ${r.removedReasonDetail}` : ""
+                  }${r.contentPurgedAt ? " · Đã dọn nội dung" : ""}`}
+                />
+              </>
+            ) : (
+              "—"
+            )}
           </div>
           <div className="flex justify-end">
             {r.contentPurgedAt ? (
@@ -209,6 +222,15 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
           onConfirm={remove}
         />
       )}
+    </div>
+  );
+}
+
+/** Lý do gỡ — cắt 2 dòng trong ô; bản đầy đủ ở tooltip (title). */
+function RemovalReasonText({ text }: { text: string }) {
+  return (
+    <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug" title={text}>
+      {text}
     </div>
   );
 }
