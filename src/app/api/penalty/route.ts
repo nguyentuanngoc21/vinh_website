@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { getNextPenalty, getPenaltyDeduction, PENALTY_DAY_MS } from "@/lib/penalty/rules";
+import { isAdminRole } from "@/lib/roles";
 
 async function getPenaltyProfile(supabase: ReturnType<typeof createServiceRoleClient>, userId: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, screenshot_penalty_count, screenshot_penalty_expires_at, screenshot_penalty_banned, screenshot_penalty_last_offense_at"
+      "id, role, screenshot_penalty_count, screenshot_penalty_expires_at, screenshot_penalty_banned, screenshot_penalty_last_offense_at"
     )
     .eq("id", userId)
     .single();
@@ -35,10 +36,23 @@ async function resolvePenaltyProfile(supabase: ReturnType<typeof createServiceRo
   return profileResult.data;
 }
 
+// admin/super_admin được MIỄN phạt chụp màn hình — họ cần chụp màn hình để
+// làm hướng dẫn/kiểm duyệt. Trả trạng thái "sạch" (kể cả khi tài khoản đã
+// lỡ bị ghi nhận vi phạm trước khi có ngoại lệ này) và POST không ghi nhận
+// gì. Client (use-screenshot-penalty.ts) cũng bỏ qua phát hiện cho admin,
+// nhưng server mới là lớp chặn thật.
+const EXEMPT_PENALTY_STATE = {
+  screenshot_penalty_count: 0,
+  screenshot_penalty_expires_at: null,
+  screenshot_penalty_banned: false,
+  screenshot_penalty_last_offense_at: null,
+} as const;
+
 export async function GET() {
   const supabase = createServiceRoleClient();
   const profile = await resolvePenaltyProfile(supabase);
   if (profile instanceof NextResponse) return profile;
+  if (isAdminRole(profile.role)) return NextResponse.json({ id: profile.id, ...EXEMPT_PENALTY_STATE, exempt: true });
 
   return NextResponse.json(profile);
 }
@@ -52,6 +66,9 @@ export async function POST(request: Request) {
   const supabase = createServiceRoleClient();
   const profile = await resolvePenaltyProfile(supabase);
   if (profile instanceof NextResponse) return profile;
+  if (isAdminRole(profile.role)) {
+    return NextResponse.json({ ...EXEMPT_PENALTY_STATE, last_deducted_amount: 0, warning_only: false, exempt: true });
+  }
 
   const currentCount = Number(profile.screenshot_penalty_count ?? 0);
   const nextCount = currentCount + 1;

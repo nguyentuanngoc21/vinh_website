@@ -116,9 +116,18 @@ async function postScreenshotPenaltyToServer(): Promise<{ state: PenaltyState; w
   }
 }
 
+const NO_PENALTY: PenaltyState = { count: 0, expiresAt: null, banned: false, lastOffenseAt: null, deductedAmount: null };
+
 /** `paragraphRefs` — các đoạn nội dung chương; chỉ sao chép chữ NẰM TRONG
- * các đoạn này mới bị tính là vi phạm (xem onCopy). */
-export function useScreenshotPenalty(paragraphRefs: RefObject<Array<HTMLParagraphElement | null>>) {
+ * các đoạn này mới bị tính là vi phạm (xem onCopy).
+ *
+ * `exempt` — admin/super_admin: không phát hiện, không gọi /api/penalty, không
+ * hiện phạt (kể cả trạng thái cũ còn lưu ở localStorage). Server cũng tự
+ * miễn cho 2 role này (api/penalty/route.ts) — đây chỉ là lớp giao diện. */
+export function useScreenshotPenalty(
+  paragraphRefs: RefObject<Array<HTMLParagraphElement | null>>,
+  { exempt = false }: { exempt?: boolean } = {}
+) {
   const [penalty, setPenalty] = useState<PenaltyState>({ count: 0, expiresAt: null, banned: false, lastOffenseAt: null, deductedAmount: null });
   // penalty ban đầu luôn count:0 (giá trị thật chỉ tới sau 1 lượt tải từ
   // localStorage/server) — onKeyDown/onCopy bên dưới đăng ký 1 lần lúc
@@ -145,6 +154,7 @@ export function useScreenshotPenalty(paragraphRefs: RefObject<Array<HTMLParagrap
   const isPenaltyActive = penalty.banned || (!!penalty.expiresAt && now !== null && penalty.expiresAt > now);
 
   useEffect(() => {
+    if (exempt) return;
     const loadPenalty = async () => {
       const serverState = await fetchPenaltyStateFromServer();
       if (serverState) {
@@ -157,7 +167,7 @@ export function useScreenshotPenalty(paragraphRefs: RefObject<Array<HTMLParagrap
     };
 
     loadPenalty();
-  }, []);
+  }, [exempt]);
 
   // Cấp "giờ hiện tại" cho isPenaltyActive từ effect (client-only), không
   // gọi Date.now() lúc render. 30s/lần là đủ mịn — hạn phạt tính theo NGÀY
@@ -263,6 +273,7 @@ export function useScreenshotPenalty(paragraphRefs: RefObject<Array<HTMLParagrap
     // chỉ là phản hồi tức thời trong lúc chờ.
     // Chỉ phím tắt chụp/lưu thật, bỏ qua ô nhập liệu — xem
     // src/lib/reading/capture-detection.ts (lỗi Shift+S trước đây).
+    if (exempt) return;
     const isTyping = (target: EventTarget | null) => target instanceof HTMLElement && isEditableTarget(target);
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target)) return;
@@ -300,7 +311,8 @@ export function useScreenshotPenalty(paragraphRefs: RefObject<Array<HTMLParagrap
     };
     // paragraphRefs là ref object ổn định (useRef ở reader.tsx) — vẫn chỉ
     // đăng ký 1 lần lúc mount như trước khi tách hook.
-  }, [paragraphRefs]);
+  }, [paragraphRefs, exempt]);
 
+  if (exempt) return { penalty: NO_PENALTY, isPenaltyActive: false, warningMessage: null };
   return { penalty, isPenaltyActive, warningMessage };
 }
