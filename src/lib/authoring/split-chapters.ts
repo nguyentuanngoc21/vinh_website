@@ -27,10 +27,43 @@ export type SplitResult = {
 
 export const MAX_DETECTED_CHAPTERS = 300;
 
-const CHUONG_MARKER_RE = /^[ \t]*ch[uư]ơng\s+(\d+)\s*[:.\-]?\s*([^\n]*)$/gim;
+const CHUONG_MARKER_RE = /^[ \t]*ch[uư]ơng[ \t]+(\d+)[ \t]*[:.\-]?[ \t]*([^\n]*)$/gim;
 
 export function countWords(text: string): number {
   return (text.trim().match(/\S+/g) ?? []).length;
+}
+
+export function chapterWarnings(chapters: DetectedChapter[]): string[] {
+  const warnings: string[] = [];
+  const seen = new Set<number>();
+  const duplicates = new Set<number>();
+  for (const c of chapters) {
+    if (seen.has(c.no)) duplicates.add(c.no);
+    seen.add(c.no);
+  }
+  if (duplicates.size) warnings.push(`Mốc chương trùng: ${[...duplicates].join(", ")}. Hãy đọc lại và gộp nếu cùng một chương.`);
+  if (chapters.some((c) => !c.content.trim())) warnings.push("Có chương chưa có nội dung.");
+  if (chapters.some((c, i) => i > 0 && c.no > chapters[i - 1].no + 1)) warnings.push("Số chương bị nhảy. Hãy kiểm tra phần nội dung giữa các mốc.");
+  return warnings;
+}
+
+export function mergeChapterWithNext(chapters: DetectedChapter[], index: number): DetectedChapter[] {
+  if (!chapters[index] || !chapters[index + 1]) return chapters;
+  const first = chapters[index], next = chapters[index + 1];
+  // Retain the second title so that merging never silently removes text.
+  const content = [first.content, next.title, next.content].filter(Boolean).join("\n\n");
+  return [...chapters.slice(0, index), { ...first, content, words: countWords(content) }, ...chapters.slice(index + 2)];
+}
+
+export function splitChapterAt(chapters: DetectedChapter[], index: number, offset: number): DetectedChapter[] {
+  const chapter = chapters[index];
+  if (!chapter || !Number.isInteger(offset) || offset <= 0 || offset >= chapter.content.length) return chapters;
+  const left = chapter.content.slice(0, offset), right = chapter.content.slice(offset);
+  if (!left.trim() || !right.trim()) return chapters;
+  return [...chapters.slice(0, index),
+    { ...chapter, content: left, words: countWords(left) },
+    { no: chapter.no + 1, title: `${chapter.title} (phần tiếp)`, content: right, words: countWords(right) },
+    ...chapters.slice(index + 1)];
 }
 
 function capChapters(chapters: DetectedChapter[]): { chapters: DetectedChapter[]; truncated: boolean } {
@@ -139,15 +172,19 @@ export function extractHeadingChapters(html: string): DetectedChapter[] {
 
   if (marks.length < 2) return [];
 
-  return marks.map((mark, i) => {
+  const chapters = marks.map((mark, i) => {
     const end = i + 1 < marks.length ? marks[i + 1].index : html.length;
     const content = htmlToText(html.slice(mark.end, end));
     const title = htmlToText(mark.titleHtml) || `Chương ${i + 1}`;
     return { no: i + 1, title, content, words: countWords(content) };
   });
+  const leading = htmlToText(html.slice(0, marks[0].index));
+  if (leading) chapters.unshift({ no: 0, title: "Mở đầu", content: leading, words: countWords(leading) });
+  return chapters;
 }
 
 export function splitChapters(text: string, mode: SplitMode): SplitResult {
+  text = text.replace(/\r\n?/g, "\n");
   if (!text.trim()) {
     return { chapters: [], truncated: false, fellBackToSingle: false };
   }

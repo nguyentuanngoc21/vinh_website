@@ -15,10 +15,12 @@ import {
   UploadSimpleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { ImportManuscriptModal } from "@/components/author/import-manuscript-modal";
+import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
+import { PublicationSchedulePanel } from "@/components/author/publication-schedule-panel";
 import { BookCoverUpload } from "@/components/author/book-cover-upload";
 import { ShareManuscriptPanel, type ManuscriptGrant } from "@/components/author/share-manuscript-panel";
 import { CharacterManager, type ManagedCharacter } from "@/components/author/character-manager";
-import { Button, Textarea } from "@/components/ui";
+import { Button, Field, Textarea } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 
 export type OverviewChapter = {
@@ -101,9 +103,52 @@ export function BookOverview({
   const [order, setOrder] = useState<OverviewChapter[] | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [pendingPublicationIds, setPendingPublicationIds] = useState<string[]>([]);
+  const [publishedIds, setPublishedIds] = useState<string[]>([]);
+  const [publishMessage, setPublishMessage] = useState<string | null>(null);
+  const [missingAgreementIds, setMissingAgreementIds] = useState<string[]>([]);
+  const [excludedChapterIds, setExcludedChapterIds] = useState<string[]>([]);
+  const [bulkPrice, setBulkPrice] = useState("");
+  const draftChapters = chapters.filter((c) => !c.published && !c.removed && !publishedIds.includes(c.id));
+  const selectedDrafts = draftChapters.filter((c) => !excludedChapterIds.includes(c.id));
+  const publicationIds = pendingPublicationIds.length ? pendingPublicationIds : selectedDrafts.map((c) => c.id);
+  const invalidBulkPrice = bulkPrice.trim() !== "" && (!Number.isSafeInteger(Number(bulkPrice)) || Number(bulkPrice) < 0 || Number(bulkPrice) > 2147483647);
+
+  const publishAllDrafts = async () => {
+    if (publishing || !publicationIds.length || invalidBulkPrice) return;
+    setPublishing(true);
+    setPublishMessage(null);
+    setPendingPublicationIds(publicationIds);
+    try {
+      const res = await fetch(`/api/authoring/books/${bookId}/chapters`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chapterIds: publicationIds, ...(bulkPrice.trim() !== "" ? { price: Number(bulkPrice) } : {}) }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (Array.isArray(data?.missingAgreementIds)) {
+          setMissingAgreementIds(data.missingAgreementIds.filter((id: unknown): id is string => typeof id === "string"));
+        }
+        // Refresh the reviewed selection after a conflict or moderation change.
+        if (res.status === 409 || (res.status === 403 && !data?.missingAgreementIds)) setPendingPublicationIds([]);
+        setPublishMessage(typeof data?.error === "string" ? data.error : "Không xuất bản được các chương.");
+        return;
+      }
+      setPendingPublicationIds([]);
+      setPublishedIds((ids) => [...new Set([...ids, ...publicationIds])]);
+      setPublishMessage(`Đã hoàn tất xuất bản ${publicationIds.length} chương. Độc giả có thể đọc trên trang truyện.`);
+    } catch {
+      setPublishMessage("Mất kết nối khi xuất bản. Bấm thử lại để kiểm tra và hoàn tất lượt đăng này.");
+    } finally {
+      setPublishing(false);
+      router.refresh();
+    }
+  };
 
   const latest = chapters[chapters.length - 1] ?? null;
-  const publishedCount = chapters.filter((c) => c.published).length;
+  const publishedCount = chapters.filter((c) => c.published || publishedIds.includes(c.id)).length;
 
   // Chỉ để hiện/disable nút — server (DELETE route) là chốt chặn thật
   // (còn kiểm cả lịch sử giao dịch mua chương, việc client không biết).
@@ -277,7 +322,7 @@ export function BookOverview({
             size="sm"
             fullWidth={false}
             onClick={handleDelete}
-            disabled={!canDelete || deleting}
+            disabled={!canDelete || deleting || publishing}
             title={
               !canDelete
                 ? "Không thể xoá tác phẩm đã xuất bản ở dạng độc quyền — chuyển sang tự do trước, hoặc liên hệ quản trị viên."
@@ -293,6 +338,7 @@ export function BookOverview({
             size="sm"
             fullWidth={false}
             onClick={() => setShowImport(true)}
+            disabled={publishing}
             className="gap-1.5 rounded-[9px] border-cream-border bg-white py-2.5 text-[13.5px] font-semibold"
           >
             <UploadSimpleIcon size={16} /> Nhập bản thảo
@@ -302,7 +348,7 @@ export function BookOverview({
             size="sm"
             fullWidth={false}
             onClick={handleNewChapter}
-            disabled={creatingChapter}
+            disabled={creatingChapter || publishing}
             className="gap-1.5 rounded-[9px] py-2.5 text-[13.5px]"
           >
             <PlusIcon size={16} weight="fill" /> {creatingChapter ? "Đang tạo…" : "Chương mới"}
@@ -405,6 +451,7 @@ export function BookOverview({
             <button
               type="button"
               onClick={() => setOrder(chapters)}
+              disabled={publishing}
               className="flex min-h-10 items-center gap-1.5 text-[12.5px] font-semibold text-brand-gold-dark transition-colors hover:text-brand-ink"
             >
               <ArrowsDownUpIcon size={14} weight="bold" /> Sắp xếp chương
@@ -412,6 +459,32 @@ export function BookOverview({
           )
         )}
       </div>
+
+      {(draftChapters.length > 0 || pendingPublicationIds.length > 0 || publishing) && (
+        <div className="mb-3 space-y-3 rounded-xl border border-cream-border bg-white p-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={draftChapters.length > 0 && selectedDrafts.length === draftChapters.length}
+              disabled={publishing || pendingPublicationIds.length > 0}
+              onChange={(e) => setExcludedChapterIds(e.target.checked ? [] : draftChapters.map((c) => c.id))} />
+            Chọn tất cả chương nháp ({selectedDrafts.length}/{draftChapters.length})
+          </label>
+          <Field label="Giá cho các chương được chọn (Xu)" type="number" min={0} step={1}
+            value={bulkPrice} disabled={publishing || pendingPublicationIds.length > 0}
+            placeholder="Để trống để giữ giá hiện tại; 0 = miễn phí"
+            onChange={(e) => setBulkPrice(e.target.value)} />
+          {invalidBulkPrice && <p role="alert" className="text-sm text-error">Giá phải là số nguyên không âm.</p>}
+          <Button type="button" size="sm" fullWidth={false} onClick={publishAllDrafts}
+            disabled={!publicationIds.length || invalidBulkPrice || publishing || !!order || !!deletingChapterId || deleting}>
+            {publishing ? `Đang xuất bản ${publicationIds.length} chương…` : pendingPublicationIds.length ? "Thử lại xuất bản" : `Xuất bản ${publicationIds.length} chương đã chọn`}
+          </Button>
+          <p className="text-xs text-stone-alt">Kiểm tra tên chương và giá trước khi xuất bản. Các chương được chọn sẽ công khai cùng lúc.</p>
+        </div>
+      )}
+      {publishMessage && <p role="status" className="mb-3 text-sm text-stone-dark">{publishMessage}</p>}
+      <PublicationSchedulePanel bookId={bookId} chapterIds={selectedDrafts.map((c) => c.id)}
+        price={bulkPrice.trim() === "" ? undefined : Number(bulkPrice)}
+        disabled={publishing || invalidBulkPrice || !!order || !!deletingChapterId || deleting || pendingPublicationIds.length > 0}
+        onMissingAgreements={setMissingAgreementIds} />
 
       <div className="overflow-hidden rounded-[12px] border border-cream-border bg-white">
         {/* Header cột chỉ có ý nghĩa ở layout lưới (sm:+) — trên điện thoại
@@ -425,14 +498,17 @@ export function BookOverview({
           </div>
           <span className="w-[88px]" />
         </div>
-        {(order ?? chapters).map((c, i, list) => {
+        {(order ?? chapters).map((original, i, list) => {
+          const c = publishedIds.includes(original.id) ? { ...original, published: true } : original;
           const content = (
             <>
               {/* sm:contents — bỏ 2 div bọc khỏi box model từ sm trở lên, để
                   4 <span> bên trong thành item trực tiếp của grid 4 cột;
                   dưới sm chúng chỉ là 2 dòng flex thường. */}
               <div className="flex min-w-0 items-center gap-2 sm:contents">
-                <span className="shrink-0 text-[11.5px] font-bold text-stone-alt">{order ? i + 1 : c.order_index}</span>
+                <span className="flex shrink-0 items-center gap-1 text-[11.5px] font-bold text-stone-alt">
+                  {order ? i + 1 : c.order_index}
+                </span>
                 <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-brand-ink sm:flex-none">
                   {c.title}
                 </span>
@@ -468,6 +544,9 @@ export function BookOverview({
           const canDown = !!order && !!moveChapter(list, i, 1);
           return (
             <div key={c.id} className="flex items-center gap-1 border-b border-cream-card-alt pr-2 last:border-b-0">
+              {!order && !c.published && !c.removed && <input type="checkbox" className="ml-3" aria-label={`Chọn chương ${c.order_index}: ${c.title}`}
+                checked={!excludedChapterIds.includes(c.id)} disabled={publishing || pendingPublicationIds.length > 0}
+                onChange={(e) => setExcludedChapterIds((ids) => e.target.checked ? ids.filter((id) => id !== c.id) : [...ids, c.id])} />}
               {order ? (
                 <div className={rowGrid}>{content}</div>
               ) : (
@@ -507,7 +586,7 @@ export function BookOverview({
                       aria-label={`Xoá "${c.title}"`}
                       title="Xoá chương nháp"
                       onClick={() => handleDeleteChapter(c)}
-                      disabled={!!deletingChapterId}
+                      disabled={!!deletingChapterId || publishing}
                       className="flex h-10 w-10 items-center justify-center rounded-lg text-error transition-colors hover:bg-error-bg disabled:opacity-40"
                     >
                       <TrashIcon size={16} />
@@ -532,6 +611,14 @@ export function BookOverview({
         books={[]}
         destinationBookId={bookId}
       />
+      {missingAgreementIds.length > 0 && (
+        <RequiredAgreementsModal missingAgreementIds={missingAgreementIds}
+          onClose={() => setMissingAgreementIds([])}
+          onAllAccepted={() => {
+            setMissingAgreementIds([]);
+            setPublishMessage("Đã xác nhận thỏa thuận. Bấm Xuất bản tất cả để đăng các chương còn nháp.");
+          }} />
+      )}
     </div>
   );
 }
