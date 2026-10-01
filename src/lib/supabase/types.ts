@@ -256,6 +256,12 @@ export type ContestReviewFlag = {
 export type Database = {
   public: {
     Tables: {
+      chapter_publication_schedules: {
+        Row: { id: string; book_id: string; author_id: string; chapter_ids: string[]; starts_at: string; interval_days: number; price: number | null; next_index: number; status: "pending" | "completed" | "cancelled" | "failed"; error: string | null; created_at: string };
+        Insert: { id: string; book_id: string; author_id: string; chapter_ids: string[]; starts_at: string; interval_days?: number; price?: number | null; next_index?: number; status?: "pending" | "completed" | "cancelled" | "failed"; error?: string | null; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["chapter_publication_schedules"]["Insert"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string; // uuid, references auth.users.id
@@ -2493,6 +2499,12 @@ export type Database = {
       };
     };
     Functions: {
+      schedule_chapter_publication: {
+        Args: { p_id: string; p_book_id: string; p_chapter_ids: string[]; p_starts_at: string; p_interval_days?: number; p_price?: number | null };
+        Returns: string;
+      };
+      cancel_chapter_publication: { Args: { p_id: string }; Returns: void };
+      run_due_chapter_publications: { Args: { p_agreement_version: string }; Returns: number };
       set_chapter_characters: {
         Args: { p_chapter_id: string; p_character_ids: string[]; p_expected_character_ids?: string[] };
         Returns: string[];
