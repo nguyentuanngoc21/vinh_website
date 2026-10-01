@@ -10,7 +10,8 @@ import {
   XIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Alert, Button, Field, Modal, Textarea } from "@/components/ui";
-import { countWords, splitChapters, type DetectedChapter, type SplitMode } from "@/lib/authoring/split-chapters";
+import { countWords, splitChapters, chapterWarnings, mergeChapterWithNext, splitChapterAt, type DetectedChapter, type SplitMode } from "@/lib/authoring/split-chapters";
+import { MAX_CHAPTER_CONTENT_LENGTH } from "@/lib/authoring/chapter-limits";
 
 type ImportManuscriptModalProps = {
   open: boolean;
@@ -71,6 +72,9 @@ export function ImportManuscriptModal({
   const [newBookTitle, setNewBookTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editedChapters, setEditedChapters] = useState<DetectedChapter[] | null>(null);
+  const [activeChapter, setActiveChapter] = useState<number | null>(null);
+  const [splitOffset, setSplitOffset] = useState(0);
 
   // Reset sạch mỗi lần mở lại (modal dùng lại cho nhiều lượt nhập, không
   // muốn giữ file/văn bản của lượt trước) — set state trực tiếp trong lúc
@@ -94,18 +98,20 @@ export function ImportManuscriptModal({
       setNewBookTitle("");
       setSubmitting(false);
       setError(null);
+      setEditedChapters(null);
+      setActiveChapter(null);
     }
   }
 
   const splitOptions = useMemo(
     () =>
       headingChapters.length > 0
-        ? [{ id: "heading" as const, label: "Theo Heading trong Word (khuyên dùng)" }, ...TEXT_SPLIT_OPTIONS]
+        ? [{ id: "heading" as const, label: "Theo Heading trong Word" }, ...TEXT_SPLIT_OPTIONS]
         : TEXT_SPLIT_OPTIONS,
     [headingChapters]
   );
 
-  const { chapters: detected, truncated, fellBackToSingle } = useMemo(() => {
+  const { chapters: originalChapters, truncated, fellBackToSingle } = useMemo(() => {
     if (splitMode === "heading") {
       const capped = headingChapters.length > 300;
       return {
@@ -116,9 +122,27 @@ export function ImportManuscriptModal({
     }
     return splitChapters(rawText, splitMode);
   }, [rawText, splitMode, headingChapters]);
+  const detected = editedChapters ?? originalChapters;
+  const markerChapters = useMemo(() => splitChapters(rawText, "chuong"), [rawText]);
+  const warnings = chapterWarnings(detected);
+  const headingMismatch = headingChapters.length > 0 && !markerChapters.fellBackToSingle &&
+    headingChapters.length !== markerChapters.chapters.length;
+  const invalidContent = detected.some((c) => c.content.length > MAX_CHAPTER_CONTENT_LENGTH);
+  const current = activeChapter === null ? null : detected[activeChapter];
+  const updateChapter = (patch: Partial<DetectedChapter>) => {
+    if (activeChapter === null) return;
+    setEditedChapters(detected.map((c, i) => i === activeChapter ? { ...c, ...patch,
+      words: countWords(patch.content ?? c.content) } : c));
+  };
 
   const handleFile = async (file: File) => {
     setError(null);
+    setEditedChapters(null);
+    setActiveChapter(null);
+    if (file.size > 4 * 1024 * 1024) {
+      setError("File quá lớn — tối đa 4MB.");
+      return;
+    }
     const lower = file.name.toLowerCase();
 
     if (lower.endsWith(".txt")) {
@@ -152,7 +176,8 @@ export function ImportManuscriptModal({
       setHeadingChapters(headings);
       // Style Heading thật của Word đáng tin hơn regex đoán chữ — ưu tiên
       // chọn sẵn khi có, tác giả vẫn đổi được sang 3 chế độ khác bên dưới.
-      setSplitMode(headings.length > 0 ? "heading" : "chuong");
+      const markers = splitChapters(data.text, "chuong");
+      setSplitMode(headings.length > 0 && (markers.fellBackToSingle || headings.length === markers.chapters.length) ? "heading" : "chuong");
       setStep("review");
     } catch {
       setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
@@ -164,6 +189,8 @@ export function ImportManuscriptModal({
   const handlePasteContinue = () => {
     if (!pastedText.trim()) return;
     setRawText(pastedText);
+    setEditedChapters(null);
+    setActiveChapter(null);
     setSourceLabel(`${countWords(pastedText).toLocaleString("vi-VN")} chữ đã dán`);
     setHeadingChapters([]);
     setSplitMode("chuong");
@@ -171,7 +198,7 @@ export function ImportManuscriptModal({
   };
 
   const handleConfirm = async () => {
-    if (!detected.length || submitting) return;
+    if (!detected.length || submitting || invalidContent) return;
     setSubmitting(true);
     setError(null);
 
@@ -222,7 +249,8 @@ export function ImportManuscriptModal({
         }
 
         onClose();
-        router.push(`/author/${createData.bookId}/${createData.chapterId}`);
+        router.push(`/author/${createData.bookId}`);
+        router.refresh();
       } else {
         const targetId = destinationBookId ?? existingBookId;
         if (!targetId) {
@@ -244,6 +272,7 @@ export function ImportManuscriptModal({
         }
         onClose();
         router.push(`/author/${targetId}`);
+        router.refresh();
       }
     } catch {
       setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
@@ -377,14 +406,23 @@ export function ImportManuscriptModal({
                 </Alert>
               </div>
             )}
+            {headingMismatch && <div className="mb-3"><Alert tone="info">
+              Heading trong Word cho {headingChapters.length} mục, còn mốc “Chương N” cho {markerChapters.chapters.length} mục. Hãy kiểm tra trước khi nhập.
+            </Alert></div>}
+            {warnings.map((warning) => <div key={warning} className="mb-3"><Alert tone="info">{warning}</Alert></div>)}
+            {invalidContent && <Alert tone="error">Có chương vượt {MAX_CHAPTER_CONTENT_LENGTH.toLocaleString("vi-VN")} ký tự. Hãy tách nhỏ trước khi nhập.</Alert>}
 
             <div className="mb-1.5 text-[13px] font-semibold text-[#5C5650]">Tách chương theo</div>
-            <div className="mb-4 flex w-fit gap-1.5 rounded-[9px] border border-cream-border bg-white p-1">
+            <div className="mb-4 flex flex-wrap gap-1.5 rounded-[9px] border border-cream-border bg-white p-1">
               {splitOptions.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setSplitMode(opt.id)}
+                  disabled={submitting}
+                  onClick={() => {
+                    if (editedChapters && !window.confirm("Đổi cách tách sẽ bỏ các chỉnh sửa xem trước. Tiếp tục?")) return;
+                    setEditedChapters(null); setActiveChapter(null); setSplitMode(opt.id);
+                  }}
                   className={`rounded-[6px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
                     splitMode === opt.id ? "bg-info-bg text-brand-ink" : "text-stone-alt"
                   }`}
@@ -395,10 +433,10 @@ export function ImportManuscriptModal({
             </div>
 
             <div className="mb-4 max-h-[180px] overflow-y-auto rounded-xl border border-cream-border">
-              {detected.map((c) => (
-                <div
-                  key={c.no + c.title}
-                  className="flex items-center gap-3 border-b border-[#F2ECE0] px-3.5 py-2.5 last:border-b-0"
+              {detected.map((c, index) => (
+                <button type="button" disabled={submitting} onClick={() => { setActiveChapter(index); setSplitOffset(0); }}
+                  key={index}
+                  className={`flex w-full items-center gap-3 border-b border-[#F2ECE0] px-3.5 py-2.5 text-left last:border-b-0 ${activeChapter === index ? "bg-info-bg" : ""}`}
                 >
                   <div className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] bg-cream-card-alt text-[11.5px] font-bold text-stone-alt">
                     {c.no}
@@ -409,7 +447,7 @@ export function ImportManuscriptModal({
                   <div className="shrink-0 text-xs text-stone-light">
                     {c.words.toLocaleString("vi-VN")} chữ
                   </div>
-                </div>
+                </button>
               ))}
               {detected.length === 0 && (
                 <div className="px-3.5 py-4 text-center text-sm text-stone-light">
@@ -417,6 +455,19 @@ export function ImportManuscriptModal({
                 </div>
               )}
             </div>
+            {current && activeChapter !== null && <div className="mb-4 space-y-3 rounded-xl border border-cream-border p-4">
+              <Field label="Tên chương" value={current.title} disabled={submitting} onChange={(e) => updateChapter({ title: e.target.value })} />
+              <Textarea label="Nội dung chương" value={current.content} disabled={submitting}
+                onChange={(e) => updateChapter({ content: e.target.value })}
+                onSelect={(e) => setSplitOffset(e.currentTarget.selectionStart)} rows={10} />
+              <p className="text-xs text-stone-alt">Đặt con trỏ trong nội dung để chọn vị trí tách. Gộp giữ nguyên nội dung và tên mục tiếp theo.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" fullWidth={false} disabled={submitting || detected.length >= 300 || splitOffset <= 0 || splitOffset >= current.content.length}
+                  onClick={() => { setEditedChapters(splitChapterAt(detected, activeChapter, splitOffset)); setSplitOffset(0); }}>Tách tại con trỏ</Button>
+                <Button type="button" size="sm" fullWidth={false} disabled={submitting || activeChapter >= detected.length - 1}
+                  onClick={() => setEditedChapters(mergeChapterWithNext(detected, activeChapter))}>Gộp với mục tiếp theo</Button>
+              </div>
+            </div>}
 
             {!destinationBookId && (
               <>
@@ -491,7 +542,7 @@ export function ImportManuscriptModal({
               <Button
                 type="button"
                 onClick={handleConfirm}
-                disabled={!detected.length || submitting}
+                disabled={!detected.length || submitting || invalidContent}
                 fullWidth={false}
                 className="px-5"
               >
