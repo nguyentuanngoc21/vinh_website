@@ -15,6 +15,7 @@ export type ChapterRow = { id: string; title: string; orderIndex: number; publis
 export type BookDetail = {
   id: string; title: string; synopsis: string | null; genre: string | null; tags: string[]; slug: string; published: boolean;
   isExclusive: boolean; exclusivityLocked: boolean; finalized: boolean; coverUrl: string | null; characters: Character[]; chapters: ChapterRow[];
+  ageRating: 'all' | '16' | '18'; contentWarnings: string[]; ageRatingLocked: boolean;
   manuscriptGrant: { username: string; nickname: string | null; grantedAt: string; locked: boolean } | null;
 };
 export type EditableChapter = {
@@ -23,7 +24,9 @@ export type EditableChapter = {
   linkedAudio: { id: string; title: string; narratorName: string }[];
   characters: Character[]; taggedCharacterIds: string[];
 };
-export type BookFields = { title?: string; synopsis?: string; genre?: string; tags?: string[]; is_exclusive?: boolean };
+// age_rating + content_warnings luôn gửi cùng nhau (server kiểm cặp này).
+export type BookFields = { title?: string; synopsis?: string; genre?: string; tags?: string[]; is_exclusive?: boolean;
+  age_rating?: 'all' | '16' | '18'; content_warnings?: string[] };
 export type ChapterFields = { title?: string; content?: string; published?: boolean; price?: number; is_last_chapter?: boolean };
 
 const bookPath = (bookId: string) => `authoring/books/${encodeURIComponent(bookId)}`;
@@ -33,7 +36,8 @@ export const listMyBooks = (userId: string) => mobileApi<{ books: MyBook[] }>('a
 export const getMyBook = (userId: string, bookId: string) => mobileApi<{ book: BookDetail }>(bookPath(bookId), userId).then(r => r.book);
 export const getMyChapter = (userId: string, chapterId: string) => mobileApi<EditableChapter>(chapterPath(chapterId), userId);
 
-export function createBook(userId: string, fields: { title: string; synopsis?: string; genre?: string; tags?: string[]; isExclusive: boolean; chapterTitle: string; chapterContent: string; published: boolean; price: number; isLastChapter: boolean }) {
+export function createBook(userId: string, fields: { title: string; synopsis?: string; genre?: string; tags?: string[]; isExclusive: boolean;
+  ageRating?: 'all' | '16' | '18'; contentWarnings?: string[]; chapterTitle: string; chapterContent: string; published: boolean; price: number; isLastChapter: boolean }) {
   return mobileApi<{ bookId: string; chapterId: string }>('authoring/books', userId, { action: 'create', ...fields });
 }
 export const updateBook = (userId: string, bookId: string, fields: BookFields) => mobileApi(bookPath(bookId), userId, { action: 'update', ...fields });

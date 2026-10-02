@@ -6,6 +6,7 @@ import { ChapterEditor } from "@/components/author/chapter-editor";
 import { PublishPanel } from "@/components/author/publish-panel";
 import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
 import type { BookGenre } from "@/lib/supabase/types";
+import type { AgeRating } from "@/lib/age-rating";
 
 /**
  * Trang "Tác phẩm mới" (/author/new) — KHÔNG ghi Supabase khi mở trang
@@ -34,6 +35,7 @@ export function NewWorkWorkspace() {
   const [isExclusive, setIsExclusive] = useState(false);
   const [genre, setGenre] = useState<BookGenre | null>(null);
   const [tags, setTags] = useState<string[]>([]);
+  const [ageRating, setAgeRating] = useState<{ rating: AgeRating; warnings: string[] }>({ rating: "all", warnings: [] });
   const [isLastChapter, setIsLastChapter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +63,8 @@ export function NewWorkWorkspace() {
           synopsis,
           genre,
           tags,
+          ageRating: ageRating.rating,
+          contentWarnings: ageRating.warnings,
           isExclusive,
           chapterTitle: title,
           chapterContent: content,
@@ -136,6 +140,9 @@ export function NewWorkWorkspace() {
         onGenreChange={setGenre}
         tags={tags}
         onTagsChange={setTags}
+        ageRating={ageRating.rating}
+        contentWarnings={ageRating.warnings}
+        onAgeRatingChange={(rating, warnings) => setAgeRating({ rating, warnings })}
       />
       {missingAgreementIds && (
         <RequiredAgreementsModal

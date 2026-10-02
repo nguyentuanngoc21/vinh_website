@@ -4,6 +4,7 @@ import type { ConnectPerson } from "@/lib/connect/types";
 import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import { computeCommissionStatus } from "@/lib/orders/service-listing-service";
 import { loadProfileContests } from "@/lib/contests/profile-contests";
+import { fetchAdultAudioIds } from "@/lib/audio/get-audio-catalog";
 
 type Client = SupabaseClient<Database>;
 
@@ -183,7 +184,9 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
   });
 
   const audioByAuthor = new Map<string, ConnectPerson["works"]["audio"]>();
-  for (const a of audioRows ?? []) {
+  // Audio gắn với chương truyện 18+ không hiện ở hồ sơ công khai.
+  const adultAudioIds = (audioRows ?? []).length ? await fetchAdultAudioIds(supabase) : { has: () => false };
+  for (const a of (audioRows ?? []).filter((row) => !adultAudioIds.has(row.id))) {
     const list = audioByAuthor.get(a.narrator_id) ?? [];
     const { data: urlData } = supabase.storage.from("audio-narrations").getPublicUrl(a.audio_url);
     list.push({

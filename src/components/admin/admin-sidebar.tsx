@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
   GearIcon,
   WarningOctagonIcon,
+  FlagIcon,
   TrophyIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { VinhMark } from "@/components/ui";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { label: "Tổng quan", icon: ChartLineUpIcon, href: "/admin" },
   { label: "Giao dịch", icon: ReceiptIcon, href: null },
   { label: "Nội dung", icon: BooksIcon, href: "/admin/noi-dung" },
+  { label: "Báo cáo nội dung", icon: FlagIcon, href: "/admin/bao-cao" },
   // Contest Engine — docs/CONTEST_ENGINE_AUDIT_AND_PLAN.md.
   { label: "Cuộc thi", icon: TrophyIcon, href: "/admin/cuoc-thi" },
   // Mục 9 đặc tả (Hệ thống giao dịch commission) — xem

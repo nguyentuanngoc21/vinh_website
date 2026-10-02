@@ -16,7 +16,7 @@ export function GET(request: Request, context: Ctx) {
     try { auth = await getUserContext(request); } catch (e) { return requestError(e); }
     if (!auth.userId) return Response.json({ error: 'Vui lòng đăng nhập lại.' }, { status: 401 });
     const { chapterId } = await context.params;
-    const data = isUuid(chapterId) ? await getAuthorChapter(auth.supabase, auth.userId, chapterId) : null;
+    const data = isUuid(chapterId) ? await getAuthorChapter(auth.supabase, auth.admin(), auth.userId, chapterId) : null;
     if (!data) return Response.json({ error: 'Không tìm thấy chương.' }, { status: 404 });
     return Response.json(data);
   });

@@ -5,9 +5,11 @@ import { CaretDownIcon, CheckCircleIcon, CoinsIcon } from "@phosphor-icons/react
 import { CopyrightSettings } from "@/components/author/copyright-settings";
 import { TagInput } from "@/components/author/tag-input";
 import { ChapterAudioPanel } from "@/components/author/chapter-audio-panel";
+import { AgeRatingPicker } from "@/components/author/age-rating-picker";
 import { Field, Textarea, Alert, GenreSelect } from "@/components/ui";
 import type { BookGenre } from "@/lib/supabase/types";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
+import type { AgeRating } from "@/lib/age-rating";
 
 type PublishPanelProps = {
   /** Rỗng ở /author/new: chương chưa tồn tại trong DB nên chưa thể gắn audio nội bộ. */
@@ -40,6 +42,11 @@ type PublishPanelProps = {
   onGenreChange: (genre: BookGenre) => void;
   tags: string[];
   onTagsChange: (tags: string[]) => void;
+  ageRating: AgeRating;
+  contentWarnings: string[];
+  onAgeRatingChange: (rating: AgeRating, warnings: string[]) => void;
+  ageRatingLocked?: boolean;
+  ageRatingError?: string | null;
   /** Mục "Nhân vật trong chương" — chỉ có khi chương đã tồn tại (author-workspace.tsx). */
   chapterCharacters?: { node: ReactNode; done: boolean };
 };
@@ -121,6 +128,11 @@ export function PublishPanel({
   onGenreChange,
   tags,
   onTagsChange,
+  ageRating,
+  contentWarnings,
+  onAgeRatingChange,
+  ageRatingLocked = false,
+  ageRatingError = null,
   chapterCharacters,
 }: PublishPanelProps) {
   const [openSections, setOpenSections] = useState<Record<SectionId, boolean>>({
@@ -212,6 +224,17 @@ export function PublishPanel({
             <div>
               <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tag</div>
               <TagInput tags={tags} onChange={onTagsChange} />
+            </div>
+
+            <div>
+              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Độ tuổi</div>
+              <AgeRatingPicker
+                rating={ageRating}
+                warnings={contentWarnings}
+                onChange={onAgeRatingChange}
+                locked={ageRatingLocked}
+                error={ageRatingError}
+              />
             </div>
           </div>
         </ChecklistSection>

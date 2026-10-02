@@ -21,7 +21,7 @@ export default function NewWork() {
 
 function Editor({ userId }: { userId: string }) {
   // Tự do by default, as on the web — exclusive only when the author ticks it.
-  const [info, setInfo] = useState<BookInfo>({ title: '', genre: null, synopsis: '', tags: '', isExclusive: false });
+  const [info, setInfo] = useState<BookInfo>({ title: '', genre: null, synopsis: '', tags: '', isExclusive: false, ageRating: 'all', contentWarnings: [] });
   const [chapterTitle, setChapterTitle] = useState('Chương 1');
   const [content, setContent] = useState('');
   const [price, setPrice] = useState('0');
@@ -40,7 +40,7 @@ function Editor({ userId }: { userId: string }) {
     try {
       const { bookId } = await createBook(userId, {
         title: info.title.trim(), synopsis: info.synopsis, genre: info.genre ?? undefined, tags: parseTags(info.tags),
-        isExclusive: info.isExclusive, chapterTitle: chapterTitle.trim() || 'Chương 1', chapterContent: content,
+        isExclusive: info.isExclusive, ageRating: info.ageRating, contentWarnings: info.contentWarnings, chapterTitle: chapterTitle.trim() || 'Chương 1', chapterContent: content,
         published, price: priceValue, isLastChapter: false,
       });
       router.replace({ pathname: '/sang-tac/[bookId]', params: { bookId } });

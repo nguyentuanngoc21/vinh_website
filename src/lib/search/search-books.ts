@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
 import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
+import type { AgeRating } from "@/lib/age-rating";
 
 export type BookSearchResult = {
   id: string;
@@ -11,10 +12,11 @@ export type BookSearchResult = {
   coverUrl: string | null;
   /** books.is_exclusive — hiện tag "Độc quyền" trên card. */
   isExclusive: boolean;
+  ageRating: AgeRating;
 };
 
 const SEARCH_LIMIT = 24;
-const BOOK_SEARCH_COLUMNS = "id, slug, title, genre, tags, author_id, cover_design_item_id, view_count, created_at, is_exclusive";
+const BOOK_SEARCH_COLUMNS = "id, slug, title, genre, tags, author_id, cover_design_item_id, view_count, created_at, is_exclusive, age_rating";
 
 type BookSearchRow = {
   id: string;
@@ -27,6 +29,7 @@ type BookSearchRow = {
   view_count: number;
   created_at: string;
   is_exclusive: boolean;
+  age_rating: AgeRating;
 };
 
 /** Tìm truyện theo tên, tag, hoặc tên tác giả — chưa có full-text index
@@ -83,5 +86,6 @@ export async function searchBooks(supabase: SupabaseClient<Database>, query: str
     authorNickname: nicknameById.get(r.author_id) ?? null,
     coverUrl: coverUrls[i],
     isExclusive: r.is_exclusive,
+    ageRating: r.age_rating,
   }));
 }

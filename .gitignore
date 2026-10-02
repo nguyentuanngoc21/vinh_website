@@ -62,3 +62,6 @@ mobile-vinh/web-build
 
 # File khoá tạm của Microsoft Office (tự sinh khi đang mở .docx/.xlsx)
 ~$*
+
+# Local validation dependencies and screenshots
+/.tmp/

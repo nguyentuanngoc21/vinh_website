@@ -2,9 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
 import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import type { BookSearchResult } from "./search-books";
+import type { AgeRating } from "@/lib/age-rating";
 
 const PAGE_SIZE = 24;
-const BOOK_COLUMNS = "id, slug, title, genre, author_id, cover_design_item_id, view_count, created_at, is_exclusive";
+const BOOK_COLUMNS = "id, slug, title, genre, author_id, cover_design_item_id, view_count, created_at, is_exclusive, age_rating";
 
 type BookRow = {
   id: string;
@@ -16,6 +17,7 @@ type BookRow = {
   view_count: number;
   created_at: string;
   is_exclusive: boolean;
+  age_rating: AgeRating;
 };
 
 export type GenreBooksPage = {
@@ -75,6 +77,7 @@ export async function getBooksByGenre(
       authorNickname: nicknameById.get(r.author_id) ?? null,
       coverUrl: coverUrls[i],
       isExclusive: r.is_exclusive,
+      ageRating: r.age_rating,
     })),
   };
 }

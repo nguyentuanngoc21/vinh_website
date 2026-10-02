@@ -44,6 +44,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
                     author={book.authorNickname}
                     genre={book.genre}
                     coverUrl={book.coverUrl}
+                    ageRating={book.ageRating}
                     className="h-full w-full"
                   />
                 </div>

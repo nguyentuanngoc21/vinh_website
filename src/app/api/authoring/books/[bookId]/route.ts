@@ -10,6 +10,7 @@ import {
 } from "@/lib/authoring/exclusivity-agreement";
 import type { BookGenre } from "@/lib/supabase/types";
 import { revalidatePublicBooks } from "@/lib/cache/public-data";
+import { normalizeAgeRating, type AgeRating } from "@/lib/age-rating";
 
 function isBookGenre(value: unknown): value is BookGenre {
   return typeof value === "string" && (BOOK_GENRES as readonly string[]).includes(value);
@@ -27,7 +28,7 @@ const MAX_SYNOPSIS_LENGTH = 2000;
 
 /**
  * PATCH /api/authoring/books/:bookId — sửa title/synopsis/genre/tags/
- * is_exclusive của 1 sách đã có (dùng bởi GenreSelect + toggle độc quyền +
+ * age_rating+content_warnings/is_exclusive của 1 sách đã có (dùng bởi GenreSelect + toggle độc quyền +
  * ô tóm tắt trong publish-panel.tsx). Không tự check ownership tay — policy "authors
  * update their own books" (docs/supabase/schema.sql) đã chặn qua RLS;
  * .update() trên hàng không thuộc về mình trả về 0 dòng, xử lý ở nhánh
@@ -54,6 +55,8 @@ export async function PATCH(
     genre?: BookGenre;
     tags?: string[];
     is_exclusive?: boolean;
+    age_rating?: AgeRating;
+    content_warnings?: string[];
   } = {};
   if (typeof body.title === "string" && body.title.trim()) {
     update.title = body.title.trim();
@@ -70,6 +73,16 @@ export async function PATCH(
   const tags = parseTags(body.tags);
   if (tags) {
     update.tags = tags;
+  }
+  // Nhãn độ tuổi + cảnh báo luôn gửi CÙNG NHAU (CHECK ở DB ràng buộc cặp
+  // này). normalizeAgeRating tự nâng độ tuổi lên mức cảnh báo yêu cầu.
+  if (body.age_rating !== undefined || body.content_warnings !== undefined) {
+    const rating = normalizeAgeRating(body.age_rating, body.content_warnings);
+    if (!rating) {
+      return NextResponse.json({ error: "Nhãn độ tuổi không hợp lệ." }, { status: 400 });
+    }
+    update.age_rating = rating.ageRating;
+    update.content_warnings = rating.contentWarnings;
   }
 
   let auth;
@@ -132,13 +145,20 @@ export async function PATCH(
     .from("books")
     .update(update)
     .eq("id", bookId)
-    .select("id, title, synopsis, genre, tags, is_exclusive")
+    .select("id, title, synopsis, genre, tags, is_exclusive, age_rating, content_warnings")
     .maybeSingle();
 
   if (error) {
     // D11 — đang dự thi cuộc thi yêu cầu độc quyền (trigger books_block_exclusive_off_during_contest).
     const locked = contestLockResponse(error);
     if (locked) return locked;
+    // Trigger enforce_book_age_rating_lock — admin đã khoá nhãn độ tuổi.
+    if (error.hint === "age_rating_locked") {
+      return NextResponse.json(
+        { error: "Nhãn độ tuổi của truyện đã được ban kiểm duyệt khoá. Liên hệ hỗ trợ nếu bạn cần thay đổi." },
+        { status: 403 }
+      );
+    }
     console.error("[authoring] update book failed:", error);
     return NextResponse.json({ error: "Lưu thất bại. Vui lòng thử lại." }, { status: 500 });
   }
@@ -150,7 +170,12 @@ export async function PATCH(
   }
 
   // Làm mới cache trang công khai (lib/cache/public-data.ts) — chỉ khi đổi field thẻ truyện hiển thị.
-  if (update.title !== undefined || update.synopsis !== undefined || update.genre !== undefined) {
+  if (
+    update.title !== undefined ||
+    update.synopsis !== undefined ||
+    update.genre !== undefined ||
+    update.age_rating !== undefined
+  ) {
     revalidatePublicBooks();
   }
 

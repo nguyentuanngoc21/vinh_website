@@ -8,6 +8,7 @@ import { ChapterCharactersPanel } from "@/components/author/chapter-characters-p
 import type { ManagedCharacter } from "@/components/author/character-manager";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import type { BookGenre } from "@/lib/supabase/types";
+import type { AgeRating } from "@/lib/age-rating";
 import type { AudioTrack } from "@/lib/audio/get-audio-catalog";
 
 export type WorkspaceChapter = {
@@ -30,6 +31,10 @@ type AuthorWorkspaceProps = {
   bookSynopsis: string | null;
   bookGenre: BookGenre | null;
   bookTags: string[];
+  bookAgeRating: AgeRating;
+  bookContentWarnings: string[];
+  /** Admin đã khoá nhãn độ tuổi — tác giả chỉ xem, không sửa. */
+  bookAgeRatingLocked: boolean;
   bookSlug: string;
   bookPublished: boolean;
   // Độc quyền giờ ở cấp TRUYỆN (books.is_exclusive), không phải chương —
@@ -57,6 +62,9 @@ export function AuthorWorkspace({
   bookSynopsis,
   bookGenre,
   bookTags,
+  bookAgeRating,
+  bookContentWarnings,
+  bookAgeRatingLocked,
   bookSlug,
   bookPublished,
   bookIsExclusive,
@@ -85,6 +93,9 @@ export function AuthorWorkspace({
   const [exclusiveError, setExclusiveError] = useState<string | null>(null);
   const [genre, setGenre] = useState<BookGenre | null>(bookGenre);
   const [tags, setTags] = useState<string[]>(bookTags);
+  const [ageRating, setAgeRating] = useState(() => ({ rating: bookAgeRating, warnings: bookContentWarnings }));
+  const [ageRatingLocked, setAgeRatingLocked] = useState(bookAgeRatingLocked);
+  const [ageRatingError, setAgeRatingError] = useState<string | null>(null);
   const [isLastChapter, setIsLastChapter] = useState(chapter.is_last_chapter);
   // Đã lưu true rồi thì khoá vĩnh viễn — khớp trigger DB
   // prevent_unset_last_chapter (không cho đổi lại false).
@@ -234,6 +245,33 @@ export function AuthorWorkspace({
     }
   };
 
+  // Khác genre/tags (lỗi mạng bỏ qua lặng lẽ): nhãn độ tuổi quyết định ai
+  // được đọc, nên lỗi phải hiện ra và trả giá trị cũ — không để tác giả tưởng
+  // đã lưu. Server tự nâng độ tuổi theo cảnh báo; dùng giá trị server trả về.
+  const handleAgeRatingChange = async (rating: AgeRating, warnings: string[]) => {
+    const previous = ageRating;
+    setAgeRating({ rating, warnings });
+    setAgeRatingError(null);
+    try {
+      const res = await fetch(`/api/authoring/books/${bookId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ age_rating: rating, content_warnings: warnings }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setAgeRating(previous);
+        setAgeRatingError(data?.error ?? "Không lưu được nhãn độ tuổi. Vui lòng thử lại.");
+        if (res.status === 403) setAgeRatingLocked(true);
+        return;
+      }
+      setAgeRating({ rating: data.age_rating, warnings: data.content_warnings });
+    } catch {
+      setAgeRating(previous);
+      setAgeRatingError("Không kết nối được máy chủ. Nhãn độ tuổi chưa được lưu.");
+    }
+  };
+
   const handleTagsChange = async (nextTags: string[]) => {
     setTags(nextTags);
     try {
@@ -292,6 +330,11 @@ export function AuthorWorkspace({
         onGenreChange={handleGenreChange}
         tags={tags}
         onTagsChange={handleTagsChange}
+        ageRating={ageRating.rating}
+        contentWarnings={ageRating.warnings}
+        onAgeRatingChange={handleAgeRatingChange}
+        ageRatingLocked={ageRatingLocked}
+        ageRatingError={ageRatingError}
         chapterCharacters={{
           done: taggedCount > 0,
           node: (

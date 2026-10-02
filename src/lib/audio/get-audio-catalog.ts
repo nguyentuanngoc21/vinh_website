@@ -124,16 +124,36 @@ export async function fetchNarratorProfiles(
   return new Map((data ?? []).map((p) => [p.id, p]));
 }
 
+/**
+ * Id audio đã gắn vào chương của truyện 18+ (view adult_audio_narration_ids,
+ * migrations/20261002_book_age_ratings.sql) — mọi danh sách audio CÔNG KHAI
+ * (thư viện, nổi bật, tìm kiếm, Kết nối) phải lọc bỏ. Người đã xác thực tuổi
+ * vẫn nghe trong trang đọc chương. Trả về hàm kiểm tra; lỗi truy vấn → coi
+ * MỌI audio là 18+ (danh sách tạm rỗng) — không lộ audio 18+ chỉ vì lọc hỏng,
+ * nhưng cũng không làm sập trang chủ / /audio.
+ */
+export async function fetchAdultAudioIds(supabase: SupabaseClient<Database>): Promise<{ has: (id: string) => boolean }> {
+  const { data, error } = await supabase.from("adult_audio_narration_ids").select("audio_narration_id");
+  if (error) {
+    console.error("[audio] adult_audio_narration_ids query failed:", error);
+    return { has: () => true };
+  }
+  return new Set((data ?? []).map((r) => r.audio_narration_id));
+}
+
 export async function getAudioCatalog(supabase: SupabaseClient<Database>): Promise<AudioTrack[]> {
-  const { data: rows, error } = await supabase
-    .from("public_audio_narrations")
-    .select("id, narrator_id, title, audio_url, duration_seconds, genre, play_count, created_at")
-    .order("created_at", { ascending: false });
+  const [{ data: rows, error }, adultIds] = await Promise.all([
+    supabase
+      .from("public_audio_narrations")
+      .select("id, narrator_id, title, audio_url, duration_seconds, genre, play_count, created_at")
+      .order("created_at", { ascending: false }),
+    fetchAdultAudioIds(supabase),
+  ]);
   if (error) {
     console.error("[audio] public_audio_narrations query failed:", error);
   }
 
-  const tracks = rows ?? [];
+  const tracks = (rows ?? []).filter((t) => !adultIds.has(t.id));
   if (tracks.length === 0) return [];
 
   const profileById = await fetchNarratorProfiles(supabase, [...new Set(tracks.map((t) => t.narrator_id))]);
@@ -145,14 +165,18 @@ export async function getAudioCatalog(supabase: SupabaseClient<Database>): Promi
  * kho như getAudioCatalog(). Hoà play_count thì bài mới hơn thắng, giống
  * cách trang chủ từng sort lại danh sách (vốn đã DESC theo created_at). */
 export async function getTopAudioTrack(supabase: SupabaseClient<Database>): Promise<AudioTrack | null> {
-  const { data: row, error } = await supabase
-    .from("public_audio_narrations")
-    .select("id, narrator_id, title, audio_url, duration_seconds, genre, play_count, created_at")
-    .order("play_count", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Lấy vài bài đầu rồi bỏ audio 18+ — không lọc được bằng 1 câu PostgREST.
+  const [{ data: rows, error }, adultIds] = await Promise.all([
+    supabase
+      .from("public_audio_narrations")
+      .select("id, narrator_id, title, audio_url, duration_seconds, genre, play_count, created_at")
+      .order("play_count", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(20),
+    fetchAdultAudioIds(supabase),
+  ]);
   if (error) console.error("[audio] top track query failed:", error);
+  const row = (rows ?? []).find((r) => !adultIds.has(r.id));
   if (!row) return null;
 
   const profileById = await fetchNarratorProfiles(supabase, [row.narrator_id]);

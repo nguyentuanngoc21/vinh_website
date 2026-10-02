@@ -42,7 +42,7 @@ export default async function AuthorChapterPage({
   const { data: book } = await supabase
     .from("books")
     .select(
-      "id, title, synopsis, genre, tags, slug, published, author_id, is_exclusive, published_at, deleted_at"
+      "id, title, synopsis, genre, tags, slug, published, author_id, is_exclusive, published_at, deleted_at, age_rating, content_warnings, age_rating_locked_at"
     )
     .eq("id", bookId)
     .maybeSingle();
@@ -53,7 +53,10 @@ export default async function AuthorChapterPage({
     notFound();
   }
 
-  const { data: chapter } = await supabase
+  // Service-role: anon/authenticated không còn quyền SELECT chapters.content
+  // (migrations/20261002_chapter_content_access.sql). An toàn vì quyền sở hữu
+  // sách đã kiểm ngay trên và chương được lọc theo đúng book_id đó.
+  const { data: chapter } = await createServiceRoleClient()
     .from("chapters")
     .select("id, title, content, published, price, audio_url, audio_price, is_last_chapter")
     .eq("id", chapterId)
@@ -79,6 +82,9 @@ export default async function AuthorChapterPage({
       bookSynopsis={book.synopsis}
       bookGenre={book.genre}
       bookTags={book.tags}
+      bookAgeRating={book.age_rating}
+      bookContentWarnings={book.content_warnings}
+      bookAgeRatingLocked={book.age_rating_locked_at !== null}
       bookSlug={book.slug}
       bookPublished={book.published}
       bookIsExclusive={book.is_exclusive}

@@ -2,7 +2,8 @@ import { requireSupabase } from './supabase';
 import type { Database } from '../types/database';
 
 type BookRow = Database['public']['Tables']['books']['Row'];
-export type Book = Pick<BookRow, 'id' | 'title' | 'slug' | 'synopsis' | 'genre' | 'view_count' | 'created_at'>;
+export type Book = Pick<BookRow, 'id' | 'title' | 'slug' | 'synopsis' | 'genre' | 'view_count' | 'created_at' | 'age_rating' | 'content_warnings'>;
+const BOOK_COLUMNS = 'id,title,slug,synopsis,genre,view_count,created_at,age_rating,content_warnings';
 export type ChapterSummary = Pick<Database['public']['Tables']['chapters']['Row'], 'id' | 'title' | 'order_index' | 'price'>;
 export const CHAPTER_PAGE_SIZE = 50;
 export const SEARCH_PAGE_SIZE = 20;
@@ -13,7 +14,7 @@ export async function searchBooks(term: string, offset = 0): Promise<Book[]> {
   if (!Number.isInteger(offset) || offset < 0) throw new Error('Trang kết quả không hợp lệ.');
   const pattern = title.replace(/[\\%_]/g, char => `\\${char}`);
   const { data, error } = await requireSupabase().from('books')
-    .select('id,title,slug,synopsis,genre,view_count,created_at')
+    .select(BOOK_COLUMNS)
     .eq('published', true).is('deleted_at', null).ilike('title', `%${pattern}%`)
     .order('created_at', { ascending: false }).order('id')
     .range(offset, offset + SEARCH_PAGE_SIZE - 1).abortSignal(AbortSignal.timeout(15000));
@@ -23,7 +24,7 @@ export async function searchBooks(term: string, offset = 0): Promise<Book[]> {
 
 export async function getBook(bookId: string): Promise<Book> {
   const { data, error } = await requireSupabase().from('books')
-    .select('id,title,slug,synopsis,genre,view_count,created_at')
+    .select(BOOK_COLUMNS)
     .eq('id', bookId).eq('published', true).is('deleted_at', null)
     .abortSignal(AbortSignal.timeout(15000)).maybeSingle();
   if (error) throw new Error('Không tải được thông tin truyện. Vui lòng thử lại.');
@@ -44,7 +45,7 @@ export async function getChapterPage(bookId: string, offset = 0): Promise<Chapte
 }
 export async function getBooks(): Promise<Book[]> {
   const { data, error } = await requireSupabase().from('books')
-    .select('id,title,slug,synopsis,genre,view_count,created_at')
+    .select(BOOK_COLUMNS)
     .eq('published', true).is('deleted_at', null)
     .order('view_count', { ascending: false }).limit(60).abortSignal(AbortSignal.timeout(15000));
   if (error) throw new Error('Không tải được truyện. Kiểm tra kết nối và thử lại.');
@@ -62,9 +63,24 @@ export async function getFirstChapter(bookId: string) {
 
 export type ReaderChapter = {
   id: string; bookId: string; title: string; bookTitle: string; content: string;
-  price: number; gate: 'none' | 'login' | 'purchase';
+  // 'age18': truyện 18+, chưa xác thực tuổi qua CCCD — server không gửi nội dung (ageReason cho lời nhắc).
+  price: number; gate: 'none' | 'login' | 'purchase' | 'age18';
+  ageRating: 'all' | '16' | '18';
+  ageReason?: 'guest' | 'unverified' | 'underage';
   previousId: string | null; nextId: string | null;
 };
+
+/** Quyền xem truyện 18+ của người đang đăng nhập (RPC chạy theo phiên của chính họ): 'ok', chưa xác
+ * thực CCCD, hoặc đã xác thực nhưng năm sinh chưa đủ 18. Chỉ để giao diện hiện đúng lời nhắc — quyền
+ * đọc thật do RLS + API đọc chương kiểm. Lỗi mạng → coi như chưa xác thực (đóng chứ không mở nhầm). */
+export async function getAdultAccess(userId: string): Promise<'ok' | 'unverified' | 'underage'> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc('viewer_can_read_adult').abortSignal(AbortSignal.timeout(15000));
+  if (!error && data === true) return 'ok';
+  const { data: profile } = await supabase.from('profiles').select('cccd_verified').eq('id', userId)
+    .abortSignal(AbortSignal.timeout(15000)).maybeSingle();
+  return profile?.cccd_verified ? 'underage' : 'unverified';
+}
 
 export async function getChapter(id: string, signal: AbortSignal): Promise<ReaderChapter> {
   const base = process.env.EXPO_PUBLIC_API_URL;

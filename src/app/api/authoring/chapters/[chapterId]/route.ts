@@ -162,7 +162,10 @@ export async function PATCH(
     .from("chapters")
     .update(update)
     .eq("id", chapterId)
-    .select("id, book_id, title, content, published, price, audio_url, audio_price, is_last_chapter")
+    // Không lấy `content` trong RETURNING: anon/authenticated không còn quyền
+    // SELECT cột này (migrations/20261002_chapter_content_access.sql). Nội
+    // dung vừa lưu được trả lại từ chính request (client đã có sẵn).
+    .select("id, book_id, title, published, price, audio_url, audio_price, is_last_chapter")
     .maybeSingle();
 
   if (error) {
@@ -224,7 +227,7 @@ export async function PATCH(
     revalidatePublicBooks();
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(update.content !== undefined ? { ...data, content: update.content } : data);
 }
 
 /**

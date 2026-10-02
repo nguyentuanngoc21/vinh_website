@@ -38,7 +38,7 @@ export function POST(request: Request, context: Ctx) {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     switch (body?.action) {
       case 'update':
-        return updateBook(forwardRequest(request, 'PATCH', pick(body, ['title', 'synopsis', 'genre', 'tags', 'is_exclusive'])), context);
+        return updateBook(forwardRequest(request, 'PATCH', pick(body, ['title', 'synopsis', 'genre', 'tags', 'is_exclusive', 'age_rating', 'content_warnings'])), context);
       case 'delete':
         return deleteBook(forwardRequest(request, 'DELETE'), context);
       case 'add-chapters':

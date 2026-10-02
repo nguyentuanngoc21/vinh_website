@@ -181,7 +181,7 @@ export function RankingBoard({
                 {r.tied && <span className="block text-[10px] font-semibold text-stone-alt">đồng hạng</span>}
               </span>
               <div className="h-[58px] w-[42px] overflow-hidden rounded-md">
-                <BookCover id={r.book.id} title={r.book.title} genre={r.book.genre} coverUrl={r.book.coverUrl} className="h-full w-full" />
+                <BookCover id={r.book.id} title={r.book.title} genre={r.book.genre} coverUrl={r.book.coverUrl} ageRating={r.book.ageRating} className="h-full w-full" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[15px] font-semibold text-ink">

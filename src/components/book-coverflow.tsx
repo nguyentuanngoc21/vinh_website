@@ -187,6 +187,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                   author={current.authorNickname}
                   genre={current.genre}
                   coverUrl={current.coverUrl}
+                  ageRating={current.ageRating}
                   priority
                 />
                 {current.isExclusive && <ExclusiveBadge variant="overlay" />}
@@ -295,6 +296,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                         author={book.authorNickname}
                         genre={book.genre}
                         coverUrl={book.coverUrl}
+                        ageRating={book.ageRating}
                         priority={nearView}
                       />
                       {book.isExclusive && <ExclusiveBadge variant="overlay" />}

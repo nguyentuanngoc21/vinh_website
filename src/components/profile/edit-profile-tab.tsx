@@ -399,7 +399,8 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
               </Alert>
             </div>
           )}
-          <div className="mt-[22px]">
+          {/* #xac-thuc-cccd — đích của nút "Xác thực CCCD" khi chặn truyện 18+ (story/age-gate.tsx). */}
+          <div id="xac-thuc-cccd" className="mt-[22px] scroll-mt-24">
             <IdentityForm onStatusChange={onIdentityStatus} />
           </div>
         </div>

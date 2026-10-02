@@ -110,6 +110,7 @@ export default async function SearchPage({
                           author={b.authorNickname}
                           genre={b.genre}
                           coverUrl={b.coverUrl}
+                          ageRating={b.ageRating}
                           className="h-full w-full"
                         />
                         {b.isExclusive && <ExclusiveBadge variant="overlay" />}

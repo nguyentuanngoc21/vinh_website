@@ -2,6 +2,8 @@ import type { BookGenre } from "@/lib/supabase/types";
 import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import { GeneratedBookCover } from "./generated-book-cover";
 import { ProtectedImage } from "@/components/ui/protected-image";
+import { AdultCoverShield, AgeRatingBadge } from "@/components/story/age-gate";
+import type { AgeRating } from "@/lib/age-rating";
 
 export type BookCoverProps = {
   // Seed cho biến thể (hash deterministic) — dùng book id THẬT khi có
@@ -25,9 +27,29 @@ export type BookCoverProps = {
   // chỉ tải khi sắp cuộn tới. Chỉ ảnh hưởng bìa ảnh thật, không ảnh hưởng
   // bìa sinh tự động (SVG inline).
   priority?: boolean;
+  // books.age_rating — có thì hiện huy hiệu 16+/18+ ở góc dưới-phải bìa; 18+ còn
+  // bị làm mờ với người chưa xác thực tuổi (AdultCoverShield). Bỏ trống ở nơi
+  // không cần (trang tác giả, bìa đang chỉnh).
+  ageRating?: AgeRating;
 };
 
-export function BookCover({ id, title, author, genre, coverUrl, className, priority = false }: BookCoverProps) {
+export function BookCover({ ageRating = "all", ...props }: BookCoverProps) {
+  if (ageRating === "all") return <CoverImage {...props} />;
+  return (
+    <div className="relative h-full w-full">
+      {ageRating === "18" ? (
+        <AdultCoverShield>
+          <CoverImage {...props} />
+        </AdultCoverShield>
+      ) : (
+        <CoverImage {...props} />
+      )}
+      <AgeRatingBadge rating={ageRating} overlay />
+    </div>
+  );
+}
+
+function CoverImage({ id, title, author, genre, coverUrl, className, priority = false }: Omit<BookCoverProps, "ageRating">) {
   if (coverUrl) {
     return (
       // Ảnh tới từ bucket Supabase Storage của người dùng (project ref

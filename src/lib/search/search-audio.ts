@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { fetchAdultAudioIds } from "@/lib/audio/get-audio-catalog";
 
 export type AudioSearchResult = {
   id: string;
@@ -48,8 +49,11 @@ export async function searchAudio(supabase: SupabaseClient<Database>, query: str
         .limit(SEARCH_LIMIT)
     : { data: [] as AudioSearchRow[] };
 
+  const adultIds = await fetchAdultAudioIds(supabase);
   const merged = new Map<string, AudioSearchRow>();
-  for (const row of [...(byTitle.data ?? []), ...(byNarrator.data ?? [])]) merged.set(row.id, row);
+  for (const row of [...(byTitle.data ?? []), ...(byNarrator.data ?? [])]) {
+    if (!adultIds.has(row.id)) merged.set(row.id, row);
+  }
   const rows = [...merged.values()].slice(0, SEARCH_LIMIT);
   if (rows.length === 0) return [];
 

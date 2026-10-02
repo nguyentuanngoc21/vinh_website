@@ -8,6 +8,7 @@ import { ProfileTabs } from "@/components/profile/profile-tabs";
 import { EditProfileTab } from "@/components/profile/edit-profile-tab";
 import { Skeleton } from "@/components/ui";
 import { PROFILE_TABS, type ProfileTab } from "@/lib/profile";
+import { chatThreadHref } from "@/lib/chat-thread-href";
 
 // Mỗi lúc chỉ hiện 1 tab, nên các tab không phải mặc định được tải lười
 // (next/dynamic) — ServicesTab (~1000 dòng), ChatTab, AgreementsTab (kéo
@@ -70,6 +71,40 @@ export function ProfilePage() {
   const [activeContext, setActiveContext] = useState<"personal" | "moderation">(contextParam);
   const [mobileView, setMobileView] = useState<"list" | "thread">(chatWithParam ? "thread" : "list");
 
+  // URL là nguồn sự thật cho tab + luồng đang mở. useState ở trên chỉ đọc
+  // searchParams LÚC MOUNT — khi ĐANG ở /ca-nhan mà bấm link chỉ đổi query
+  // ("Xem tất cả trong Hội thoại", 1 dòng trong flyout tin nhắn trên
+  // mobile, thẻ đơn ở bong bóng chat...), Next giữ nguyên component nên
+  // state không đổi theo, trang đứng im. Điều chỉnh state ngay trong
+  // render khi chuỗi query đổi (pattern "adjusting state when a prop
+  // changes" của React, không cần effect).
+  const paramsKey = searchParams.toString();
+  const [syncedParamsKey, setSyncedParamsKey] = useState(paramsKey);
+  if (paramsKey !== syncedParamsKey) {
+    setSyncedParamsKey(paramsKey);
+    if (chatWithParam) {
+      setActiveUserId(chatWithParam);
+      setActiveContext(contextParam);
+      setMobileView("thread");
+      setTab("chat");
+    } else if (isProfileTab(tabParam)) {
+      setTab(tabParam);
+    }
+  }
+
+  // Ghi ngược tab/luồng đang mở lên URL (replaceState tích hợp với
+  // useSearchParams của Next, không tải lại trang) — để link ?tab=chat
+  // luôn có tác dụng kể cả khi người dùng đã tự chuyển sang tab khác
+  // (URL cũ trùng URL link thì bấm vào không đổi gì), và mỗi hội thoại có
+  // URL riêng để tải lại/chia sẻ đúng chỗ.
+  const replaceUrl = (params: Record<string, string>) => {
+    window.history.replaceState(null, "", `/ca-nhan?${new URLSearchParams(params).toString()}`);
+  };
+  const changeTab = (next: ProfileTab) => {
+    setTab(next);
+    replaceUrl({ tab: next });
+  };
+
   // Header hiển thị trên MỌI tab (không chỉ tab "edit"), nên fetch riêng
   // ở đây thay vì đọc state của EditProfileTab — 2 nơi cùng gọi
   // GET /api/profile/me độc lập là chấp nhận được, cùng pattern
@@ -115,6 +150,7 @@ export function ProfilePage() {
     setActiveContext("personal");
     setMobileView("thread");
     setTab("chat");
+    window.history.replaceState(null, "", chatThreadHref(userId, "personal"));
   };
 
   return (
@@ -131,7 +167,7 @@ export function ProfilePage() {
         avatarUrl={avatarUrl}
         onAvatarSaved={setAvatarUrl}
       />
-      <ProfileTabs active={tab} onChange={setTab} />
+      <ProfileTabs active={tab} onChange={changeTab} />
 
       {tab === "following" && <FollowingTab onMessage={openChatWith} />}
 
@@ -143,9 +179,15 @@ export function ProfilePage() {
             setActiveUserId(userId);
             setActiveContext(context);
             setMobileView("thread");
+            window.history.replaceState(null, "", chatThreadHref(userId, context));
           }}
           mobileView={mobileView}
-          onBack={() => setMobileView("list")}
+          onBack={() => {
+            setMobileView("list");
+            // Bỏ ?chat= khỏi URL — không thì bấm lại đúng luồng này từ flyout
+            // tin nhắn (cùng URL) sẽ không đổi gì, kẹt ở danh sách.
+            replaceUrl({ tab: "chat" });
+          }}
         />
       )}
 

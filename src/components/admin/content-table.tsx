@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwiseIcon, BookOpenTextIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOutIcon, MagnifyingGlassIcon, TrashIcon, ArrowCounterClockwiseIcon, BookOpenTextIcon, LockKeyIcon } from "@phosphor-icons/react/dist/ssr";
 import { RemoveChapterModal, type RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
-import { Alert, Button, Checkbox } from "@/components/ui";
+import { Alert, Button, Checkbox, Select } from "@/components/ui";
 import { ExclusivityModal } from "@/components/admin/exclusivity-modal";
+import { AgeRatingModal } from "@/components/admin/age-rating-modal";
+import { AGE_RATING_LABELS, type AgeRating } from "@/lib/age-rating";
 import { reasonGroupLabel, type ReasonGroupId } from "@/lib/moderation/chapter-removal-templates";
 
 export type ContentBookRow = {
@@ -15,6 +17,9 @@ export type ContentBookRow = {
   authorUsername: string;
   published: boolean;
   isExclusive: boolean;
+  ageRating: AgeRating;
+  /** Admin đã khoá nhãn độ tuổi (tác giả không tự sửa được). */
+  ageRatingLocked: boolean;
   deletedAt: string | null;
   /** Username admin đã xoá (books.removed_by). null khi đã xoá = tác giả tự
    * xoá (route tác giả chỉ set deleted_at, không ghi removed_by). */
@@ -28,7 +33,24 @@ export type ContentBookRow = {
   contentPurgedAt: string | null;
 };
 
-const GRID_COLS = "grid-cols-[1fr_160px_110px_130px_230px_100px_190px]";
+const AGE_FILTERS = [
+  { id: "any", label: "Mọi nhãn độ tuổi" },
+  { id: "all", label: "Mọi lứa tuổi" },
+  { id: "16", label: "16+" },
+  { id: "18", label: "18+" },
+  { id: "unlocked", label: "Nhãn chưa khoá (chưa rà)" },
+  { id: "locked", label: "Nhãn đã khoá" },
+] as const;
+type AgeFilter = (typeof AGE_FILTERS)[number]["id"];
+
+function matchesAgeFilter(r: ContentBookRow, filter: AgeFilter): boolean {
+  if (filter === "any") return true;
+  if (filter === "locked") return r.ageRatingLocked;
+  if (filter === "unlocked") return !r.ageRatingLocked;
+  return r.ageRating === filter;
+}
+
+const GRID_COLS = "grid-cols-[1fr_160px_110px_130px_120px_230px_100px_190px]";
 
 /**
  * Bảng quản lý truyện cho src/app/admin/noi-dung/page.tsx. Tìm kiếm lọc
@@ -58,19 +80,26 @@ export function ContentTable({
   // nhầm). Admin/super_admin bỏ qua khoá 3 ngày của tác giả; chỉ trigger
   // cuộc thi (D11) còn chặn — lỗi đó hiện ở Alert phía trên bảng.
   const [togglingBook, setTogglingBook] = useState<ContentBookRow | null>(null);
+  // Sửa nhãn độ tuổi — modal tự tải nhãn/lịch sử và tự lưu (PUT
+  // /api/admin/books/:id/age-rating), bảng chỉ cập nhật lại hàng khi xong.
+  const [ratingBook, setRatingBook] = useState<ContentBookRow | null>(null);
   // Mặc định ẩn — hàng đã dọn nội dung (quá 30 ngày) không còn thao tác gì
   // được nữa (Khôi phục vô nghĩa), giữ khỏi làm rối bảng hàng ngày; vẫn có
   // thể bật lên để đối chiếu/audit.
   const [showPurged, setShowPurged] = useState(false);
+  // Lọc theo nhãn độ tuổi để rà nhanh. "Chưa khoá" = admin chưa xác nhận nhãn
+  // (khoá nhãn sau khi rà là cách đánh dấu "đã rà").
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>("any");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
       if (!showPurged && r.contentPurgedAt) return false;
+      if (!matchesAgeFilter(r, ageFilter)) return false;
       if (!q) return true;
       return r.title.toLowerCase().includes(q) || r.authorUsername.toLowerCase().includes(q);
     });
-  }, [rows, query, showPurged]);
+  }, [rows, query, showPurged, ageFilter]);
 
   const patch = async (id: string, body: Record<string, unknown>) => {
     if (pendingId) return null;
@@ -142,7 +171,21 @@ export function ContentTable({
             className="w-[280px] bg-transparent text-sm outline-none"
           />
         </div>
-        <div className="flex items-center gap-3.5">
+        <div className="flex flex-wrap items-center gap-3.5">
+          <Select
+            label={null}
+            aria-label="Lọc theo độ tuổi"
+            size="sm"
+            value={ageFilter}
+            onChange={(e) => setAgeFilter(e.target.value as AgeFilter)}
+            wrapperClassName="w-[190px]"
+          >
+            {AGE_FILTERS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </Select>
           <Checkbox checked={showPurged} onChange={() => setShowPurged((v) => !v)}>
             Hiện cả truyện đã dọn nội dung (&gt;30 ngày)
           </Checkbox>
@@ -161,11 +204,12 @@ export function ContentTable({
           "Chương" (và cả Xoá/Khôi phục) sẽ bị cắt mất hẳn, không cách nào
           xem/bấm được, đúng như bug đã xảy ra khi thêm cột thứ 7. */}
       <div className="overflow-x-auto">
-      <div className={`grid ${GRID_COLS} min-w-[980px] gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
+      <div className={`grid ${GRID_COLS} min-w-[1110px] gap-3 border-b border-cream-border px-2.5 pb-2.5 text-xs font-semibold text-stone-alt`}>
         <div>Truyện</div>
         <div>Tác giả</div>
         <div>Trạng thái</div>
         <div>Độc quyền</div>
+        <div>Độ tuổi</div>
         <div>Đã xoá</div>
         <div />
         <div />
@@ -174,7 +218,7 @@ export function ContentTable({
       {filtered.map((r) => (
         <div
           key={r.id}
-          className={`grid ${GRID_COLS} min-w-[980px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
+          className={`grid ${GRID_COLS} min-w-[1110px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
         >
           <div className="flex items-center gap-1.5 truncate">
             <span className="truncate">{r.title}</span>
@@ -213,6 +257,23 @@ export function ContentTable({
               }`}
             >
               {r.isExclusive ? "Độc quyền" : "Tự do"}
+            </button>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => setRatingBook(r)}
+              title="Bấm để sửa nhãn độ tuổi"
+              className={`inline-flex items-center gap-1 rounded-full px-[11px] py-1 text-[11px] font-semibold ${
+                r.ageRating === "18"
+                  ? "bg-error text-white"
+                  : r.ageRating === "16"
+                    ? "bg-cream-gold text-brand-gold-dark"
+                    : "border border-cream-border text-stone-dark"
+              }`}
+            >
+              {AGE_RATING_LABELS[r.ageRating]}
+              {r.ageRatingLocked && <LockKeyIcon size={11} weight="bold" aria-label="Đã khoá" />}
             </button>
           </div>
           <div className="text-xs text-stone-alt">
@@ -278,6 +339,19 @@ export function ContentTable({
 
       {filtered.length === 0 && (
         <div className="px-2.5 py-6 text-center text-sm text-stone-light">Không có truyện nào khớp.</div>
+      )}
+
+      {ratingBook && (
+        <AgeRatingModal
+          book={ratingBook}
+          onCancel={() => setRatingBook(null)}
+          onSaved={({ ageRating, locked }) => {
+            setRows((prev) =>
+              prev.map((row) => (row.id === ratingBook.id ? { ...row, ageRating, ageRatingLocked: locked } : row))
+            );
+            setRatingBook(null);
+          }}
+        />
       )}
 
       {togglingBook && (

@@ -26,7 +26,7 @@ export default async function AdminContentPage() {
   const { data: bookRows } = await supabase
     .from("books")
     .select(
-      "id, title, slug, author_id, published, is_exclusive, deleted_at, removed_by, removed_reason_group, removed_reason_detail, content_purged_at, created_at"
+      "id, title, slug, author_id, published, is_exclusive, deleted_at, removed_by, removed_reason_group, removed_reason_detail, content_purged_at, created_at, age_rating, age_rating_locked_at"
     )
     .order("created_at", { ascending: false })
     .limit(FETCH_LIMIT + 1);
@@ -50,6 +50,8 @@ export default async function AdminContentPage() {
     authorUsername: usernameById.get(b.author_id) ?? "—",
     published: b.published,
     isExclusive: b.is_exclusive,
+    ageRating: b.age_rating,
+    ageRatingLocked: b.age_rating_locked_at !== null,
     deletedAt: b.deleted_at,
     removedByUsername: b.removed_by ? (usernameById.get(b.removed_by) ?? "—") : null,
     removedReasonGroup: b.removed_reason_group,

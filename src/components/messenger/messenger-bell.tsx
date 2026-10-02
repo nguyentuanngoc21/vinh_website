@@ -149,6 +149,9 @@ export function MessengerBell({ open, onOpenChange }: { open: boolean; onOpenCha
                 key={`${c.userId}::${c.context}`}
                 href={chatThreadHref(c.userId, c.context)}
                 onClick={handleRowClick(c)}
+                // Desktop: handleRowClick chặn điều hướng để mở bong bóng —
+                // báo NavigationOverlay đừng bật lớp phủ "đang tải".
+                data-no-nav-overlay={isDesktop ? "" : undefined}
                 className="flex items-center gap-3 border-b border-[#f5f4f2] px-[18px] py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card"
               >
                 <UserAvatar userId={c.userId} nickname={c.nickname} avatarUrl={c.avatarUrl} size={40} />

@@ -281,6 +281,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                           author={b.authorNickname}
                           genre={b.genre}
                           coverUrl={b.coverUrl}
+                          ageRating={b.ageRating}
                           className="h-full w-full"
                         />
                         {b.isExclusive && <ExclusiveBadge variant="overlay" />}
@@ -364,6 +365,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                               author={b.authorNickname}
                               genre={b.genre}
                               coverUrl={b.coverUrl}
+                              ageRating={b.ageRating}
                               className="h-full w-full"
                             />
                           </div>

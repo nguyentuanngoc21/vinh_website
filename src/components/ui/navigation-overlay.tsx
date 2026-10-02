@@ -62,6 +62,14 @@ export function NavigationOverlay() {
       // client-side transition ở TRANG NÀY.
       if (anchor.target && anchor.target !== "_self") return;
       if (anchor.hasAttribute("download")) return;
+      // Link mà onClick của chính nó tự preventDefault() (không điều hướng
+      // thật, vd dòng hội thoại ở messenger-bell.tsx trên desktop — mở bong
+      // bóng chat tại chỗ) PHẢI tự gắn data-no-nav-overlay. Listener này
+      // chạy ở capture phase, TRƯỚC onClick đó, nên không thể dựa vào
+      // e.defaultPrevented (chính Next <Link> cũng luôn preventDefault khi
+      // điều hướng client-side) — không opt-out thì overlay bật mà pathname
+      // không bao giờ đổi để tắt, kẹt "đang tải" mãi.
+      if (anchor.hasAttribute("data-no-nav-overlay")) return;
       const rawHref = anchor.getAttribute("href");
       if (!rawHref || rawHref.startsWith("#")) return;
 
