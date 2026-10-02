@@ -9,6 +9,7 @@ import { themes, useReaderSettings } from '../../src/hooks/useReaderSettings';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useAudio } from '../../src/providers/AudioProvider';
 import { SaveBook } from '../../src/components/SaveBook';
+import { Age16Confirm, Age18Notice } from '../../src/components/AgeGate';
 import { ReaderParagraphs } from '../../src/components/ReaderParagraphs';
 import { ParagraphComments } from '../../src/components/ParagraphComments';
 import { ChapterEngagement } from '../../src/components/ChapterEngagement';
@@ -107,6 +108,7 @@ function ReaderContent({ chapterId }: { chapterId: string }) {
       {chapter && button('Mục lục', () => router.replace({ pathname: '/truyen/[bookId]', params: { bookId: chapter.bookId } }))}
       {button('Aa', () => setShowSettings(true), false, !ready)}
     </View>
+    <Age16Confirm active={chapter?.ageRating === '16'} />
     {!chapter && !error && <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={colors.text} /></View>}
     {!!error && <View style={{ flex: 1, justifyContent: 'center', padding: 28 }}>
       <Text accessibilityLiveRegion="polite" style={{ color: colors.text, marginBottom: 16 }}>{error}</Text>
@@ -126,7 +128,9 @@ function ReaderContent({ chapterId }: { chapterId: string }) {
         <View style={{ backgroundColor: colors.muted, height: 1, width: 44, marginTop: 28 }} />
       </View>}
       footer={<View style={{ paddingVertical: 28 }}>
-        {chapter.gate !== 'none' ? <View style={{ backgroundColor: colors.panel, borderRadius: 18, padding: 22, marginBottom: 24 }}>
+        {chapter.gate === 'age18' ? <Age18Notice reason={chapter.ageReason ?? 'guest'}
+          textColor={colors.text} mutedColor={colors.muted} panelColor={colors.panel} />
+        : chapter.gate !== 'none' ? <View style={{ backgroundColor: colors.panel, borderRadius: 18, padding: 22, marginBottom: 24 }}>
           <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', marginBottom: 12 }}>
             {chapter.gate === 'purchase' ? `Chương khóa · ${chapter.price} xu` : 'Bạn vừa đọc hết phần đọc thử'}</Text>
           <Text style={{ color: colors.muted, lineHeight: 24 }}>{chapter.gate === 'login'

@@ -97,6 +97,11 @@ docs/SUPABASE_SETUP.md §5 for the full state machine before touching `/quen-mat
   (see docs/DEV_WORKFLOW.md for the exact test-in-a-transaction recipe) before production. Every
   migration must be mirrored into the matching `migrations/baseline/` domain file (then
   `npm run build-schema`) and `src/lib/supabase/types.ts` in the same change.
+- `chapters` uses **column-level SELECT grants**: anon/authenticated can read every column except
+  `content` (migrations/20261002_chapter_content_access.sql). Chapter text is read only server-side with
+  the service-role client after the route checks purchase / age rating / ownership. A migration that adds
+  a `chapters` column must also `grant select (<col>) on public.chapters to anon, authenticated`, and
+  user-scoped queries must never `select("*")` or return `content` from chapters.
 - Sensitive data is deliberately split off the hot `profiles` table: `identity_verifications`
   (CCCD number + private-bucket image paths) is a separate table so the frequently-queried
   `profiles` row never carries it. CCCD images live in a **private** Supabase Storage bucket,

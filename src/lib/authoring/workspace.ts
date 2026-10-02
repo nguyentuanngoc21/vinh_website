@@ -53,7 +53,7 @@ async function ownBook(client: Client, userId: string, bookId: string) {
   const { data: book } = await client
     .from("books")
     .select(
-      "id, title, synopsis, genre, tags, slug, published, published_at, author_id, is_exclusive, deleted_at, cover_design_item_id, finalized_at"
+      "id, title, synopsis, genre, tags, slug, published, published_at, author_id, is_exclusive, deleted_at, cover_design_item_id, finalized_at, age_rating, content_warnings, age_rating_locked_at"
     )
     .eq("id", bookId)
     .maybeSingle();
@@ -93,6 +93,9 @@ export async function getAuthorBook(client: Client, userId: string, bookId: stri
     synopsis: book.synopsis,
     genre: book.genre,
     tags: book.tags ?? [],
+    ageRating: book.age_rating,
+    contentWarnings: book.content_warnings ?? [],
+    ageRatingLocked: book.age_rating_locked_at !== null,
     slug: book.slug,
     published: book.published,
     isExclusive: book.is_exclusive,
@@ -122,18 +125,24 @@ export async function getAuthorBook(client: Client, userId: string, bookId: stri
   };
 }
 
-export async function getAuthorChapter(client: Client, userId: string, chapterId: string) {
+/**
+ * `service`: service-role client — chỉ dùng để đọc `content` SAU khi đã xác
+ * nhận người gọi sở hữu truyện (anon/authenticated không có quyền SELECT cột
+ * này, xem migrations/20261002_chapter_content_access.sql).
+ */
+export async function getAuthorChapter(client: Client, service: Client, userId: string, chapterId: string) {
   const { data: chapter } = await client
     .from("chapters")
     .select(
-      "id, book_id, title, content, published, price, audio_url, audio_price, is_last_chapter, removed_at, removed_reason_detail"
+      "id, book_id, title, published, price, audio_url, audio_price, is_last_chapter, removed_at, removed_reason_detail"
     )
     .eq("id", chapterId)
     .maybeSingle();
   if (!chapter) return null;
   const book = await ownBook(client, userId, chapter.book_id);
   if (!book) return null;
-  const [linkedAudio, { data: characters }, { data: tagged }] = await Promise.all([
+  const [{ data: contentRow }, linkedAudio, { data: characters }, { data: tagged }] = await Promise.all([
+    service.from("chapters").select("content").eq("id", chapter.id).eq("book_id", book.id).maybeSingle(),
     getChapterAudio(client, chapter.id),
     client.from("characters").select(CHARACTER_FIELDS).eq("book_id", book.id).order("created_at", { ascending: true }),
     client.from("chapter_characters").select("character_id").eq("chapter_id", chapter.id),
@@ -143,7 +152,7 @@ export async function getAuthorChapter(client: Client, userId: string, chapterId
     chapter: {
       id: chapter.id,
       title: chapter.title,
-      content: chapter.content,
+      content: contentRow?.content ?? "",
       published: chapter.published,
       price: chapter.price,
       audioUrl: chapter.audio_url,

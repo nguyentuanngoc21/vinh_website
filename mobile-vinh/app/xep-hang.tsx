@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Notice, ScreenHeader } from '../src/components/Form';
 import { getRankings, PERIODS, type PeriodId, type RankingPeriod } from '../src/services/discover';
+import { ThumbCover } from '../src/components/BookCover';
 
 // Real "Truyện chữ" rankings from the web /rankings (reads per period; all-time by views).
 export default function Rankings() {
@@ -50,9 +51,7 @@ export default function Rankings() {
       renderItem={({ item, index }) => <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/truyen/[bookId]', params: { bookId: item.id } })}
         className="mb-3 flex-row items-center gap-3 rounded-2xl border border-cream-border bg-white p-3">
         <Text className="w-8 text-center text-xl font-bold text-brand-ink">{index + 1}</Text>
-        <View className="overflow-hidden rounded-md bg-brand-ink" style={{ width: 46, height: 66 }}>
-          {item.coverUrl && <Image source={{ uri: item.coverUrl }} accessibilityIgnoresInvertColors style={{ width: '100%', height: '100%' }} />}
-        </View>
+        <ThumbCover coverUrl={item.coverUrl} ageRating={item.ageRating} />
         <View className="flex-1">
           <Text numberOfLines={2} className="font-bold text-brand-ink">{item.title}{item.isNew ? '  · MỚI' : ''}</Text>
           <Text numberOfLines={1} className="text-xs text-stone">{item.authorNickname ?? 'Tác giả'} · {item.genre ?? 'Truyện'}</Text>

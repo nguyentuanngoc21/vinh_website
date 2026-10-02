@@ -36,6 +36,8 @@ Chạy lần lượt theo tên file trong SQL editor (hoặc `psql -f`), từng 
 | `10_legal_agreements.sql` | `agreement_acceptances` |
 | `11_contests.sql` | Contest Engine: cuộc thi, bài dự thi, bình chọn, giải, snapshot, điểm, gian lận, chấm giám khảo, công bố, nhiệm vụ sự kiện, Passport, chụp hạng |
 | `12_content_retention.sql` | `content_purged_at` + index hàng chờ dọn nội dung |
+| `14_age_ratings.sql` | Nhãn độ tuổi + cảnh báo nội dung cấp truyện, khoá nhãn bởi admin + `book_age_rating_events`, xác thực tuổi qua CCCD (`is_age_verified_adult`), policy SELECT `chapters` chặn truyện 18+ |
+| `15_chapter_content_access.sql` | Thu hồi SELECT cột `chapters.content` khỏi anon/authenticated (cấp lại các cột khác) — nội dung chương chỉ đọc qua server |
 | `99_seed_data.sql` | Seed danh mục: `task_templates`, `achievement_templates`, `streak_milestones`, `service_tag_options` |
 
 Mỗi file bắt đầu bằng header liệt kê: phạm vi, bảng/view/hàm/enum/bucket tạo trong file, cột

@@ -95,6 +95,7 @@ export function HeroTrending({ book }: { book: HomepageBook | null }) {
               author={book.authorNickname}
               genre={book.genre}
               coverUrl={book.coverUrl}
+              ageRating={book.ageRating}
               className="h-full w-full"
             />
             {book.isExclusive && <ExclusiveBadge variant="overlay" />}

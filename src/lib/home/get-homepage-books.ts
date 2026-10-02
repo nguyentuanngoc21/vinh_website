@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
 import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 import { computeBookStatus, type BookStatus } from "@/lib/story/status";
+import type { AgeRating } from "@/lib/age-rating";
 
 /**
  * Real, DB-backed shape for the homepage sections (BookCoverflow,
@@ -24,6 +25,8 @@ export type HomepageBook = {
   status: BookStatus;
   /** books.is_exclusive — tag "Độc quyền" trên card. */
   isExclusive: boolean;
+  /** books.age_rating — huy hiệu 16+/18+ + làm mờ bìa 18+ (BookCover). */
+  ageRating: AgeRating;
 };
 
 type BookRow = Database["public"]["Tables"]["books"]["Row"];
@@ -32,7 +35,7 @@ type BookRow = Database["public"]["Tables"]["books"]["Row"];
  * books có cột `embedding vector(1536)` (~15-20 KB JSON/hàng) chỉ dùng
  * cho recommend_books() trong SQL, không bao giờ cần gửi về app. */
 export const HOMEPAGE_BOOK_COLUMNS =
-  "id, slug, title, genre, view_count, author_id, synopsis, cover_design_item_id, created_at, is_exclusive";
+  "id, slug, title, genre, view_count, author_id, synopsis, cover_design_item_id, created_at, is_exclusive, age_rating";
 export type HomepageBookRow = Pick<
   BookRow,
   | "id"
@@ -45,6 +48,7 @@ export type HomepageBookRow = Pick<
   | "cover_design_item_id"
   | "created_at"
   | "is_exclusive"
+  | "age_rating"
 >;
 
 /** Exported for reuse by src/lib/recommendations/get-recommended-books.ts
@@ -88,6 +92,7 @@ export async function toHomepageBooks(
       latestPublishedChapterCreatedAt: statsByBook.get(r.id)?.latest_published_chapter_at ?? null,
     }),
     isExclusive: r.is_exclusive,
+    ageRating: r.age_rating,
   }));
 }
 

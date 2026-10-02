@@ -7,6 +7,7 @@ import { Book, getBooks } from '../../src/services/books';
 import { getDiscover, markRecommendationView, type HomepageBook } from '../../src/services/discover';
 import { BookCover } from '../../src/components/BookCover';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { AgeBadge } from '../../src/components/AgeGate';
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -63,7 +64,7 @@ export default function Home() {
         {!!recommended.length && <>
           <Text className="mb-3 text-xl font-bold text-brand-ink">Gợi ý cho bạn</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingBottom: 24 }}>
-            {recommended.map(b => <BookCover key={b.id} title={b.title} coverUrl={b.coverUrl} subtitle={b.authorNickname}
+            {recommended.map(b => <BookCover key={b.id} title={b.title} coverUrl={b.coverUrl} subtitle={b.authorNickname} ageRating={b.ageRating}
               onPress={() => { if (userId) void markRecommendationView(userId, b.id); router.push({ pathname: '/truyen/[bookId]', params: { bookId: b.id } }); }} />)}
           </ScrollView>
         </>}
@@ -85,7 +86,9 @@ export default function Home() {
               onPress={() => open(book)} style={{ width: 270, minHeight: 270 }} className="justify-between rounded-3xl bg-brand-ink p-6">
               <Text className="mb-6 text-xs tracking-widest text-brand-gold">VỊNH TUYỂN CHỌN · 0{index + 1}</Text>
               <Text numberOfLines={3} className="mb-4 text-3xl font-bold text-cream-card">{book.title}</Text>
-              <Text numberOfLines={2} className="mb-6 text-sm leading-6 text-cream">{book.synopsis || book.genre || 'Một câu chuyện đang chờ bạn khám phá.'}</Text>
+              {book.age_rating !== 'all' && <View className="mb-3"><AgeBadge rating={book.age_rating} /></View>}
+              {/* Truyện 18+: không hiện tóm tắt ở trang chủ (trang truyện ẩn tóm tắt với người chưa xác thực tuổi). */}
+              <Text numberOfLines={2} className="mb-6 text-sm leading-6 text-cream">{(book.age_rating !== '18' && book.synopsis) || book.genre || 'Một câu chuyện đang chờ bạn khám phá.'}</Text>
               <Text className="font-bold text-brand-gold">Khám phá truyện →</Text>
             </Pressable>)}
           </ScrollView>
@@ -98,6 +101,7 @@ export default function Home() {
         className="mb-3 flex-row items-center rounded-2xl border border-cream-border p-4">
         <View className="mr-4 h-20 w-14 items-center justify-center rounded-lg bg-brand-ink"><Text className="text-xl text-brand-gold">{String(index + 1).padStart(2, '0')}</Text></View>
         <View className="flex-1"><Text numberOfLines={2} className="mb-2 text-base font-bold text-brand-ink">{item.title}</Text>
+          {item.age_rating !== 'all' && <View className="mb-2"><AgeBadge rating={item.age_rating} /></View>}
           <Text className="text-xs text-stone">{item.genre || 'Truyện'} · {item.view_count.toLocaleString('vi')} lượt xem</Text></View>
         <Text className="ml-3 text-xl text-brand-ink">→</Text>
       </Pressable>} />

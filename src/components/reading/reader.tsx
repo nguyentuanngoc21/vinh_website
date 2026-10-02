@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { recallReadingSource } from "@/lib/reading/reading-source";
+import { ReportContentButton } from "@/components/story/report-content-button";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/reading/heartbeat-config";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1427,6 +1428,9 @@ export function Reader({
             >
               <ShareNetworkIcon /> Chia sẻ
             </button>
+            {bookId && chapterId && (
+              <ReportContentButton bookId={bookId} chapterId={chapterId} triggerStyle={{ borderColor: c.hair, color: c.ink }} />
+            )}
           </div>
 
           <TropeVotePanel

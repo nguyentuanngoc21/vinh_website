@@ -24,7 +24,8 @@ export default function BookOverview() {
   return <Overview key={`${session.user.id}:${bookId}`} userId={session.user.id} bookId={bookId} />;
 }
 
-const toInfo = (b: BookDetail): BookInfo => ({ title: b.title, genre: b.genre, synopsis: b.synopsis ?? '', tags: b.tags.join(', '), isExclusive: b.isExclusive });
+const toInfo = (b: BookDetail): BookInfo => ({ title: b.title, genre: b.genre, synopsis: b.synopsis ?? '', tags: b.tags.join(', '),
+  isExclusive: b.isExclusive, ageRating: b.ageRating ?? 'all', contentWarnings: b.contentWarnings ?? [] });
 const canDelete = (c: ChapterRow) => !c.published && !c.removed && !c.isLastChapter && !c.sold;
 
 function Overview({ userId, bookId }: { userId: string; bookId: string }) {
@@ -71,6 +72,10 @@ function Overview({ userId, bookId }: { userId: string; bookId: string }) {
   const tags = parseTags(info.tags);
   if (tags.join('\n') !== book.tags.join('\n')) changes.tags = tags;
   if (info.isExclusive !== original.isExclusive) changes.is_exclusive = info.isExclusive;
+  if (info.ageRating !== original.ageRating || [...info.contentWarnings].sort().join() !== [...original.contentWarnings].sort().join()) {
+    changes.age_rating = info.ageRating;
+    changes.content_warnings = info.contentWarnings;
+  }
   const dirty = Object.keys(changes).length > 0;
   const chapters = order ?? book.chapters;
 
@@ -146,7 +151,8 @@ function Overview({ userId, bookId }: { userId: string; bookId: string }) {
         <ManuscriptShare userId={userId} book={book} onChanged={load} />
 
         <Text className="mb-3 mt-8 text-lg font-bold text-brand-ink">Thông tin truyện</Text>
-        <BookInfoForm value={info} onChange={setInfo} disabled={busy} exclusivityLocked={book.exclusivityLocked} />
+        <BookInfoForm value={info} onChange={setInfo} disabled={busy} exclusivityLocked={book.exclusivityLocked}
+          ageRatingLocked={book.ageRatingLocked} />
         <Button label={busy ? 'Đang lưu…' : 'Lưu thông tin'} disabled={busy || !dirty} onPress={saveInfo} />
         {dirty && <Button label="Bỏ thay đổi" disabled={busy} secondary onPress={() => setInfo(original)} />}
 

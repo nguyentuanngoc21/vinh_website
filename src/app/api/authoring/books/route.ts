@@ -10,6 +10,7 @@ import {
 } from "@/lib/authoring/exclusivity-agreement";
 import type { BookGenre } from "@/lib/supabase/types";
 import { revalidatePublicBooks } from "@/lib/cache/public-data";
+import { normalizeAgeRating } from "@/lib/age-rating";
 
 function isBookGenre(value: unknown): value is BookGenre {
   return typeof value === "string" && (BOOK_GENRES as readonly string[]).includes(value);
@@ -87,6 +88,15 @@ export async function POST(request: Request) {
   // Mặc định Tự do — chỉ độc quyền khi client gửi rõ isExclusive: true
   // (luồng "Nhập bản thảo" chỉ gửi { title }, trước đây bị gán độc quyền).
   const isExclusive = body?.isExclusive === true;
+  // Nhãn độ tuổi — không gửi thì mặc định "Mọi lứa tuổi" (luồng "Nhập bản
+  // thảo" chỉ gửi { title }). Gửi mà sai định dạng thì báo lỗi.
+  const ageRating =
+    body?.ageRating === undefined && body?.contentWarnings === undefined
+      ? { ageRating: "all" as const, contentWarnings: [] }
+      : normalizeAgeRating(body?.ageRating, body?.contentWarnings ?? []);
+  if (!ageRating) {
+    return NextResponse.json({ error: "Nhãn độ tuổi không hợp lệ." }, { status: 400 });
+  }
 
   const chapterTitle = (typeof body?.chapterTitle === "string" ? body.chapterTitle.trim() : "") || "Chương 1";
   const chapterContent = typeof body?.chapterContent === "string" ? body.chapterContent : "";
@@ -140,6 +150,8 @@ export async function POST(request: Request) {
       genre,
       tags,
       is_exclusive: isExclusive,
+      age_rating: ageRating.ageRating,
+      content_warnings: ageRating.contentWarnings,
     })
     .select("id")
     .single();

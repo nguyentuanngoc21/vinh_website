@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookGenre, Database } from "@/lib/supabase/types";
 import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
+import type { AgeRating } from "@/lib/age-rating";
 
 /**
  * Real, DB-backed ranking data for the "Truyện chữ" tab of /rankings
@@ -63,6 +64,7 @@ export type RankedBook = {
   isNew: boolean;
   /** books.is_exclusive — tag "Độc quyền" trên card. */
   isExclusive: boolean;
+  ageRating: AgeRating;
 };
 
 export type RankingLeader = { name: string; meta: string; color: string };
@@ -164,7 +166,7 @@ export async function getBookRankings(
   const [{ data: rows }, periodReads] = await Promise.all([
     supabase
       .from("books")
-      .select("id, slug, title, genre, author_id, view_count, created_at, cover_design_item_id, is_exclusive")
+      .select("id, slug, title, genre, author_id, view_count, created_at, cover_design_item_id, is_exclusive, age_rating")
       .eq("published", true)
       .is("deleted_at", null)
       .order("view_count", { ascending: false })
@@ -222,6 +224,7 @@ export async function getBookRankings(
       viewCount: b.view_count,
       createdAtMs: new Date(b.created_at).getTime(),
       isExclusive: b.is_exclusive,
+      ageRating: b.age_rating,
     }));
   }
 
@@ -275,6 +278,7 @@ export async function getBookRankings(
         coverUrl: b.coverUrl,
         viewCount: b.viewCount,
         isExclusive: b.isExclusive,
+        ageRating: b.ageRating,
         reads: curReads(b.id),
         delta: (prevRank.get(b.id) ?? 0) - (curRank.get(b.id) ?? 0),
         isNew: b.createdAtMs >= w.curStart.getTime(),
@@ -299,6 +303,7 @@ export async function getBookRankings(
         coverUrl: b.coverUrl,
         viewCount: b.viewCount,
         isExclusive: b.isExclusive,
+        ageRating: b.ageRating,
         reads: b.viewCount,
         delta: null,
         isNew: now.getTime() - b.createdAtMs < NEW_WINDOW_MS,

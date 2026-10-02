@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useAuth } from '../src/providers/AuthProvider';
 import { useAudio } from '../src/providers/AudioProvider';
 import { searchAll, type AudioResult, type BookResult, type DesignResult } from '../src/services/discover';
+import { ThumbCover } from '../src/components/BookCover';
 
 type Tab = 'truyen' | 'audio' | 'thiet-ke';
 const TABS: [Tab, string][] = [['truyen', 'Truyện'], ['audio', 'Audio'], ['thiet-ke', 'Thiết kế']];
@@ -69,9 +70,7 @@ export default function Search() {
           const b = item as BookResult;
           return <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/truyen/[bookId]', params: { bookId: b.id } })}
             className="mb-3 flex-row items-center gap-3 rounded-2xl border border-cream-border bg-white p-3">
-            <View className="overflow-hidden rounded-md bg-brand-ink" style={{ width: 46, height: 66 }}>
-              {b.coverUrl && <Image source={{ uri: b.coverUrl }} accessibilityIgnoresInvertColors style={{ width: '100%', height: '100%' }} />}
-            </View>
+            <ThumbCover coverUrl={b.coverUrl} ageRating={b.ageRating} />
             <View className="flex-1"><Text className="font-bold text-brand-ink">{b.title}</Text>
               <Text className="text-sm text-stone">{b.authorNickname ?? 'Tác giả'} · {b.genre ?? 'Truyện'}</Text></View>
           </Pressable>;

@@ -3,7 +3,8 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Book, ChapterSummary, CHAPTER_PAGE_SIZE, getBook, getChapterPage, getFirstChapter } from '../../src/services/books';
+import { Book, ChapterSummary, CHAPTER_PAGE_SIZE, getAdultAccess, getBook, getChapterPage, getFirstChapter } from '../../src/services/books';
+import { Age16Confirm, Age18Notice, AgeBadge, ContentWarnings } from '../../src/components/AgeGate';
 import { openLibraryBook } from '../../src/services/library';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { SaveBook } from '../../src/components/SaveBook';
@@ -23,6 +24,18 @@ function Detail({ bookId, userId }: { bookId: string; userId?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pageError, setPageError] = useState('');
+  // Truyện 18+: null = đang kiểm tra; khác 'ok' → ẩn tóm tắt, mục lục, nút đọc (RLS cũng trả mục lục rỗng).
+  const [adultAccess, setAdultAccess] = useState<'ok' | 'guest' | 'unverified' | 'underage' | null>(null);
+  const isAdult = book?.age_rating === '18';
+  useEffect(() => {
+    if (!isAdult) return;
+    let active = true;
+    (userId ? getAdultAccess(userId) : Promise.resolve('guest' as const))
+      .then(v => { if (active) setAdultAccess(v); })
+      .catch(() => { if (active) setAdultAccess(userId ? 'unverified' : 'guest'); });
+    return () => { active = false; };
+  }, [isAdult, userId]);
+  const blocked = isAdult && adultAccess !== 'ok';
   const alive = useRef(true);
   const loadLock = useRef(false);
   const openLock = useRef(false);
@@ -79,7 +92,8 @@ function Detail({ bookId, userId }: { bookId: string; userId?: string }) {
     <Pressable accessibilityRole="button" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} className="px-6 py-4">
       <Text className="text-base text-brand-ink">← Quay lại</Text>
     </Pressable>
-    <FlatList data={error ? [] : chapters} keyExtractor={item => item.id} refreshing={loading} onRefresh={() => void load()}
+    <Age16Confirm active={book?.age_rating === '16'} />
+    <FlatList data={error || blocked ? [] : chapters} keyExtractor={item => item.id} refreshing={loading} onRefresh={() => void load()}
       contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
       ListHeaderComponent={<>
         {!!error ? <View className="mb-6"><Text accessibilityLiveRegion="polite" className="mb-3 text-red-700">{error}</Text>
@@ -87,7 +101,10 @@ function Detail({ bookId, userId }: { bookId: string; userId?: string }) {
           : book && <>
             <Text className="mb-3 text-sm tracking-widest text-stone">{book.genre || 'VỊNH · TRUYỆN'}</Text>
             <Text accessibilityRole="header" className="mb-4 text-3xl font-bold leading-10 text-brand-ink">{book.title}</Text>
+            {book.age_rating !== 'all' && <View className="mb-3"><AgeBadge rating={book.age_rating} /></View>}
+            <ContentWarnings warnings={book.content_warnings} />
             <Text className="mb-6 text-sm text-stone">{book.view_count.toLocaleString('vi')} lượt xem</Text>
+            {blocked ? (adultAccess ? <Age18Notice reason={adultAccess} /> : <ActivityIndicator color="#143b4d" />) : <>
             <Text className="mb-6 text-base leading-7 text-brand-ink">{book.synopsis || 'Truyện chưa có lời giới thiệu.'}</Text>
             <Pressable accessibilityRole="button" disabled={busy || !chapters.length} onPress={() => void read()}
               style={{ opacity: busy || !chapters.length ? 0.5 : 1 }} className="mb-4 items-center rounded-2xl bg-brand-ink p-4">
@@ -96,9 +113,10 @@ function Detail({ bookId, userId }: { bookId: string; userId?: string }) {
             <SaveBook bookId={bookId} />
             <Text accessibilityRole="header" className="mb-2 mt-8 text-xl font-bold text-brand-ink">Mục lục</Text>
             <Text className="mb-5 text-sm leading-6 text-stone">Chọn chương để đọc. Quyền truy cập chương có phí được kiểm tra khi mở.</Text>
+            </>}
           </>}
       </>}
-      ListEmptyComponent={loading ? <ActivityIndicator color="#143b4d" /> : !error ? <Text className="py-6 text-stone">Truyện chưa có chương được xuất bản.</Text> : null}
+      ListEmptyComponent={loading ? <ActivityIndicator color="#143b4d" /> : !error && !blocked ? <Text className="py-6 text-stone">Truyện chưa có chương được xuất bản.</Text> : null}
       renderItem={({ item }) => <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/doc/[chapterId]', params: { chapterId: item.id } })}
         className="mb-3 rounded-2xl border border-cream-border p-4">
         <Text className="mb-2 text-base font-bold text-brand-ink">{item.title}</Text>

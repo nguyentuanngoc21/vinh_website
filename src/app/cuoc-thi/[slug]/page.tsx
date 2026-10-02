@@ -501,7 +501,7 @@ function Results({ awards, publishedAt, visible }: { awards: PublicAward[]; publ
   const cover = (a: PublicAward, size: string) =>
     a.book ? (
       <div className={`${size} relative overflow-hidden rounded-xl shadow-[0_14px_30px_rgb(0_0_0/.2)]`}>
-        <BookCover id={a.book.id} title={a.book.title} genre={a.book.genre} coverUrl={a.book.coverUrl} className="h-full w-full" />
+        <BookCover id={a.book.id} title={a.book.title} genre={a.book.genre} coverUrl={a.book.coverUrl} ageRating={a.book.ageRating} className="h-full w-full" />
         {a.book.isExclusive && <ExclusiveBadge variant="overlay" />}
       </div>
     ) : (

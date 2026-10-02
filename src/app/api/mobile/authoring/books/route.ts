@@ -15,7 +15,7 @@ export function GET(request: Request) {
   });
 }
 
-const CREATE_FIELDS = ['title', 'synopsis', 'genre', 'tags', 'isExclusive', 'chapterTitle', 'chapterContent', 'published', 'price', 'isLastChapter'];
+const CREATE_FIELDS = ['title', 'synopsis', 'genre', 'tags', 'isExclusive', 'chapterTitle', 'chapterContent', 'published', 'price', 'isLastChapter', 'ageRating', 'contentWarnings'];
 // POST { action: 'create', …fields } → web POST /api/authoring/books (new book + first chapter).
 export function POST(request: Request) {
   return mobileResponse(request, async () => {

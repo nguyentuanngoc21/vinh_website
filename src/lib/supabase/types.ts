@@ -256,6 +256,23 @@ export type ContestReviewFlag = {
 export type Database = {
   public: {
     Tables: {
+      // Khai báo tại chỗ (không import từ src/lib/moderation) — file này dùng
+      // chung với mobile-vinh, nơi alias "@/..." không phân giải được.
+      // Khớp ContentReport ở src/lib/moderation/content-reports.ts.
+      content_reports: {
+        Row: {
+          id: string; reporter_id: string; book_id: string; chapter_id: string | null;
+          reason: "offensive" | "age_rating" | "plagiarism"; description: string; evidence_url: string | null;
+          book_title: string; chapter_title: string | null; book_slug: string;
+          status: "pending" | "reviewing" | "resolved" | "dismissed";
+          resolution_note: string | null; reviewed_by: string | null;
+          created_at: string; updated_at: string;
+        };
+        Insert: Pick<Database["public"]["Tables"]["content_reports"]["Row"],
+          "reporter_id" | "book_id" | "chapter_id" | "reason" | "description" | "evidence_url" | "book_title" | "chapter_title" | "book_slug">;
+        Update: Partial<Database["public"]["Tables"]["content_reports"]["Row"]>;
+        Relationships: [];
+      };
       chapter_publication_schedules: {
         Row: { id: string; book_id: string; author_id: string; chapter_ids: string[]; starts_at: string; interval_days: number; price: number | null; next_index: number; status: "pending" | "completed" | "cancelled" | "failed"; error: string | null; created_at: string };
         Insert: { id: string; book_id: string; author_id: string; chapter_ids: string[]; starts_at: string; interval_days?: number; price?: number | null; next_index?: number; status?: "pending" | "completed" | "cancelled" | "failed"; error?: string | null; created_at?: string };
@@ -474,6 +491,15 @@ export type Database = {
           // 'co_authorship' — 2 giá trị sau CHỈ được set qua
           // confirm_author_name_agreement() khi đủ 2 xác nhận.
           author_display: "pen_name" | "anonymous" | "customer_name" | "co_authorship";
+          // Nhãn độ tuổi + cảnh báo nội dung (src/lib/age-rating.ts). CHECK
+          // ép cảnh báo kéo theo độ tuổi tối thiểu. Khi age_rating_locked_at
+          // not null (admin khoá), tác giả không sửa được 2 cột này — chỉ
+          // RPC admin_set_book_age_rating. Xem
+          // migrations/20261002_book_age_ratings.sql.
+          age_rating: "all" | "16" | "18";
+          content_warnings: string[];
+          age_rating_locked_at: string | null;
+          age_rating_locked_by: string | null;
           // pgvector column — the JS client returns/accepts this as a
           // plain number[] (or null), Postgres handles the vector type.
           embedding: number[] | null;
@@ -496,6 +522,8 @@ export type Database = {
           removed_reason_detail?: string | null;
           content_purged_at?: string | null;
           finalized_at?: string | null;
+          age_rating?: "all" | "16" | "18";
+          content_warnings?: string[];
           embedding?: number[] | null;
         };
         Update: Partial<Database["public"]["Tables"]["books"]["Insert"]>;
@@ -1126,6 +1154,27 @@ export type Database = {
           book_id: string;
           from_exclusive: boolean | null;
           to_exclusive: boolean;
+          actor_id: string | null;
+          actor_kind: "author" | "admin" | "system";
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Lịch sử nhãn độ tuổi — chỉ trigger log_book_age_rating_event ghi
+      // (tạo truyện + mỗi lần đổi nhãn/khoá). from_* null = lúc tạo. Xem
+      // migrations/20261002_book_age_ratings.sql.
+      book_age_rating_events: {
+        Row: {
+          id: string;
+          book_id: string;
+          from_rating: "all" | "16" | "18" | null;
+          to_rating: "all" | "16" | "18";
+          from_warnings: string[] | null;
+          to_warnings: string[];
+          locked: boolean;
           actor_id: string | null;
           actor_kind: "author" | "admin" | "system";
           reason: string | null;
@@ -2392,6 +2441,12 @@ export type Database = {
       };
     };
     Views: {
+      // Audio gắn với chương truyện 18+ — ẩn khỏi danh sách audio công khai.
+      // Xem migrations/20261002_book_age_ratings.sql.
+      adult_audio_narration_ids: {
+        Row: { audio_narration_id: string };
+        Relationships: [];
+      };
       public_characters: {
         Row: { id: string; book_id: string; name: string; role: CharacterRole | null; trope: string | null;
           story_role: CharacterProfile["story_role"]; aliases: string | null; avatar_url: string | null;
@@ -2545,6 +2600,27 @@ export type Database = {
       admin_set_book_exclusive: {
         Args: { p_book_id: string; p_admin_id: string; p_exclusive: boolean; p_reason: string };
         Returns: Database["public"]["Tables"]["books"]["Row"];
+      };
+      admin_set_book_age_rating: {
+        Args: {
+          p_book_id: string;
+          p_admin_id: string;
+          p_rating: "all" | "16" | "18";
+          p_warnings: string[];
+          p_reason: string;
+          p_lock: boolean;
+        };
+        Returns: Database["public"]["Tables"]["books"]["Row"];
+      };
+      // Chỉ service_role — đủ 18 tuổi theo năm sinh trên CCCD đã xác thực.
+      is_age_verified_adult: {
+        Args: { p_user_id: string };
+        Returns: boolean;
+      };
+      // Cho chính người gọi (auth.uid()) — dùng trong RLS chapters.
+      viewer_can_read_adult: {
+        Args: Record<string, never>;
+        Returns: boolean;
       };
       transition_contest_status: {
         Args: { p_contest_id: string; p_to: ContestStatus; p_actor_id: string | null; p_reason?: string | null };

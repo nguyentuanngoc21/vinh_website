@@ -4,7 +4,7 @@ import { mobileApi } from './api';
 
 export type Progress = { book_id: string; chapter_id: string; last_paragraph_index: number | null; updated_at: string };
 export type LibraryEntry = { book: Book; progress?: Progress; lists: { id: string; name: string }[] };
-const bookFields = 'id,title,slug,synopsis,genre,view_count,created_at' as const;
+const bookFields = 'id,title,slug,synopsis,genre,view_count,created_at,age_rating,content_warnings' as const;
 export async function requireReader(userId: string) {
   const client = requireSupabase();
   const { data, error } = await client.auth.getSession();

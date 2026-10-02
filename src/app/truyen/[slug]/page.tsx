@@ -16,9 +16,12 @@ import { ReadingSourceMarker } from "@/components/reading/reading-source-marker"
 import { readingSourceFromParam } from "@/lib/reading/reading-source";
 import { getStoryContestCards } from "@/lib/contests/public-view";
 import { computeBookStatus } from "@/lib/story/status";
+import { ReportContentButton } from "@/components/story/report-content-button";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { getAuthedUserId } from "@/lib/wallet/session";
+import { getAuthedViewer } from "@/lib/wallet/session";
+import { resolveAgeGate } from "@/lib/age-rating-access";
+import { Age16Confirm, Age18Notice, AgeRatingBadge, ContentWarningList } from "@/components/story/age-gate";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 
 const lora = Lora({
@@ -34,7 +37,9 @@ const getBookBySlug = cache(async (slug: string) => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("books")
-    .select("id, slug, title, synopsis, genre, tags, view_count, author_id, cover_design_item_id, published, is_exclusive")
+    .select(
+      "id, slug, title, synopsis, genre, tags, view_count, author_id, cover_design_item_id, published, is_exclusive, age_rating, content_warnings"
+    )
     .eq("slug", slug)
     .maybeSingle();
   return data;
@@ -46,7 +51,8 @@ export async function generateMetadata({ params }: PageProps<"/truyen/[slug]">):
 
   return {
     title: book ? `${book.title} — Vịnh` : "Truyện — Vịnh",
-    description: book?.synopsis ?? undefined,
+    // Truyện 18+: không đưa tóm tắt vào thẻ meta (trang cũng ẩn nó với người chưa xác thực tuổi).
+    description: book && book.age_rating !== "18" ? (book.synopsis ?? undefined) : undefined,
     // Xem giải thích đầy đủ ở generateMetadata của
     // src/app/read/[bookSlug]/[chapterId]/page.tsx — cùng lý do áp dụng
     // cho trang giới thiệu truyện (có tóm tắt là text công khai).
@@ -71,20 +77,29 @@ export default async function StoryPage({
   // publish. Tác giả xem/soạn truyện qua /author, không qua route này.
   if (!book || !book.published) notFound();
 
-  const [viewerId, { data: authorProfile }, { data: chapters }] = await Promise.all([
+  const [viewer, { data: authorProfile }, { data: chapters }] = await Promise.all([
     // getAuthedUserId() thử cả session cookie tự ký VÀ Supabase Auth thật
     // (src/lib/wallet/session.ts) — nhất quán với các route khác trong
     // repo (penalty, wallet), thay vì chỉ supabase.auth.getUser() (bỏ lọt
     // trường hợp chỉ có session cookie tự ký).
-    getAuthedUserId(serviceClient),
+    getAuthedViewer(serviceClient),
     supabase.from("author_public_profiles").select("nickname").eq("id", book.author_id).maybeSingle(),
-    supabase
+    // Service-role: RLS chapters ẩn chương truyện 18+ với người chưa xác thực
+    // tuổi (kể cả người đã xác thực nhưng chỉ có cookie phiên tự ký). Chỉ lấy
+    // tiêu đề/mốc thời gian, không lấy nội dung; danh sách này bị ẩn khỏi
+    // trang khi cổng 18+ đóng (xem ageGate bên dưới).
+    serviceClient
       .from("chapters")
       .select("id, title, order_index, created_at, is_last_chapter")
       .eq("book_id", book.id)
       .eq("published", true)
       .order("order_index", { ascending: true }),
   ]);
+  const viewerId = viewer?.id ?? null;
+  // Cổng độ tuổi — xem src/lib/age-rating-access.ts. verify18: làm mờ bìa,
+  // ẩn tóm tắt + mục lục + nút đọc, thay bằng lời nhắc xác thực.
+  const ageGate = await resolveAgeGate(serviceClient, book, viewer);
+  const age18Blocked = ageGate.gate === "verify18";
 
   // Nhiệm vụ reader_view_recommendations — chỉ khi đến từ mục "Gợi ý cho
   // bạn" ở trang chủ (?from=goi-y, xem recommended-for-you.tsx), không
@@ -155,18 +170,24 @@ export default async function StoryPage({
     <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
       <div className="mx-auto max-w-[1280px] bg-white">
         <SiteHeader sticky={false} />
+        {ageGate.gate === "confirm16" && <Age16Confirm />}
         <main className="px-4 py-6 sm:px-8 sm:py-9 lg:px-11">
           <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
             <div className="mx-auto w-[156px] shrink-0 sm:mx-0 sm:w-[200px]">
-              <div className="aspect-[2/3] overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]">
+              <div className="relative aspect-[2/3] overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(0,0,0,.12)]">
                 <BookCover
                   id={book.id}
                   title={book.title}
                   author={authorProfile?.nickname}
                   genre={book.genre}
                   coverUrl={coverUrl}
-                  className="h-full w-full"
+                  className={`h-full w-full ${age18Blocked ? "scale-110 blur-xl" : ""}`}
                 />
+                {age18Blocked && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/30">
+                    <AgeRatingBadge rating="18" className="px-4 py-1.5 text-[18px]" />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -175,11 +196,13 @@ export default async function StoryPage({
                 {book.title}
               </h1>
               {authorProfile?.nickname && <p className="mt-1 text-sm text-stone-alt">bởi {authorProfile.nickname}</p>}
-              {book.is_exclusive && (
-                <div className="mt-2.5">
-                  <ExclusiveBadge />
+              {(book.is_exclusive || book.age_rating !== "all") && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <AgeRatingBadge rating={book.age_rating} />
+                  {book.is_exclusive && <ExclusiveBadge />}
                 </div>
               )}
+              <ContentWarningList warnings={book.content_warnings} />
 
               <div className="mt-3.5 flex flex-wrap items-center gap-3.5 text-sm text-stone-alt sm:gap-5">
                 <span className="flex items-center gap-1.5">
@@ -194,16 +217,21 @@ export default async function StoryPage({
               </div>
 
               <div className="mt-5">
-                <StoryCtaButtons
-                  bookSlug={book.slug}
-                  firstChapterId={firstChapter?.id ?? null}
-                  lastChapterId={lastChapter?.id ?? null}
-                  continueChapterId={continueChapterId}
-                />
+                {ageGate.gate === "verify18" ? (
+                  <Age18Notice reason={ageGate.reason} nextPath={`/truyen/${book.slug}`} />
+                ) : (
+                  <StoryCtaButtons
+                    bookSlug={book.slug}
+                    firstChapterId={firstChapter?.id ?? null}
+                    lastChapterId={lastChapter?.id ?? null}
+                    continueChapterId={continueChapterId}
+                  />
+                )}
               </div>
 
               <StoryContestCards cards={contestCards} />
               {readingSource && <ReadingSourceMarker bookId={book.id} source={readingSource} />}
+              <ReportContentButton bookId={book.id} />
 
               {book.tags.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -213,7 +241,9 @@ export default async function StoryPage({
                 </div>
               )}
 
-              {book.synopsis ? (
+              {age18Blocked ? (
+                <p className="mt-4 text-[14.5px] italic text-stone-light">Tóm tắt được ẩn với nội dung 18+.</p>
+              ) : book.synopsis ? (
                 <p className="mt-4 max-w-[900px] whitespace-pre-line text-[14.5px] leading-[1.7] text-ink">{book.synopsis}</p>
               ) : (
                 <p className="mt-4 text-[14.5px] italic text-stone-light">Truyện này chưa có mô tả</p>
@@ -221,16 +251,18 @@ export default async function StoryPage({
             </div>
           </div>
 
-          <div className="mt-8 max-w-[900px] sm:mt-10">
-            <StoryTabs
-              bookSlug={book.slug}
-              status={status}
-              lastUpdatedLabel={latestCreatedAt ? new Date(latestCreatedAt).toLocaleDateString("vi-VN") : null}
-              genre={book.genre}
-              chaptersAscending={chaptersAscending}
-              characters={characters}
-            />
-          </div>
+          {!age18Blocked && (
+            <div className="mt-8 max-w-[900px] sm:mt-10">
+              <StoryTabs
+                bookSlug={book.slug}
+                status={status}
+                lastUpdatedLabel={latestCreatedAt ? new Date(latestCreatedAt).toLocaleDateString("vi-VN") : null}
+                genre={book.genre}
+                chaptersAscending={chaptersAscending}
+                characters={characters}
+              />
+            </div>
+          )}
         </main>
         <SiteFooter />
       </div>

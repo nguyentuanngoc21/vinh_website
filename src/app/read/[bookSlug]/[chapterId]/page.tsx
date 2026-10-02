@@ -9,17 +9,32 @@ import { isAdminRole } from "@/lib/roles";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 import { buildContentPreview } from "@/lib/reading/access-gate";
 import { extractAllDesignImageIds } from "@/lib/design/share-link";
+import { resolveAgeGate } from "@/lib/age-rating-access";
+import { Age16Confirm, Age18Notice, AgeRatingBadge } from "@/components/story/age-gate";
+import { SiteHeader } from "@/components/site-header";
 
 // Query chính (sách + chương) dùng chung cho generateMetadata và page —
 // cache() dedupe trong cùng 1 request, nên chỉ chạy 1 lần. Sách và chương
 // query SONG SONG (chương theo id, không lọc book_id), rồi kiểm lại
 // chapter.book_id === book.id — giữ đúng hành vi cũ (chương không thuộc
 // sách trong URL → 404). Trả null ở mọi trường hợp page phải notFound().
+//
+// Chương đọc bằng service-role (không qua RLS): RLS chapters ẩn chương truyện
+// 18+ với người chưa xác thực tuổi, mà cổng 18+ ở page dưới cần biết chương
+// CÓ TỒN TẠI để hiện thông báo chặn thay vì 404 — và người đã xác thực chỉ có
+// cookie phiên tự ký (không có phiên Supabase) vẫn phải đọc được. Điều kiện
+// công khai (sách published + chưa xoá qua RLS books, chương published) vẫn
+// kiểm ngay dưới; nội dung chỉ được gửi đi sau khi qua resolveAgeGate.
 const loadReadChapter = cache(async (bookSlug: string, chapterId: string) => {
   const supabase = await createClient();
+  const serviceClient = createServiceRoleClient();
   const [{ data: book }, { data: chapter }] = await Promise.all([
-    supabase.from("books").select("id, slug, title, synopsis, author_id, published").eq("slug", bookSlug).maybeSingle(),
     supabase
+      .from("books")
+      .select("id, slug, title, synopsis, author_id, published, age_rating")
+      .eq("slug", bookSlug)
+      .maybeSingle(),
+    serviceClient
       .from("chapters")
       .select("id, book_id, title, content, order_index, published, price")
       .eq("id", chapterId)
@@ -70,7 +85,7 @@ export default async function ReadChapterPage({
       supabase.from("author_public_profiles").select("nickname, avatar_url").eq("id", book.author_id).maybeSingle(),
       // Lấy luôn `title` — dùng chung cho tính prev/next VÀ danh sách chọn
       // chương (ChapterPicker), không thêm 1 query riêng cho việc đó.
-      supabase
+      serviceClient
         .from("chapters")
         .select("id, title, order_index")
         .eq("book_id", book.id)
@@ -101,6 +116,25 @@ export default async function ReadChapterPage({
   const chapterPosition = idx >= 0 ? idx + 1 : 1;
 
   const isOwnBook = viewerId !== null && viewerId === book.author_id;
+
+  // Cổng độ tuổi (src/lib/age-rating-access.ts). 18+ chưa xác thực: dừng ở
+  // đây, không gửi nội dung chương, không ghi lượt xem/tiến độ.
+  const ageGate = await resolveAgeGate(serviceClient, book, viewer);
+  if (ageGate.gate === "verify18") {
+    return (
+      <div className="flex-1 bg-white">
+        <SiteHeader />
+        <main className="mx-auto max-w-[680px] px-4 py-10 sm:py-14">
+          <div className="mb-1 flex flex-wrap items-center gap-2 text-[13px] text-stone-alt">
+            <span className="truncate">{book.title}</span>
+            <AgeRatingBadge rating={book.age_rating} />
+          </div>
+          <h1 className="mb-6 text-[24px] font-bold leading-tight text-brand-ink sm:text-[28px]">{chapter.title}</h1>
+          <Age18Notice reason={ageGate.reason} nextPath={`/read/${book.slug}/${chapter.id}`} />
+        </main>
+      </div>
+    );
+  }
 
   // Chỉ query khi đã đăng nhập — 3 bảng này chỉ có ý nghĩa với 1 viewer cụ
   // thể. purchase_transactions chỉ cần tra khi chương thật sự có giá — hầu
@@ -206,36 +240,39 @@ export default async function ReadChapterPage({
   });
 
   return (
-    <Reader
-      bookSlug={book.slug}
-      bookId={book.id}
-      bookTitle={book.title}
-      bookSynopsis={book.synopsis}
-      authorId={book.author_id}
-      authorName={authorProfile?.nickname ?? "Ẩn danh"}
-      authorAvatarUrl={authorProfile?.avatar_url ?? null}
-      isOwnBook={isOwnBook}
-      showFollowButton={!isOwnBook && viewerId !== null}
-      isFollowingAuthor={!!followRow}
-      chapterId={chapter.id}
-      chapterTitle={chapter.title}
-      chapterPosition={chapterPosition}
-      content={content}
-      designImages={designImages}
-      prevChapterId={prevChapterId}
-      nextChapterId={nextChapterId}
-      chapters={ordered.map((c, i) => ({ id: c.id, title: c.title, position: i + 1 }))}
-      initialVoted={!!votedRow}
-      initialVoteCount={voteCountRow?.vote_count ?? 0}
-      linkedAudio={linkedAudio}
-      viewerIsAdmin={viewerIsAdmin}
-      accessGate={accessGate}
-      chapterPrice={chapter.price}
-      isLoggedIn={viewerId !== null}
-      initialParagraphIndex={initialParagraphIndex}
-      tropeCandidates={tropeCandidates}
-      initialTropeVoteCharacterId={myTropeVote?.character_id ?? null}
-    />
+    <>
+      {ageGate.gate === "confirm16" && <Age16Confirm />}
+      <Reader
+        bookSlug={book.slug}
+        bookId={book.id}
+        bookTitle={book.title}
+        bookSynopsis={book.synopsis}
+        authorId={book.author_id}
+        authorName={authorProfile?.nickname ?? "Ẩn danh"}
+        authorAvatarUrl={authorProfile?.avatar_url ?? null}
+        isOwnBook={isOwnBook}
+        showFollowButton={!isOwnBook && viewerId !== null}
+        isFollowingAuthor={!!followRow}
+        chapterId={chapter.id}
+        chapterTitle={chapter.title}
+        chapterPosition={chapterPosition}
+        content={content}
+        designImages={designImages}
+        prevChapterId={prevChapterId}
+        nextChapterId={nextChapterId}
+        chapters={ordered.map((c, i) => ({ id: c.id, title: c.title, position: i + 1 }))}
+        initialVoted={!!votedRow}
+        initialVoteCount={voteCountRow?.vote_count ?? 0}
+        linkedAudio={linkedAudio}
+        viewerIsAdmin={viewerIsAdmin}
+        accessGate={accessGate}
+        chapterPrice={chapter.price}
+        isLoggedIn={viewerId !== null}
+        initialParagraphIndex={initialParagraphIndex}
+        tropeCandidates={tropeCandidates}
+        initialTropeVoteCharacterId={myTropeVote?.character_id ?? null}
+      />
+    </>
   );
 }
 
