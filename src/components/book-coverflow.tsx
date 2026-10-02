@@ -17,6 +17,7 @@ import {
 import { NavBarContent } from "@/components/nav-bar-content";
 import { BookCover } from "@/components/covers/book-cover";
 import { ExclusiveBadge } from "@/components/story/exclusive-badge";
+import { AGE_RATING_LABELS } from "@/lib/age-rating";
 import { formatCount } from "@/lib/design/get-design-gallery";
 import { BOOK_STATUS_LABEL, type BookStatus } from "@/lib/story/status";
 import { truncateWords } from "@/lib/story/truncate-words";
@@ -209,13 +210,25 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
               >
                 {current.title}
               </Link>
-              {current.synopsis && (
+              {/* Truyện 18+: không hiện tóm tắt ở trang chủ (trang truyện ẩn tóm tắt với người chưa xác thực tuổi). */}
+              {current.synopsis && current.ageRating !== "18" && (
                 <p className="mt-3.5 max-w-[560px] text-[15px] leading-[1.6] text-pretty text-[#57534e] sm:text-base">
                   {truncateWords(current.synopsis, DESC_MAX_WORDS)}
                 </p>
               )}
 
               <div className="mt-[22px] flex flex-wrap gap-2 text-[#3a3430]">
+                {current.ageRating && current.ageRating !== "all" && (
+                  <div
+                    className={`${CHIP} font-bold ${
+                      current.ageRating === "18"
+                        ? "border-error bg-error text-white"
+                        : "border-cream-gold-border bg-cream-gold text-brand-gold-dark"
+                    }`}
+                  >
+                    {AGE_RATING_LABELS[current.ageRating]}
+                  </div>
+                )}
                 {current.genre && (
                   <div className={`${CHIP} border-[#cfc6b8]`}>
                     <BookmarkSimpleIcon />

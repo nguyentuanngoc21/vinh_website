@@ -26,6 +26,13 @@ import type { BookGenre } from "@/lib/supabase/types";
 
 const PUBLIC_REVALIDATE_SECONDS = 300;
 
+// Tăng mỗi khi CẤU TRÚC dữ liệu trả về đổi (thêm/bớt trường). Data cache của
+// Vercel giữ nguyên qua các lần deploy và khoá unstable_cache không đổi theo
+// code của hàm bên trong, nên không đổi số này thì bản deploy mới vẫn nhận
+// object kiểu cũ (vd. thiếu ageRating — huy hiệu 16+/18+ không hiện) cho tới
+// khi cache tự làm mới. v2: thêm ageRating (nhãn độ tuổi, 02/10/2026).
+const CACHE_SHAPE_VERSION = "v2";
+
 export const PUBLIC_CACHE_TAGS = {
   books: "public-books",
   audio: "public-audio",
@@ -41,19 +48,19 @@ function createPublicClient(): SupabaseClient<Database> {
 
 export const getCachedHomepageData = unstable_cache(
   () => getHomepageData(createPublicClient()),
-  ["public-homepage-data"],
+  ["public-homepage-data", CACHE_SHAPE_VERSION],
   { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.books] }
 );
 
 export const getCachedTopAudioTrack = unstable_cache(
   () => getTopAudioTrack(createPublicClient()),
-  ["public-top-audio-track"],
+  ["public-top-audio-track", CACHE_SHAPE_VERSION],
   { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.audio] }
 );
 
 export const getCachedAudioCatalog = unstable_cache(
   () => getAudioCatalog(createPublicClient()),
-  ["public-audio-catalog"],
+  ["public-audio-catalog", CACHE_SHAPE_VERSION],
   { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.audio] }
 );
 
@@ -61,14 +68,14 @@ export const getCachedAudioCatalog = unstable_cache(
 // nhận được cho bảng xếp hạng.
 export const getCachedBookRankings = unstable_cache(
   () => getBookRankings(createPublicClient()),
-  ["public-book-rankings"],
+  ["public-book-rankings", CACHE_SHAPE_VERSION],
   { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.books] }
 );
 
 // Tham số `genre` tự thành một phần của cache key (mỗi thể loại 1 entry).
 export const getCachedBooksByGenre = unstable_cache(
   (genre: BookGenre | null) => getBooksByGenre(createPublicClient(), genre),
-  ["public-books-by-genre"],
+  ["public-books-by-genre", CACHE_SHAPE_VERSION],
   { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.books] }
 );
 
