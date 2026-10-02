@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowSquareOutIcon,
@@ -83,6 +83,30 @@ export function ChapterEditor({
   const [imageLinkInput, setImageLinkInput] = useState("");
   const [imageLinkPending, setImageLinkPending] = useState(false);
   const [imageLinkError, setImageLinkError] = useState<string | null>(null);
+
+  // Ô nội dung giãn theo độ dài chương (không cuộn bên trong 1 khung cố
+  // định) — tối thiểu bằng phần còn trống của cột (textarea flex-1, cột
+  // editor cao bằng sidebar PublishPanel nhờ grid stretch), dài hơn thì
+  // đẩy cả cột/trang dài ra. minHeight (không phải height) vì height bị
+  // flex-1 bỏ qua. Reset về "" (min-h-[460px] gốc) trước khi đo để co lại
+  // được khi xoá bớt chữ; giữ nguyên vị trí cuộn vì lúc reset trang co tạm
+  // thời, trình duyệt có thể kéo scroll lên.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const fit = () => {
+      const scroller = el.closest<HTMLElement>("[data-editor-scroll]");
+      const scrollerTop = scroller?.scrollTop ?? 0;
+      const windowY = window.scrollY;
+      el.style.minHeight = "";
+      el.style.minHeight = `${el.scrollHeight}px`;
+      if (scroller) scroller.scrollTop = scrollerTop;
+      window.scrollTo({ top: windowY });
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [content]);
 
   const words = (content.trim().match(/\S+/g) ?? []).length;
   const wordCount = words.toLocaleString("vi-VN");
@@ -281,8 +305,8 @@ export function ChapterEditor({
         </div>
       </div>
 
-      <div className="flex-1 py-6 lg:overflow-y-auto lg:py-9">
-        <div className="mx-auto max-w-[660px] px-4 lg:px-7">
+      <div data-editor-scroll className="flex flex-1 flex-col py-6 lg:overflow-y-auto lg:py-9">
+        <div className="mx-auto flex w-full max-w-[660px] flex-1 flex-col px-4 lg:px-7">
           <Field
             label={null}
             value={title}
@@ -392,7 +416,7 @@ export function ChapterEditor({
 
           <textarea
             ref={textareaRef}
-            className="min-h-[460px] w-full resize-none border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] outline-none"
+            className="min-h-[460px] w-full flex-1 resize-none overflow-hidden border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] outline-none"
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
             onPaste={handleContentPaste}
