@@ -38,12 +38,12 @@ export function PackGrid({ packs, selectedId, customTokens, onSelectPack, onOpen
           <div
             key={pack.id}
             onClick={() => onSelectPack(pack.id)}
-            className={`${cardBase} border ${isSelected ? "border-2 border-brand-ink bg-cream-card" : "border-cream bg-white"}`}
+            className={`${cardBase} border ${isSelected ? "border-2 border-brand-ink bg-cream-card" : "border-cream bg-surface"}`}
           >
             {pack.tag && (
               <div
                 className={`absolute -top-[9px] left-4 rounded-full px-2.5 py-1 text-[10.5px] font-bold tracking-[.6px] text-white ${
-                  isSelected ? "bg-brand-ink" : "bg-brand-gold-dark"
+                  isSelected ? "bg-brand-navy" : "bg-brand-gold-dark"
                 }`}
               >
                 {pack.tag}
@@ -67,7 +67,7 @@ export function PackGrid({ packs, selectedId, customTokens, onSelectPack, onOpen
       <div
         onClick={onOpenCustom}
         className={`${cardBase} border border-dashed ${
-          selectedId === CUSTOM_PACK_ID ? "border-2 border-brand-ink bg-cream-card" : "border-[#cfcac2] bg-white"
+          selectedId === CUSTOM_PACK_ID ? "border-2 border-brand-ink bg-cream-card" : "border-[#cfcac2] dark:border-line bg-surface"
         }`}
       >
         <div className="flex items-center gap-1.5">

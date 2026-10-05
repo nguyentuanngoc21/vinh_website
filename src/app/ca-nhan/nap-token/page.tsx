@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 
 export default function TopupRoutePage() {
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main>
           <TopupPage />

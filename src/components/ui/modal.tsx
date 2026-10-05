@@ -96,7 +96,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className={`w-full rounded-[var(--radius-xl)] bg-white shadow-[0_24px_60px_rgba(0,0,0,.28)] ${panelClassName}`}
+        className={`w-full rounded-[var(--radius-xl)] bg-surface shadow-[0_24px_60px_rgba(0,0,0,.28)] ${panelClassName}`}
       >
         {children}
       </div>

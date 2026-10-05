@@ -33,7 +33,7 @@ export default async function JudgeContestPage({ params }: { params: Promise<{ s
 
   return (
     <div className="flex-1 bg-neutral-bg">
-      <div className="mx-auto max-w-[1280px] bg-white">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main className="px-4 pb-12 pt-6 sm:px-8 lg:px-11">
           <Link href="/giam-khao" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-stone-dark no-underline">

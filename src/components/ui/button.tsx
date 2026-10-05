@@ -5,15 +5,15 @@ type Variant = "primary" | "dark" | "ghost" | "danger" | "danger-outline";
 
 const VARIANT_CLASS: Record<Variant, string> = {
   // Gold CTA — the "submit / continue" action across auth and author flows.
-  primary: "bg-brand-gold text-brand-ink hover:brightness-[1.08]",
+  primary: "bg-brand-gold text-brand-navy hover:brightness-[1.08]",
   // Solid ink — used for secondary confirms (e.g. admin panel actions).
-  dark: "bg-brand-ink text-white hover:bg-brand-ink-dark",
+  dark: "bg-brand-navy text-white hover:bg-brand-ink-dark",
   // Text-only, for tertiary/cancel actions.
   ghost: "bg-transparent text-brand-ink border border-border-light hover:bg-cream-card",
   // Hành động phá huỷ/không hoàn tác (gỡ chương, xoá, mở tranh chấp).
   danger: "bg-error text-white hover:brightness-[0.95]",
   // Bản nhẹ của danger — nút phụ cạnh hành động chính (xoá, báo mất liên lạc).
-  "danger-outline": "border border-error-border bg-white text-error hover:bg-error-bg",
+  "danger-outline": "border border-error-border bg-surface text-error hover:bg-error-bg",
 };
 
 const SIZE_CLASS = {

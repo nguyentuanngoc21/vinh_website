@@ -66,7 +66,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
       {start != null || end != null ? (
         <div
           className={cn(
-            "flex items-center gap-2.5 border bg-white focus-within:border-brand-ink",
+            "flex items-center gap-2.5 border bg-surface focus-within:border-brand-ink",
             toneClass,
             SIZE_CLASS[size]
           )}

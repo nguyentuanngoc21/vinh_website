@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RegisterPage() {
   return (
-    <div className={`${lora.variable} grid flex-1 grid-cols-1 bg-white lg:grid-cols-[1fr_1.15fr]`}>
+    <div className={`${lora.variable} grid flex-1 grid-cols-1 bg-surface lg:grid-cols-[1fr_1.15fr]`}>
       <div className="relative hidden flex-col justify-between gap-10 overflow-hidden bg-brand-ink-dark p-14 text-white lg:flex lg:gap-0 lg:p-[56px_60px]">
         <div
           aria-hidden="true"
@@ -61,9 +61,9 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="relative text-[13px] text-[#7d94a0]">
-          © 2026 Vịnh · <LegalLink doc="terms" className="text-[#7d94a0] hover:text-white">Điều khoản</LegalLink> ·{" "}
-          <LegalLink doc="privacy" className="text-[#7d94a0] hover:text-white">Bảo mật</LegalLink>
+        <div className="relative text-[13px] text-slate-muted">
+          © 2026 Vịnh · <LegalLink doc="terms" className="text-slate-muted hover:text-white">Điều khoản</LegalLink> ·{" "}
+          <LegalLink doc="privacy" className="text-slate-muted hover:text-white">Bảo mật</LegalLink>
         </div>
       </div>
 

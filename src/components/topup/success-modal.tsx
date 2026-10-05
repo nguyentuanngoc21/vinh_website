@@ -11,7 +11,7 @@ type SuccessModalProps = {
 export function SuccessModal({ open, message, onClose }: SuccessModalProps) {
   return (
     <Modal open={open} onClose={onClose} layer="nested" panelClassName="max-w-[400px] p-8 text-center">
-      <div className="mx-auto flex h-[62px] w-[62px] items-center justify-center rounded-full bg-success-form-border text-[#2C7453]">
+      <div className="mx-auto flex h-[62px] w-[62px] items-center justify-center rounded-full bg-success-form-border text-success-text">
         <CheckCircleIcon weight="fill" size={34} />
       </div>
       <div className="mt-4 font-[family-name:var(--font-lora)] text-xl font-bold text-brand-ink">
@@ -21,7 +21,7 @@ export function SuccessModal({ open, message, onClose }: SuccessModalProps) {
       <button
         type="button"
         onClick={onClose}
-        className="mt-5 inline-block cursor-pointer rounded-full bg-brand-gold px-[26px] py-3 text-sm font-semibold text-brand-ink"
+        className="mt-5 inline-block cursor-pointer rounded-full bg-brand-gold px-[26px] py-3 text-sm font-semibold text-brand-navy"
       >
         Xong
       </button>

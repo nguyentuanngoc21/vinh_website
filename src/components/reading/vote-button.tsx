@@ -41,8 +41,8 @@ export function VoteButton({ variant, voted, voteCount, pending, onToggle, c }: 
       onClick={onToggle}
       disabled={pending}
       style={{
-        background: voted ? "var(--color-brand-ink)" : "var(--color-brand-gold)",
-        color: voted ? "#fff" : "var(--color-brand-ink)",
+        background: voted ? "var(--color-brand-navy)" : "var(--color-brand-gold)",
+        color: voted ? "#fff" : "var(--color-brand-navy)",
       }}
       className="flex cursor-pointer items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-colors disabled:cursor-default disabled:opacity-70"
     >

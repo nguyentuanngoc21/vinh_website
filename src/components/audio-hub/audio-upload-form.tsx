@@ -71,7 +71,7 @@ export function AudioUploadForm({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
-        className="flex w-full cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#e2ded7] bg-neutral-bg py-10 text-center transition-colors hover:border-brand-gold"
+        className="flex w-full cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-line bg-neutral-bg py-10 text-center transition-colors hover:border-brand-gold"
       >
         {file ? (
           <>
@@ -105,7 +105,7 @@ export function AudioUploadForm({ className }: { className?: string }) {
             type="button"
             onClick={() => setGenre(g)}
             className={`cursor-pointer rounded-full px-4 py-2 text-[13px] font-medium transition-colors ${
-              g === genre ? "bg-brand-ink text-white" : "bg-neutral-bg text-[#3a3a3a]"
+              g === genre ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
             }`}
           >
             {g}

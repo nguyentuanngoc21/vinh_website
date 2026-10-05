@@ -34,8 +34,8 @@ export default async function ConnectPage() {
   const connectPeople = await loadConnectDirectory(supabase, viewerId);
 
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader showSearch={false} />
         <main>
           <Suspense fallback={null}>

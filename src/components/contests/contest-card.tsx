@@ -17,7 +17,7 @@ export function ContestCard({ contest, now }: { contest: ContestSummary; now: nu
 
   return (
     <Link href={`/cuoc-thi/${contest.slug}`}
-      className="flex flex-col overflow-hidden rounded-2xl border border-border-light bg-white no-underline transition-colors hover:border-brand-gold">
+      className="flex flex-col overflow-hidden rounded-2xl border border-border-light bg-surface no-underline transition-colors hover:border-brand-gold">
       <ContestKeyVisual url={contest.key_visual_url} title={contest.title} className="h-[120px] p-3">
         <div className="relative"><PhaseChip label={phase.label} tone={phase.tone} dark /></div>
       </ContestKeyVisual>

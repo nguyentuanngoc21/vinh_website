@@ -50,15 +50,15 @@ export default async function DesignPage({
   ]);
 
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader searchPlaceholder="Tìm ảnh bìa…" searchType="thiet-ke" />
         <main>
           {viewerId && (
             <div className="flex justify-end px-11 pt-5">
               <Link
                 href="/thiet-ke/quan-ly"
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#e2ded7] px-4 py-2 text-[12.5px] font-semibold text-brand-ink no-underline transition-colors hover:border-brand-gold hover:bg-[#fdf8ec]"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-line px-4 py-2 text-[12.5px] font-semibold text-brand-ink no-underline transition-colors hover:border-brand-gold hover:bg-surface-gold"
               >
                 <ImageSquareIcon size={14} /> Quản lý ảnh của tôi
               </Link>
@@ -79,7 +79,7 @@ export default async function DesignPage({
               </div>
               <Link
                 href="/ket-noi"
-                className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
+                className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-navy no-underline"
               >
                 Xem hồ sơ họa sĩ
               </Link>

@@ -27,31 +27,86 @@
  * use for the same semantic; unify only once a designer confirms which one
  * is "correct" (same rule as stone/cream above).
  */
+/*
+ * Dark mode (chế độ tối): <html data-theme="dark">, set before first paint
+ * by the inline script in app/layout.tsx from localStorage ("vinh_theme"),
+ * toggled by components/theme-toggle.tsx. Color tokens live in a plain
+ * `@theme` (NOT `inline`) so every utility emits `var(--color-*)` and the
+ * [data-theme="dark"] block below can re-point them at runtime.
+ *
+ * Navy is split into two tokens by ROLE, because one value can't serve both
+ * in dark mode:
+ *  - brand-ink  = navy used as TEXT / border / icon -> turns light in dark mode.
+ *  - brand-navy = navy used as a SURFACE (nav bar, primary buttons) and as
+ *    text on solid gold -> stays navy. Use bg-brand-navy, never bg-brand-ink.
+ *  - surface    = page/card white (bg-surface). Plain `white` is NOT themed:
+ *    keep it for text/overlays on navy (text-white, bg-white/10).
+ *
+ * A subtree can opt out with data-theme="light" (the reader does: it has its
+ * own cream/sepia/dark reading themes). That is why the light values are
+ * repeated in [data-theme="light"] below; keep the three blocks in sync.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *):not(:where([data-theme="light"], [data-theme="light"] *)));
+
 @theme inline {
   --font-sans: var(--font-be-vietnam-pro);
+}
 
+@theme {
   /* Brand identity */
   --color-brand-ink: #143b4d;
+  --color-brand-navy: #143b4d;
   --color-brand-ink-dark: #0f2e3d;
   --color-brand-gold: #d9a441;
   --color-brand-gold-light: #e9c074;
   --color-brand-gold-dark: #a9781a;
+  /* Cream that does NOT flip in dark mode, for marks/text on navy surfaces. */
+  --color-cream-fixed: #f4efe4;
 
   /* Neutrals — text */
   --color-ink: #15110f;
+  /* Near-black used as a SURFACE (footer, dark promo bands) — stays dark. */
+  --color-ink-surface: #15110f;
+  --color-ink-muted: #5c5650;
+  --color-ink-soft: #3a3a3a;
+  --color-ink-warm: #3a352e;
   --color-stone: #8a8178;
   --color-stone-alt: #8a8278;
   --color-stone-light: #a09689;
   --color-stone-dark: #6f665c;
   --color-slate: #41525c;
+  --color-slate-muted: #7d94a0;
+  --color-slate-muted-dark: #6f8794;
+  --color-mute: #9a9a9a;
+  /* Faint text on dark surfaces only (footer, promo bands) — not themed. */
+  --color-mute-light: #c9c3bd;
 
   /* Neutrals — surfaces & borders */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f2f2f3;
+  --color-surface-warm: #fbf8f1;
+  --color-surface-soft: #fdfdfc;
+  --color-surface-soft-alt: #fafaf9;
+  --color-surface-gold: #fdf8ec;
+  --color-surface-peach: #fdf3e7;
+  --color-surface-sunken: #f0efec;
   --color-cream: #eceae7;
   --color-cream-card: #fbf7ec;
   --color-cream-card-alt: #f4efe4;
   --color-cream-border: #e2d9c8;
   --color-border-light: #dcd7d0;
   --color-neutral-bg: #f4f4f5;
+  --color-line: #e2ded7;
+  --color-line-soft: #f1efec;
+  --color-line-faint: #f0f0ef;
+  --color-line-softer: #f5f4f2;
+  --color-line-softer-alt: #f4f2ef;
+  --color-line-warm: #f1ece0;
+  --color-line-alt: #e7e5e4;
+  --color-line-strong: #cfc6b8;
+  --color-line-header: #f0f0f0;
+  --color-gold-soft: #f0e3c4;
+  --color-gold-soft-alt: #f0d9b5;
 
   /* Contest (Cuộc thi) — Vịnh Cuộc thi.dc.html. Gold-tinted callout surfaces
      and the muted text used on the navy hero. */
@@ -63,8 +118,11 @@
 
   /* Status */
   --color-success: #1f8a6b;
+  --color-success-text: #2c7453;
   --color-info: #2563a8;
   --color-info-bg: #eaf0f2;
+  --color-info-text: #2c5870;
+  --color-gold-text: #7a5a12;
 
   /* Status — error/danger (was hardcoded hex in Field/Alert) */
   --color-error: #b02a37;
@@ -103,6 +161,143 @@
   --color-chart-green: #16a34a;
   --color-chart-teal-dark: #115e59;
   --color-chart-teal-2: #0d9488;
+}
+
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-brand-ink: #dcebf2;
+  --color-brand-navy: #1a4a5f;
+
+  --color-ink: #ece7e1;
+  --color-ink-surface: #0e1113;
+  --color-ink-muted: #bab1a7;
+  --color-ink-soft: #d6d1cb;
+  --color-ink-warm: #d6cfc5;
+  --color-stone: #a69d93;
+  --color-stone-alt: #a69d93;
+  --color-stone-light: #8c8379;
+  --color-stone-dark: #c3bab0;
+  --color-slate: #a9bac3;
+  --color-slate-muted: #8fa6b2;
+  --color-slate-muted-dark: #9db3bf;
+  --color-mute: #8d8d8d;
+
+  --color-surface: #171b1e;
+  --color-surface-muted: #23292d;
+  --color-surface-warm: #1e2327;
+  --color-surface-soft: #1b2023;
+  --color-surface-soft-alt: #1c2124;
+  --color-surface-gold: #29251a;
+  --color-surface-peach: #2d241b;
+  --color-surface-sunken: #262c30;
+  --color-cream: #2a3034;
+  --color-cream-card: #1e2327;
+  --color-cream-card-alt: #22282c;
+  --color-cream-border: #353c41;
+  --color-border-light: #3a4247;
+  --color-neutral-bg: #20262a;
+  --color-line: #3a4247;
+  --color-line-soft: #2a3034;
+  --color-line-faint: #2a3034;
+  --color-line-softer: #262c30;
+  --color-line-softer-alt: #2a3034;
+  --color-line-warm: #343a3f;
+  --color-line-alt: #343b40;
+  --color-line-strong: #4b545a;
+  --color-line-header: #262c30;
+  --color-gold-soft: #4a4129;
+  --color-gold-soft-alt: #54472b;
+
+  --color-cream-gold: #2b2719;
+  --color-cream-gold-border: #4a4129;
+  --color-cream-gold-text: #dccb98;
+
+  --color-success: #3fbf96;
+  --color-success-text: #6fcf97;
+  --color-info: #7fb2e8;
+  --color-info-bg: #1d2a31;
+  --color-info-text: #8ec0dc;
+  --color-gold-text: #e2b35c;
+
+  --color-error: #f0868f;
+  --color-error-bg: #361c1f;
+  --color-error-border: #6a2f35;
+
+  --color-success-form: #6fcf97;
+  --color-success-form-bg: #15251c;
+  --color-success-form-border: #25503a;
+}
+
+/* Light island inside a dark page: same values as @theme above. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-brand-ink: #143b4d;
+  --color-brand-navy: #143b4d;
+
+  --color-ink: #15110f;
+  --color-ink-surface: #15110f;
+  --color-ink-muted: #5c5650;
+  --color-ink-soft: #3a3a3a;
+  --color-ink-warm: #3a352e;
+  --color-stone: #8a8178;
+  --color-stone-alt: #8a8278;
+  --color-stone-light: #a09689;
+  --color-stone-dark: #6f665c;
+  --color-slate: #41525c;
+  --color-slate-muted: #7d94a0;
+  --color-slate-muted-dark: #6f8794;
+  --color-mute: #9a9a9a;
+
+  --color-surface: #ffffff;
+  --color-surface-muted: #f2f2f3;
+  --color-surface-warm: #fbf8f1;
+  --color-surface-soft: #fdfdfc;
+  --color-surface-soft-alt: #fafaf9;
+  --color-surface-gold: #fdf8ec;
+  --color-surface-peach: #fdf3e7;
+  --color-surface-sunken: #f0efec;
+  --color-cream: #eceae7;
+  --color-cream-card: #fbf7ec;
+  --color-cream-card-alt: #f4efe4;
+  --color-cream-border: #e2d9c8;
+  --color-border-light: #dcd7d0;
+  --color-neutral-bg: #f4f4f5;
+  --color-line: #e2ded7;
+  --color-line-soft: #f1efec;
+  --color-line-faint: #f0f0ef;
+  --color-line-softer: #f5f4f2;
+  --color-line-softer-alt: #f4f2ef;
+  --color-line-warm: #f1ece0;
+  --color-line-alt: #e7e5e4;
+  --color-line-strong: #cfc6b8;
+  --color-line-header: #f0f0f0;
+  --color-gold-soft: #f0e3c4;
+  --color-gold-soft-alt: #f0d9b5;
+
+  --color-cream-gold: #f7efd8;
+  --color-cream-gold-border: #ebdcb4;
+  --color-cream-gold-text: #6b5f3a;
+
+  --color-success: #1f8a6b;
+  --color-success-text: #2c7453;
+  --color-info: #2563a8;
+  --color-info-bg: #eaf0f2;
+  --color-info-text: #2c5870;
+  --color-gold-text: #7a5a12;
+
+  --color-error: #b02a37;
+  --color-error-bg: #fbedec;
+  --color-error-border: #f3c6c6;
+
+  --color-success-form: #2f7a4f;
+  --color-success-form-bg: #f4faf6;
+  --color-success-form-border: #dbf3e8;
 }
 
 body {

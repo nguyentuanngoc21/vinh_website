@@ -70,7 +70,7 @@ export function MyNarrationsList({ narrations }: { narrations: MyNarration[] }) 
       </p>
       <div className="mt-3 flex flex-col gap-2.5">
         {narrations.map((n) => (
-          <div key={n.id} className="rounded-xl border border-[#e2ded7] p-3.5">
+          <div key={n.id} className="rounded-xl border border-line p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-ink">{n.title}</div>

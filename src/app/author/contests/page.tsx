@@ -30,7 +30,7 @@ export default async function AuthorContestsPage() {
 
       <div className="mb-3 mt-8 text-xs font-semibold tracking-[1.2px] text-brand-gold-dark">ĐANG THAM GIA</div>
       {active.length === 0 ? (
-        <div className="flex flex-col items-start gap-2 rounded-[14px] border border-dashed border-cream-border bg-white p-5 text-sm text-slate">
+        <div className="flex flex-col items-start gap-2 rounded-[14px] border border-dashed border-cream-border bg-surface p-5 text-sm text-slate">
           Bạn chưa tham gia cuộc thi nào đang diễn ra.
           <Link href="/cuoc-thi" className="font-semibold text-brand-gold-dark">Xem các cuộc thi →</Link>
         </div>
@@ -49,7 +49,7 @@ export default async function AuthorContestsPage() {
             const award = e.awards.find((a) => !a.revoked);
             return (
               <Link key={e.submission_id} href={`/cuoc-thi/${e.contest.slug}?tab=ket-qua`}
-                className={`flex flex-col gap-1.5 rounded-2xl border p-4 no-underline ${award ? "border-cream-gold-border bg-cream-card" : "border-cream-border bg-white"}`}>
+                className={`flex flex-col gap-1.5 rounded-2xl border p-4 no-underline ${award ? "border-cream-gold-border bg-cream-card" : "border-cream-border bg-surface"}`}>
                 <div className="flex items-center gap-2 text-[13px] font-bold text-brand-gold-dark">
                   <TrophyIcon size={17} weight={award ? "fill" : "regular"} /> {award ? award.award_name : "Đã tham gia"}
                 </div>

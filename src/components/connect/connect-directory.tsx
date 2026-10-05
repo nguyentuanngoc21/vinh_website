@@ -25,8 +25,8 @@ const SECTION_KEYS = ["truyen", "audio", "design", "cuoc_thi"] as const;
 type SectionKey = (typeof SECTION_KEYS)[number];
 
 const SECTION_META: Record<SectionKey, { label: string; sub: string; color: string; bg: string }> = {
-  truyen: { label: "Truyện chữ", sub: "Tác phẩm văn bản đã xuất bản trên Vịnh", color: "#2C5870", bg: "var(--color-info-bg)" },
-  audio: { label: "Audio", sub: "Bản thu và chương audio", color: "#2C7453", bg: "var(--color-success-form-border)" },
+  truyen: { label: "Truyện chữ", sub: "Tác phẩm văn bản đã xuất bản trên Vịnh", color: "light-dark(#2C5870, var(--color-info-text))", bg: "var(--color-info-bg)" },
+  audio: { label: "Audio", sub: "Bản thu và chương audio", color: "light-dark(#2C7453, var(--color-success-text))", bg: "var(--color-success-form-border)" },
   design: { label: "Design", sub: "Ảnh bìa, minh họa đã đăng", color: "#6B21A8", bg: "#F3E8FF" },
   cuoc_thi: {
     label: "Cuộc thi",
@@ -201,15 +201,15 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
         <div className="grid gap-[30px] px-4 pb-[46px] pt-[26px] sm:px-8 lg:grid-cols-[320px_1fr] lg:px-11">
           {/* People list */}
           <div className="overflow-hidden rounded-[20px] border border-cream lg:sticky lg:top-[90px] lg:self-start">
-            <div className="border-b border-[#f1efec] px-[18px] pb-3 pt-4">
+            <div className="border-b border-line-soft px-[18px] pb-3 pt-4">
               <div className="mb-3 rounded-full bg-neutral-bg px-[15px] py-2.5">
                 <Field
                   label={null}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Tìm theo tên hoặc @tên tài khoản"
-                  className="border-none bg-transparent px-0 py-0 text-[13.5px] text-ink placeholder:text-[#9a9a9a] focus:border-transparent"
-                  suffix={<MagnifyingGlassIcon className="text-[#9a9a9a]" size={16} />}
+                  className="border-none bg-transparent px-0 py-0 text-[13.5px] text-ink placeholder:text-mute focus:border-transparent"
+                  suffix={<MagnifyingGlassIcon className="text-mute" size={16} />}
                 />
               </div>
               <div className="flex flex-wrap gap-[7px]">
@@ -219,7 +219,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                     type="button"
                     onClick={() => setTag(label)}
                     className={`cursor-pointer whitespace-nowrap rounded-full px-3.5 py-[7px] text-[12.5px] font-medium transition-colors ${
-                      label === tag ? "bg-brand-ink text-white" : "bg-neutral-bg text-[#3a3a3a]"
+                      label === tag ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
                     }`}
                   >
                     {label}
@@ -236,9 +236,9 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                   onClick={() => setSelectedId(p.id)}
                   style={{
                     borderLeft: p.id === selected?.id ? "3px solid var(--color-brand-gold)" : "3px solid transparent",
-                    background: p.id === selected?.id ? "var(--color-cream-card)" : "#fff",
+                    background: p.id === selected?.id ? "var(--color-cream-card)" : "var(--color-surface)",
                   }}
-                  className="flex w-full cursor-pointer items-center gap-3.5 border-b border-[#f4f2ef] px-[18px] py-3.5 text-left transition-colors hover:bg-cream-card"
+                  className="flex w-full cursor-pointer items-center gap-3.5 border-b border-line-softer-alt px-[18px] py-3.5 text-left transition-colors hover:bg-cream-card"
                 >
                   <Avatar person={p} size={46} />
                   <div className="min-w-0 flex-1">
@@ -250,7 +250,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                       {tagsOf(p).map((t) => (
                         <span
                           key={t}
-                          className="rounded-full bg-info-bg px-2.5 py-[3px] text-[11px] font-semibold text-[#2C5870]"
+                          className="rounded-full bg-info-bg px-2.5 py-[3px] text-[11px] font-semibold text-info-text"
                         >
                           {t}
                         </span>
@@ -304,7 +304,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                       disabled={!!followPending[selected.id]}
                       style={{
                         background: isFollowing ? "rgba(255,255,255,.14)" : "var(--color-brand-gold)",
-                        color: isFollowing ? "#fff" : "var(--color-brand-ink)",
+                        color: isFollowing ? "#fff" : "var(--color-brand-navy)",
                       }}
                       className="cursor-pointer whitespace-nowrap rounded-full px-[26px] py-2.5 text-center text-[13.5px] font-bold transition-colors disabled:cursor-default disabled:opacity-70"
                     >
@@ -320,12 +320,12 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 border-b border-[#f1efec] sm:grid-cols-4">
+              <div className="grid grid-cols-2 border-b border-line-soft sm:grid-cols-4">
                 {SECTION_KEYS.map((key, i) => (
                   <div
                     key={key}
                     // 2 cột trên điện thoại, 4 cột từ sm: viền phải chỉ giữa các cột thật.
-                    className={`border-[#f1efec] px-5 py-4 ${i < 2 ? "border-b sm:border-b-0" : ""} ${
+                    className={`border-line-soft px-5 py-4 ${i < 2 ? "border-b sm:border-b-0" : ""} ${
                       i % 2 === 0 ? "border-r" : ""
                     } ${i < SECTION_KEYS.length - 1 ? "sm:border-r" : "sm:border-r-0"}`}
                   >
@@ -336,7 +336,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
               </div>
 
               {selected.services.length > 0 && (
-                <div className="border-b border-[#f1efec] px-[22px] py-4">
+                <div className="border-b border-line-soft px-[22px] py-4">
                   <div className="text-xs font-bold tracking-[1.1px] text-stone">DỊCH VỤ NHẬN ĐẶT</div>
                   {orderError && (
                     <div className="mt-2 text-xs font-semibold text-error">{orderError}</div>
@@ -386,7 +386,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                             type="button"
                             disabled={orderingId === s.id}
                             onClick={() => placeOrder(s.id, selected.id)}
-                            className="shrink-0 cursor-pointer rounded-full bg-brand-gold px-4 py-1.5 text-xs font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                            className="shrink-0 cursor-pointer rounded-full bg-brand-gold px-4 py-1.5 text-xs font-bold text-brand-navy disabled:cursor-default disabled:opacity-60"
                           >
                             {orderingId === s.id ? "Đang tạo…" : "Đặt dịch vụ"}
                           </button>
@@ -421,7 +421,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                       <button
                         type="button"
                         onClick={() => toggleSection(key)}
-                        className="flex w-full cursor-pointer items-center gap-3.5 bg-[#FAFAF9] px-[18px] py-[15px] text-left transition-colors hover:bg-[#F3F5F6]"
+                        className="flex w-full cursor-pointer items-center gap-3.5 bg-surface-soft-alt px-[18px] py-[15px] text-left transition-colors hover:bg-[#F3F5F6] dark:hover:bg-surface-muted"
                       >
                         <div
                           style={{ background: meta.bg, color: meta.color }}
@@ -452,7 +452,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                         <div>
                           {its.map((it) => {
                             const row = (
-                              <div className="flex items-center gap-3.5 border-t border-[#f4f2ef] px-[18px] py-3.5 transition-colors hover:bg-cream-card">
+                              <div className="flex items-center gap-3.5 border-t border-line-softer-alt px-[18px] py-3.5 transition-colors hover:bg-cream-card">
                                 {it.imageUrl ? (
                                   <ProtectedImage
                                     src={it.imageUrl}
@@ -484,7 +484,7 @@ export function ConnectDirectory({ people, viewerId }: ConnectDirectoryProps) {
                             );
                           })}
                           {its.length === 0 && (
-                            <div className="border-t border-[#f4f2ef] px-[18px] py-5 text-[13px] text-stone-light">
+                            <div className="border-t border-line-softer-alt px-[18px] py-5 text-[13px] text-stone-light">
                               {key === "cuoc_thi" ? "Chưa tham gia cuộc thi nào." : "Chưa có tác phẩm nào trong mục này."}
                             </div>
                           )}

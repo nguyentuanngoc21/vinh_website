@@ -26,7 +26,7 @@ export function BlogPosts() {
               setLimit(5);
             }}
             className={`cursor-pointer rounded-full px-[18px] py-2.5 text-sm font-medium transition-colors ${
-              label === cat ? "bg-brand-ink text-white" : "bg-neutral-bg text-[#3a3a3a]"
+              label === cat ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
             }`}
           >
             {label}
@@ -40,7 +40,7 @@ export function BlogPosts() {
             <Link
               key={p.title}
               href="/read"
-              className="grid grid-cols-1 gap-5 border-b border-[#f1efec] p-5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[180px_1fr]"
+              className="grid grid-cols-1 gap-5 border-b border-line-soft p-5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[180px_1fr]"
             >
               <div
                 style={{ background: p.gradient }}
@@ -77,7 +77,7 @@ export function BlogPosts() {
             <button
               type="button"
               onClick={() => setLimit((l) => l + 3)}
-              className="flex cursor-pointer items-center gap-2 rounded-full border border-[#e2ded7] px-7 py-3 text-sm font-semibold text-brand-ink"
+              className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-7 py-3 text-sm font-semibold text-brand-ink"
             >
               {exhausted ? "Đã hết bài trong chủ đề này" : "Xem thêm bài viết"}
               <ArrowDownIcon />

@@ -93,7 +93,7 @@ export function Age18Notice({
       <p className="mx-auto mt-2 max-w-[440px] text-[14px] leading-[1.6] text-slate">{body}</p>
       <Link
         href={cta.href}
-        className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-brand-ink px-6 text-[14px] font-semibold text-white no-underline transition-opacity hover:opacity-90"
+        className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-brand-navy px-6 text-[14px] font-semibold text-white no-underline transition-opacity hover:opacity-90"
       >
         {cta.label}
       </Link>
@@ -154,7 +154,7 @@ export function Age16Confirm() {
           <button
             type="button"
             onClick={confirm}
-            className="min-h-11 flex-1 cursor-pointer rounded-full bg-brand-ink px-5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="min-h-11 flex-1 cursor-pointer rounded-full bg-brand-navy px-5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
           >
             Tôi đủ 16 tuổi
           </button>

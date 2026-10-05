@@ -22,7 +22,7 @@ export function Checkbox({
       className="flex cursor-pointer items-start gap-2.5 text-left disabled:cursor-not-allowed disabled:opacity-60">
       <span
         className={`mt-0.5 flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
-          checked ? "border-brand-ink bg-brand-ink" : "border-border-light bg-white"
+          checked ? "border-brand-ink bg-brand-navy" : "border-border-light bg-surface"
         }`}
       >
         <CheckIcon

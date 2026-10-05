@@ -136,7 +136,7 @@ export function RankingBoard({
           {kinds.map((k) => (
             <button key={k.key} type="button" onClick={() => select(k.key)}
               className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-semibold ${
-                k.key === active ? "bg-white text-brand-ink shadow-[0_1px_4px_rgb(0_0_0/.08)] ring-1 ring-border-light sm:ring-0" : "bg-neutral-bg text-stone-dark sm:bg-transparent"
+                k.key === active ? "bg-surface text-brand-ink shadow-[0_1px_4px_rgb(0_0_0/.08)] ring-1 ring-border-light sm:ring-0" : "bg-neutral-bg text-stone-dark sm:bg-transparent"
               }`}>
               {k.label}
             </button>

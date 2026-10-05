@@ -422,7 +422,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
           </div>
           <Link
             href="/ca-nhan/nap-token"
-            className="mt-4 flex w-auto items-center justify-center gap-2 rounded-[10px] bg-brand-gold px-5 py-2.5 text-[13.5px] font-semibold text-brand-ink no-underline transition-transform active:scale-[.99]"
+            className="mt-4 flex w-auto items-center justify-center gap-2 rounded-[10px] bg-brand-gold px-5 py-2.5 text-[13.5px] font-semibold text-brand-navy no-underline transition-transform active:scale-[.99]"
           >
             <CoinsIcon weight="fill" size={16} /> Nạp thêm token
           </Link>
@@ -437,7 +437,7 @@ export function EditProfileTab({ onNicknameSaved }: EditProfileTabProps) {
             transactions.map((txn) => (
               <div
                 key={txn.id}
-                className="flex justify-between gap-3 border-t border-[#f5f4f2] py-2.5"
+                className="flex justify-between gap-3 border-t border-line-softer py-2.5"
               >
                 <div className="min-w-0 text-[13px] text-stone-dark">
                   {txn.description ?? transactionTypeLabel(txn.type)} · {formatShortDate(txn.created_at)}

@@ -66,7 +66,7 @@ export function VoteButton({
       <div className="flex flex-col">
         <button type="button" disabled={!state.can_retract || pending} onClick={toggle}
           title={state.can_retract ? "Bấm để bỏ phiếu" : undefined}
-          className={`${base} bg-brand-ink text-brand-gold-light disabled:cursor-default`}>
+          className={`${base} bg-brand-navy text-brand-gold-light disabled:cursor-default`}>
           <CheckCircleIcon size={15} weight="fill" /> Đã bình chọn
         </button>
         {error && <span className="mt-1 text-[11.5px] text-error">{error}</span>}
@@ -85,7 +85,7 @@ export function VoteButton({
   return (
     <div className="flex flex-col">
       <button type="button" disabled={pending} onClick={toggle}
-        className={`${base} border border-border-light bg-white text-brand-ink transition-colors hover:border-brand-ink disabled:opacity-60`}>
+        className={`${base} border border-border-light bg-surface text-brand-ink transition-colors hover:border-brand-ink disabled:opacity-60`}>
         <CheckSquareIcon size={15} weight="bold" /> Bình chọn
       </button>
       {error && <span className="mt-1 text-[11.5px] text-error">{error}</span>}

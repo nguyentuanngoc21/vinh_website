@@ -12,7 +12,7 @@ export function RemindButton({ slug, initialOn, loggedIn }: { slug: string; init
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cls = `inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full px-7 py-3 text-[15px] font-semibold ${
-    on ? "bg-white/15 text-white" : "bg-brand-gold text-brand-ink"
+    on ? "bg-white/15 text-white" : "bg-brand-gold text-brand-navy"
   }`;
 
   if (!loggedIn) {

@@ -79,7 +79,7 @@ export function ResetPasswordForm() {
         </div>
         <Link
           href="/quen-mat-khau"
-          className="mt-6 flex items-center justify-center gap-[9px] rounded-[10px] bg-brand-gold py-[13px] text-[14.5px] font-bold text-brand-ink no-underline transition-transform active:scale-[.99]"
+          className="mt-6 flex items-center justify-center gap-[9px] rounded-[10px] bg-brand-gold py-[13px] text-[14.5px] font-bold text-brand-navy no-underline transition-transform active:scale-[.99]"
         >
           Gửi lại liên kết <ArrowRightIcon size={16} />
         </Link>
@@ -116,7 +116,7 @@ export function ResetPasswordForm() {
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
-                style={{ background: i < score ? PASSWORD_SCORE_COLORS[score] : "#efedea" }}
+                style={{ background: i < score ? PASSWORD_SCORE_COLORS[score] : "light-dark(#efedea, var(--color-surface-muted))" }}
                 className="h-1 flex-1 rounded-full transition-colors"
               />
             ))}

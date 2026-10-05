@@ -8,7 +8,7 @@ type BankTransferCardProps = {
   note: string;
 };
 
-const fieldClass = "bg-white px-[18px] py-3.5";
+const fieldClass = "bg-surface px-[18px] py-3.5";
 const labelClass = "text-[11.5px] tracking-[.6px] text-stone";
 const valueClass = "mt-1 text-sm font-semibold text-ink";
 
@@ -16,8 +16,8 @@ const valueClass = "mt-1 text-sm font-semibold text-ink";
 export function BankTransferCard({ amount, note }: BankTransferCardProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-cream">
-      <div className="flex items-center gap-3.5 border-b border-[#F0E3C4] bg-cream-card px-[18px] py-3.5">
-        <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-brand-ink text-brand-gold-light">
+      <div className="flex items-center gap-3.5 border-b border-gold-soft bg-cream-card px-[18px] py-3.5">
+        <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-brand-navy text-brand-gold-light">
           <BankIcon weight="fill" size={19} />
         </div>
         <div className="min-w-0 flex-1">
@@ -26,10 +26,10 @@ export function BankTransferCard({ amount, note }: BankTransferCardProps) {
             Hiện tại Vịnh chỉ hỗ trợ hình thức này. Token cộng trong 5–15 phút.
           </div>
         </div>
-        <div className="shrink-0 text-[12.5px] font-semibold text-[#2C7453]">Miễn phí</div>
+        <div className="shrink-0 text-[12.5px] font-semibold text-success-text">Miễn phí</div>
       </div>
 
-      <div className="grid grid-cols-1 gap-px bg-[#f0efec] sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-px bg-surface-sunken sm:grid-cols-2">
         <div className={fieldClass}>
           <div className={labelClass}>NGÂN HÀNG</div>
           <div className={valueClass}>{BANK_INFO.bank}</div>
@@ -50,7 +50,7 @@ export function BankTransferCard({ amount, note }: BankTransferCardProps) {
         </div>
       </div>
 
-      <div className="border-t border-[#f0efec] bg-white px-[18px] py-3.5">
+      <div className="border-t border-surface-sunken bg-surface px-[18px] py-3.5">
         <div className={labelClass}>NỘI DUNG CHUYỂN KHOẢN — BẮT BUỘC</div>
         <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
           <div className="rounded-[9px] border border-dashed border-brand-gold-light bg-cream-card px-[13px] py-1.5 text-[15px] font-bold text-brand-gold-dark">

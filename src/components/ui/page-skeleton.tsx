@@ -20,7 +20,7 @@ import { Skeleton } from "./skeleton";
 
 export function GridPageSkeleton({ cards = 12 }: { cards?: number }) {
   return (
-    <div className="min-h-screen bg-white px-4 py-8 sm:px-8 lg:px-11">
+    <div className="min-h-screen bg-surface px-4 py-8 sm:px-8 lg:px-11">
       <Skeleton className="mb-2 h-8 w-64 rounded-[var(--radius-sm)]" />
       <Skeleton className="mb-6 h-4 w-40 rounded-[var(--radius-sm)]" />
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
@@ -38,7 +38,7 @@ export function GridPageSkeleton({ cards = 12 }: { cards?: number }) {
 
 export function ListPageSkeleton({ rows = 8 }: { rows?: number }) {
   return (
-    <div className="min-h-screen bg-white px-4 py-8 sm:px-8 lg:px-11">
+    <div className="min-h-screen bg-surface px-4 py-8 sm:px-8 lg:px-11">
       <Skeleton className="mb-6 h-8 w-64 rounded-[var(--radius-sm)]" />
       <div className="flex flex-col gap-3">
         {Array.from({ length: rows }).map((_, i) => (
@@ -51,7 +51,7 @@ export function ListPageSkeleton({ rows = 8 }: { rows?: number }) {
 
 export function DetailPageSkeleton() {
   return (
-    <div className="mx-auto min-h-screen max-w-[800px] bg-white px-4 py-8 sm:px-8">
+    <div className="mx-auto min-h-screen max-w-[800px] bg-surface px-4 py-8 sm:px-8">
       <Skeleton className="mb-4 h-56 w-40 rounded-[10px]" />
       <Skeleton className="mb-2 h-7 w-3/4 rounded-[var(--radius-sm)]" />
       <Skeleton className="mb-6 h-4 w-1/2 rounded-[var(--radius-sm)]" />

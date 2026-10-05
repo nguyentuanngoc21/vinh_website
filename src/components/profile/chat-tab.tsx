@@ -278,7 +278,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
           không bị đè lên nhau — cần chỉnh lại nếu SiteHeader đổi chiều
           cao sau này. */}
       <div
-        className={`grid h-[604px] overflow-hidden border border-cream bg-white max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-auto max-[759px]:overflow-visible max-[759px]:grid-cols-1 min-[760px]:sticky min-[760px]:top-[124px] sm:rounded-[18px] ${
+        className={`grid h-[604px] overflow-hidden border border-cream bg-surface max-[1080px]:grid-cols-[288px_1fr] max-[759px]:h-auto max-[759px]:overflow-visible max-[759px]:grid-cols-1 min-[760px]:sticky min-[760px]:top-[124px] sm:rounded-[18px] ${
           counterparty ? "grid-cols-[320px_1fr_272px]" : "grid-cols-[320px_1fr]"
         }`}
       >
@@ -291,11 +291,11 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
             lặng thay vì cuộn được. Cùng lý do cho "Thread"/"Side panel"
             bên dưới. */}
         <div
-          className={`flex min-h-0 min-w-0 flex-col border-r border-[#f0f0ef] ${
+          className={`flex min-h-0 min-w-0 flex-col border-r border-line-faint ${
             mobileView === "thread" ? "max-[759px]:hidden" : ""
           }`}
         >
-          <div className="border-b border-[#f5f4f2] p-4 pb-3">
+          <div className="border-b border-line-softer p-4 pb-3">
             <div className="mb-3 text-[17px] font-bold text-brand-ink">Hội thoại</div>
             <div className="rounded-full bg-neutral-bg px-3.5 py-2.5">
               <Field
@@ -303,8 +303,8 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                 value={listQuery}
                 onChange={(e) => setListQuery(e.target.value)}
                 placeholder="Tìm cuộc trò chuyện"
-                className="border-none bg-transparent px-0 py-0 text-[13.5px] text-ink placeholder:text-[#9a9a9a] focus:border-transparent"
-                suffix={<MagnifyingGlassIcon size={16} className="text-[#9a9a9a]" />}
+                className="border-none bg-transparent px-0 py-0 text-[13.5px] text-ink placeholder:text-mute focus:border-transparent"
+                suffix={<MagnifyingGlassIcon size={16} className="text-mute" />}
               />
             </div>
           </div>
@@ -340,7 +340,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                           {c.nickname}
                         </div>
                         {c.isModerationThread && (
-                          <span className="shrink-0 rounded-full bg-brand-ink px-1.5 py-0.5 text-[9.5px] font-semibold text-brand-gold-light">
+                          <span className="shrink-0 rounded-full bg-brand-navy px-1.5 py-0.5 text-[9.5px] font-semibold text-brand-gold-light">
                             Kiểm duyệt
                           </span>
                         )}
@@ -361,7 +361,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                     </div>
                   </div>
                   {c.unreadCount > 0 && (
-                    <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-gold px-1.5 text-[11px] font-bold text-brand-ink">
+                    <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-gold px-1.5 text-[11px] font-bold text-brand-navy">
                       {c.unreadCount}
                     </span>
                   )}
@@ -373,7 +373,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
 
         {/* Thread */}
         <div
-          className={`flex min-h-0 min-w-0 flex-col bg-[#fdfdfc] ${
+          className={`flex min-h-0 min-w-0 flex-col bg-surface-soft ${
             mobileView === "list" ? "max-[759px]:hidden" : ""
           }`}
         >
@@ -383,7 +383,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
             </div>
           ) : !threadReady || !counterparty ? (
             <div className="flex flex-1 flex-col">
-              <div className="flex items-center gap-3 border-b border-[#f0f0ef] bg-white px-[18px] py-3.5">
+              <div className="flex items-center gap-3 border-b border-line-faint bg-surface px-[18px] py-3.5">
                 <Skeleton className="h-9 w-9 rounded-full" />
                 <Skeleton className="h-4 w-32 rounded-[var(--radius-sm)]" />
               </div>
@@ -395,7 +395,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-3 border-b border-[#f0f0ef] bg-white px-[18px] py-3.5">
+              <div className="flex items-center gap-3 border-b border-line-faint bg-surface px-[18px] py-3.5">
                 <button
                   type="button"
                   onClick={onBack}
@@ -413,7 +413,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   <div className="flex items-center gap-1.5">
                     <div className="text-[15px] font-semibold text-ink">{counterparty.nickname}</div>
                     {counterparty.isModerationThread && (
-                      <span className="rounded-full bg-brand-ink px-2 py-0.5 text-[10px] font-semibold text-brand-gold-light">
+                      <span className="rounded-full bg-brand-navy px-2 py-0.5 text-[10px] font-semibold text-brand-gold-light">
                         Kiểm duyệt
                       </span>
                     )}
@@ -448,7 +448,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                     <div className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
                       <div
                         style={{
-                          background: m.mine ? "var(--color-brand-ink)" : "#f2f1ee",
+                          background: m.mine ? "var(--color-brand-navy)" : "light-dark(#f2f1ee, var(--color-surface-muted))",
                           color: m.mine ? "#fff" : "var(--color-ink)",
                           borderRadius: m.mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                         }}
@@ -507,7 +507,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   cho tự giãn dòng khi soạn tin dài — input cũ không làm
                   được vì input luôn 1 dòng bất kể CSS. items-end (thay vì
                   items-center) để nút gửi ghim đáy khi textarea cao lên. */}
-              <div className="flex shrink-0 items-end gap-2.5 border-t border-[#f0f0ef] bg-white px-4 py-3 max-[759px]:sticky max-[759px]:bottom-0 max-[759px]:z-10">
+              <div className="flex shrink-0 items-end gap-2.5 border-t border-line-faint bg-surface px-4 py-3 max-[759px]:sticky max-[759px]:bottom-0 max-[759px]:z-10">
                 <textarea
                   ref={composerRef}
                   value={draft}
@@ -530,7 +530,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   onClick={handleSend}
                   disabled={sending || !draft.trim()}
                   aria-label="Gửi"
-                  className="flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink transition-transform hover:brightness-[1.08] active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55"
+                  className="flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-navy transition-transform hover:brightness-[1.08] active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   <PaperPlaneRightIcon weight="fill" size={17} />
                 </button>
@@ -541,7 +541,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
 
         {/* Side panel */}
         {counterparty && (
-          <div className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-l border-[#f0f0ef] px-[18px] py-5 min-[1081px]:flex">
+          <div className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-l border-line-faint px-[18px] py-5 min-[1081px]:flex">
             <div className="flex flex-col items-center gap-2.5 text-center">
               <Avatar
                 userId={counterparty.userId}
@@ -554,7 +554,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
                   profile thật để xem, không cần ẩn nút này nữa. */}
               <Link
                 href={`/ket-noi?p=${counterparty.userId}`}
-                className="flex items-center gap-2 rounded-full bg-brand-ink px-[18px] py-2 text-[13px] font-semibold text-white no-underline"
+                className="flex items-center gap-2 rounded-full bg-brand-navy px-[18px] py-2 text-[13px] font-semibold text-white no-underline"
               >
                 <UserCircleIcon size={16} color="var(--color-brand-gold-light)" /> Xem Profile
               </Link>

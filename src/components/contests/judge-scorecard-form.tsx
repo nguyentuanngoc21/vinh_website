@@ -73,7 +73,7 @@ export function JudgeScorecardForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-[14px] border border-cream-border bg-white p-4 sm:p-5">
+    <div className="flex flex-col gap-3 rounded-[14px] border border-cream-border bg-surface p-4 sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-base font-bold text-brand-ink">Phiếu chấm</h2>
         <span className="text-[22px] font-bold text-brand-ink">

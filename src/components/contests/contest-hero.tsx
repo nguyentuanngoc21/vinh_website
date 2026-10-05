@@ -27,7 +27,7 @@ function CtaLink({ cta, contest, capabilities, loggedIn, reminderOn, primary }: 
   reminderOn: boolean;
   primary: boolean;
 }) {
-  const style = primary ? `${pill} bg-brand-gold text-brand-ink` : `${pill} border border-white/30 text-white`;
+  const style = primary ? `${pill} bg-brand-gold text-brand-navy` : `${pill} border border-white/30 text-white`;
   if (cta.action === "remind") return <RemindButton slug={contest.slug} initialOn={reminderOn} loggedIn={loggedIn} />;
   if (cta.action === "submit") {
     if (!loggedIn) return <Link href={`/dang-nhap?next=${encodeURIComponent(`/cuoc-thi/${contest.slug}/gui-bai`)}`} className={style}>{cta.label}</Link>;

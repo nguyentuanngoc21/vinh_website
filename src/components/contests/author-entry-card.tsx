@@ -8,7 +8,7 @@ import { CONTEST_STATUS_LABEL, SUBMISSION_STATUS_LABEL } from "@/lib/contests/la
 const TONE: Record<AuthorEntry["status"], string> = {
   submitted: "bg-cream-card-alt text-stone-dark",
   eligible: "bg-success-form-bg text-success-form",
-  shortlisted: "bg-brand-ink text-white",
+  shortlisted: "bg-brand-navy text-white",
   ineligible: "bg-error-bg text-error",
   disqualified: "bg-error-bg text-error",
   withdrawn: "bg-neutral-bg text-stone-dark",
@@ -32,7 +32,7 @@ export function AuthorEntryCard({ entry, showBook }: { entry: AuthorEntry; showB
   const warn = e.capabilities.needs_revision;
 
   return (
-    <div className={`flex flex-col gap-2.5 rounded-[14px] border p-4 ${warn ? "border-cream-gold-border bg-cream-card" : "border-cream-border bg-white"}`}>
+    <div className={`flex flex-col gap-2.5 rounded-[14px] border p-4 ${warn ? "border-cream-gold-border bg-cream-card" : "border-cream-border bg-surface"}`}>
       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <Link href={`/cuoc-thi/${e.contest.slug}`} className="text-[15px] font-bold text-brand-ink no-underline">{e.contest.title}</Link>

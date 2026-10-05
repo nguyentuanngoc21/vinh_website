@@ -150,7 +150,7 @@ export function DesignManageGallery() {
         <p className="text-sm text-stone-dark">Bạn chưa đăng ảnh nào.</p>
         <Link
           href="/thiet-ke/new"
-          className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-ink no-underline"
+          className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-navy no-underline"
         >
           Đăng thiết kế
         </Link>
@@ -239,7 +239,7 @@ export function DesignManageGallery() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="grid w-full max-w-[880px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-white shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1fr_1.1fr]"
+            className="grid w-full max-w-[880px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-surface shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1fr_1.1fr]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={editing.imageUrl} alt={editing.title} className="min-h-[220px] w-full object-cover sm:min-h-full" />

@@ -32,7 +32,7 @@ export function MiniPlayerBar() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2.5 bg-brand-ink-dark px-3 py-2.5 text-white sm:gap-5 sm:px-8 sm:py-3 lg:px-11">
-      <div className="hidden h-[46px] w-[46px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-ink to-[#7a2e1c] text-sm font-bold sm:flex">
+      <div className="hidden h-[46px] w-[46px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-navy to-[#7a2e1c] text-sm font-bold sm:flex">
         {track.narratorName[0]}
       </div>
       <div className="min-w-0 max-w-[110px] sm:max-w-none sm:min-w-[150px]">
@@ -52,7 +52,7 @@ export function MiniPlayerBar() {
           // vô nghĩa. Mở thẳng modal đăng nhập thay vì toggle().
           onClick={audioGated ? () => setGateModalOpen(true) : toggle}
           aria-label={audioGated ? "Đăng nhập để nghe tiếp" : undefined}
-          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink sm:h-10 sm:w-10"
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-navy sm:h-10 sm:w-10"
         >
           {audioGated ? (
             <LockKeyIcon weight="fill" size={16} />

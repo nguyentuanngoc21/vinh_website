@@ -20,7 +20,7 @@ export function FeaturedGrid() {
           chụp bị rò rỉ, chúng tôi truy được nguồn trong vài giây.
         </div>
         <div className="mt-5 flex items-center gap-2.5 text-[13px] font-medium text-sidebar-text">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-gold text-xs font-bold text-brand-ink">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-gold text-xs font-bold text-brand-navy">
             V
           </div>
           Đội ngũ Vịnh · 04/08/2026 · 7 phút đọc
@@ -32,7 +32,7 @@ export function FeaturedGrid() {
           <Link
             key={s.title}
             href="/read"
-            className="flex gap-4 rounded-2xl border border-cream bg-white p-4 no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.14)]"
+            className="flex gap-4 rounded-2xl border border-cream bg-surface p-4 no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.14)]"
           >
             <div
               style={{ background: s.gradient }}

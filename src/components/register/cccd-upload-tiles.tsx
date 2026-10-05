@@ -55,9 +55,9 @@ export function CccdUploadTiles({ files, onFile }: CccdUploadTilesProps) {
             key={slot.key}
             style={{
               borderColor: file ? "var(--color-success-form)" : "var(--color-border-light)",
-              background: file ? "var(--color-success-form-bg)" : "#fdfdfc",
+              background: file ? "var(--color-success-form-bg)" : "light-dark(#fdfdfc, var(--color-surface-soft))",
             }}
-            className="flex min-h-[132px] cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] border-dashed p-[22px_16px] transition-colors hover:border-brand-gold hover:bg-[#FCFAF4]"
+            className="flex min-h-[132px] cursor-pointer flex-col items-center justify-center rounded-xl border-[1.5px] border-dashed p-[22px_16px] transition-colors hover:border-brand-gold hover:bg-[#FCFAF4] dark:hover:bg-surface-warm"
           >
             <input
               type="file"

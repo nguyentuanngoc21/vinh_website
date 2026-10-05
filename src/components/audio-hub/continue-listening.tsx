@@ -32,7 +32,7 @@ export function ContinueListening({ track, positionSeconds }: ContinueListeningP
         <button
           type="button"
           onClick={resume}
-          className="relative flex h-[200px] w-full cursor-pointer flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-br from-brand-ink to-[#7a2e1c] p-[22px] text-left font-[family-name:var(--font-lora)] text-xl font-bold leading-[1.2] shadow-[0_24px_48px_rgba(0,0,0,.45)] sm:h-[260px] sm:text-2xl"
+          className="relative flex h-[200px] w-full cursor-pointer flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-br from-brand-navy to-[#7a2e1c] p-[22px] text-left font-[family-name:var(--font-lora)] text-xl font-bold leading-[1.2] shadow-[0_24px_48px_rgba(0,0,0,.45)] sm:h-[260px] sm:text-2xl"
         >
           {track.title}
           <span className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/18">
@@ -65,7 +65,7 @@ export function ContinueListening({ track, positionSeconds }: ContinueListeningP
             <button
               type="button"
               onClick={resume}
-              className="flex w-full sm:w-auto justify-center cursor-pointer items-center gap-[9px] rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink"
+              className="flex w-full sm:w-auto justify-center cursor-pointer items-center gap-[9px] rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-navy"
             >
               <PlayIcon weight="fill" /> Nghe tiếp
             </button>

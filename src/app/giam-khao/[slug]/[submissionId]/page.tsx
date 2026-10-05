@@ -44,7 +44,7 @@ export default async function JudgeEntryPage({
 
   return (
     <div className={`flex-1 bg-neutral-bg ${lora.variable}`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main className="px-4 pb-12 pt-6 sm:px-8 lg:px-11">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -75,7 +75,7 @@ export default async function JudgeEntryPage({
                     {view.chapters.map((c) => (
                       <Link key={c.index} href={`${base}?chuong=${c.index}`} scroll={false} title={c.title}
                         className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-semibold no-underline ${
-                          c.index === current ? "bg-brand-ink text-white" : "bg-neutral-bg text-stone-dark"
+                          c.index === current ? "bg-brand-navy text-white" : "bg-neutral-bg text-stone-dark"
                         }`}>
                         Ch. {c.index}
                       </Link>

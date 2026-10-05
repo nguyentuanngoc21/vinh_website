@@ -10,6 +10,7 @@ import { ChatBubbleDock } from "@/components/messenger/chat-bubble-dock";
 import { NavigationOverlay } from "@/components/ui/navigation-overlay";
 import { NavigationPendingProvider } from "@/lib/navigation/pending-navigation";
 import { ToastProvider } from "@/components/ui/toast";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -27,8 +28,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="vi" className={`${beVietnamPro.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-white font-sans text-ink">
+    // suppressHydrationWarning: THEME_INIT_SCRIPT gắn data-theme lên <html>
+    // trước khi React hydrate — lệch với HTML server là cố ý (xem lib/theme.ts).
+    <html lang="vi" className={`${beVietnamPro.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="min-h-full flex flex-col bg-surface font-sans text-ink">
         {/* Bọc NGOÀI CÙNG (kể cả NavigationOverlay) — usePendingNavigate()
             có thể được gọi từ bất kỳ đâu trong {children} (form đăng
             nhập/đăng ký...), và bản thân NavigationOverlay đọc state pending

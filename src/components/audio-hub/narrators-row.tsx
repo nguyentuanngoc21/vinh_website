@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatPlayCount, type NarratorStat } from "@/lib/audio/get-audio-catalog";
 
 const AVATAR_COLORS = [
-  "var(--color-brand-ink)",
+  "var(--color-brand-navy)",
   "var(--color-success)",
   "var(--color-chart-pink)",
   "var(--color-chart-amber)",

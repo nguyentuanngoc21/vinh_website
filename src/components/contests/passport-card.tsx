@@ -25,7 +25,7 @@ export function PassportCard({ passport, eventQuest }: { passport: Passport; eve
       )}
 
       {eventQuest && (
-        <div className="mt-3 flex flex-col gap-2 rounded-[12px] bg-white px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3 flex flex-col gap-2 rounded-[12px] bg-surface px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-[.6px] text-brand-gold-dark">
               <TrophyIcon size={12} weight="fill" /> NHIỆM VỤ SỰ KIỆN HÔM NAY
@@ -41,7 +41,7 @@ export function PassportCard({ passport, eventQuest }: { passport: Passport; eve
 
       <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {passport.milestones.map((m) => (
-          <li key={m.code} className={`flex items-start gap-2 rounded-[12px] px-3 py-2.5 ${m.done ? "bg-white" : "bg-white/60"}`}>
+          <li key={m.code} className={`flex items-start gap-2 rounded-[12px] px-3 py-2.5 ${m.done ? "bg-surface" : "bg-surface/60"}`}>
             {m.done ? (
               <CheckCircleIcon size={18} weight="fill" className="mt-0.5 shrink-0 text-success-form" />
             ) : (

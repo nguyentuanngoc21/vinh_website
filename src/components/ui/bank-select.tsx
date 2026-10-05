@@ -129,7 +129,7 @@ export function BankSelect({ value, onChange, className }: BankSelectProps) {
         <div
           id={listboxId}
           role="listbox"
-          className="absolute z-10 mt-1.5 max-h-[280px] w-full overflow-y-auto rounded-[10px] border border-border-light bg-white shadow-lg"
+          className="absolute z-10 mt-1.5 max-h-[280px] w-full overflow-y-auto rounded-[10px] border border-border-light bg-surface shadow-lg"
         >
           {results.length === 0 ? (
             <div className="px-[15px] py-3 text-[13.5px] text-stone-light">Không tìm thấy ngân hàng phù hợp</div>

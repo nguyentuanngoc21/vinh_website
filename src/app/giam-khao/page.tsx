@@ -23,7 +23,7 @@ export default async function JudgeHomePage() {
 
   return (
     <div className="flex-1 bg-neutral-bg">
-      <div className="mx-auto max-w-[1280px] bg-white">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main className="px-4 pb-12 pt-7 sm:px-8 lg:px-11">
           <h1 className="flex items-center gap-2 text-[24px] font-bold text-brand-ink sm:text-[26px]"><GavelIcon size={24} /> Chấm giải</h1>

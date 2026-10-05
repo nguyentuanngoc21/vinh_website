@@ -151,7 +151,7 @@ export function IdentityForm({ onStatusChange }: { onStatusChange?: (status: Ide
   if (verified && !editing) {
     return (
       <div className="flex flex-col gap-3.5">
-        <div className="flex items-start gap-3 rounded-[10px] border border-[#cfe8d9] bg-success-form-bg px-[13px] py-2.5">
+        <div className="flex items-start gap-3 rounded-[10px] border border-[#cfe8d9] dark:border-success-form-border bg-success-form-bg px-[13px] py-2.5">
           <div className="flex min-w-0 flex-1 flex-col gap-1 text-[13px]">
             <div className="flex items-center gap-2 font-medium text-success-form">
               <CheckCircleIcon weight="fill" size={16} className="shrink-0" />

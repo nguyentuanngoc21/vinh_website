@@ -24,7 +24,7 @@ export function ContestKeyVisual({
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(120% 90% at 70% 30%, var(--color-brand-ink) 0%, var(--color-brand-ink-dark) 70%), linear-gradient(135deg, transparent 60%, var(--color-brand-gold) 140%)",
+              "radial-gradient(120% 90% at 70% 30%, var(--color-brand-navy) 0%, var(--color-brand-ink-dark) 70%), linear-gradient(135deg, transparent 60%, var(--color-brand-gold) 140%)",
           }}
         />
       )}

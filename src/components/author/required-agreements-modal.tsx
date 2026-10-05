@@ -124,7 +124,7 @@ export function RequiredAgreementsModal({
                   type="button"
                   onClick={() => openDocument(r.id)}
                   disabled={acceptingId === r.id}
-                  className="shrink-0 cursor-pointer whitespace-nowrap rounded-lg border border-brand-ink bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                  className="shrink-0 cursor-pointer whitespace-nowrap rounded-lg border border-brand-ink bg-surface px-3.5 py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
                 >
                   Xem &amp; đồng ý
                 </button>

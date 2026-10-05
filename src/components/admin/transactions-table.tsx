@@ -24,7 +24,7 @@ const GRID_COLS = "grid-cols-[1fr_1fr_130px_100px]";
 
 export function TransactionsTable({ transactions }: { transactions: RecentTransaction[] }) {
   return (
-    <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+    <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div className="text-base font-bold text-brand-ink">Giao dịch gần đây</div>
       </div>
@@ -44,7 +44,7 @@ export function TransactionsTable({ transactions }: { transactions: RecentTransa
         return (
           <div
             key={t.id}
-            className={`grid ${GRID_COLS} items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e] transition-colors hover:bg-[#FBF8F1]`}
+            className={`grid ${GRID_COLS} items-center gap-3 border-b border-line-warm px-2.5 py-[13px] text-sm font-medium text-ink-warm transition-colors hover:bg-surface-warm`}
           >
             <div>{t.userName}</div>
             <div className="text-stone-alt">{transactionTypeLabel(t.type)}</div>

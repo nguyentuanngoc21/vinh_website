@@ -173,7 +173,7 @@ export function TopupPage() {
             onPay={() => setShowSuccess(true)}
           />
           <TopupHistoryCard history={TOPUP_HISTORY} />
-          <div className="flex gap-2.5 rounded-2xl bg-[#f7f7f7] px-4 py-3.5">
+          <div className="flex gap-2.5 rounded-2xl bg-[#f7f7f7] dark:bg-surface-soft px-4 py-3.5">
             <div className="text-[12.5px] leading-[1.6] text-stone-dark">
               Chuyển khoản chưa được cộng token sau 30 phút?{" "}
               <a href="/ket-noi" className="text-brand-gold-dark">
@@ -215,7 +215,7 @@ function TopupStep({ step, title, children }: { step: number; title: string; chi
   return (
     <div>
       <div className="flex items-baseline gap-2.5">
-        <div className="flex h-[22px] w-[22px] shrink-0 translate-y-[3px] items-center justify-center rounded-full bg-brand-ink text-xs font-bold text-brand-gold-light">
+        <div className="flex h-[22px] w-[22px] shrink-0 translate-y-[3px] items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-brand-gold-light">
           {step}
         </div>
         <div className="text-[17px] font-bold text-brand-ink">{title}</div>

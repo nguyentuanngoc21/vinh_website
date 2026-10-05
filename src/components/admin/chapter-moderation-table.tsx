@@ -109,7 +109,7 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
   };
 
   return (
-    <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+    <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
       {/* w-fit — Checkbox là <button> flex (chiếm cả hàng); giữ vùng bấm chỉ quanh nhãn như cũ. */}
       <div className="mb-3.5 w-fit">
         <Checkbox checked={showPurged} onChange={() => setShowPurged((v) => !v)}>
@@ -136,7 +136,7 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
       {visibleRows.map((r) => (
         <div
           key={r.id}
-          className={`grid ${GRID_COLS} min-w-[740px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
+          className={`grid ${GRID_COLS} min-w-[740px] items-center gap-3 border-b border-line-warm px-2.5 py-[13px] text-sm font-medium text-ink-warm`}
         >
           <div className="text-stone-alt">{r.orderIndex}</div>
           <div className="truncate">{r.title}</div>
@@ -144,9 +144,9 @@ export function ChapterModerationTable({ rows: initialRows }: { rows: ChapterMod
             <span
               className={`rounded-full px-[11px] py-1 text-[11px] font-semibold ${
                 r.removedAt
-                  ? "bg-[#F8D7DA] text-error"
+                  ? "bg-[#F8D7DA] dark:bg-error-bg text-error"
                   : r.published
-                    ? "bg-success-form-border text-[#2C7453]"
+                    ? "bg-success-form-border text-success-text"
                     : "bg-cream-card-alt text-stone-dark"
               }`}
             >

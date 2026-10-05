@@ -15,7 +15,7 @@ export function AuthorCta() {
         </div>
         <Link
           href="/author"
-          className="w-full shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-8 py-3.5 text-center text-[15px] font-semibold text-brand-ink no-underline sm:w-auto"
+          className="w-full shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-8 py-3.5 text-center text-[15px] font-semibold text-brand-navy no-underline sm:w-auto"
         >
           Bắt đầu viết
         </Link>

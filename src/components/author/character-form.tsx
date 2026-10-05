@@ -64,7 +64,7 @@ export function CharacterForm({ bookId, initial, names, busy, onSave, onCancel, 
       <legend className="mb-3 font-semibold">{initial ? `Sửa ${initial.name}` : "Thêm nhân vật"}</legend>
       {field("name", "Tên nhân vật", 60)}
       {duplicate && <p role="status" className="text-sm text-brand-gold-dark">Đã có nhân vật cùng tên trong truyện. Bạn vẫn có thể lưu nếu đây là chủ ý.</p>}
-      <label className="text-sm">Vai trò trong truyện<select aria-label="Vai trò trong truyện" className="mt-1 block w-full rounded-lg border bg-white p-2" value={draft.story_role} onChange={e => setDraft(d => ({ ...d, story_role: e.target.value as StoryRole }))}>
+      <label className="text-sm">Vai trò trong truyện<select aria-label="Vai trò trong truyện" className="mt-1 block w-full rounded-lg border bg-surface p-2" value={draft.story_role} onChange={e => setDraft(d => ({ ...d, story_role: e.target.value as StoryRole }))}>
         {Object.entries(STORY_ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select></label>
       <fieldset><legend className="mb-2 text-sm">Chính/phản diện</legend><div className="flex flex-wrap gap-3">

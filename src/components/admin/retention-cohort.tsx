@@ -8,7 +8,7 @@ import { WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 // hạ tầng tracking trước, không phải chỉ đổi component này.
 export function RetentionCohort() {
   return (
-    <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+    <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
       <div className="text-base font-bold text-brand-ink">
         Retention theo cohort
       </div>

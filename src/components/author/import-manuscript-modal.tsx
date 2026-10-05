@@ -305,7 +305,7 @@ export function ImportManuscriptModal({
 
         {step === "input" ? (
           <div className="mt-5">
-            <div className="mb-4 flex w-fit gap-1.5 rounded-[9px] border border-cream-border bg-white p-1">
+            <div className="mb-4 flex w-fit gap-1.5 rounded-[9px] border border-cream-border bg-surface p-1">
               <button
                 type="button"
                 onClick={() => setInputMode("file")}
@@ -327,7 +327,7 @@ export function ImportManuscriptModal({
             </div>
 
             {inputMode === "file" ? (
-              <label className="flex min-h-[180px] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-border-light bg-[#fdfdfc] p-6 text-center transition-colors hover:border-brand-gold hover:bg-[#FCFAF4]">
+              <label className="flex min-h-[180px] cursor-pointer flex-col items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-border-light bg-surface-soft p-6 text-center transition-colors hover:border-brand-gold hover:bg-[#FCFAF4] dark:hover:bg-surface-warm">
                 <input
                   type="file"
                   accept=".docx,.txt"
@@ -381,7 +381,7 @@ export function ImportManuscriptModal({
               <ArrowLeftIcon size={13} /> Đổi nguồn nhập
             </button>
 
-            <div className="mb-4 flex items-center gap-2.5 rounded-[10px] border border-cream-border bg-white px-3.5 py-2.5">
+            <div className="mb-4 flex items-center gap-2.5 rounded-[10px] border border-cream-border bg-surface px-3.5 py-2.5">
               <FileTextIcon size={18} color="var(--color-brand-gold)" />
               <div className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-brand-ink">
                 {sourceLabel}
@@ -412,8 +412,8 @@ export function ImportManuscriptModal({
             {warnings.map((warning) => <div key={warning} className="mb-3"><Alert tone="info">{warning}</Alert></div>)}
             {invalidContent && <Alert tone="error">Có chương vượt {MAX_CHAPTER_CONTENT_LENGTH.toLocaleString("vi-VN")} ký tự. Hãy tách nhỏ trước khi nhập.</Alert>}
 
-            <div className="mb-1.5 text-[13px] font-semibold text-[#5C5650]">Tách chương theo</div>
-            <div className="mb-4 flex flex-wrap gap-1.5 rounded-[9px] border border-cream-border bg-white p-1">
+            <div className="mb-1.5 text-[13px] font-semibold text-ink-muted">Tách chương theo</div>
+            <div className="mb-4 flex flex-wrap gap-1.5 rounded-[9px] border border-cream-border bg-surface p-1">
               {splitOptions.map((opt) => (
                 <button
                   key={opt.id}
@@ -436,7 +436,7 @@ export function ImportManuscriptModal({
               {detected.map((c, index) => (
                 <button type="button" disabled={submitting} onClick={() => { setActiveChapter(index); setSplitOffset(0); }}
                   key={index}
-                  className={`flex w-full items-center gap-3 border-b border-[#F2ECE0] px-3.5 py-2.5 text-left last:border-b-0 ${activeChapter === index ? "bg-info-bg" : ""}`}
+                  className={`flex w-full items-center gap-3 border-b border-[#F2ECE0] dark:border-gold-soft px-3.5 py-2.5 text-left last:border-b-0 ${activeChapter === index ? "bg-info-bg" : ""}`}
                 >
                   <div className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] bg-cream-card-alt text-[11.5px] font-bold text-stone-alt">
                     {c.no}
@@ -471,15 +471,15 @@ export function ImportManuscriptModal({
 
             {!destinationBookId && (
               <>
-                <div className="mb-1.5 text-[13px] font-semibold text-[#5C5650]">Nhập vào</div>
+                <div className="mb-1.5 text-[13px] font-semibold text-ink-muted">Nhập vào</div>
                 <div className="mb-3.5 flex gap-2">
                   <button
                     type="button"
                     onClick={() => setDestinationMode("new")}
                     className={`flex-1 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${
                       destinationMode === "new"
-                        ? "bg-brand-ink text-white"
-                        : "border border-cream-border bg-white text-stone-alt"
+                        ? "bg-brand-navy text-white"
+                        : "border border-cream-border bg-surface text-stone-alt"
                     }`}
                   >
                     Truyện mới
@@ -490,8 +490,8 @@ export function ImportManuscriptModal({
                     disabled={books.length === 0}
                     className={`flex-1 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
                       destinationMode === "existing"
-                        ? "bg-brand-ink text-white"
-                        : "border border-cream-border bg-white text-stone-alt"
+                        ? "bg-brand-navy text-white"
+                        : "border border-cream-border bg-surface text-stone-alt"
                     }`}
                   >
                     Truyện có sẵn

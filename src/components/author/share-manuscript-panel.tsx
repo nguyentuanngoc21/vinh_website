@@ -78,7 +78,7 @@ export function ShareManuscriptPanel({ bookId, finalized: initialFinalized, init
   };
 
   return (
-    <div className="mb-6 rounded-[12px] border border-cream-border bg-white p-5">
+    <div className="mb-6 rounded-[12px] border border-cream-border bg-surface p-5">
       <div className="flex items-center gap-2 text-[14.5px] font-bold text-brand-ink">
         <ShareNetworkIcon size={18} /> Chia sẻ bản thảo
       </div>
@@ -141,7 +141,7 @@ export function ShareManuscriptPanel({ bookId, finalized: initialFinalized, init
         )}
       </div>
 
-      <div className="mt-4 border-t border-[#F2ECE0] pt-3.5">
+      <div className="mt-4 border-t border-[#F2ECE0] dark:border-gold-soft pt-3.5">
         <button
           type="button"
           onClick={finalize}

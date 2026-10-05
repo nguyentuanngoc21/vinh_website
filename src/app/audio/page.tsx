@@ -46,8 +46,8 @@ export default async function AudioHubPage() {
   const [hero, ...rest] = progress;
 
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white pb-24">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface pb-24">
         <SiteHeader searchPlaceholder="Tìm truyện audio…" searchType="audio" />
         <main>
           {hero && <ContinueListening track={hero.track} positionSeconds={hero.positionSeconds} />}
@@ -67,7 +67,7 @@ export default async function AudioHubPage() {
               </div>
               <Link
                 href="/audio/new"
-                className="w-full shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-6 py-3 text-center text-sm font-semibold text-brand-ink no-underline sm:w-auto sm:px-[30px] sm:py-3.5 sm:text-[15px]"
+                className="w-full shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-6 py-3 text-center text-sm font-semibold text-brand-navy no-underline sm:w-auto sm:px-[30px] sm:py-3.5 sm:text-[15px]"
               >
                 Gửi bản thu
               </Link>

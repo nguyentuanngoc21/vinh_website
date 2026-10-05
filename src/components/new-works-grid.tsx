@@ -15,9 +15,9 @@ export function NewWorksGrid({ books }: { books: HomepageBook[] }) {
         )}
       </div>
       {books.length === 0 ? (
-        <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#e7e5e4] bg-[#fafaf9] py-10 text-center">
+        <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-line-alt bg-surface-soft-alt py-10 text-center">
           <div className="text-sm font-semibold text-ink">Chưa có truyện mới</div>
-          <div className="text-[13px] text-[#9a9a9a]">Truyện vừa xuất bản sẽ hiện ở đây.</div>
+          <div className="text-[13px] text-mute">Truyện vừa xuất bản sẽ hiện ở đây.</div>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
@@ -41,7 +41,7 @@ export function NewWorksGrid({ books }: { books: HomepageBook[] }) {
               </div>
               <div className="px-1 py-3">
                 <div className="line-clamp-2 min-h-[2.5rem] text-[15px] font-semibold text-ink">{book.title}</div>
-                <div className="mt-0.5 text-[13px] text-[#9a9a9a]">{book.authorNickname ?? "Ẩn danh"}</div>
+                <div className="mt-0.5 text-[13px] text-mute">{book.authorNickname ?? "Ẩn danh"}</div>
               </div>
             </Link>
           ))}

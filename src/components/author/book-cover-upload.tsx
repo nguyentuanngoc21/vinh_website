@@ -118,7 +118,7 @@ export function BookCoverUpload({
         onClick={handlePick}
         disabled={pending}
         title="Đổi ảnh bìa"
-        className="absolute -bottom-2 -right-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-brand-ink text-white shadow-[0_1px_3px_rgba(0,0,0,.25)] transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-70"
+        className="absolute -bottom-2 -right-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-brand-navy text-white shadow-[0_1px_3px_rgba(0,0,0,.25)] transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-70"
       >
         <CameraIcon weight="fill" size={13} />
       </button>
@@ -130,14 +130,14 @@ export function BookCoverUpload({
         }}
         disabled={pending}
         title="Dán link từ hoạ sĩ khác"
-        className="absolute -bottom-2 -left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-brand-ink text-white shadow-[0_1px_3px_rgba(0,0,0,.25)] transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-70"
+        className="absolute -bottom-2 -left-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-brand-navy text-white shadow-[0_1px_3px_rgba(0,0,0,.25)] transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-70"
       >
         <LinkSimpleIcon size={13} />
       </button>
       {linkMode && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 w-[220px] rounded-lg border border-cream-border bg-white p-2.5 shadow-[0_6px_20px_rgba(0,0,0,.15)]"
+          className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 w-[220px] rounded-lg border border-cream-border bg-surface p-2.5 shadow-[0_6px_20px_rgba(0,0,0,.15)]"
         >
           {/* Popover rộng 220px nên dùng cỡ gọn size="sm" */}
           <Field
@@ -153,7 +153,7 @@ export function BookCoverUpload({
         </div>
       )}
       {error && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-10 rounded-md bg-[#FDECEC] px-2 py-1 text-[11px] font-medium text-error">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-10 rounded-md bg-[#FDECEC] dark:bg-error-bg px-2 py-1 text-[11px] font-medium text-error">
           {error}
         </div>
       )}

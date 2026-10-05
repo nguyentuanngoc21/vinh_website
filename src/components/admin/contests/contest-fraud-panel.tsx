@@ -93,7 +93,7 @@ export function ContestFraudPanel({
   };
 
   return (
-    <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+    <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
       <div className="mb-4 flex items-start gap-2.5 rounded-[12px] bg-cream-card/60 px-3.5 py-3 text-[13px] leading-relaxed text-stone-dark">
         <ShieldWarningIcon size={18} weight="fill" className="mt-0.5 shrink-0 text-brand-gold-dark" />
         <span>
@@ -113,7 +113,7 @@ export function ContestFraudPanel({
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {FILTERS.map((f) => (
             <button key={f} type="button" onClick={() => applyFilter(f)}
-              className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium ${filter === f ? "bg-brand-ink text-white" : "bg-neutral-bg text-ink"}`}>
+              className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium ${filter === f ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink"}`}>
               {f === "all" ? "Tất cả" : FRAUD_STATUS_LABEL[f]}
               {f !== "all" && <span className="ml-1.5 opacity-70">{counts[f]}</span>}
             </button>

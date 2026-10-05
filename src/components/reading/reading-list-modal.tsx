@@ -147,7 +147,7 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
             >
               <span
                 className={`flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
-                  list.containsBook ? "border-brand-ink bg-brand-ink" : "border-border-light bg-white"
+                  list.containsBook ? "border-brand-ink bg-brand-navy" : "border-border-light bg-surface"
                 }`}
               >
                 <CheckIcon weight="bold" size={12} className={`text-white ${list.containsBook ? "opacity-100" : "opacity-0"}`} />
@@ -159,7 +159,7 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
 
         {error && <div className="mt-3 text-[12.5px] font-medium text-error">{error}</div>}
 
-        <div className="mt-4 flex items-center gap-2 border-t border-[#f1efec] pt-4">
+        <div className="mt-4 flex items-center gap-2 border-t border-line-soft pt-4">
           <input
             type="text"
             value={newName}
@@ -172,7 +172,7 @@ export function ReadingListModal({ open, onClose, bookId, bookTitle }: ReadingLi
             type="button"
             onClick={createList}
             disabled={creating || !newName.trim()}
-            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-gold px-3.5 py-2.5 text-sm font-bold text-brand-ink disabled:cursor-default disabled:opacity-60"
+            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-gold px-3.5 py-2.5 text-sm font-bold text-brand-navy disabled:cursor-default disabled:opacity-60"
           >
             <PlusIcon weight="bold" /> Tạo
           </button>

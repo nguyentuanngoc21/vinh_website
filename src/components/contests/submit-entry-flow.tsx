@@ -68,7 +68,7 @@ export function SubmitEntryFlow({
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border-light p-10 text-center">
         <div className="text-lg font-bold text-ink">Bạn chưa có tác phẩm nào</div>
         <p className="max-w-[420px] text-sm text-stone-alt">Tạo và xuất bản một truyện trong trình soạn thảo, rồi quay lại để gửi dự thi.</p>
-        <Link href="/author/new" className="rounded-full bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-ink no-underline">Tạo tác phẩm mới</Link>
+        <Link href="/author/new" className="rounded-full bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy no-underline">Tạo tác phẩm mới</Link>
       </div>
     );
   }
@@ -90,7 +90,7 @@ export function SubmitEntryFlow({
             return (
               <button key={b.bookId} type="button" onClick={() => { setSelected(b.bookId); setAgree(false); setError(null); setStep(2); }}
                 className={`flex items-center gap-3 rounded-[14px] border p-4 text-left transition-colors ${
-                  selected === b.bookId ? "border-brand-ink bg-white" : "border-border-light bg-white hover:border-brand-gold"
+                  selected === b.bookId ? "border-brand-ink bg-surface" : "border-border-light bg-surface hover:border-brand-gold"
                 }`}>
                 <span className={`h-[18px] w-[18px] shrink-0 rounded-full border-2 ${selected === b.bookId ? "border-[5px] border-brand-ink" : "border-border-light"}`} />
                 <span className="min-w-0 flex-1">
@@ -107,7 +107,7 @@ export function SubmitEntryFlow({
 
       {step === 2 && book && (
         <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-1 rounded-[14px] border border-border-light bg-white p-4">
+          <div className="flex flex-col gap-1 rounded-[14px] border border-border-light bg-surface p-4">
             <div className="text-xs text-stone-alt">Tác phẩm</div>
             <div className="flex items-center justify-between gap-3">
               <span className="truncate text-base font-bold text-ink">{book.title}</span>

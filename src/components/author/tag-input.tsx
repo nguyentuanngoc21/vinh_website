@@ -47,7 +47,7 @@ export function TagInput({ tags, onChange }: TagInputProps) {
         onBlur={commit}
         disabled={tags.length >= MAX_TAGS}
         placeholder={tags.length >= MAX_TAGS ? `Tối đa ${MAX_TAGS} tag` : "Thêm tag, Enter để xác nhận"}
-        className="w-full rounded-lg border border-cream-border bg-white px-3 py-2.5 text-[13px] outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-lg border border-cream-border bg-surface px-3 py-2.5 text-[13px] outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );

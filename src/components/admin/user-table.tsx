@@ -45,7 +45,7 @@ export function UserTable({
   }, [rows, query]);
 
   return (
-    <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+    <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
       <div className="mb-3.5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 rounded-lg border border-cream-border px-3 py-2">
           <MagnifyingGlassIcon size={15} color="var(--color-stone-alt)" />
@@ -78,7 +78,7 @@ export function UserTable({
         <Link
           key={r.id}
           href={`/admin/nguoi-dung/${r.id}`}
-          className={`grid ${GRID_COLS} min-w-[600px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e] no-underline transition-colors hover:bg-[#FBF8F1]`}
+          className={`grid ${GRID_COLS} min-w-[600px] items-center gap-3 border-b border-line-warm px-2.5 py-[13px] text-sm font-medium text-ink-warm no-underline transition-colors hover:bg-surface-warm`}
         >
           <div className="min-w-0">
             <div className="truncate">{r.nickname}</div>
@@ -88,9 +88,9 @@ export function UserTable({
             <span
               className={`rounded-full px-[11px] py-1 text-[11px] font-semibold ${
                 r.role === "super_admin"
-                  ? "bg-brand-ink text-white"
+                  ? "bg-brand-navy text-white"
                   : r.role === "admin"
-                    ? "bg-[#DBE8F3] text-[#2C5870]"
+                    ? "bg-[#DBE8F3] dark:bg-info-bg text-info-text"
                     : "bg-cream-card-alt text-stone-dark"
               }`}
             >

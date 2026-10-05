@@ -41,7 +41,7 @@ const LINK_COLUMNS: { title: string; links: FooterLink[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="bg-ink px-4 pb-9 pt-12 text-[#c9c3bd] sm:px-8 lg:px-11">
+    <footer className="bg-ink-surface px-4 pb-9 pt-12 text-mute-light sm:px-8 lg:px-11">
       <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <Link href="/" className="mb-3 flex items-center gap-2 text-2xl font-extrabold text-brand-gold no-underline">
@@ -66,14 +66,14 @@ export function SiteFooter() {
             <div className="flex flex-col gap-2.5 text-sm">
               {col.links.map((link) =>
                 link.legalDoc ? (
-                  <LegalLink key={link.label} doc={link.legalDoc} className="text-left text-[#c9c3bd] hover:text-white">
+                  <LegalLink key={link.label} doc={link.legalDoc} className="text-left text-mute-light hover:text-white">
                     {link.label}
                   </LegalLink>
                 ) : link.href ? (
                   <Link
                     key={link.label}
                     href={link.href}
-                    className="text-[#c9c3bd] no-underline transition-colors hover:text-white"
+                    className="text-mute-light no-underline transition-colors hover:text-white"
                   >
                     {link.label}
                   </Link>

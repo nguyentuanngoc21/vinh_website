@@ -11,10 +11,10 @@ export function BlogSidebar() {
           bản quyền.
         </div>
         <div className="mt-4 flex gap-2">
-          <div className="flex-1 rounded-full bg-white px-4 py-[11px] text-[13.5px] text-[#a49a86]">
+          <div className="flex-1 rounded-full bg-surface px-4 py-[11px] text-[13.5px] text-[#a49a86] dark:text-stone">
             Email của bạn
           </div>
-          <div className="cursor-pointer rounded-full bg-brand-ink px-5 py-[11px] text-[13.5px] font-semibold text-white">
+          <div className="cursor-pointer rounded-full bg-brand-navy px-5 py-[11px] text-[13.5px] font-semibold text-white">
             Đăng ký
           </div>
         </div>

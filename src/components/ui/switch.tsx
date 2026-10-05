@@ -54,12 +54,12 @@ export function Switch({
         className={cn(
           "flex shrink-0 rounded-full p-0.5 transition-colors",
           track,
-          checked ? "bg-brand-ink" : "bg-border-light"
+          checked ? "bg-brand-navy" : "bg-border-light"
         )}
       >
         <span
           className={cn(
-            "rounded-full bg-white shadow-sm transition-transform",
+            "rounded-full bg-surface shadow-sm transition-transform",
             knob,
             checked ? shift : "translate-x-0"
           )}

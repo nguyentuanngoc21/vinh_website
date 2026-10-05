@@ -51,7 +51,7 @@ export function LoginGateModal({
       <div className="mt-6 flex flex-col gap-2.5">
         <Link
           href={loginHref}
-          className="cursor-pointer rounded-full bg-brand-gold py-3 text-center text-sm font-bold text-brand-ink no-underline"
+          className="cursor-pointer rounded-full bg-brand-gold py-3 text-center text-sm font-bold text-brand-navy no-underline"
         >
           {primaryLabel}
         </Link>

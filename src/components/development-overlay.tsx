@@ -33,12 +33,12 @@ export function DevelopmentOverlay({ children }: { children: ReactNode }) {
         {children}
       </div>
 
-      <div className="pointer-events-none absolute inset-0 bg-white/80" />
+      <div className="pointer-events-none absolute inset-0 bg-surface/80" />
 
       {/* `fixed` (not `sticky`) so the label stays pinned to the center of
           the viewport no matter how far the user scrolls up/down the page
           — not just centered within the overlay's own box. */}
-      <div className="pointer-events-none fixed left-1/2 top-1/2 z-10 flex w-fit -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-full bg-brand-ink px-7 py-3.5 text-[15px] font-bold text-white shadow-[0_10px_30px_rgba(20,59,77,0.35)]">
+      <div className="pointer-events-none fixed left-1/2 top-1/2 z-10 flex w-fit -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-full bg-brand-navy px-7 py-3.5 text-[15px] font-bold text-white shadow-[0_10px_30px_rgba(20,59,77,0.35)]">
         <WrenchIcon weight="bold" size={17} className="text-brand-gold-light" />
         Đang phát triển
       </div>

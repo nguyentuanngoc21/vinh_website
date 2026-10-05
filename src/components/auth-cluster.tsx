@@ -127,7 +127,7 @@ export function AuthCluster() {
       {isGuest && (
         <Link
           href="/dang-nhap"
-          className="whitespace-nowrap text-[15px] font-medium text-[#3a3a3a] no-underline transition-colors hover:text-brand-gold-dark"
+          className="whitespace-nowrap text-[15px] font-medium text-ink-soft no-underline transition-colors hover:text-brand-gold-dark"
         >
           Đăng nhập
         </Link>
@@ -149,13 +149,13 @@ export function AuthCluster() {
           type="button"
           data-tour="tour-cta"
           onClick={() => setUploadMenuOpen((v) => !v)}
-          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-ink"
+          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-brand-gold px-[22px] py-2.5 text-sm font-semibold text-brand-navy"
         >
           Đăng tải
           <CaretDownIcon size={13} weight="bold" className={uploadMenuOpen ? "rotate-180 transition-transform" : "transition-transform"} />
         </button>
         {uploadMenuOpen && (
-          <div className="absolute right-0 top-[46px] z-[60] w-[236px] overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.16)]">
+          <div className="absolute right-0 top-[46px] z-[60] w-[236px] overflow-hidden rounded-2xl border border-cream bg-surface shadow-[0_14px_34px_rgba(0,0,0,.16)]">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
@@ -163,9 +163,9 @@ export function AuthCluster() {
                   key={action.label}
                   href={action.href}
                   onClick={() => setUploadMenuOpen(false)}
-                  className="flex items-center gap-3 border-b border-[#f1efec] px-4 py-3 text-sm font-semibold text-brand-ink no-underline transition-colors last:border-b-0 hover:bg-cream-card"
+                  className="flex items-center gap-3 border-b border-line-soft px-4 py-3 text-sm font-semibold text-brand-ink no-underline transition-colors last:border-b-0 hover:bg-cream-card"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-ink text-brand-gold-light">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-navy text-brand-gold-light">
                     <Icon size={17} weight="bold" />
                   </span>
                   {action.label}
@@ -194,7 +194,7 @@ export function AuthCluster() {
                   onClick={() => setQuickActionsOpen(false)}
                   className="fixed inset-0 z-[-1] cursor-default bg-transparent"
                 />
-                <div className="mb-3 w-[218px] overflow-hidden rounded-2xl border border-cream-border bg-white shadow-[0_14px_36px_rgba(0,0,0,.2)]">
+                <div className="mb-3 w-[218px] overflow-hidden rounded-2xl border border-cream-border bg-surface shadow-[0_14px_36px_rgba(0,0,0,.2)]">
                   {quickActions.map((action) => {
                     const Icon = action.icon;
                     return (
@@ -202,9 +202,9 @@ export function AuthCluster() {
                         key={action.label}
                         href={action.href}
                         onClick={() => setQuickActionsOpen(false)}
-                        className="flex items-center gap-3 border-b border-[#f1efec] px-4 py-3 text-sm font-semibold text-brand-ink no-underline transition-colors last:border-b-0 hover:bg-cream-card"
+                        className="flex items-center gap-3 border-b border-line-soft px-4 py-3 text-sm font-semibold text-brand-ink no-underline transition-colors last:border-b-0 hover:bg-cream-card"
                       >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-ink text-brand-gold-light">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-navy text-brand-gold-light">
                           <Icon size={17} weight="bold" />
                         </span>
                         {action.label}
@@ -220,7 +220,7 @@ export function AuthCluster() {
               aria-label={quickActionsOpen ? "Đóng tác vụ nhanh" : "Mở tác vụ nhanh"}
               title="Tác vụ nhanh"
               onClick={() => setQuickActionsOpen((value) => !value)}
-              className="ml-auto flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink shadow-[0_8px_24px_rgba(0,0,0,.25)] transition-transform active:scale-95"
+              className="ml-auto flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-navy shadow-[0_8px_24px_rgba(0,0,0,.25)] transition-transform active:scale-95"
             >
               {quickActionsOpen ? <XIcon weight="bold" size={24} /> : <PlusIcon weight="bold" size={26} />}
             </button>
@@ -232,7 +232,7 @@ export function AuthCluster() {
           href="/admin"
           aria-label="Bảng điều khiển"
           title="Bảng điều khiển"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-ink text-white no-underline sm:h-auto sm:w-auto sm:gap-2 sm:whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm sm:font-semibold"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-navy text-white no-underline sm:h-auto sm:w-auto sm:gap-2 sm:whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm sm:font-semibold"
         >
           <ShieldCheckIcon weight="fill" size={17} color="var(--color-brand-gold-light)" />
           <span className="hidden sm:inline">Bảng điều khiển</span>
@@ -273,13 +273,13 @@ export function AuthCluster() {
             }}
             title="Trang cá nhân"
             data-tour="tour-avatar"
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-brand-ink text-sm font-bold text-brand-gold-light"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-brand-navy text-sm font-bold text-brand-gold-light"
           >
             {initial}
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-[46px] z-[60] w-[236px] overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.16)]">
-              <div className="border-b border-[#f1efec] px-[18px] pb-3 pt-3.5">
+            <div className="absolute right-0 top-[46px] z-[60] w-[236px] overflow-hidden rounded-2xl border border-cream bg-surface shadow-[0_14px_34px_rgba(0,0,0,.16)]">
+              <div className="border-b border-line-soft px-[18px] pb-3 pt-3.5">
                 <div className="text-[14.5px] font-semibold text-ink">
                   {userName}
                 </div>
@@ -338,7 +338,7 @@ export function AuthCluster() {
                   logout();
                   setMenuOpen(false);
                 }}
-                className="flex w-full cursor-pointer items-center gap-[11px] border-t border-[#f1efec] px-[18px] py-3 text-left text-sm font-medium text-error transition-colors hover:bg-cream-card"
+                className="flex w-full cursor-pointer items-center gap-[11px] border-t border-line-soft px-[18px] py-3 text-left text-sm font-medium text-error transition-colors hover:bg-cream-card"
               >
                 <SignOutIcon size={18} /> Đăng xuất
               </button>

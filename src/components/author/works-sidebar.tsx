@@ -106,12 +106,12 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
           </button>
         </div>
 
-      <div className="px-3.5 pb-2 pt-4 text-[11px] font-bold tracking-wide text-[#6f8794]">
+      <div className="px-3.5 pb-2 pt-4 text-[11px] font-bold tracking-wide text-slate-muted-dark">
         TÁC PHẨM CỦA TÔI
       </div>
       <div className="flex flex-col gap-0.5 px-2.5">
         {books.length === 0 && (
-          <div className="px-3 py-2 text-xs leading-relaxed text-[#6f8794]">
+          <div className="px-3 py-2 text-xs leading-relaxed text-slate-muted-dark">
             Chưa có tác phẩm nào — bấm &quot;Tác phẩm mới&quot; bên dưới để bắt đầu.
           </div>
         )}
@@ -130,7 +130,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
                 >
                   {book.title}
                 </div>
-                <div className={`text-xs ${active ? "text-sidebar-text-dim" : "text-[#6f8794]"}`}>
+                <div className={`text-xs ${active ? "text-sidebar-text-dim" : "text-slate-muted-dark"}`}>
                   {book.meta}
                 </div>
               </div>
@@ -160,7 +160,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
                   rel="noopener noreferrer"
                   title="Xem trang truyện (tab mới)"
                   className={`mr-2 shrink-0 rounded-md p-1.5 transition-colors hover:bg-white/10 ${
-                    active ? "text-white" : "text-[#6f8794]"
+                    active ? "text-white" : "text-slate-muted-dark"
                   }`}
                 >
                   <ArrowSquareOutIcon size={15} />
@@ -211,7 +211,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
           <div className="overflow-hidden truncate text-[13px] font-semibold text-white">
             {session?.name ?? ""}
           </div>
-          <div className="overflow-hidden truncate text-[11px] text-[#6f8794]">
+          <div className="overflow-hidden truncate text-[11px] text-slate-muted-dark">
             @{session?.handle ?? ""}
           </div>
         </div>

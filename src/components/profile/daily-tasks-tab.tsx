@@ -178,7 +178,7 @@ export function DailyTasksTab() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-[#F0E3C4] bg-cream-card px-6 py-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-gold-soft bg-cream-card px-6 py-5">
         <div>
           <div className="text-lg font-bold text-brand-ink">Nhiệm vụ hôm nay</div>
           <div className="mt-1.5 text-[13.5px] text-stone-dark">
@@ -187,7 +187,7 @@ export function DailyTasksTab() {
           <div className="mt-1 text-[12px] text-stone-light">Còn {resetsRemaining}/{maxResetsPerDay} lượt đổi quest hôm nay</div>
         </div>
         {currentStreak !== null && (
-          <div className="flex items-center gap-2.5 rounded-full border border-[#F0E3C4] bg-white px-[18px] py-2.5">
+          <div className="flex items-center gap-2.5 rounded-full border border-gold-soft bg-surface px-[18px] py-2.5">
             <FlameIcon weight="fill" size={18} color="var(--color-brand-gold)" />
             <div className="text-[13.5px] font-semibold text-ink">Chuỗi {currentStreak} ngày</div>
           </div>
@@ -214,12 +214,12 @@ export function DailyTasksTab() {
             return (
               <div
                 key={slot.taskTemplateId}
-                style={{ background: done && !slot.claimed ? "#FCFAF4" : "#fff" }}
+                style={{ background: done && !slot.claimed ? "light-dark(#FCFAF4, var(--color-cream-gold))" : "var(--color-surface)" }}
                 className={`flex items-center gap-4 rounded-2xl border px-5 py-[18px] ${isEvent ? "border-cream-gold-border" : "border-cream"}`}
               >
                 <div
                   style={{
-                    background: done ? "var(--color-brand-ink)" : "#f2f1ee",
+                    background: done ? "var(--color-brand-navy)" : "light-dark(#f2f1ee, var(--color-surface-muted))",
                     color: done ? "var(--color-brand-gold-light)" : "var(--color-stone)",
                   }}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
@@ -229,7 +229,7 @@ export function DailyTasksTab() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="text-[15px] font-semibold text-ink">{slot.title}</div>
-                    <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${isEvent ? "bg-cream-gold text-cream-gold-text" : "bg-[#f2f1ee] text-stone-dark"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${isEvent ? "bg-cream-gold text-cream-gold-text" : "bg-[#f2f1ee] dark:bg-surface-muted text-stone-dark"}`}>
                       {typeLabel}
                     </span>
                   </div>
@@ -241,7 +241,7 @@ export function DailyTasksTab() {
                   <div className="mt-1 text-[12.5px] text-stone">
                     {slot.description ?? `Đã ${slot.progress}/${slot.targetCount}`}
                   </div>
-                  <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#f0efec]">
+                  <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface-sunken">
                     <div
                       style={{ width: `${fraction * 100}%`, background: done ? "var(--color-brand-gold)" : "#C9A86A" }}
                       className="h-full rounded-full transition-[width] duration-300"
@@ -267,7 +267,7 @@ export function DailyTasksTab() {
                       onClick={() => handleClaim(slot)}
                       disabled={!done || slot.claimed || claimPending}
                       style={{
-                        background: done && !slot.claimed ? "var(--color-brand-gold)" : "#fff",
+                        background: done && !slot.claimed ? "var(--color-brand-gold)" : "var(--color-surface)",
                         color: done && !slot.claimed ? "var(--color-brand-ink)" : "#a8a29e",
                         borderColor: done && !slot.claimed ? "var(--color-brand-gold)" : "var(--color-cream)",
                       }}

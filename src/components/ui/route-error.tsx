@@ -26,7 +26,7 @@ export function RouteError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-white px-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface px-4 text-center">
       <div className="text-lg font-bold text-brand-ink">Đã có lỗi xảy ra</div>
       <div className="max-w-[420px] text-sm text-stone-dark">
         Không tải được nội dung này. Vui lòng thử lại — nếu vẫn lỗi, hãy quay lại trang chủ.

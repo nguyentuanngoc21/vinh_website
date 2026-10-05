@@ -34,9 +34,9 @@ export function ResumeRow({ items }: { items: ListeningProgressItem[] }) {
               key={track.id}
               type="button"
               onClick={() => resume(track, positionSeconds)}
-              className="flex cursor-pointer items-center gap-3.5 rounded-2xl border border-cream bg-white p-3.5 text-left transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.14)]"
+              className="flex cursor-pointer items-center gap-3.5 rounded-2xl border border-cream bg-surface p-3.5 text-left transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,.14)]"
             >
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-brand-ink to-brand-ink-dark text-white">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-brand-navy to-brand-ink-dark text-white">
                 {track.narratorName[0]}
               </div>
               <div className="min-w-0 flex-1">
@@ -46,7 +46,7 @@ export function ResumeRow({ items }: { items: ListeningProgressItem[] }) {
                   {duration > 0 ? ` · còn ${formatClock(duration - positionSeconds)}` : ""}
                 </div>
                 {duration > 0 && (
-                  <div className="mt-[9px] h-1 rounded-full bg-[#efece8]">
+                  <div className="mt-[9px] h-1 rounded-full bg-[#efece8] dark:bg-surface-warm">
                     <div style={{ width: `${pct}%` }} className="h-1 rounded-full bg-brand-gold" />
                   </div>
                 )}

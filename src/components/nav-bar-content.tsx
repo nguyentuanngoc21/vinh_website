@@ -1,6 +1,7 @@
 import { MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr";
 import { NavStripLinks } from "@/components/nav-strip-links";
 import { MobileNavDrawer } from "@/components/mobile-nav-drawer";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export type SearchType = "truyen" | "audio" | "thiet-ke";
 
@@ -44,6 +45,9 @@ export function NavBarContent({
         <NavStripLinks />
       </div>
       <MobileNavDrawer />
+      {/* Nút chế độ tối: dưới `lg` nằm ngay cạnh hamburger, từ `lg` trở lên
+          chuyển ra sát mép phải, sau ô tìm kiếm (2 bản, dùng chung 1 state). */}
+      <ThemeToggle className="flex lg:hidden" />
       {showSearch && (
         <form
           action="/tim-kiem"
@@ -60,6 +64,7 @@ export function NavBarContent({
           {searchType !== "truyen" && <input type="hidden" name="type" value={searchType} />}
         </form>
       )}
+      <ThemeToggle className={`hidden lg:flex ${showSearch ? "" : "ml-auto"}`} />
     </>
   );
 }

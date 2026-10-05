@@ -154,7 +154,7 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
                 onClick={() => unlink(t.id)}
                 disabled={unlinkingId === t.id}
                 title="Gỡ khỏi chương này"
-                className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone-alt transition-colors hover:bg-[#fdf1f1] hover:text-error disabled:cursor-default"
+                className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone-alt transition-colors hover:bg-[#fdf1f1] dark:hover:bg-error-bg hover:text-error disabled:cursor-default"
               >
                 <TrashIcon size={14} />
               </button>

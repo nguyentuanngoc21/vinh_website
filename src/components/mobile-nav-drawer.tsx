@@ -76,17 +76,17 @@ export function MobileNavDrawer() {
             )}
 
             <aside
-              className={`fixed inset-y-0 right-0 z-50 flex w-[280px] max-w-[85vw] flex-col overflow-y-auto bg-white shadow-[-18px_0_44px_rgba(20,59,77,0.18)] transition-transform duration-200 lg:hidden ${
+              className={`fixed inset-y-0 right-0 z-50 flex w-[280px] max-w-[85vw] flex-col overflow-y-auto bg-surface shadow-[-18px_0_44px_rgba(20,59,77,0.18)] transition-transform duration-200 lg:hidden ${
                 open ? "translate-x-0" : "translate-x-full"
               }`}
             >
-              <div className="flex items-center justify-between border-b border-[#f0f0f0] px-5 py-4">
+              <div className="flex items-center justify-between border-b border-line-header px-5 py-4">
                 <span className="text-[15px] font-extrabold text-brand-ink">Menu</span>
                 <button
                   type="button"
                   onClick={closeDrawer}
                   aria-label="Đóng menu"
-                  className="cursor-pointer rounded-md p-1 text-[#3a3a3a]"
+                  className="cursor-pointer rounded-md p-1 text-ink-soft"
                 >
                   <XIcon size={20} />
                 </button>
@@ -110,7 +110,7 @@ export function MobileNavDrawer() {
 
                   const isExpanded = expanded === item.key;
                   return (
-                    <div key={item.key} className="border-b border-[#f5f5f5] last:border-b-0">
+                    <div key={item.key} className="border-b border-[#f5f5f5] dark:border-line-soft last:border-b-0">
                       <div className="flex items-center">
                         <Link href={item.href} onClick={closeDrawer} className={linkClassName}>
                           {item.label}
@@ -120,7 +120,7 @@ export function MobileNavDrawer() {
                           onClick={() => setExpanded(isExpanded ? null : item.key)}
                           aria-label={isExpanded ? `Thu gọn ${item.label}` : `Mở rộng ${item.label}`}
                           aria-expanded={isExpanded}
-                          className="cursor-pointer px-3 py-3 text-[#3a3a3a]"
+                          className="cursor-pointer px-3 py-3 text-ink-soft"
                         >
                           <CaretDownIcon
                             size={14}
@@ -140,7 +140,7 @@ export function MobileNavDrawer() {
                                     key={itemLabel(subItem)}
                                     href={itemHref(subItem, item.href)}
                                     onClick={closeDrawer}
-                                    className="text-[13.5px] text-[#3a3a3a] no-underline transition-colors hover:text-brand-gold-dark"
+                                    className="text-[13.5px] text-ink-soft no-underline transition-colors hover:text-brand-gold-dark"
                                   >
                                     {itemLabel(subItem)}
                                   </Link>

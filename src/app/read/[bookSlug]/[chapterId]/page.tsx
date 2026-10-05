@@ -122,7 +122,7 @@ export default async function ReadChapterPage({
   const ageGate = await resolveAgeGate(serviceClient, book, viewer);
   if (ageGate.gate === "verify18") {
     return (
-      <div className="flex-1 bg-white">
+      <div className="flex-1 bg-surface">
         <SiteHeader />
         <main className="mx-auto max-w-[680px] px-4 py-10 sm:py-14">
           <div className="mb-1 flex flex-wrap items-center gap-2 text-[13px] text-stone-alt">

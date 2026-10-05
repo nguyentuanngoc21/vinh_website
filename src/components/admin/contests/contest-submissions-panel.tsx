@@ -17,7 +17,7 @@ import type { ContestSubmissionStatus } from "@/lib/supabase/types";
 const STATUS_TONE: Record<ContestSubmissionStatus, string> = {
   submitted: "bg-cream-card-alt text-stone-dark",
   eligible: "bg-success-form-border text-success-form",
-  shortlisted: "bg-brand-ink text-white",
+  shortlisted: "bg-brand-navy text-white",
   ineligible: "bg-error-bg text-error",
   disqualified: "bg-error text-white",
   withdrawn: "bg-neutral-bg text-stone-dark",
@@ -86,12 +86,12 @@ export function ContestSubmissionsPanel({
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+    <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {FILTERS.map((f) => (
             <button key={f.value || "all"} type="button" onClick={() => applyFilter({ status: f.value })}
-              className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium ${status === f.value ? "bg-brand-ink text-white" : "bg-neutral-bg text-ink"}`}>
+              className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium ${status === f.value ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink"}`}>
               {f.label}
             </button>
           ))}
@@ -238,7 +238,7 @@ function SubmissionRow({
             <div className="flex flex-col gap-2">
               <div className="text-[13px] font-semibold text-slate">Cờ “Cần bổ sung”</div>
               {s.review_flags.map((f) => (
-                <div key={f.id} className="flex flex-col gap-2 rounded-[10px] border border-cream-border bg-white p-3 sm:flex-row sm:items-center">
+                <div key={f.id} className="flex flex-col gap-2 rounded-[10px] border border-cream-border bg-surface p-3 sm:flex-row sm:items-center">
                   <div className="min-w-0 flex-1 text-[13px]">
                     <div className="font-semibold text-ink">{f.message}</div>
                     <div className="text-xs text-stone-alt">
@@ -269,7 +269,7 @@ function SubmissionRow({
               <div className="flex flex-wrap gap-2">
                 {nextStatuses.map((n) => (
                   <button key={n} type="button" onClick={() => setTo(to === n ? "" : n)}
-                    className={`rounded-full px-3.5 py-2 text-[13px] font-medium ${to === n ? "bg-brand-ink text-white" : "bg-white text-ink ring-1 ring-cream-border"}`}>
+                    className={`rounded-full px-3.5 py-2 text-[13px] font-medium ${to === n ? "bg-brand-navy text-white" : "bg-surface text-ink ring-1 ring-cream-border"}`}>
                     {SUBMISSION_STATUS_LABEL[n]}
                   </button>
                 ))}
