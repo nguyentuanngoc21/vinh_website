@@ -148,7 +148,7 @@ export function AgreementsTab() {
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-cream-border">
-        <div className="grid min-w-[860px] grid-cols-[1.1fr_1.35fr_0.8fr_0.8fr_0.95fr] gap-4 border-b border-[#F0E3C4] bg-cream-card px-[22px] py-3.5 text-[12.5px] font-bold text-brand-ink">
+        <div className="grid min-w-[860px] grid-cols-[1.1fr_1.35fr_0.8fr_0.8fr_0.95fr] gap-4 border-b border-gold-soft bg-cream-card px-[22px] py-3.5 text-[12.5px] font-bold text-brand-ink">
           <div>Tên thỏa thuận</div>
           <div>Mô tả</div>
           <div>Ngày cập nhật</div>
@@ -158,7 +158,7 @@ export function AgreementsTab() {
         {filtered.map((r, i) => (
           <div
             key={r.id}
-            style={{ background: r.accepted ? "#fff" : "#FCFAF4", borderTop: i === 0 ? "none" : "1px solid #f3f2f0" }}
+            style={{ background: r.accepted ? "var(--color-surface)" : "light-dark(#FCFAF4, var(--color-cream-gold))", borderTop: i === 0 ? "none" : "1px solid #f3f2f0" }}
             className="grid min-w-[860px] grid-cols-[1.1fr_1.35fr_0.8fr_0.8fr_0.95fr] items-center gap-4 px-[22px] py-4"
           >
             <div>
@@ -188,7 +188,7 @@ export function AgreementsTab() {
               ) : (
                 <>
                   {r.updatedSincePending && (
-                    <div className="rounded-full bg-[#FBF0DC] px-2.5 py-0.5 text-[10.5px] font-bold text-[#B7791F]">
+                    <div className="rounded-full bg-[#FBF0DC] dark:bg-cream-gold px-2.5 py-0.5 text-[10.5px] font-bold text-[#B7791F] dark:text-gold-text">
                       Đã cập nhật
                     </div>
                   )}
@@ -196,7 +196,7 @@ export function AgreementsTab() {
                     type="button"
                     onClick={() => accept(r.id)}
                     disabled={pendingId === r.id}
-                    className="cursor-pointer whitespace-nowrap rounded-lg border border-brand-ink bg-white px-[15px] py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                    className="cursor-pointer whitespace-nowrap rounded-lg border border-brand-ink bg-surface px-[15px] py-1.5 text-[12.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
                   >
                     Xác nhận
                   </button>

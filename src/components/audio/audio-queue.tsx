@@ -17,7 +17,7 @@ export function AudioQueue({ tracks }: { tracks: AudioTrack[] }) {
 
   if (!current) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 bg-[#FBF8F1] p-10 text-center">
+      <div className="flex flex-col items-center justify-center gap-2 bg-surface-warm p-10 text-center">
         <p className="text-sm text-stone-alt">Chưa phát bản thu nào.</p>
       </div>
     );
@@ -26,7 +26,7 @@ export function AudioQueue({ tracks }: { tracks: AudioTrack[] }) {
   const related = tracks.filter((t) => t.narratorId === current.narratorId && t.id !== current.id);
 
   return (
-    <div className="flex flex-col overflow-hidden bg-[#FBF8F1]">
+    <div className="flex flex-col overflow-hidden bg-surface-warm">
       <div className="border-b border-cream-border px-6 pb-3.5 pt-[22px]">
         <div className="text-lg font-bold text-brand-ink">Cùng giọng đọc {current.narratorName}</div>
         <div className="mt-[3px] text-[13px] text-stone-alt">
@@ -50,7 +50,7 @@ export function AudioQueue({ tracks }: { tracks: AudioTrack[] }) {
               <HeadphonesIcon size={16} color="#b3a994" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-[#3a352e]">{t.title}</div>
+              <div className="truncate text-sm font-semibold text-ink-warm">{t.title}</div>
               <div className="text-xs text-stone-alt">
                 {formatDurationShort(t.durationSeconds)} · {formatPlayCount(t.playCount)} nghe
               </div>

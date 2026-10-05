@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 
 export default function BlogPage() {
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface">
         {/* searchType mặc định (truyện) — Blog vẫn là dữ liệu mock (xem
             src/lib/blog.ts), không có tab kết quả thật để trỏ tới, nên
             không đặt searchType="blog" giả vờ có (xem
@@ -55,7 +55,7 @@ export default function BlogPage() {
                 </div>
                 <Link
                   href="/author"
-                  className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
+                  className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-navy no-underline"
                 >
                   Gửi bài viết
                 </Link>

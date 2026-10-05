@@ -52,7 +52,7 @@ export function ContestStatusPanel({ contest, events }: { contest: ContestRow; e
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <div className="text-xs font-semibold uppercase tracking-wide text-stone-alt">Trạng thái hiện tại</div>
         <div className="mt-1 text-xl font-bold text-brand-ink">{CONTEST_STATUS_LABEL[contest.status]}</div>
         <p className="mt-1 text-xs text-stone-alt">
@@ -73,7 +73,7 @@ export function ContestStatusPanel({ contest, events }: { contest: ContestRow; e
         )}
       </section>
 
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <h2 className="mb-3 text-base font-bold text-brand-ink">Lịch sử trạng thái</h2>
         {events.length === 0 ? (
           <p className="text-sm text-stone-alt">Chưa có thay đổi nào.</p>

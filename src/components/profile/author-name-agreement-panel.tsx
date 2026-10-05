@@ -91,7 +91,7 @@ export function AuthorNameAgreementPanel({ orderId, viewerId }: AuthorNameAgreem
     agreement && viewerId === agreement.ghostwriter_id ? agreement.ghostwriter_statement_text : agreement?.customer_statement_text;
 
   return (
-    <div className="mt-3 rounded-xl border border-cream bg-[#FBFAF8] p-4">
+    <div className="mt-3 rounded-xl border border-cream bg-[#FBFAF8] dark:bg-surface-soft p-4">
       <div className="flex items-center gap-2 text-[13.5px] font-bold text-brand-ink">
         <SealCheckIcon size={16} /> Đứng tên tác giả thay
       </div>
@@ -104,8 +104,8 @@ export function AuthorNameAgreementPanel({ orderId, viewerId }: AuthorNameAgreem
 
       {!agreement && (
         <div className="mt-2.5">
-          <div className="rounded-lg border border-[#F0D9B5] bg-[#FDF3E7] p-3.5 text-xs leading-[1.7] text-[#5c4a1e]">
-            <div className="mb-1.5 font-bold text-[#7a5a12]">Trước khi xác nhận, cả hai bên cần hiểu rõ:</div>
+          <div className="rounded-lg border border-gold-soft-alt bg-surface-peach p-3.5 text-xs leading-[1.7] text-[#5c4a1e] dark:text-gold-text">
+            <div className="mb-1.5 font-bold text-gold-text">Trước khi xác nhận, cả hai bên cần hiểu rõ:</div>
             <ol className="list-decimal space-y-1.5 pl-4">
               <li>
                 Đây là thỏa thuận thực tế giữa hai bên, không phải chuyển nhượng quyền đứng tên theo nghĩa pháp lý tuyệt đối — vì
@@ -158,7 +158,7 @@ export function AuthorNameAgreementPanel({ orderId, viewerId }: AuthorNameAgreem
         <div className="mt-2.5">
           {myPendingConfirm ? (
             <>
-              <div className="rounded-lg border border-cream bg-white p-3 text-xs leading-[1.6] text-ink">{myStatement}</div>
+              <div className="rounded-lg border border-cream bg-surface p-3 text-xs leading-[1.6] text-ink">{myStatement}</div>
               <Button
                 type="button"
                 fullWidth={false}
@@ -176,7 +176,7 @@ export function AuthorNameAgreementPanel({ orderId, viewerId }: AuthorNameAgreem
       )}
 
       {bothConfirmed && (
-        <div className="mt-2.5 text-xs font-semibold text-[#1f5738]">
+        <div className="mt-2.5 text-xs font-semibold text-[#1f5738] dark:text-success-text">
           Đã hoàn tất — {agreement?.author_display_choice === "customer_name" ? "khách hàng đứng tên tác giả" : "cả 2 cùng đứng tên đồng tác giả"}.
         </div>
       )}

@@ -22,9 +22,9 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
         <AdminModerationCallout />
 
         {weeklyRanking.length === 0 ? (
-          <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#e7e5e4] bg-[#fafaf9] py-10 text-center">
+          <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-line-alt bg-surface-soft-alt py-10 text-center">
             <div className="text-sm font-semibold text-ink">Chưa có dữ liệu xếp hạng</div>
-            <div className="text-[13px] text-[#9a9a9a]">Cần ít nhất 1 truyện được xuất bản để tính bảng xếp hạng.</div>
+            <div className="text-[13px] text-mute">Cần ít nhất 1 truyện được xuất bản để tính bảng xếp hạng.</div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -53,7 +53,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
                     <span className="min-w-0">{book.title}</span>
                     {book.isExclusive && <ExclusiveBadge variant="pill" />}
                   </div>
-                  <div className="text-[13px] text-[#9a9a9a]">
+                  <div className="text-[13px] text-mute">
                     {book.authorNickname ?? "Ẩn danh"} · {book.viewCount.toLocaleString("vi-VN")} đọc
                     {book.genre ? ` · ${book.genre}` : ""}
                   </div>
@@ -78,8 +78,8 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
               className={
                 "rounded-full px-[18px] py-2.5 text-sm font-medium no-underline transition-colors " +
                 (genre.active
-                  ? "bg-cream-gold font-semibold text-brand-gold-dark hover:bg-[#eedfc4]"
-                  : "bg-neutral-bg text-ink hover:bg-[#ebebeb] hover:text-brand-gold-dark")
+                  ? "bg-cream-gold font-semibold text-brand-gold-dark hover:bg-[#eedfc4] dark:hover:bg-cream-gold"
+                  : "bg-neutral-bg text-ink hover:bg-[#ebebeb] dark:hover:bg-surface-muted hover:text-brand-gold-dark")
               }
             >
               {genre.label}
@@ -87,7 +87,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
           ))}
         </div>
         <div className="mt-[26px] flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-cream-gold-border bg-cream-gold p-5 sm:p-[22px]">
-          <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-xl bg-brand-ink text-brand-gold-light">
+          <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-xl bg-brand-navy text-brand-gold-light">
             <FingerprintIcon weight="fill" size={24} />
           </div>
           <div>

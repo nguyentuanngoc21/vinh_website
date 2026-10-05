@@ -31,7 +31,7 @@ export function AdminModerationCallout() {
   return (
     <Link
       href="/admin/tranh-chap"
-      className="mb-[18px] flex items-center gap-3.5 rounded-2xl bg-brand-ink px-[18px] py-3.5 no-underline"
+      className="mb-[18px] flex items-center gap-3.5 rounded-2xl bg-brand-navy px-[18px] py-3.5 no-underline"
     >
       <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] bg-brand-gold-light/16 text-brand-gold-light">
         <WarningCircleIcon weight="fill" size={20} />
@@ -40,7 +40,7 @@ export function AdminModerationCallout() {
         <div className="text-[15px] font-semibold text-white">Tranh chấp đang chờ xử lý</div>
         <div className="mt-0.5 text-[12.5px] text-sidebar-text-dim-2">Chỉ quản trị viên thấy mục này</div>
       </div>
-      <div className="rounded-full bg-brand-gold-light px-3 py-[5px] text-[12.5px] font-bold text-brand-ink">
+      <div className="rounded-full bg-brand-gold-light px-3 py-[5px] text-[12.5px] font-bold text-brand-navy">
         {openDisputeCount}
       </div>
     </Link>

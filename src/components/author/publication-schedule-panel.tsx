@@ -78,7 +78,7 @@ export function PublicationSchedulePanel({ bookId, chapterIds, price, disabled, 
     finally { setBusy(false); }
   }
 
-  return <div className="mb-4 space-y-3 rounded-xl border border-cream-border bg-white p-4">
+  return <div className="mb-4 space-y-3 rounded-xl border border-cream-border bg-surface p-4">
     <div className="text-sm font-semibold text-brand-ink">Hẹn giờ đăng</div>
     <p className="text-xs text-stone-alt">Áp dụng cho chương và giá đã chọn ở trên. Thời gian theo Việt Nam (UTC+7); thứ tự theo danh sách chương.</p>
     <Field label="Thời điểm bắt đầu (giờ Việt Nam)" type="datetime-local" value={startsAt}

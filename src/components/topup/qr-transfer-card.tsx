@@ -19,7 +19,7 @@ type QrTransferCardProps = {
 export function QrTransferCard({ show, onShow, onHide, qrSrc, amount, tokens, note }: QrTransferCardProps) {
   if (!show) {
     return (
-      <div className="rounded-2xl border border-brand-ink bg-brand-ink">
+      <div className="rounded-2xl border border-brand-ink bg-brand-navy">
         <button
           type="button"
           onClick={onShow}
@@ -36,7 +36,7 @@ export function QrTransferCard({ show, onShow, onHide, qrSrc, amount, tokens, no
 
   return (
     <div className="flex flex-wrap items-center gap-6 rounded-[18px] border border-cream p-[22px]">
-      <div className="shrink-0 rounded-[14px] border border-[#f0efec] bg-white p-2.5">
+      <div className="shrink-0 rounded-[14px] border border-surface-sunken bg-surface p-2.5">
         {/* External VietQR endpoint renders the code server-side from amount + note. */}
         <Image
           src={qrSrc}

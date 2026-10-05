@@ -100,7 +100,7 @@ export function MegaMenu({ label, href, triggerClassName, columns }: MegaMenuPro
             onMouseEnter={show}
             onMouseLeave={scheduleHide}
             style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 70 }}
-            className={`rounded-2xl border border-cream bg-white p-6 shadow-[0_18px_44px_rgba(20,59,77,0.18)] ${
+            className={`rounded-2xl border border-cream bg-surface p-6 shadow-[0_18px_44px_rgba(20,59,77,0.18)] ${
               columns.length > 1 ? "min-w-[420px]" : "min-w-[240px]"
             }`}
           >
@@ -113,7 +113,7 @@ export function MegaMenu({ label, href, triggerClassName, columns }: MegaMenuPro
                       <Link
                         key={itemLabel(item)}
                         href={itemHref(item, href)}
-                        className="text-[13.5px] text-[#3a3a3a] no-underline transition-colors hover:text-brand-gold-dark"
+                        className="text-[13.5px] text-ink-soft no-underline transition-colors hover:text-brand-gold-dark"
                         onClick={() => setOpen(false)}
                       >
                         {itemLabel(item)}

@@ -28,8 +28,8 @@ export default async function TruyenPage({
   const { books } = await getCachedBooksByGenre(genre);
 
   return (
-    <div className="flex-1 bg-[#f2f2f3]">
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className="flex-1 bg-surface-muted">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main className="px-4 py-8 sm:px-8 lg:px-11">
           <h1 className="mb-1 text-2xl font-bold text-brand-ink">
@@ -49,7 +49,7 @@ export default async function TruyenPage({
             <Link
               href="/truyen"
               className={`rounded-full px-[16px] py-2 text-[13.5px] font-medium no-underline transition-colors ${
-                !genre ? "bg-brand-ink text-white" : "bg-neutral-bg text-ink hover:text-brand-gold-dark"
+                !genre ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink hover:text-brand-gold-dark"
               }`}
             >
               Tất cả
@@ -59,7 +59,7 @@ export default async function TruyenPage({
                 key={g}
                 href={`/truyen?the-loai=${GENRE_SLUGS[g]}`}
                 className={`rounded-full px-[16px] py-2 text-[13.5px] font-medium no-underline transition-colors ${
-                  g === genre ? "bg-brand-ink text-white" : "bg-neutral-bg text-ink hover:text-brand-gold-dark"
+                  g === genre ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink hover:text-brand-gold-dark"
                 }`}
               >
                 {g}

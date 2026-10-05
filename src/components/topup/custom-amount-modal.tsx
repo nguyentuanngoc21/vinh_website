@@ -118,7 +118,7 @@ export function CustomAmountModal({
             type="button"
             onClick={onConfirm}
             disabled={!isValid}
-            className="flex-1 cursor-pointer rounded-full bg-brand-gold py-3 text-center text-sm font-bold text-brand-ink disabled:cursor-default disabled:bg-[#efedea] disabled:text-[#b3aca3]"
+            className="flex-1 cursor-pointer rounded-full bg-brand-gold py-3 text-center text-sm font-bold text-brand-navy disabled:cursor-default disabled:bg-[#efedea] dark:disabled:bg-surface-muted disabled:text-[#b3aca3]"
           >
             Xác nhận
           </button>

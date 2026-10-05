@@ -27,13 +27,13 @@ export function RandomPick({ pool, variant = "card" }: { pool: HomepageBook[]; v
 
   const button = (
     <button type="button" onClick={roll}
-      className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-full bg-brand-ink px-5 py-3 text-[14.5px] font-semibold text-white">
+      className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-full bg-brand-navy px-5 py-3 text-[14.5px] font-semibold text-white">
       <DiceFiveIcon size={17} weight="bold" /> {pick ? "Đổi tác phẩm khác" : "Khám phá một tác phẩm"}
     </button>
   );
 
   const picked = pick && (
-    <Link href={`/truyen/${pick.slug}?from=cuoc-thi`} className="flex items-center gap-3 rounded-[14px] bg-white p-2.5 no-underline">
+    <Link href={`/truyen/${pick.slug}?from=cuoc-thi`} className="flex items-center gap-3 rounded-[14px] bg-surface p-2.5 no-underline">
       <div className="h-[62px] w-[46px] shrink-0 overflow-hidden rounded-lg">
         <BookCover id={pick.id} title={pick.title} genre={pick.genre} coverUrl={pick.coverUrl} ageRating={pick.ageRating} className="h-full w-full" />
       </div>

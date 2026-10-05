@@ -69,7 +69,7 @@ function ChecklistSection({
   children: ReactNode;
 }) {
   return (
-    <section className="border-b border-[#f0efec] last:border-b-0">
+    <section className="border-b border-surface-sunken last:border-b-0">
       <button
         type="button"
         onClick={() => onToggle(id)}
@@ -78,7 +78,7 @@ function ChecklistSection({
       >
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-            done ? "bg-success-form-border text-[#2C7453]" : "bg-cream-card-alt text-stone-alt"
+            done ? "bg-success-form-border text-success-text" : "bg-cream-card-alt text-stone-alt"
           }`}
         >
           {done ? <CheckCircleIcon weight="fill" size={16} /> : <span className="h-2 w-2 rounded-full bg-current" />}
@@ -152,8 +152,8 @@ export function PublishPanel({
   const hasAudio = audioUrl.trim().length > 0;
 
   return (
-    <div className="flex flex-col border-t border-cream-border bg-white lg:overflow-y-auto lg:border-l lg:border-t-0">
-      <div className="sticky top-0 z-10 flex gap-2.5 border-b border-cream-border bg-white px-[22px] py-5">
+    <div className="flex flex-col border-t border-cream-border bg-surface lg:overflow-y-auto lg:border-l lg:border-t-0">
+      <div className="sticky top-0 z-10 flex gap-2.5 border-b border-cream-border bg-surface px-[22px] py-5">
         <button
           type="button"
           onClick={onSaveDraft}
@@ -166,7 +166,7 @@ export function PublishPanel({
           type="button"
           onClick={onPublish}
           disabled={saving}
-          className="flex-1 cursor-pointer rounded-[9px] bg-brand-gold py-[11px] text-center text-sm font-bold text-brand-ink transition-opacity disabled:cursor-default disabled:opacity-60"
+          className="flex-1 cursor-pointer rounded-[9px] bg-brand-gold py-[11px] text-center text-sm font-bold text-brand-navy transition-opacity disabled:cursor-default disabled:opacity-60"
         >
           {saving ? "Đang lưu..." : published ? "Cập nhật" : "Xuất bản"}
         </button>
@@ -184,7 +184,7 @@ export function PublishPanel({
         >
           <div className="flex flex-col gap-3.5">
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tên truyện</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Tên truyện</div>
               <Field
                 label={null}
                 value={bookTitle}
@@ -195,7 +195,7 @@ export function PublishPanel({
             </div>
 
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tóm tắt truyện</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Tóm tắt truyện</div>
               <Textarea
                 label={null}
                 value={synopsis}
@@ -217,17 +217,17 @@ export function PublishPanel({
         >
           <div className="flex flex-col gap-3.5">
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Thể loại</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Thể loại</div>
               <GenreSelect value={genre} onChange={onGenreChange} />
             </div>
 
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Tag</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Tag</div>
               <TagInput tags={tags} onChange={onTagsChange} />
             </div>
 
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Độ tuổi</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Độ tuổi</div>
               <AgeRatingPicker
                 rating={ageRating}
                 warnings={contentWarnings}
@@ -260,7 +260,7 @@ export function PublishPanel({
         >
           <div className="flex flex-col gap-3.5">
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">
                 Link audio <span className="font-normal text-stone-alt">(không bắt buộc)</span>
               </div>
               <Field
@@ -272,7 +272,7 @@ export function PublishPanel({
             </div>
 
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Giá</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Giá</div>
               <div className="flex flex-col gap-2">
                 {/* start/end nằm trong khung viền của Field — cả hàng là <label> nên bấm nhãn cũng focus ô giá */}
                 <Field
@@ -286,7 +286,7 @@ export function PublishPanel({
                   onChange={(event) => onPriceChange(Math.max(0, Number(event.target.value) || 0))}
                   start={
                     <>
-                      <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện chữ:</span>
+                      <span className="w-[92px] shrink-0 text-[13px] font-medium text-ink-muted">Truyện chữ:</span>
                       <CoinsIcon color="var(--color-brand-gold)" className="shrink-0" />
                     </>
                   }
@@ -305,7 +305,7 @@ export function PublishPanel({
                     onChange={(event) => onAudioPriceChange(Math.max(0, Number(event.target.value) || 0))}
                     start={
                       <>
-                        <span className="w-[92px] shrink-0 text-[13px] font-medium text-[#5C5650]">Truyện audio</span>
+                        <span className="w-[92px] shrink-0 text-[13px] font-medium text-ink-muted">Truyện audio</span>
                         <CoinsIcon color="var(--color-brand-gold)" className="shrink-0" />
                       </>
                     }
@@ -320,13 +320,13 @@ export function PublishPanel({
             </div>
 
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Quyền độc quyền</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Quyền độc quyền</div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => onExclusiveChange(true)}
                   className={`flex-1 cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${
-                    isExclusive ? "bg-brand-ink text-white" : "border border-cream-border bg-white text-stone-alt"
+                    isExclusive ? "bg-brand-navy text-white" : "border border-cream-border bg-surface text-stone-alt"
                   }`}
                 >
                   Độc quyền
@@ -343,7 +343,7 @@ export function PublishPanel({
                         : undefined
                   }
                   className={`flex-1 cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
-                    !isExclusive ? "bg-brand-ink text-white" : "border border-cream-border bg-white text-stone-alt"
+                    !isExclusive ? "bg-brand-navy text-white" : "border border-cream-border bg-surface text-stone-alt"
                   }`}
                 >
                   Tự do

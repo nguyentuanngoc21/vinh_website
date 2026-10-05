@@ -82,7 +82,7 @@ export function FollowingTab({ onMessage }: FollowingTabProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Lọc theo tên…"
-            className="border-none bg-transparent px-0 py-0 text-[13.5px] text-ink placeholder:text-[#9a9a9a] focus:border-transparent"
+            className="border-none bg-transparent px-0 py-0 text-[13.5px] text-ink placeholder:text-mute focus:border-transparent"
           />
         </div>
       </div>
@@ -139,7 +139,7 @@ export function FollowingTab({ onMessage }: FollowingTabProps) {
                     type="button"
                     onClick={() => handleUnfollow(p.userId)}
                     disabled={!!pending[p.userId]}
-                    className="cursor-pointer whitespace-nowrap rounded-full border border-brand-gold bg-brand-gold px-4 py-2 text-[12.5px] font-semibold text-brand-ink transition-transform hover:-translate-y-0.5 disabled:cursor-default disabled:opacity-60"
+                    className="cursor-pointer whitespace-nowrap rounded-full border border-brand-gold bg-brand-gold px-4 py-2 text-[12.5px] font-semibold text-brand-navy transition-transform hover:-translate-y-0.5 disabled:cursor-default disabled:opacity-60"
                   >
                     Đang theo dõi
                   </button>

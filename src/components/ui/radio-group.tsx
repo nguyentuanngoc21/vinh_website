@@ -79,13 +79,13 @@ export function RadioGroup<T extends string>({
               <span
                 aria-hidden
                 className={cn(
-                  "mt-0.5 flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full border bg-white transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-gold",
+                  "mt-0.5 flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full border bg-surface transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-gold",
                   checked ? "border-brand-ink" : "border-border-light"
                 )}
               >
                 <span
                   className={cn(
-                    "h-[9px] w-[9px] rounded-full bg-brand-ink transition-opacity",
+                    "h-[9px] w-[9px] rounded-full bg-brand-navy transition-opacity",
                     checked ? "opacity-100" : "opacity-0"
                   )}
                 />

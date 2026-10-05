@@ -17,7 +17,7 @@ type VinhMarkProps = {
 
 const FILL_BY_TONE: Record<"ink" | "cream", string> = {
   ink: "var(--color-brand-ink)",
-  cream: "var(--color-cream-card-alt)",
+  cream: "var(--color-cream-fixed)",
 };
 
 /**

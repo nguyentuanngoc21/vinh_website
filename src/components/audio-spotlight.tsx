@@ -68,11 +68,11 @@ export function AudioSpotlight({ track }: { track: AudioTrack }) {
             <div className="my-1 truncate text-base font-bold text-ink sm:my-1.5 sm:text-xl sm:whitespace-normal">
               {track.title}
             </div>
-            <div className="truncate text-xs text-[#6a6a6a] sm:text-sm sm:whitespace-normal">
+            <div className="truncate text-xs text-[#6a6a6a] dark:text-ink-muted sm:text-sm sm:whitespace-normal">
               Diễn đọc: {track.narratorName} · {formatDurationShort(track.durationSeconds)} ·{" "}
               {formatPlayCount(track.playCount)} lượt nghe
             </div>
-            <div className="mt-2.5 h-1.5 w-full max-w-[520px] overflow-hidden rounded-full bg-[#dcdcdc] sm:mt-3.5">
+            <div className="mt-2.5 h-1.5 w-full max-w-[520px] overflow-hidden rounded-full bg-[#dcdcdc] dark:bg-surface-muted sm:mt-3.5">
               <div style={{ width: `${pct}%` }} className="h-full bg-brand-gold" />
             </div>
           </button>
@@ -89,7 +89,7 @@ export function AudioSpotlight({ track }: { track: AudioTrack }) {
           <button
             type="button"
             onClick={handlePlayPause}
-            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink sm:h-[54px] sm:w-[54px]"
+            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-navy sm:h-[54px] sm:w-[54px]"
           >
             {isCurrent && isPlaying ? <PauseIcon weight="fill" size={20} /> : <PlayIcon weight="fill" size={20} />}
           </button>

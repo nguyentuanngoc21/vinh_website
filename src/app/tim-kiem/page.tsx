@@ -53,8 +53,8 @@ export default async function SearchPage({
   };
 
   return (
-    <div className="flex-1 bg-[#f2f2f3]">
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className="flex-1 bg-surface-muted">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader searchPlaceholder="Tìm truyện, tác giả…" searchType={activeTab} searchDefaultValue={query} />
         <main className="px-4 py-8 sm:px-8 lg:px-11">
           <h1 className="mb-1 text-2xl font-bold text-brand-ink">
@@ -129,9 +129,9 @@ export default async function SearchPage({
                     <Link
                       key={a.id}
                       href="/audio"
-                      className="flex items-center gap-3.5 rounded-[10px] border border-cream-border px-4 py-3 no-underline transition-colors hover:bg-[#FBF8F1]"
+                      className="flex items-center gap-3.5 rounded-[10px] border border-cream-border px-4 py-3 no-underline transition-colors hover:bg-surface-warm"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-ink text-brand-gold-light">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-navy text-brand-gold-light">
                         <HeadphonesIcon size={18} />
                       </div>
                       <div className="min-w-0 flex-1">

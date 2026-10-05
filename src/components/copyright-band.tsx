@@ -24,7 +24,7 @@ const WATERMARK_TEXT =
 export function CopyrightBand() {
   return (
     <section className="px-4 py-11 sm:px-8 lg:px-11">
-      <div className="grid grid-cols-1 items-center gap-12 rounded-[22px] bg-ink p-5 text-white sm:p-8 lg:grid-cols-[1fr_460px] lg:p-11">
+      <div className="grid grid-cols-1 items-center gap-12 rounded-[22px] bg-ink-surface p-5 text-white sm:p-8 lg:grid-cols-[1fr_460px] lg:p-11">
         <div>
           <div className="text-xs font-semibold tracking-[1px] text-brand-gold-light">
             BẢO VỆ BẢN QUYỀN
@@ -38,7 +38,7 @@ export function CopyrightBand() {
                 <f.icon size={24} color="var(--color-brand-gold-light)" className="shrink-0" />
                 <div>
                   <div className="text-base font-semibold">{f.title}</div>
-                  <div className="text-sm leading-[1.5] text-[#c9c3bd]">
+                  <div className="text-sm leading-[1.5] text-mute-light">
                     {f.desc}
                   </div>
                 </div>
@@ -47,7 +47,7 @@ export function CopyrightBand() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl bg-[#fbf8f0] p-5 sm:p-9">
+        <div className="relative overflow-hidden rounded-2xl bg-[#fbf8f0] dark:bg-surface-warm p-5 sm:p-9">
           <div
             aria-hidden="true"
             style={{ inset: "-40% -10%" }}
@@ -65,10 +65,10 @@ export function CopyrightBand() {
               {WATERMARK_TEXT}
             </div>
           </div>
-          <div className="relative z-[1] mb-4 text-[11px] font-medium tracking-[1px] text-[#8a5a2f]">
+          <div className="relative z-[1] mb-4 text-[11px] font-medium tracking-[1px] text-[#8a5a2f] dark:text-gold-text">
             XEM TRƯỚC · WATERMARK ĐỘNG
           </div>
-          <div className="relative z-[1] font-[family-name:var(--font-lora)] text-[17px] font-medium leading-[2] text-[#3a322a]">
+          <div className="relative z-[1] font-[family-name:var(--font-lora)] text-[17px] font-medium leading-[2] text-[#3a322a] dark:text-ink">
             Gió từ vịnh thổi vào, mang theo mùi muối và một thứ im lặng rất
             cũ. Bà tôi nói biển nhớ tất cả những ai từng ra đi, và cất giữ tên
             họ dưới đáy nước sâu, nơi không ánh nắng nào với tới.

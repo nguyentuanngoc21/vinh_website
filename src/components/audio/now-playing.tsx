@@ -64,7 +64,7 @@ export function NowPlaying() {
         <p className="text-white">Chưa phát bản thu nào.</p>
         <Link
           href="/audio"
-          className="rounded-full bg-brand-gold px-6 py-3 text-sm font-semibold text-brand-ink no-underline"
+          className="rounded-full bg-brand-gold px-6 py-3 text-sm font-semibold text-brand-navy no-underline"
         >
           Về Kho Audio
         </Link>
@@ -101,7 +101,7 @@ export function NowPlaying() {
             hết % preview) — thẻ khoá đè lên trên (absolute inset-0 bên
             dưới) là nơi duy nhất còn bấm được. */}
         <div className={audioGated ? "pointer-events-none w-full select-none blur-[6px] opacity-50" : "w-full"}>
-          <div className="relative mx-auto flex h-[min(280px,calc(100vw-3rem))] w-[min(280px,calc(100vw-3rem))] max-h-[300px] max-w-[300px] flex-col justify-end rounded-[20px] bg-gradient-to-br from-brand-ink to-[#7a2e1c] p-5 sm:p-[26px] text-white shadow-[0_24px_60px_rgba(0,0,0,.5)]">
+          <div className="relative mx-auto flex h-[min(280px,calc(100vw-3rem))] w-[min(280px,calc(100vw-3rem))] max-h-[300px] max-w-[300px] flex-col justify-end rounded-[20px] bg-gradient-to-br from-brand-navy to-[#7a2e1c] p-5 sm:p-[26px] text-white shadow-[0_24px_60px_rgba(0,0,0,.5)]">
             {track.genre && (
               <div className="text-xs tracking-[2px] text-white/80">{track.genre.toUpperCase()}</div>
             )}
@@ -150,7 +150,7 @@ export function NowPlaying() {
             <button
               type="button"
               onClick={toggle}
-              className="flex h-14 w-14 sm:h-[68px] sm:w-[68px] cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink transition-transform active:scale-90"
+              className="flex h-14 w-14 sm:h-[68px] sm:w-[68px] cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-navy transition-transform active:scale-90"
             >
               {isPlaying ? <PauseIcon weight="fill" size={26} /> : <PlayIcon weight="fill" size={26} />}
             </button>
@@ -183,7 +183,7 @@ export function NowPlaying() {
             <button
               type="button"
               onClick={() => setGateModalOpen(true)}
-              className="mt-1 cursor-pointer rounded-full bg-brand-gold px-6 py-2.5 text-sm font-bold text-brand-ink"
+              className="mt-1 cursor-pointer rounded-full bg-brand-gold px-6 py-2.5 text-sm font-bold text-brand-navy"
             >
               Đăng nhập để nghe tiếp
             </button>
@@ -213,7 +213,7 @@ export function NowPlaying() {
         >
           <ChatCircleIcon /> Bình luận
         </button>
-        <div className="flex items-center gap-2 text-xs font-medium text-[#6f8794]">
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-muted-dark">
           <ShieldCheckIcon color="var(--color-brand-gold-light)" /> Âm thanh có dấu vân số theo
           phiên nghe
         </div>

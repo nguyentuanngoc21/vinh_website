@@ -20,8 +20,8 @@ export type StoryCharacter = {
 
 const ROLE_LABEL: Record<CharacterRole, string> = { hero: "Chính diện", villain: "Phản diện", neutral: "Trung lập" };
 const ROLE_STYLE: Record<CharacterRole, string> = {
-  hero: "bg-[#E4F1EA] text-[#256B4C]",
-  villain: "bg-[#FBEAEA] text-error",
+  hero: "bg-[#E4F1EA] dark:bg-success-form-bg text-[#256B4C] dark:text-success-text",
+  villain: "bg-[#FBEAEA] dark:bg-error-bg text-error",
   neutral: "bg-cream-card-alt text-stone-dark",
 };
 
@@ -85,8 +85,8 @@ export function CharacterList({ characters: initial }: { characters: StoryCharac
             aria-pressed={c.followedByViewer}
             onClick={() => toggleFollow(c.id)}
             style={{
-              background: c.followedByViewer ? "var(--color-brand-ink)" : "var(--color-brand-gold)",
-              color: c.followedByViewer ? "#fff" : "var(--color-brand-ink)",
+              background: c.followedByViewer ? "var(--color-brand-navy)" : "var(--color-brand-gold)",
+              color: c.followedByViewer ? "#fff" : "var(--color-brand-navy)",
             }}
             className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-bold transition-colors disabled:opacity-60"
           >

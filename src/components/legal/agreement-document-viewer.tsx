@@ -155,9 +155,9 @@ export function AgreementDocumentViewer({
     <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[88vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_24px_60px_rgba(0,0,0,.3)]"
+        className="flex max-h-[88vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[18px] bg-surface shadow-[0_24px_60px_rgba(0,0,0,.3)]"
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#f0f0ef] px-[26px] pb-[18px] pt-[22px]">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line-faint px-[26px] pb-[18px] pt-[22px]">
           <div className="min-w-0">
             <div className="text-[11.5px] font-semibold tracking-[1.3px] text-brand-gold-dark">
               VĂN BẢN THỎA THUẬN
@@ -172,16 +172,16 @@ export function AgreementDocumentViewer({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#f4f4f5] text-stone-dark"
+            className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#f4f4f5] dark:bg-surface-muted text-stone-dark"
           >
             <XIcon size={17} />
           </button>
         </div>
         <div className="overflow-y-auto px-[26px] py-6">
           {row.updatedSincePending && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-[#F0E3C4] bg-[#FBF0DC] px-3.5 py-3">
+            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-gold-soft bg-[#FBF0DC] dark:bg-cream-gold px-3.5 py-3">
               <WarningCircleIcon weight="fill" size={17} color="#B7791F" className="mt-px shrink-0" />
-              <div className="text-[12.5px] leading-[1.6] text-[#7a5a1f]">
+              <div className="text-[12.5px] leading-[1.6] text-[#7a5a1f] dark:text-gold-text">
                 Văn bản này vừa được cập nhật ngày {formatVi(row.updatedAt)}. Xác nhận trước đó của bạn không còn
                 hiệu lực — vui lòng đọc lại và xác nhận.
               </div>
@@ -200,7 +200,7 @@ export function AgreementDocumentViewer({
                     BÊN A · TÁC GIẢ (BẠN)
                   </div>
                   {contractInfoError ? (
-                    <div className="text-[12.5px] leading-[1.5] text-[#B02A37]">
+                    <div className="text-[12.5px] leading-[1.5] text-[#B02A37] dark:text-error">
                       Không tải được thông tin của bạn. Vui lòng thử tải lại trang; nếu vẫn lỗi, báo cho quản trị
                       viên.
                     </div>
@@ -286,16 +286,16 @@ export function AgreementDocumentViewer({
           />
           )}
         </div>
-        <div className="flex flex-col gap-2.5 border-t border-[#f0f0ef] bg-[#fdfdfc] px-[26px] py-4">
+        <div className="flex flex-col gap-2.5 border-t border-line-faint bg-surface-soft px-[26px] py-4">
           {missingAuthorFields.length > 0 && (
-            <div className="text-[12px] leading-[1.5] text-[#B02A37]">
+            <div className="text-[12px] leading-[1.5] text-[#B02A37] dark:text-error">
               Cần điền: {missingAuthorFields.map((f) => f.label).join(", ")} trước khi xác nhận.
             </div>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3.5">
             <div
               className="flex items-center gap-1.5 text-[13px] font-semibold"
-              style={{ color: row.accepted ? "#2F7A4F" : row.updatedSincePending ? "#B7791F" : "var(--color-stone-light)" }}
+              style={{ color: row.accepted ? "light-dark(#2F7A4F, var(--color-success-text))" : row.updatedSincePending ? "light-dark(#B7791F, var(--color-gold-text))" : "var(--color-stone-light)" }}
             >
               {row.accepted && <SealCheckIcon weight="fill" size={16} />}
               {row.accepted
@@ -317,7 +317,7 @@ export function AgreementDocumentViewer({
                   type="button"
                   onClick={handleAcceptClick}
                   disabled={accepting || authorInfoLoading || html === null || !!error}
-                  className="cursor-pointer rounded-full bg-brand-gold px-[22px] py-2.5 text-[13.5px] font-semibold text-brand-ink disabled:cursor-default disabled:opacity-60"
+                  className="cursor-pointer rounded-full bg-brand-gold px-[22px] py-2.5 text-[13.5px] font-semibold text-brand-navy disabled:cursor-default disabled:opacity-60"
                 >
                   {authorInfoLoading
                     ? "Đang tải…"

@@ -56,7 +56,7 @@ export function OverviewKpis({ stats }: { stats: OverviewStats }) {
           return (
             <div
               key={kpi.label}
-              className="rounded-[14px] border border-cream-border bg-white p-5 transition-shadow hover:shadow-sm"
+              className="rounded-[14px] border border-cream-border bg-surface p-5 transition-shadow hover:shadow-sm"
             >
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-medium text-stone-alt">{kpi.label}</span>
@@ -78,7 +78,7 @@ export function OverviewKpis({ stats }: { stats: OverviewStats }) {
         {secondaryKpis.map((kpi) => (
           <div
             key={kpi.label}
-            className="rounded-[14px] border border-cream-border bg-white px-5 py-4"
+            className="rounded-[14px] border border-cream-border bg-surface px-5 py-4"
           >
             <div className="text-xs font-medium text-stone-alt">{kpi.label}</div>
             <div className="mt-[5px] text-[21px] font-bold text-stone-alt/60">Chưa có dữ liệu</div>

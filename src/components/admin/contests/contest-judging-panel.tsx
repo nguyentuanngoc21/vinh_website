@@ -83,7 +83,7 @@ export function ContestJudgingPanel({
 }) {
   return (
     <div className="flex flex-col gap-5">
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <h2 className="text-base font-bold text-brand-ink">Khung chấm chính thức</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-stone-dark">
           {officialWindow.start
@@ -201,7 +201,7 @@ function ConfigSection({ contestId, initial }: { contestId: string; initial: Sco
   );
 
   return (
-    <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+    <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <h2 className="text-base font-bold text-brand-ink">Cấu hình chấm chung cuộc</h2>
         <span className="text-xs text-stone-alt">
@@ -391,7 +391,7 @@ function JudgesSection({ contestId, contestSlug, initial }: { contestId: string;
   };
 
   return (
-    <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+    <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <h2 className="text-base font-bold text-brand-ink">Giám khảo</h2>
         <Link href={`/giam-khao/${contestSlug}`} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-gold-dark no-underline">
@@ -460,7 +460,7 @@ function ProgressSection({ contestId, initial }: { contestId: string; initial: J
   };
 
   return (
-    <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+    <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold text-brand-ink"><GavelIcon size={17} /> Tiến độ chấm</h2>
         <span className="text-xs text-stone-alt">{overview.progress.finalized}/{overview.progress.required} phiếu đã chốt</span>

@@ -17,7 +17,7 @@ import type { DesignItemCategory } from "@/lib/supabase/types";
 import { ProtectedImage } from "@/components/ui/protected-image";
 
 const AVATAR_COLORS = [
-  "var(--color-brand-ink)",
+  "var(--color-brand-navy)",
   "var(--color-success)",
   "var(--color-chart-pink)",
   "var(--color-chart-amber)",
@@ -134,7 +134,7 @@ export function DesignGallery({
               type="button"
               onClick={() => setSort(s.key)}
               style={{
-                background: s.key === sort ? "#fff" : "transparent",
+                background: s.key === sort ? "var(--color-surface)" : "transparent",
                 color: s.key === sort ? "var(--color-brand-ink)" : "var(--color-stone)",
                 boxShadow: s.key === sort ? "0 1px 4px rgba(0,0,0,.12)" : "none",
               }}
@@ -147,7 +147,7 @@ export function DesignGallery({
       </section>
 
       {activeAlbum && (
-        <div className="mx-11 mt-5 flex items-center justify-between gap-3 rounded-xl bg-[#fdf8ec] px-4 py-2.5 text-[13px] text-brand-ink">
+        <div className="mx-11 mt-5 flex items-center justify-between gap-3 rounded-xl bg-surface-gold px-4 py-2.5 text-[13px] text-brand-ink">
           <span>
             Đang xem album <strong>{activeAlbum.name}</strong>
           </span>
@@ -164,7 +164,7 @@ export function DesignGallery({
             type="button"
             onClick={() => setCat(c.key)}
             className={`cursor-pointer rounded-full px-[18px] py-2.5 text-sm font-medium transition-colors ${
-              c.key === cat ? "bg-brand-ink text-white" : "bg-neutral-bg text-[#3a3a3a]"
+              c.key === cat ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
             }`}
           >
             {c.label}
@@ -180,13 +180,13 @@ export function DesignGallery({
       </div>
 
       {list.length === 0 ? (
-        <div className="mx-11 my-8 rounded-2xl border border-dashed border-[#e2ded7] px-8 py-14 text-center">
+        <div className="mx-11 my-8 rounded-2xl border border-dashed border-line px-8 py-14 text-center">
           <p className="text-sm text-stone-dark">
             Chưa có ai đăng thiết kế ở mục này. Là người đầu tiên?
           </p>
           <Link
             href="/thiet-ke/new"
-            className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-ink no-underline"
+            className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-navy no-underline"
           >
             Đăng thiết kế
           </Link>
@@ -205,7 +205,7 @@ export function DesignGallery({
                   <ProtectedImage src={p.imageUrl} alt={p.title} className="block w-full" loading="lazy" />
 
                   {showRank && (
-                    <div className="absolute left-3 top-3 rounded-full bg-brand-gold px-2.5 py-1 text-[11px] font-bold tracking-[.5px] text-brand-ink">
+                    <div className="absolute left-3 top-3 rounded-full bg-brand-gold px-2.5 py-1 text-[11px] font-bold tracking-[.5px] text-brand-navy">
                       TOP {i + 1}
                     </div>
                   )}
@@ -218,7 +218,7 @@ export function DesignGallery({
                         toggleLike(p.id);
                       }}
                       style={likedByViewerOf(p.id) ? { background: "var(--color-brand-gold)" } : undefined}
-                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-white/94 text-brand-ink transition-colors hover:bg-brand-gold"
+                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-surface/94 text-brand-ink transition-colors hover:bg-brand-gold"
                     >
                       <HeartIcon weight={likedByViewerOf(p.id) ? "fill" : "regular"} size={16} />
                     </button>
@@ -228,7 +228,7 @@ export function DesignGallery({
                         e.stopPropagation();
                         handleShare(p);
                       }}
-                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-white/94 text-brand-ink transition-colors hover:bg-brand-gold"
+                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-surface/94 text-brand-ink transition-colors hover:bg-brand-gold"
                     >
                       <ShareNetworkIcon size={16} />
                     </button>
@@ -285,7 +285,7 @@ export function DesignGallery({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="grid w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-white shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1.15fr_minmax(0,1fr)]"
+            className="grid w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-surface shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1.15fr_minmax(0,1fr)]"
           >
             <ProtectedImage
               src={open.imageUrl}
@@ -326,12 +326,12 @@ export function DesignGallery({
                 </div>
                 <Link
                   href={`/ket-noi?p=${open.illustratorId}`}
-                  className="ml-auto whitespace-nowrap rounded-full border border-[#e2ded7] px-[18px] py-2.5 text-[13px] font-semibold text-brand-ink no-underline"
+                  className="ml-auto whitespace-nowrap rounded-full border border-line px-[18px] py-2.5 text-[13px] font-semibold text-brand-ink no-underline"
                 >
                   Xem hồ sơ
                 </Link>
               </div>
-              <div className="mt-[22px] flex gap-[26px] border-y border-[#f1efec] py-[18px]">
+              <div className="mt-[22px] flex gap-[26px] border-y border-line-soft py-[18px]">
                 <div>
                   <div className="text-[22px] font-extrabold text-brand-ink">
                     {formatCount(likeCountOf(open.id))}
@@ -359,8 +359,8 @@ export function DesignGallery({
                   type="button"
                   onClick={() => toggleLike(open.id)}
                   style={{
-                    background: likedByViewerOf(open.id) ? "var(--color-brand-ink)" : "var(--color-brand-gold)",
-                    color: likedByViewerOf(open.id) ? "#fff" : "var(--color-brand-ink)",
+                    background: likedByViewerOf(open.id) ? "var(--color-brand-navy)" : "var(--color-brand-gold)",
+                    color: likedByViewerOf(open.id) ? "#fff" : "var(--color-brand-navy)",
                   }}
                   className="flex cursor-pointer items-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition-colors"
                 >
@@ -370,7 +370,7 @@ export function DesignGallery({
                 <button
                   type="button"
                   onClick={() => handleShare(open)}
-                  className="flex cursor-pointer items-center gap-2 rounded-full border border-[#e2ded7] px-5 py-3 text-sm font-semibold text-brand-ink"
+                  className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-5 py-3 text-sm font-semibold text-brand-ink"
                 >
                   <ShareNetworkIcon />
                   Chia sẻ
@@ -378,7 +378,7 @@ export function DesignGallery({
                 <button
                   type="button"
                   onClick={() => setCommentsOpenId(open.id)}
-                  className="flex cursor-pointer items-center gap-2 rounded-full border border-[#e2ded7] px-5 py-3 text-sm font-semibold text-brand-ink"
+                  className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-5 py-3 text-sm font-semibold text-brand-ink"
                 >
                   <ChatCircleIcon />
                   Bình luận
@@ -386,7 +386,7 @@ export function DesignGallery({
                 <button
                   type="button"
                   onClick={() => setOpenId(null)}
-                  className="ml-auto cursor-pointer rounded-full border border-[#e2ded7] px-[18px] py-3 text-sm font-semibold text-stone"
+                  className="ml-auto cursor-pointer rounded-full border border-line px-[18px] py-3 text-sm font-semibold text-stone"
                 >
                   Đóng
                 </button>

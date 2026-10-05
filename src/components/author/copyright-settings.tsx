@@ -20,7 +20,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
     >
       <span
         style={{ transform: `translateX(${on ? "17px" : "0px"})` }}
-        className="block h-[17px] w-[17px] rounded-full bg-white transition-transform"
+        className="block h-[17px] w-[17px] rounded-full bg-surface transition-transform"
       />
     </button>
   );

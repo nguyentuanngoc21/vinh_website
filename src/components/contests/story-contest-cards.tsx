@@ -15,7 +15,7 @@ export function StoryContestCards({ cards }: { cards: StoryContestCard[] }) {
       {cards.map((card) =>
         card.kind === "award" ? (
           <Link key={`a-${card.contest.slug}-${card.award_name}`} href={`/cuoc-thi/${card.contest.slug}?tab=ket-qua`}
-            className="flex items-center gap-3.5 rounded-[16px] bg-brand-ink px-4 py-3.5 text-white no-underline">
+            className="flex items-center gap-3.5 rounded-[16px] bg-brand-navy px-4 py-3.5 text-white no-underline">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-brand-gold-light/20 text-brand-gold-light">
               <TrophyIcon size={22} weight="fill" />
             </span>

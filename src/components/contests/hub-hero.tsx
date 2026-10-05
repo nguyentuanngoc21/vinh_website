@@ -27,7 +27,7 @@ export function HubHero({ contests }: { contests: ContestSummary[] }) {
   };
 
   return (
-    <div className="flex flex-col-reverse overflow-hidden rounded-[22px] bg-brand-ink text-white md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+    <div className="flex flex-col-reverse overflow-hidden rounded-[22px] bg-brand-navy text-white md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       <div className="flex flex-col gap-4 p-6 sm:p-9 lg:p-11">
         <div className="flex flex-wrap items-center gap-2.5">
           <PhaseChip label={phase.label} tone={phase.tone} dark />
@@ -50,7 +50,7 @@ export function HubHero({ contests }: { contests: ContestSummary[] }) {
         </div>
         <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Link href={ctaHref(phase.primary.action)}
-            className="flex min-h-[46px] items-center justify-center rounded-full bg-brand-gold px-7 py-3 text-[15px] font-semibold text-brand-ink no-underline">
+            className="flex min-h-[46px] items-center justify-center rounded-full bg-brand-gold px-7 py-3 text-[15px] font-semibold text-brand-navy no-underline">
             {phase.primary.label}
           </Link>
           {phase.secondary && (
@@ -73,7 +73,7 @@ export function HubHero({ contests }: { contests: ContestSummary[] }) {
         )}
       </div>
       <ContestKeyVisual url={c.key_visual_url} title={c.title} className="aspect-video md:aspect-auto md:min-h-[420px]">
-        <div aria-hidden className="absolute inset-0 hidden md:block" style={{ background: "linear-gradient(90deg, var(--color-brand-ink) 0%, transparent 30%)" }} />
+        <div aria-hidden className="absolute inset-0 hidden md:block" style={{ background: "linear-gradient(90deg, var(--color-brand-navy) 0%, transparent 30%)" }} />
       </ContestKeyVisual>
     </div>
   );

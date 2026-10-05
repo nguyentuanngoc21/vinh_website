@@ -35,7 +35,7 @@ export function PromoCodeForm({ value, onChange, onApply, message }: PromoCodeFo
       {message && (
         <div
           className={`mt-2.5 text-[12.5px] font-medium ${
-            message.tone === "success" ? "text-[#2C7453]" : "text-error"
+            message.tone === "success" ? "text-success-text" : "text-error"
           }`}
         >
           {message.text}

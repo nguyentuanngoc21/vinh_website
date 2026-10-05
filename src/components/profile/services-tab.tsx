@@ -382,7 +382,7 @@ export function ServicesTab() {
             return (
               <div
                 key={l.id}
-                className="grid items-start gap-3 bg-white px-4 py-3.5"
+                className="grid items-start gap-3 bg-surface px-4 py-3.5"
                 style={{
                   gridTemplateColumns: "minmax(0,1fr) 140px 150px 76px 40px",
                   borderTop: i === 0 ? "none" : "1px solid #f4f2ef",
@@ -459,7 +459,7 @@ export function ServicesTab() {
                         <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(null)} />
                         <div
                           style={{ position: "fixed", top: openMenu.top, left: openMenu.left, zIndex: 50 }}
-                          className="min-w-[178px] rounded-xl border border-cream bg-white p-1 shadow-[0_12px_30px_rgba(20,59,77,0.14)]"
+                          className="min-w-[178px] rounded-xl border border-cream bg-surface p-1 shadow-[0_12px_30px_rgba(20,59,77,0.14)]"
                         >
                           <RowMenuItem
                             icon={<PencilSimpleIcon size={15} weight="bold" />}
@@ -540,7 +540,7 @@ export function ServicesTab() {
 
   return (
     <div className="px-4 pb-[60px] pt-[26px] sm:px-8 lg:px-11">
-      <div className="flex items-center gap-3 border-b border-[#f2f0ed] pb-4">
+      <div className="flex items-center gap-3 border-b border-[#f2f0ed] dark:border-gold-soft pb-4">
         <button
           type="button"
           onClick={() => setSelectedId(null)}
@@ -571,16 +571,16 @@ export function ServicesTab() {
       <div
         className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border px-5 py-4"
         style={{
-          borderColor: selected.is_accepting_orders ? "#CFE6D9" : "var(--color-cream)",
-          background: selected.is_accepting_orders ? "#F2F8F4" : "#FBFAF8",
+          borderColor: selected.is_accepting_orders ? "light-dark(#CFE6D9, var(--color-success-form-border))" : "var(--color-cream)",
+          background: selected.is_accepting_orders ? "light-dark(#F2F8F4, var(--color-surface-muted))" : "light-dark(#FBFAF8, var(--color-surface-soft))",
         }}
       >
         <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px]"
             style={{
-              background: selected.is_accepting_orders ? "var(--color-success-form-border)" : "#EEF2F4",
-              color: selected.is_accepting_orders ? "#2C7453" : "#2C5870",
+              background: selected.is_accepting_orders ? "var(--color-success-form-border)" : "light-dark(#EEF2F4, var(--color-info-bg))",
+              color: selected.is_accepting_orders ? "light-dark(#2C7453, var(--color-success-text))" : "light-dark(#2C5870, var(--color-info-text))",
             }}
           >
             {(() => {
@@ -611,13 +611,13 @@ export function ServicesTab() {
       </div>
 
       {missing.length > 0 && (
-        <div className="mt-3 rounded-xl border border-[#F0D9B5] bg-[#FDF3E7] px-4 py-3">
-          <div className="text-xs font-bold text-[#7a5a12]">
+        <div className="mt-3 rounded-xl border border-gold-soft-alt bg-surface-peach px-4 py-3">
+          <div className="text-xs font-bold text-gold-text">
             {selected.is_accepting_orders ? "Gói đang tạm dừng" : "Chưa thể nhận đơn"} — còn thiếu {missing.length} mục:
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {missing.map((m) => (
-              <span key={m.key} className="rounded-full border border-[#F0D9B5] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#8a6f3a]">
+              <span key={m.key} className="rounded-full border border-gold-soft-alt bg-surface px-2.5 py-1 text-[11px] font-semibold text-[#8a6f3a] dark:text-gold-text">
                 {m.label}
               </span>
             ))}
@@ -700,18 +700,18 @@ export function ServicesTab() {
                   <div
                     key={g.key}
                     className="rounded-[13px] border px-[15px] py-[13px]"
-                    style={{ borderColor: groupDone || g.optional ? "#f0eeea" : "#F0D9B5", background: groupDone || g.optional ? "#FBFAF8" : "#FFFDF8" }}
+                    style={{ borderColor: groupDone || g.optional ? "light-dark(#f0eeea, var(--color-gold-soft))" : "light-dark(#F0D9B5, var(--color-gold-soft))", background: groupDone || g.optional ? "light-dark(#FBFAF8, var(--color-surface-soft))" : "light-dark(#FFFDF8, var(--color-cream-gold))" }}
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       {g.tier && (
-                        <span className="rounded-[7px] bg-[#EEF2F4] px-2.5 py-0.5 text-[10.5px] font-bold text-[#2C5870]">{g.tier}</span>
+                        <span className="rounded-[7px] bg-[#EEF2F4] dark:bg-info-bg px-2.5 py-0.5 text-[10.5px] font-bold text-info-text">{g.tier}</span>
                       )}
                       <span className="text-[13px] font-semibold text-slate">{g.label}</span>
                       <span
                         className="ml-auto rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold"
                         style={{
-                          background: groupDone ? "var(--color-success-form-border)" : g.optional ? "#F1F3F4" : "var(--color-cream-gold)",
-                          color: groupDone ? "#2C7453" : g.optional ? "var(--color-stone-dark)" : "#8A6414",
+                          background: groupDone ? "var(--color-success-form-border)" : g.optional ? "light-dark(#F1F3F4, var(--color-surface-muted))" : "var(--color-cream-gold)",
+                          color: groupDone ? "light-dark(#2C7453, var(--color-success-text))" : g.optional ? "var(--color-stone-dark)" : "light-dark(#8A6414, var(--color-gold-text))",
                         }}
                       >
                         {groupChip}
@@ -727,7 +727,7 @@ export function ServicesTab() {
                             type="button"
                             onClick={() => toggleTag(g, o.label)}
                             className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium ${
-                              checked ? "border-brand-ink bg-brand-ink text-white" : "border-cream text-ink"
+                              checked ? "border-brand-ink bg-brand-navy text-white" : "border-cream text-ink"
                             }`}
                           >
                             {o.label}
@@ -736,9 +736,9 @@ export function ServicesTab() {
                       })}
                     </div>
                     {activeWarning && (
-                      <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#F0D9B5] bg-[#FDF3E7] px-3 py-2">
+                      <div className="mt-2 flex items-start gap-2 rounded-lg border border-gold-soft-alt bg-surface-peach px-3 py-2">
                         <WarningCircleIcon weight="fill" size={15} className="mt-0.5 shrink-0 text-brand-gold-dark" />
-                        <div className="text-[11.5px] leading-[1.6] text-[#7a5a12]">{activeWarning}</div>
+                        <div className="text-[11.5px] leading-[1.6] text-gold-text">{activeWarning}</div>
                       </div>
                     )}
                   </div>
@@ -756,7 +756,7 @@ export function ServicesTab() {
                 type="button"
                 onClick={() => patch({ default_usage_scope: o.value })}
                 className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-medium ${
-                  selected.default_usage_scope === o.value ? "border-brand-ink bg-brand-ink text-white" : "border-cream text-ink"
+                  selected.default_usage_scope === o.value ? "border-brand-ink bg-brand-navy text-white" : "border-cream text-ink"
                 }`}
               >
                 {o.label}
@@ -871,7 +871,7 @@ function RowMenuItem({
       type="button"
       onClick={onClick}
       className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-left text-[12.5px] font-medium hover:bg-neutral-bg"
-      style={{ color: danger ? "#A33A2B" : "var(--color-ink)" }}
+      style={{ color: danger ? "light-dark(#A33A2B, var(--color-error))" : "var(--color-ink)" }}
     >
       {icon}
       {label}
@@ -896,19 +896,19 @@ function NumberedField({
   return (
     <div
       className="rounded-2xl border px-[18px] py-4"
-      style={{ borderColor: filled ? "var(--color-cream)" : "#F0D9B5", background: filled ? "#fff" : "#FFFDF8" }}
+      style={{ borderColor: filled ? "var(--color-cream)" : "light-dark(#F0D9B5, var(--color-gold-soft))", background: filled ? "var(--color-surface)" : "light-dark(#FFFDF8, var(--color-cream-gold))" }}
     >
       <div className="flex items-center gap-2.5">
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11.5px] font-bold"
-          style={{ background: filled ? "#EEF2F4" : "var(--color-cream-gold)", color: filled ? "#2C5870" : "#8A6414" }}
+          style={{ background: filled ? "light-dark(#EEF2F4, var(--color-info-bg))" : "var(--color-cream-gold)", color: filled ? "light-dark(#2C5870, var(--color-info-text))" : "light-dark(#8A6414, var(--color-gold-text))" }}
         >
           {num}
         </span>
         <span className="flex-1 text-[13px] font-semibold text-slate">{label}</span>
         <span
           className="shrink-0 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold"
-          style={{ background: filled ? "var(--color-success-form-border)" : "var(--color-cream-gold)", color: filled ? "#2C7453" : "#8A6414" }}
+          style={{ background: filled ? "var(--color-success-form-border)" : "var(--color-cream-gold)", color: filled ? "light-dark(#2C7453, var(--color-success-text))" : "light-dark(#8A6414, var(--color-gold-text))" }}
         >
           {filled ? "Đã điền" : "Còn thiếu"}
         </span>

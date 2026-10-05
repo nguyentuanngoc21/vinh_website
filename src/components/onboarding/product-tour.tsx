@@ -239,7 +239,7 @@ export function ProductTour() {
       <div
         role="dialog"
         aria-modal="true"
-        className={`fixed z-[201] w-[min(320px,92vw)] rounded-2xl border border-cream bg-white p-4 shadow-[0_14px_34px_rgba(0,0,0,.24)] transition-all duration-300 ease-out sm:p-5${
+        className={`fixed z-[201] w-[min(320px,92vw)] rounded-2xl border border-cream bg-surface p-4 shadow-[0_14px_34px_rgba(0,0,0,.24)] transition-all duration-300 ease-out sm:p-5${
           tooltipLayout ? "" : " top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
         }`}
         style={tooltipLayout ? { top: tooltipLayout.top, left: tooltipLayout.left } : undefined}
@@ -273,7 +273,7 @@ export function ProductTour() {
             <button
               type="button"
               onClick={next}
-              className="flex-1 cursor-pointer rounded-full bg-brand-gold px-4 py-2 text-[13px] font-semibold text-brand-ink hover:brightness-95 sm:flex-none"
+              className="flex-1 cursor-pointer rounded-full bg-brand-gold px-4 py-2 text-[13px] font-semibold text-brand-navy hover:brightness-95 sm:flex-none"
             >
               {isLast ? "Xong" : "Tiếp theo"}
             </button>

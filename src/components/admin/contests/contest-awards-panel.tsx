@@ -95,7 +95,7 @@ export function ContestAwardsPanel({
           } />
       )}
       {error && proposals.length > 0 && <Alert tone="error">{error}</Alert>}
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <h2 className="mb-3 text-base font-bold text-brand-ink">Giải đã trao</h2>
         {!resultsVisible && awards.length > 0 && (
           <div className="mb-3"><Alert tone="info">Kết quả chưa công bố — người dùng chưa thấy các giải này.</Alert></div>
@@ -170,7 +170,7 @@ export function ContestAwardsPanel({
         )}
       </section>
 
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <h2 className="mb-1 text-base font-bold text-brand-ink">Trao giải</h2>
         {!canAward ? (
           <p className="text-sm text-stone-alt">Trao giải được từ khi đóng nhận bài đến khi công bố kết quả.</p>
@@ -228,7 +228,7 @@ function ProposalsSection({
         {proposals.map((p) => {
           const key = `${p.code}:${p.submission_id}`;
           return (
-            <div key={key} className="flex flex-col gap-2 rounded-[12px] border border-cream-border bg-white p-3.5 sm:flex-row sm:items-center">
+            <div key={key} className="flex flex-col gap-2 rounded-[12px] border border-cream-border bg-surface p-3.5 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-ink">
                   {p.name} <span className="text-xs font-normal text-stone-alt">· hạng chung cuộc {p.rank}</span>

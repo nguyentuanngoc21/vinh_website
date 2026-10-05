@@ -159,7 +159,7 @@ export function ContentTable({
   };
 
   return (
-    <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+    <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
       {/* flex-wrap — trên điện thoại ô tìm (280px) + checkbox + bộ đếm không đủ một hàng. */}
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
         <div className="flex items-center gap-2 rounded-lg border border-cream-border px-3 py-2">
@@ -218,7 +218,7 @@ export function ContentTable({
       {filtered.map((r) => (
         <div
           key={r.id}
-          className={`grid ${GRID_COLS} min-w-[1110px] items-center gap-3 border-b border-[#F1ECE0] px-2.5 py-[13px] text-sm font-medium text-[#3a352e]`}
+          className={`grid ${GRID_COLS} min-w-[1110px] items-center gap-3 border-b border-line-warm px-2.5 py-[13px] text-sm font-medium text-ink-warm`}
         >
           <div className="flex items-center gap-1.5 truncate">
             <span className="truncate">{r.title}</span>
@@ -237,7 +237,7 @@ export function ContentTable({
           <div>
             <span
               className={`rounded-full px-[11px] py-1 text-[11px] font-semibold ${
-                r.published ? "bg-success-form-border text-[#2C7453]" : "bg-cream-card-alt text-stone-dark"
+                r.published ? "bg-success-form-border text-success-text" : "bg-cream-card-alt text-stone-dark"
               }`}
             >
               {r.published ? "Đã đăng" : "Bản nháp"}
@@ -253,7 +253,7 @@ export function ContentTable({
               }}
               title={r.isExclusive ? "Bấm để bỏ độc quyền" : "Bấm để đặt độc quyền"}
               className={`rounded-full px-[11px] py-1 text-[11px] font-semibold transition-opacity disabled:opacity-50 ${
-                r.isExclusive ? "bg-brand-ink text-white" : "border border-cream-border text-stone-dark"
+                r.isExclusive ? "bg-brand-navy text-white" : "border border-cream-border text-stone-dark"
               }`}
             >
               {r.isExclusive ? "Độc quyền" : "Tự do"}

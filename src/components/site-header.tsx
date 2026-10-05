@@ -26,7 +26,7 @@ export function SiteHeader({
   searchDefaultValue,
 }: SiteHeaderProps = {}) {
   return (
-    <header className={`${sticky ? "sticky top-0 z-20" : "relative z-10"} flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-[#f0f0f0] bg-white/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11`}>
+    <header className={`${sticky ? "sticky top-0 z-20" : "relative z-10"} flex flex-wrap items-center justify-between gap-x-[26px] gap-y-3 border-b border-line-header bg-surface/96 px-4 py-4 backdrop-blur sm:px-8 lg:px-11`}>
       {/* Logo + AuthCluster — giữ nguyên ở mọi kích thước màn hình, không
           ẩn/thu gọn gì thêm (ô tìm kiếm đã chuyển xuống thanh nav màu
           brand-ink bên dưới — xem NavBarContent). Bookmark ("Tác phẩm đã
@@ -57,7 +57,7 @@ export function SiteHeader({
         // hướng, dưới `lg` thay bằng hamburger — luôn kèm ô tìm kiếm bên
         // phải ở MỌI kích thước (xem NavBarContent). order-3 + bleed full
         // chiều rộng để xuống hàng riêng, y hệt kỹ thuật cũ.
-        <div className="order-3 -mx-4 -mb-4 flex min-w-0 flex-[0_0_calc(100%+32px)] items-center gap-5 overflow-x-auto overflow-y-hidden bg-brand-ink px-4 py-[13px] text-[15px] font-medium [scrollbar-width:none] sm:-mx-8 sm:flex-[0_0_calc(100%+64px)] sm:px-8 lg:-mx-11 lg:flex-[0_0_calc(100%+88px)] lg:px-11 [&::-webkit-scrollbar]:hidden">
+        <div className="order-3 -mx-4 -mb-4 flex min-w-0 flex-[0_0_calc(100%+32px)] items-center gap-5 overflow-x-auto overflow-y-hidden bg-brand-navy px-4 py-[13px] text-[15px] font-medium [scrollbar-width:none] sm:-mx-8 sm:flex-[0_0_calc(100%+64px)] sm:px-8 lg:-mx-11 lg:flex-[0_0_calc(100%+88px)] lg:px-11 [&::-webkit-scrollbar]:hidden">
           <NavBarContent
             showSearch={showSearch}
             searchPlaceholder={searchPlaceholder}

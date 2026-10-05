@@ -32,7 +32,7 @@ export function StoryCtaButtons({ bookSlug, firstChapterId, lastChapterId, conti
       {continueChapterId && (
         <Link
           href={`/read/${bookSlug}/${continueChapterId}`}
-          className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand-gold py-3 text-[15px] font-bold text-brand-ink transition-transform active:scale-[.99] sm:flex-1 sm:py-[13px]"
+          className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand-gold py-3 text-[15px] font-bold text-brand-navy transition-transform active:scale-[.99] sm:flex-1 sm:py-[13px]"
         >
           <ArrowClockwiseIcon weight="bold" /> Tiếp tục đọc
         </Link>
@@ -47,7 +47,7 @@ export function StoryCtaButtons({ bookSlug, firstChapterId, lastChapterId, conti
       </Link>
       <Link
         href={`/read/${bookSlug}/${lastChapterId}`}
-        className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand-ink py-3 text-[15px] font-bold text-white transition-transform active:scale-[.99] sm:flex-1 sm:py-[13px]"
+        className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand-navy py-3 text-[15px] font-bold text-white transition-transform active:scale-[.99] sm:flex-1 sm:py-[13px]"
       >
         Đọc mới nhất <ArrowRightIcon weight="bold" />
       </Link>

@@ -99,7 +99,7 @@ export default async function ContestPage({ params, searchParams }: Props) {
 
   return (
     <div className="flex-1 bg-neutral-bg">
-      <div className="mx-auto max-w-[1280px] bg-white">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         {data.isAdminPreview && (
           <div className="flex items-center gap-2 border-b border-cream-gold-border bg-cream-card px-4 py-2.5 text-[13.5px] text-cream-gold-text sm:px-8 lg:px-11">
@@ -117,7 +117,7 @@ export default async function ContestPage({ params, searchParams }: Props) {
           bookTitles={bookTitles}
         />
 
-        <nav className="sticky top-0 z-10 flex gap-6 overflow-x-auto border-b border-border-light bg-white px-4 sm:gap-8 sm:px-8 lg:px-11 [scrollbar-width:none]">
+        <nav className="sticky top-0 z-10 flex gap-6 overflow-x-auto border-b border-border-light bg-surface px-4 sm:gap-8 sm:px-8 lg:px-11 [scrollbar-width:none]">
           {tabsFor(contest.status).map((t) => (
             <Link key={t.key} href={`${baseHref}?tab=${t.key}`} scroll={false}
               className={`shrink-0 whitespace-nowrap border-b-[3px] pb-3.5 pt-4 text-[15px] no-underline ${
@@ -177,7 +177,7 @@ async function TabContent({
           </div>
           <div className="mt-1.5 flex flex-col gap-2.5 sm:flex-row">
             <Link href={`${baseHref}?tab=the-le`} scroll={false} className="rounded-full border border-border-light px-5 py-2.5 text-sm font-semibold text-ink no-underline">Đọc thể lệ</Link>
-            <Link href="/author" className="rounded-full bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-ink no-underline">Mở trình soạn thảo</Link>
+            <Link href="/author" className="rounded-full bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy no-underline">Mở trình soạn thảo</Link>
           </div>
         </div>
       );
@@ -268,7 +268,7 @@ async function TabContent({
     return (
       <div className="flex flex-col gap-5">
         {voting && (
-          <div className="flex items-start gap-3 rounded-[14px] bg-brand-ink px-4 py-3.5 text-sm text-white sm:items-center">
+          <div className="flex items-start gap-3 rounded-[14px] bg-brand-navy px-4 py-3.5 text-sm text-white sm:items-center">
             <TrophyIcon size={20} weight="fill" className="shrink-0 text-brand-gold-light" />
             <span>
               Mỗi tài khoản bình chọn được <b className="text-brand-gold-light">1 phiếu cho mỗi tác phẩm</b>. Phiếu chỉ hợp lệ khi bạn đã đọc thật ít nhất 1 chương
@@ -423,7 +423,7 @@ async function TabContent({
               const winners = awards.filter((a) => !a.revoked && a.award_name === p.name);
               return (
                 <div key={`${p.name}-${i}`}
-                  className={`flex min-h-[190px] flex-col gap-2 rounded-[18px] border p-5 ${i === 0 ? "border-cream-gold-border bg-cream-card" : "border-border-light bg-white"}`}>
+                  className={`flex min-h-[190px] flex-col gap-2 rounded-[18px] border p-5 ${i === 0 ? "border-cream-gold-border bg-cream-card" : "border-border-light bg-surface"}`}>
                   <div className="flex items-center gap-2 text-[13px] font-bold tracking-[.4px] text-brand-gold-dark"><TrophyIcon size={18} weight="fill" /> {p.name}</div>
                   <div className="text-[26px] font-extrabold tracking-[-.5px] text-brand-ink">{vnd(p.amount_vnd)}</div>
                   {p.extra && <div className="text-[13.5px] leading-normal text-slate">{p.extra}</div>}

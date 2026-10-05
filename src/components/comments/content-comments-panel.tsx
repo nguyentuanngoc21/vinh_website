@@ -186,7 +186,7 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
     <div onClick={onClose} className="fixed inset-0 z-[95] flex items-center justify-center bg-brand-ink-dark/55 p-6">
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-[520px] flex-col rounded-[20px] bg-white shadow-[0_24px_60px_rgba(0,0,0,.28)]"
+        className="flex max-h-[80vh] w-full max-w-[520px] flex-col rounded-[20px] bg-surface shadow-[0_24px_60px_rgba(0,0,0,.28)]"
       >
         <div className="flex items-center justify-between border-b border-cream-border px-6 py-4">
           <div className="text-[15.5px] font-bold text-brand-ink">{title}</div>
@@ -204,7 +204,7 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
             </div>
           ) : (
             threads.map((t) => (
-              <div key={t.top.id} className="border-b border-[#F1ECE0] pb-3.5 last:border-b-0">
+              <div key={t.top.id} className="border-b border-line-warm pb-3.5 last:border-b-0">
                 {renderOne(t.top, false)}
                 {t.replies.map((r) => renderOne(r, true))}
                 {replyTo?.id === t.top.id && (
@@ -222,7 +222,7 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
                         type="button"
                         disabled={sending || !replyDraft.trim()}
                         onClick={() => post(replyDraft.trim(), t.top.id)}
-                        className="rounded-lg bg-brand-gold px-3 py-1.5 text-[12px] font-bold text-brand-ink disabled:opacity-50"
+                        className="rounded-lg bg-brand-gold px-3 py-1.5 text-[12px] font-bold text-brand-navy disabled:opacity-50"
                       >
                         Gửi
                       </button>
@@ -262,7 +262,7 @@ export function ContentCommentsPanel({ title, apiBase, onClose }: ContentComment
             type="button"
             disabled={sending || !draft.trim()}
             onClick={() => post(draft.trim(), null)}
-            className="shrink-0 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-bold text-brand-ink disabled:opacity-50"
+            className="shrink-0 rounded-full bg-brand-gold px-4 py-2.5 text-[13px] font-bold text-brand-navy disabled:opacity-50"
           >
             Gửi
           </button>

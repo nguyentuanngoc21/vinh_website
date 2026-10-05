@@ -171,7 +171,7 @@ export function ParagraphCommentsPanel({
         role="dialog"
         aria-label="Chú thích đoạn văn"
         style={{ ["--panel-w" as string]: `${PARAGRAPH_COMMENTS_PANEL_WIDTH}px` }}
-        className="fixed inset-x-0 bottom-0 z-[95] flex h-[85dvh] flex-col rounded-t-[20px] bg-white shadow-[0_-12px_40px_rgba(0,0,0,.22)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-dvh lg:w-[var(--panel-w)] lg:rounded-none lg:border-l lg:border-cream lg:shadow-none"
+        className="fixed inset-x-0 bottom-0 z-[95] flex h-[85dvh] flex-col rounded-t-[20px] bg-surface shadow-[0_-12px_40px_rgba(0,0,0,.22)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-dvh lg:w-[var(--panel-w)] lg:rounded-none lg:border-l lg:border-cream lg:shadow-none"
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border-light lg:hidden" aria-hidden />
         <div className="flex items-center justify-between gap-3 px-6 pb-3 pt-4 lg:pt-6">
@@ -212,7 +212,7 @@ export function ParagraphCommentsPanel({
                 disabled={sending}
                 onClick={() => post(draft.trim(), null)}
                 aria-label="Gửi bình luận"
-                className="mb-0.5 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink disabled:opacity-50"
+                className="mb-0.5 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-navy disabled:opacity-50"
               >
                 <PaperPlaneRightIcon size={16} weight="fill" />
               </button>
@@ -274,7 +274,7 @@ export function ParagraphCommentsPanel({
                           type="button"
                           disabled={sending || !replyDraft.trim()}
                           onClick={() => post(replyDraft.trim(), t.top.id)}
-                          className="cursor-pointer rounded-full bg-brand-gold px-3 py-1 text-[12px] font-bold text-brand-ink disabled:opacity-50"
+                          className="cursor-pointer rounded-full bg-brand-gold px-3 py-1 text-[12px] font-bold text-brand-navy disabled:opacity-50"
                         >
                           Gửi
                         </button>

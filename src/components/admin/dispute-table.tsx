@@ -76,7 +76,7 @@ export function DisputeTable({ rows: initialRows }: { rows: DisputeRow[] }) {
   return (
     <div className="flex flex-col gap-3">
       {rows.map((row) => (
-        <div key={row.id} className="overflow-hidden rounded-[12px] border border-cream-border bg-white">
+        <div key={row.id} className="overflow-hidden rounded-[12px] border border-cream-border bg-surface">
           <button
             type="button"
             onClick={() => setOpenId(openId === row.id ? null : row.id)}
@@ -95,7 +95,7 @@ export function DisputeTable({ rows: initialRows }: { rows: DisputeRow[] }) {
             <div className="border-t border-cream-border bg-cream-card px-5 py-4">
               <div className="text-xs leading-[1.6] text-ink">{row.description}</div>
               {error && <Alert tone="error" className="mt-2">{error}</Alert>}
-              {/* Nền panel là cream-card — bg-white để ô nhập nổi lên, đồng bộ với Select (kit đã có bg-white). */}
+              {/* Nền panel là cream-card — bg-surface để ô nhập nổi lên, đồng bộ với Select (kit đã có bg-surface). */}
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <Select
                   label="Bên có lỗi"
@@ -126,7 +126,7 @@ export function DisputeTable({ rows: initialRows }: { rows: DisputeRow[] }) {
                   min={0}
                   value={refundAmount}
                   onChange={(e) => setRefundAmount(e.target.value)}
-                  className="bg-white"
+                  className="bg-surface"
                 />
               </div>
               <Textarea
@@ -136,7 +136,7 @@ export function DisputeTable({ rows: initialRows }: { rows: DisputeRow[] }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
-                className="bg-white"
+                className="bg-surface"
               />
               <Button
                 type="button"

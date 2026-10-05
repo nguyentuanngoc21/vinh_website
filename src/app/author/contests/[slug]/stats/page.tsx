@@ -58,7 +58,7 @@ export default async function AuthorContestStatsPage({
           {data.contests.map((c) => (
             <Link key={c.slug} href={`/author/contests/${c.slug}/stats`}
               className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-semibold no-underline ${
-                c.slug === data.contest.slug ? "bg-brand-ink text-white" : "bg-neutral-bg text-stone-dark"
+                c.slug === data.contest.slug ? "bg-brand-navy text-white" : "bg-neutral-bg text-stone-dark"
               }`}>
               {c.title}
             </Link>
@@ -80,7 +80,7 @@ export default async function AuthorContestStatsPage({
 
       <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {kpis.map((k) => (
-          <div key={k.key} className="flex flex-col gap-1 rounded-[14px] border border-cream-border bg-white p-3.5 sm:p-4">
+          <div key={k.key} className="flex flex-col gap-1 rounded-[14px] border border-cream-border bg-surface p-3.5 sm:p-4">
             <div className="text-[12.5px] font-medium text-stone-alt">{k.label}</div>
             <div className="text-[22px] font-bold leading-tight text-brand-ink sm:text-[26px]">{k.value}</div>
             <div className="text-[12px] leading-snug text-stone-dark">{k.sub}</div>
@@ -89,7 +89,7 @@ export default async function AuthorContestStatsPage({
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-5">
+        <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-5">
           <h2 className="text-base font-bold text-ink">Nguồn độc giả</h2>
           <p className="mt-0.5 text-[12.5px] text-stone-alt">Theo lần đọc đầu tiên của mỗi người.</p>
           {sources.length === 0 ? (
@@ -111,7 +111,7 @@ export default async function AuthorContestStatsPage({
           )}
         </section>
 
-        <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-5">
+        <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-5">
           <h2 className="text-base font-bold text-ink">Giữ chân theo chương</h2>
           <p className="mt-0.5 text-[12.5px] text-stone-alt">
             {stats.readers.toLocaleString("vi-VN")} người đã đọc · % so với người đọc chương 1.
@@ -124,7 +124,7 @@ export default async function AuthorContestStatsPage({
                 <div key={f.position} className="grid grid-cols-[52px_minmax(0,1fr)_44px] items-center gap-2.5 text-[13px]">
                   <span className="text-stone-alt">Ch. {f.position}</span>
                   <div className="h-2 overflow-hidden rounded-full bg-neutral-bg" title={f.title}>
-                    <div className="h-full rounded-full bg-brand-ink" style={{ width: `${f.percent}%` }} />
+                    <div className="h-full rounded-full bg-brand-navy" style={{ width: `${f.percent}%` }} />
                   </div>
                   <span className="text-right font-semibold text-brand-ink">{f.percent}%</span>
                 </div>

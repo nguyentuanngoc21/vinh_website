@@ -135,7 +135,7 @@ function AchievementCard({ item }: { item: Achievement }) {
   return (
     <div
       className="flex flex-col gap-3 rounded-2xl border border-cream-border px-4 py-4"
-      style={{ background: item.unlocked ? "#fff" : "var(--color-cream-card)" }}
+      style={{ background: item.unlocked ? "var(--color-surface)" : "var(--color-cream-card)" }}
     >
       <div className="flex items-start gap-3">
         <div
@@ -164,7 +164,7 @@ function AchievementCard({ item }: { item: Achievement }) {
       <div className="mt-auto flex items-center justify-between gap-2">
         <span
           className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold text-brand-gold-dark ${item.rewardTokens > 0 ? "" : "invisible"}`}
-          style={{ background: "#fbf1de" }}
+          style={{ background: "light-dark(#fbf1de, var(--color-cream-gold))" }}
         >
           +{item.rewardTokens} token
         </span>
@@ -258,7 +258,7 @@ export function AchievementsPage() {
             <button
               type="button"
               onClick={() => setOpenRole(null)}
-              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-cream-border bg-white px-3.5 py-2 text-[13px] font-semibold text-stone-dark hover:border-brand-ink hover:text-brand-ink"
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-cream-border bg-surface px-3.5 py-2 text-[13px] font-semibold text-stone-dark hover:border-brand-ink hover:text-brand-ink"
             >
               <CaretLeftIcon size={14} /> Nhóm thành tựu
             </button>

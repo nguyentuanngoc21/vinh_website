@@ -278,8 +278,8 @@ export function ChapterEditor({
   };
 
   return (
-    <div className="flex flex-col bg-[#FBF8F1] lg:overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cream-border bg-[#FBF8F1] px-4 py-3.5 lg:px-7">
+    <div className="flex flex-col bg-surface-warm lg:overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cream-border bg-surface-warm px-4 py-3.5 lg:px-7">
         <div className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-stone-alt">
           <span className="truncate">{bookTitle}</span>
           <CaretRightIcon size={12} className="shrink-0" />
@@ -328,7 +328,7 @@ export function ChapterEditor({
             </Checkbox>
           </div>
 
-          <div className="sticky top-0 z-[5] mb-5 flex items-center gap-1 border-b border-cream-border bg-[#FBF8F1] py-2">
+          <div className="sticky top-0 z-[5] mb-5 flex items-center gap-1 border-b border-cream-border bg-surface-warm py-2">
             <button
               type="button"
               onClick={() => wrapSelection("**")}
@@ -385,7 +385,7 @@ export function ChapterEditor({
           </div>
 
           {imagePromptOpen && (
-            <div className="mb-5 rounded-lg border border-cream-border bg-white p-3">
+            <div className="mb-5 rounded-lg border border-cream-border bg-surface p-3">
               <div className="flex gap-2">
                 {/* Ô nhập gọn — size="sm" của kit */}
                 <Field
@@ -416,7 +416,7 @@ export function ChapterEditor({
 
           <textarea
             ref={textareaRef}
-            className="min-h-[460px] w-full flex-1 resize-none overflow-hidden border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] outline-none"
+            className="min-h-[460px] w-full flex-1 resize-none overflow-hidden border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] dark:text-ink outline-none"
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
             onPaste={handleContentPaste}

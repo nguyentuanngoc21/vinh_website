@@ -98,7 +98,7 @@ Lưu ý: ${run.stale_reasons.join("; ")}.` : "";
     });
 
   return (
-    <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+    <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
       <h2 className="flex items-center gap-2 text-base font-bold text-brand-ink"><CalculatorIcon size={17} /> Kết quả chấm</h2>
       <p className="mt-1 text-xs leading-relaxed text-stone-alt">
         Luôn tính bằng version cấu hình đang áp dụng — không thử công thức khác trên dữ liệu thật. Tính thử được từ lúc khung chấm bắt đầu;

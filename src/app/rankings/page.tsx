@@ -20,8 +20,8 @@ export default async function RankingsPage() {
   const bookRankings = await getCachedBookRankings();
 
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main>
           <RankingsBoard bookRankings={bookRankings} />
@@ -39,7 +39,7 @@ export default async function RankingsPage() {
               </div>
               <Link
                 href="/author"
-                className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-ink no-underline"
+                className="shrink-0 whitespace-nowrap rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-navy no-underline"
               >
                 Xem chỉ số của tôi
               </Link>

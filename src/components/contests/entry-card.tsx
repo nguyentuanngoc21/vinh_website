@@ -35,16 +35,16 @@ export function EntryCard({
           <BookCover id={book.id} title={book.title} author={book.authorNickname} genre={book.genre} coverUrl={book.coverUrl} ageRating={book.ageRating} className="h-full w-full" />
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
             {rank != null && (
-              <span className="rounded-full bg-brand-ink px-2 py-0.5 text-[11px] font-extrabold text-brand-gold-light">#{rank}</span>
+              <span className="rounded-full bg-brand-navy px-2 py-0.5 text-[11px] font-extrabold text-brand-gold-light">#{rank}</span>
             )}
             {trend && (
-              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-brand-ink/80 px-2 py-0.5 text-[10px] font-semibold text-white">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-brand-navy/80 px-2 py-0.5 text-[10px] font-semibold text-white">
                 <FireIcon size={10} weight="fill" className="text-brand-gold-light" /> {trend}
               </span>
             )}
             {book.isExclusive && <ExclusiveBadge variant="pill" />}
             {badge && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-gold-light px-2 py-0.5 text-[10px] font-bold tracking-[.5px] text-brand-ink">
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-gold-light px-2 py-0.5 text-[10px] font-bold tracking-[.5px] text-brand-navy">
                 <TrophyIcon size={10} weight="fill" /> DỰ THI
               </span>
             )}

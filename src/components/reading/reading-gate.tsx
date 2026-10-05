@@ -121,7 +121,7 @@ export function ReadingGate(props: ReadingGateProps) {
             type="button"
             onClick={handleBuy}
             disabled={purchasing}
-            className="mt-1 cursor-pointer rounded-full bg-brand-gold px-7 py-3 text-sm font-bold text-brand-ink disabled:cursor-default disabled:opacity-70"
+            className="mt-1 cursor-pointer rounded-full bg-brand-gold px-7 py-3 text-sm font-bold text-brand-navy disabled:cursor-default disabled:opacity-70"
           >
             {purchasing ? "Đang xử lý…" : `Mua chương — ${props.price.toLocaleString("vi-VN")} token`}
           </button>
@@ -129,7 +129,7 @@ export function ReadingGate(props: ReadingGateProps) {
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="mt-1 cursor-pointer rounded-full bg-brand-gold px-7 py-3 text-sm font-bold text-brand-ink"
+            className="mt-1 cursor-pointer rounded-full bg-brand-gold px-7 py-3 text-sm font-bold text-brand-navy"
           >
             {props.variant === "purchase" ? "Đăng nhập để mua chương này" : "Đăng nhập để đọc tiếp"}
           </button>

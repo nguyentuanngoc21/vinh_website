@@ -70,7 +70,7 @@ export function TropeVotePanel({
             onClick={() => vote(cand.id)}
             style={
               votedId === cand.id
-                ? { background: "var(--color-brand-gold)", color: "var(--color-brand-ink)" }
+                ? { background: "var(--color-brand-gold)", color: "var(--color-brand-navy)" }
                 : { borderColor: c.hair, color: c.ink }
             }
             className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 ${

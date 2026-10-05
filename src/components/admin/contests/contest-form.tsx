@@ -180,7 +180,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
         </Alert>
       )}
 
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <SectionTitle>Thông tin chung</SectionTitle>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Tên cuộc thi" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
@@ -204,7 +204,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
         </div>
       </section>
 
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <SectionTitle note="Giờ Việt Nam (GMT+7).">Thời gian</SectionTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {DATE_FIELDS.map(([key, label, required]) => (
@@ -219,7 +219,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
         </div>
       </section>
 
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <SectionTitle note="Thể lệ không đổi sau khi công khai — kiểm tra kỹ trước khi chuyển khỏi bản nháp.">Thể lệ & giải thưởng</SectionTitle>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[160px_1fr]">
           <Field label="Phiên bản thể lệ" value={rulesVersion} disabled={locked} onChange={(e) => setRulesVersion(e.target.value)} maxLength={20} />
@@ -251,7 +251,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
         </div>
       </section>
 
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <SectionTitle note="Kiểm tự động khi tác giả gửi bài. Truyện dự thi luôn phải miễn phí toàn bộ chương (D8).">Điều kiện dự thi</SectionTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {numberInput("Số chương tối thiểu", rules.min_published_chapters, (v) => setRule("min_published_chapters", v))}
@@ -271,7 +271,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
               const on = rules.allowed_genres?.includes(g.label) ?? false;
               return (
                 <button key={g.slug} type="button" disabled={locked} onClick={() => toggleGenre(g.label)}
-                  className={`rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors disabled:opacity-60 ${on ? "bg-brand-ink text-white" : "bg-neutral-bg text-ink"}`}>
+                  className={`rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors disabled:opacity-60 ${on ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink"}`}>
                   {g.label}
                 </button>
               );
@@ -295,7 +295,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
         </fieldset>
       </section>
 
-      <section className="rounded-[14px] border border-cream-border bg-white p-4 sm:p-[22px]">
+      <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
         <SectionTitle note="Mỗi tài khoản 1 phiếu cho mỗi tác phẩm, không giới hạn số tác phẩm (D5).">Bình chọn</SectionTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Tuổi tài khoản tối thiểu (ngày)" type="number" min={0} inputMode="numeric" disabled={locked}
@@ -315,7 +315,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
       )}
       {saved && <Alert tone="success">Đã lưu.</Alert>}
 
-      <div className="sticky bottom-0 flex justify-end gap-3 rounded-[14px] border border-cream-border bg-white/95 p-3 backdrop-blur">
+      <div className="sticky bottom-0 flex justify-end gap-3 rounded-[14px] border border-cream-border bg-surface/95 p-3 backdrop-blur">
         <Button type="button" variant="dark" fullWidth={false} className="w-full px-6 sm:w-auto" disabled={pending} onClick={submit}>
           {pending ? "Đang lưu…" : contest ? "Lưu thay đổi" : "Tạo cuộc thi (bản nháp)"}
         </Button>

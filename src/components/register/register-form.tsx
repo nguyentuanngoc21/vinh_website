@@ -414,7 +414,7 @@ export function RegisterForm() {
                 <div
                   key={i}
                   aria-hidden="true"
-                  style={{ background: i < score ? PASSWORD_SCORE_COLORS[score] : "#efedea" }}
+                  style={{ background: i < score ? PASSWORD_SCORE_COLORS[score] : "light-dark(#efedea, var(--color-surface-muted))" }}
                   className="h-1 flex-1 rounded-full transition-colors"
                 />
               ))}
@@ -487,7 +487,7 @@ export function RegisterForm() {
             Ảnh căn cước công dân
           </div>
           <CccdUploadTiles files={files} onFile={onFile} />
-          <div className="mt-3 flex items-start gap-2 rounded-[10px] border border-[#F0E3C4] bg-cream-card p-[11px_13px]">
+          <div className="mt-3 flex items-start gap-2 rounded-[10px] border border-gold-soft bg-cream-card p-[11px_13px]">
             <InfoIcon size={16} color="var(--color-brand-gold-dark)" className="mt-0.5 shrink-0" />
             <div className="text-[12.5px] leading-[1.55] text-stone-dark">
               Ảnh JPG hoặc PNG, dưới 5 MB, chụp rõ bốn góc và không che số. Vịnh chỉ dùng để đối

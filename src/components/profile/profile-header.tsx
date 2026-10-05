@@ -220,11 +220,11 @@ export function ProfileHeader({
   return (
     <>
       <div
-        className="relative h-[120px] w-full bg-brand-ink sm:h-[170px] lg:h-[210px]"
+        className="relative h-[120px] w-full bg-brand-navy sm:h-[170px] lg:h-[210px]"
         style={
           coverImageUrl
             ? { backgroundImage: `url(${coverImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
-            : { background: "linear-gradient(135deg, var(--color-brand-ink) 0%, var(--color-brand-ink-dark) 100%)" }
+            : { background: "linear-gradient(135deg, var(--color-brand-navy) 0%, var(--color-brand-ink-dark) 100%)" }
         }
       >
         <input
@@ -258,7 +258,7 @@ export function ProfileHeader({
 
       <section className="flex flex-col items-center gap-4 px-4 pt-0 text-center sm:flex-row sm:items-end sm:gap-[22px] sm:px-8 sm:text-left lg:px-11">
         <div
-          className="relative -mt-10 flex h-[82px] w-[82px] shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-brand-ink text-[30px] font-bold text-brand-gold-light sm:-mt-11"
+          className="relative -mt-10 flex h-[82px] w-[82px] shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-brand-navy text-[30px] font-bold text-brand-gold-light sm:-mt-11"
           style={
             avatarUrl
               ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: "cover", backgroundPosition: "center" }

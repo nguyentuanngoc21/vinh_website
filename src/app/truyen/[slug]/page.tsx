@@ -167,8 +167,8 @@ export default async function StoryPage({
   }));
 
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader sticky={false} />
         {ageGate.gate === "confirm16" && <Age16Confirm />}
         <main className="px-4 py-6 sm:px-8 sm:py-9 lg:px-11">
@@ -184,7 +184,7 @@ export default async function StoryPage({
                   className={`h-full w-full ${age18Blocked ? "scale-110 blur-xl" : ""}`}
                 />
                 {age18Blocked && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/30">
+                  <div className="absolute inset-0 flex items-center justify-center bg-brand-navy/30">
                     <AgeRatingBadge rating="18" className="px-4 py-1.5 text-[18px]" />
                   </div>
                 )}

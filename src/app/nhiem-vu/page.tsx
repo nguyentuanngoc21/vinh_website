@@ -15,8 +15,8 @@ export const metadata: Metadata = {
  */
 export default function QuestsRoutePage() {
   return (
-    <div className="flex-1 bg-[#f2f2f3]">
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className="flex-1 bg-surface-muted">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main>
           <DailyTasksTab />

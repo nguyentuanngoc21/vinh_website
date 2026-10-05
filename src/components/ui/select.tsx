@@ -55,7 +55,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         <select
           ref={ref}
           className={cn(
-            "w-full appearance-none border bg-white pr-10 text-ink focus:border-brand-ink focus:outline-none disabled:cursor-not-allowed disabled:opacity-60",
+            "w-full appearance-none border bg-surface pr-10 text-ink focus:border-brand-ink focus:outline-none disabled:cursor-not-allowed disabled:opacity-60",
             toneClass,
             SIZE_CLASS[size],
             className

@@ -78,7 +78,7 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
   const archivedCount = characters.filter(c => c.archived_at).length;
   if (sort === "name") shown.sort((a, b) => a.name.localeCompare(b.name, "vi"));
   if (sort === "role") shown.sort((a, b) => ["main", "supporting", "cameo"].indexOf(a.story_role) - ["main", "supporting", "cameo"].indexOf(b.story_role));
-  return <section aria-label="Quản lý nhân vật" className="mb-6 rounded-xl border border-cream-border bg-white p-5">
+  return <section aria-label="Quản lý nhân vật" className="mb-6 rounded-xl border border-cream-border bg-surface p-5">
     <div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-bold">Nhân vật ({characters.length})</h2>
       <button type="button" disabled={busy || editing !== null} onClick={() => { setEditing("new"); setError(null); }} className="rounded-lg bg-brand-gold px-3 py-2 text-sm font-semibold disabled:opacity-50">Thêm nhân vật</button></div>
     {error && <p role="alert" className="mb-3 text-sm text-error">{error}</p>}

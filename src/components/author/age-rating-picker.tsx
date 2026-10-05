@@ -63,7 +63,7 @@ export function AgeRatingPicker({
       />
 
       <div>
-        <div className="mb-1.5 text-[13px] font-medium text-[#5C5650]">Cảnh báo nội dung</div>
+        <div className="mb-1.5 text-[13px] font-medium text-ink-muted">Cảnh báo nội dung</div>
         <p className="mb-2.5 text-[12px] leading-[1.5] text-stone-alt">
           Chọn mọi nội dung có trong truyện. Một số cảnh báo yêu cầu độ tuổi tối thiểu.
         </p>

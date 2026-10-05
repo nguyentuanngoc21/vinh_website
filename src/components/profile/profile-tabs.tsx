@@ -24,7 +24,7 @@ export function ProfileTabs({ active, onChange }: ProfileTabsProps) {
   return (
     <Tabs.List
       aria-label="Mục hồ sơ"
-      className="flex gap-2 overflow-x-auto border-b border-[#f0f0ef] px-4 pt-[22px] [scrollbar-width:none] sm:px-8 lg:px-11 [&::-webkit-scrollbar]:hidden"
+      className="flex gap-2 overflow-x-auto border-b border-line-faint px-4 pt-[22px] [scrollbar-width:none] sm:px-8 lg:px-11 [&::-webkit-scrollbar]:hidden"
     >
       {PROFILE_TABS.map((tab) => {
         const Icon = TAB_ICONS[tab.icon as keyof typeof TAB_ICONS];

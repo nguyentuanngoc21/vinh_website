@@ -7,7 +7,7 @@ export function PostsChart({ points }: { points: MonthlyPostsPoint[] }) {
   const maxValue = Math.max(1, ...points.map((p) => p.chapters + p.audio));
 
   return (
-    <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+    <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
       <div className="mb-[18px] flex items-center justify-between">
         <div>
           <div className="text-base font-bold text-brand-ink">
@@ -39,7 +39,7 @@ export function PostsChart({ points }: { points: MonthlyPostsPoint[] }) {
               />
               <div
                 style={{ height: `${(chapters / maxValue) * 100}%` }}
-                className="bg-brand-ink"
+                className="bg-brand-navy"
               />
             </div>
             <div className="text-[11px] font-medium text-[#a8a29b]">

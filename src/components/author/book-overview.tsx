@@ -279,14 +279,14 @@ export function BookOverview({
   };
 
   return (
-    <div className="flex flex-1 flex-col bg-[#FBF8F1] px-4 py-5 lg:col-span-2 lg:overflow-y-auto lg:px-9 lg:py-7">
+    <div className="flex flex-1 flex-col bg-surface-warm px-4 py-5 lg:col-span-2 lg:overflow-y-auto lg:px-9 lg:py-7">
       <div className="mb-1 flex flex-wrap items-center gap-2.5">
         {bookGenre && (
           <span className="rounded-full bg-neutral-bg px-3 py-1 text-xs font-medium text-ink">{bookGenre}</span>
         )}
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            bookPublished ? "bg-[#E4F1EA] text-[#256B4C]" : "bg-cream-card-alt text-stone-dark"
+            bookPublished ? "bg-[#E4F1EA] dark:bg-success-form-bg text-[#256B4C] dark:text-success-text" : "bg-cream-card-alt text-stone-dark"
           }`}
         >
           {bookPublished ? "Đang ra" : "Bản nháp"}
@@ -339,7 +339,7 @@ export function BookOverview({
             fullWidth={false}
             onClick={() => setShowImport(true)}
             disabled={publishing}
-            className="gap-1.5 rounded-[9px] border-cream-border bg-white py-2.5 text-[13.5px] font-semibold"
+            className="gap-1.5 rounded-[9px] border-cream-border bg-surface py-2.5 text-[13.5px] font-semibold"
           >
             <UploadSimpleIcon size={16} /> Nhập bản thảo
           </Button>
@@ -356,7 +356,7 @@ export function BookOverview({
         </div>
       </div>
 
-      <div className="mb-6 rounded-[12px] border border-cream-border bg-white p-5">
+      <div className="mb-6 rounded-[12px] border border-cream-border bg-surface p-5">
         <div className="mb-2.5 flex items-center justify-between gap-2">
           <div className="text-xs font-bold tracking-wide text-stone-alt">TÓM TẮT</div>
           {!editingSynopsis && (
@@ -394,7 +394,7 @@ export function BookOverview({
                 fullWidth={false}
                 onClick={cancelEditSynopsis}
                 disabled={savingSynopsis}
-                className="rounded-[9px] border-cream-border bg-white font-semibold"
+                className="rounded-[9px] border-cream-border bg-surface font-semibold"
               >
                 Hủy
               </Button>
@@ -416,7 +416,7 @@ export function BookOverview({
       {latest && (
         <Link
           href={`/author/${bookId}/${latest.id}`}
-          className="mb-6 flex items-center justify-between rounded-[12px] border border-cream-border bg-white px-5 py-3.5 no-underline transition-colors hover:border-brand-gold"
+          className="mb-6 flex items-center justify-between rounded-[12px] border border-cream-border bg-surface px-5 py-3.5 no-underline transition-colors hover:border-brand-gold"
         >
           <div className="min-w-0">
             <div className="text-xs font-semibold tracking-wide text-stone-alt">TIẾP TỤC VIẾT</div>
@@ -441,7 +441,7 @@ export function BookOverview({
               fullWidth={false}
               onClick={() => setOrder(null)}
               disabled={savingOrder}
-              className="min-h-10 rounded-[9px] border-cream-border bg-white font-semibold"
+              className="min-h-10 rounded-[9px] border-cream-border bg-surface font-semibold"
             >
               Hủy
             </Button>
@@ -461,7 +461,7 @@ export function BookOverview({
       </div>
 
       {(draftChapters.length > 0 || pendingPublicationIds.length > 0 || publishing) && (
-        <div className="mb-3 space-y-3 rounded-xl border border-cream-border bg-white p-4">
+        <div className="mb-3 space-y-3 rounded-xl border border-cream-border bg-surface p-4">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={draftChapters.length > 0 && selectedDrafts.length === draftChapters.length}
               disabled={publishing || pendingPublicationIds.length > 0}
@@ -486,7 +486,7 @@ export function BookOverview({
         disabled={publishing || invalidBulkPrice || !!order || !!deletingChapterId || deleting || pendingPublicationIds.length > 0}
         onMissingAgreements={setMissingAgreementIds} />
 
-      <div className="overflow-hidden rounded-[12px] border border-cream-border bg-white">
+      <div className="overflow-hidden rounded-[12px] border border-cream-border bg-surface">
         {/* Header cột chỉ có ý nghĩa ở layout lưới (sm:+) — trên điện thoại
             mỗi chương đã hiển thị dạng thẻ 2 dòng tự giải thích. */}
         <div className="hidden border-b border-cream-border bg-cream-card py-2.5 pl-4 pr-2 text-[10.5px] font-bold tracking-wide text-stone-alt sm:flex sm:items-center">

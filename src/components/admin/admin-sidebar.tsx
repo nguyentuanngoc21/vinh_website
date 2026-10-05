@@ -86,7 +86,7 @@ export function AdminSidebar() {
         </div>
         <div>
           <div className="text-[13px] font-semibold text-white">Quản trị</div>
-          <div className="text-[11px] text-[#6f8794]">admin@vinh.vn</div>
+          <div className="text-[11px] text-slate-muted-dark">admin@vinh.vn</div>
         </div>
       </div>
     </aside>

@@ -8,7 +8,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   await requireAdmin();
 
   return (
-    <div className="grid flex-1 grid-cols-[230px_1fr] bg-[#F3EFE6] text-brand-ink">
+    <div className="grid flex-1 grid-cols-[230px_1fr] bg-[#F3EFE6] dark:bg-surface-warm text-brand-ink">
       <AdminSidebar />
       <main className="overflow-hidden px-9 py-7 pb-12">{children}</main>
     </div>

@@ -79,7 +79,7 @@ function ReportRow({ row, reviewerUsername }: { row: ContentReport; reviewerUser
 
   const closed = row.status === "resolved" || row.status === "dismissed";
   return (
-    <article className="grid gap-3 rounded-xl border border-cream-border bg-white p-4 sm:p-5">
+    <article className="grid gap-3 rounded-xl border border-cream-border bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h2 className="min-w-0 break-words font-semibold text-brand-ink">
           {row.book_title}

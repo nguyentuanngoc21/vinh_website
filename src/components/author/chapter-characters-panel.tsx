@@ -105,8 +105,8 @@ export function ChapterCharactersPanel({
             aria-pressed={tagged.has(c.id)}
             className={`min-h-9 rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 ${
               tagged.has(c.id)
-                ? "border-brand-gold bg-brand-gold text-brand-ink"
-                : "border-cream-border bg-white text-stone-dark"
+                ? "border-brand-gold bg-brand-gold text-brand-navy"
+                : "border-cream-border bg-surface text-stone-dark"
             }`}
           >
             {c.name} <span className="font-normal opacity-70">· {ROLE_LABEL[c.role]}{c.archived_at ? " · Đã lưu trữ" : !c.is_public ? " · Riêng tư" : ""}</span>

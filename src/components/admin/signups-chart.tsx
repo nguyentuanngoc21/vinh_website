@@ -18,7 +18,7 @@ export function SignupsChart({ points }: { points: WeeklySignupsPoint[] }) {
   const last = coords[coords.length - 1];
 
   return (
-    <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+    <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
       <div className="text-base font-bold text-brand-ink">
         Người đăng ký mới
       </div>

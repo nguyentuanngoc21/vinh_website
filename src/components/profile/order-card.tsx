@@ -308,12 +308,12 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
   const remaining = order.price - order.paid;
 
   return (
-    <div style={{ background: "#FBFAF8" }} className="border-b border-[#f0f0ef] px-[18px] py-4">
+    <div style={{ background: "light-dark(#FBFAF8, var(--color-surface-soft))" }} className="border-b border-line-faint px-[18px] py-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-[#EEF2F4] px-2.5 py-1 text-[11px] font-bold text-[#2C5870]">
+        <span className="rounded-full bg-[#EEF2F4] dark:bg-info-bg px-2.5 py-1 text-[11px] font-bold text-info-text">
           {order.code}
         </span>
-        <span className="rounded-full bg-brand-ink px-2.5 py-1 text-[11px] font-bold text-white">
+        <span className="rounded-full bg-brand-navy px-2.5 py-1 text-[11px] font-bold text-white">
           {STATUS_LABELS[order.status] ?? order.status}
         </span>
       </div>
@@ -331,7 +331,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
       )}
 
       {needsBookAttach && (
-        <div className="mt-3 rounded-lg border border-dashed border-cream bg-white p-3">
+        <div className="mt-3 rounded-lg border border-dashed border-cream bg-surface p-3">
           <div className="text-xs font-semibold text-ink">Gắn truyện đang viết vào đơn này</div>
           <div className="mt-0.5 text-xs text-stone-light">Khách hàng sẽ được cấp quyền xem bản thảo ngay sau khi gắn.</div>
           <div className="mt-2 flex gap-2">
@@ -527,7 +527,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
       )}
 
       {order.status === "completed" && (
-        <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-[#1f5738]">
+        <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-[#1f5738] dark:text-success-text">
           <CheckCircleIcon weight="fill" size={16} className="text-success-form" /> Đơn hàng đã hoàn tất.
         </div>
       )}
@@ -615,7 +615,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
       )}
 
       {isOpenOrder && (
-        <div className="mt-3 border-t border-[#f0f0ef] pt-3">
+        <div className="mt-3 border-t border-line-faint pt-3">
           {cancelRequest ? (
             cancelRequest.requested_by === viewerId ? (
               <div className="text-xs text-stone">
@@ -677,7 +677,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                 type="button"
                 disabled={pending}
                 onClick={previewCancel}
-                className="rounded-full border-[#e6e2dd] px-3.5 py-1.5 text-xs font-medium text-stone-dark"
+                className="rounded-full border-[#e6e2dd] dark:border-gold-soft px-3.5 py-1.5 text-xs font-medium text-stone-dark"
               >
                 Yêu cầu hủy đơn
               </Button>
@@ -706,7 +706,7 @@ export function OrderCard({ order, viewerId, onChanged }: OrderCardProps) {
                 Báo cáo mất liên lạc
               </Button>
               {disputeOpen ? (
-                <div className="mt-1 flex w-full flex-col gap-2 rounded-lg border border-[#F3C3C3] bg-[#FDECEC] p-3">
+                <div className="mt-1 flex w-full flex-col gap-2 rounded-lg border border-[#F3C3C3] dark:border-error-border bg-[#FDECEC] dark:bg-error-bg p-3">
                   <Select
                     label={null}
                     value={disputeReason}

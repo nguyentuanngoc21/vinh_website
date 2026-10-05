@@ -100,7 +100,7 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
         type="button"
         onClick={handleOpen}
         aria-label="Thông báo"
-        className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
+        className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-soft transition-colors hover:text-brand-gold-dark"
       >
         <BellIcon size={21} />
         {unreadCount > 0 && (
@@ -120,8 +120,8 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
         // messenger-bell.tsx: điện thoại xoay ngang có thể thấp hơn tổng
         // chiều cao panel, giới hạn TOÀN panel theo viewport thay vì để nó
         // tràn xuống dưới; danh sách (flex-1 min-h-0) tự co lại trước.
-        <div className="fixed inset-x-3 top-[124px] z-[60] flex max-h-[calc(100vh-140px)] w-auto flex-col overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.16)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[46px] sm:w-[320px]">
-          <div className="shrink-0 border-b border-[#f1efec] px-[18px] py-3">
+        <div className="fixed inset-x-3 top-[124px] z-[60] flex max-h-[calc(100vh-140px)] w-auto flex-col overflow-hidden rounded-2xl border border-cream bg-surface shadow-[0_14px_34px_rgba(0,0,0,.16)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[46px] sm:w-[320px]">
+          <div className="shrink-0 border-b border-line-soft px-[18px] py-3">
             <div className="text-[14.5px] font-semibold text-ink">Thông báo</div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -135,7 +135,7 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
                 key={n.id}
                 href={n.link ?? "#"}
                 onClick={() => handleClickNotification(n)}
-                className="flex flex-col gap-1 border-b border-[#f5f4f2] px-[18px] py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card"
+                className="flex flex-col gap-1 border-b border-line-softer px-[18px] py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card"
               >
                 <div
                   style={{ fontWeight: n.read_at === null ? 700 : 500 }}

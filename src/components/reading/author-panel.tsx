@@ -69,7 +69,7 @@ export function AuthorPanel({
       disabled={pending}
       style={{
         background: following ? "rgba(0,0,0,.06)" : "var(--color-brand-gold)",
-        color: following ? c.ink : "var(--color-brand-ink)",
+        color: following ? c.ink : "var(--color-brand-navy)",
       }}
       className={`cursor-pointer whitespace-nowrap rounded-full px-4 py-1.5 text-[12.5px] font-bold transition-colors disabled:cursor-default disabled:opacity-70 ${
         variant === "rail" ? "w-full" : ""
@@ -102,7 +102,7 @@ export function AuthorPanel({
       onClick={onDeleteChapter}
       title="Gỡ chương này (kiểm duyệt)"
       aria-label="Gỡ chương này"
-      className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-error transition-colors hover:text-[#8a212b]"
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-error transition-colors hover:text-[#8a212b] dark:hover:text-error"
     >
       <TrashIcon size={16} /> {variant === "rail" && "Xóa"}
     </button>

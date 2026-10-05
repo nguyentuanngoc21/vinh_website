@@ -37,7 +37,7 @@ export function LibraryGrid({ tracks }: { tracks: AudioTrack[] }) {
             type="button"
             onClick={() => setGenre(label)}
             className={`cursor-pointer rounded-full px-[18px] py-2.5 text-sm font-medium transition-colors ${
-              label === genre ? "bg-brand-ink text-white" : "bg-neutral-bg text-[#3a3a3a]"
+              label === genre ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
             }`}
           >
             {label}
@@ -46,13 +46,13 @@ export function LibraryGrid({ tracks }: { tracks: AudioTrack[] }) {
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#e2ded7] px-8 py-14 text-center">
+        <div className="rounded-2xl border border-dashed border-line px-8 py-14 text-center">
           <p className="text-sm text-stone-dark">
             {tracks.length === 0 ? "Chưa có bản thu nào trong kho Audio." : "Chưa có bản thu nào ở thể loại này."}
           </p>
           <Link
             href="/audio/new"
-            className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-ink no-underline"
+            className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-navy no-underline"
           >
             Đăng tải Audio
           </Link>
@@ -66,7 +66,7 @@ export function LibraryGrid({ tracks }: { tracks: AudioTrack[] }) {
               onClick={() => handlePlay(t)}
               className="group block cursor-pointer text-left"
             >
-              <div className="relative h-[160px] sm:h-[210px] overflow-hidden rounded-2xl bg-gradient-to-br from-brand-ink to-brand-ink-dark shadow-[0_10px_22px_rgba(0,0,0,.16)]">
+              <div className="relative h-[160px] sm:h-[210px] overflow-hidden rounded-2xl bg-gradient-to-br from-brand-navy to-brand-ink-dark shadow-[0_10px_22px_rgba(0,0,0,.16)]">
                 {t.genre && (
                   <div className="absolute left-2.5 top-2.5 rounded-full bg-brand-ink-dark/60 px-2.5 py-1 text-[10px] font-semibold tracking-[.5px] text-white">
                     {t.genre}

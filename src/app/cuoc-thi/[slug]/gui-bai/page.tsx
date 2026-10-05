@@ -50,7 +50,7 @@ export default async function SubmitEntryPage({
 
   return (
     <div className="flex-1 bg-neutral-bg">
-      <div className="mx-auto max-w-[1280px] bg-white">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main className="mx-auto w-full max-w-[760px] px-4 pb-14 pt-7 sm:px-8">
           <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-[13px] text-stone-alt">

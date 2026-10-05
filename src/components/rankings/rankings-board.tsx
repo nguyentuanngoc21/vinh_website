@@ -49,7 +49,7 @@ function formatRealDelta(delta: number | null, isNew: boolean) {
   if (delta === null || delta === 0) return { txt: "—", color: "#c9c1b6", weight: 600 };
   return {
     txt: delta > 0 ? "▲ " + delta : "▼ " + Math.abs(delta),
-    color: delta > 0 ? "var(--color-chart-green)" : "#c0392b",
+    color: delta > 0 ? "var(--color-chart-green)" : "light-dark(#c0392b, var(--color-error))",
     weight: 600,
   };
 }
@@ -153,8 +153,8 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                   setLimit(7);
                 }}
                 style={{
-                  background: label === kind ? "#fff" : "transparent",
-                  color: label === kind ? "var(--color-brand-ink)" : "#7c7269",
+                  background: label === kind ? "var(--color-surface)" : "transparent",
+                  color: label === kind ? "var(--color-brand-ink)" : "light-dark(#7c7269, var(--color-ink-muted))",
                   boxShadow: label === kind ? "0 2px 8px rgba(0,0,0,.1)" : "none",
                 }}
                 className="cursor-pointer rounded-full px-5 py-2.5 text-[13.5px] font-semibold transition-all"
@@ -166,7 +166,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
         </div>
       </div>
 
-      <div className="mt-[26px] flex flex-wrap items-center justify-between gap-4 border-b border-[#f1efec] px-4 sm:px-6 lg:px-11">
+      <div className="mt-[26px] flex flex-wrap items-center justify-between gap-4 border-b border-line-soft px-4 sm:px-6 lg:px-11">
         <Tabs.List aria-label="Khoảng thời gian" className="flex gap-[30px]">
           {(isReal ? REAL_PERIODS : PERIODS).map((p) => (
             <Tabs.Tab
@@ -207,7 +207,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
               setLimit(7);
             }}
             className={`cursor-pointer rounded-full px-[18px] py-2.5 text-sm font-medium transition-colors ${
-              label === genre ? "bg-brand-ink text-white" : "bg-neutral-bg text-[#3a3a3a]"
+              label === genre ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
             }`}
           >
             {label}
@@ -216,9 +216,9 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
       </div>
 
       {isReal && listLength === 0 ? (
-        <div className="mx-4 mt-[22px] flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#e7e5e4] bg-[#fafaf9] py-14 text-center sm:mx-6 lg:mx-11">
+        <div className="mx-4 mt-[22px] flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-line-alt bg-surface-soft-alt py-14 text-center sm:mx-6 lg:mx-11">
           <div className="text-sm font-semibold text-ink">Chưa có dữ liệu xếp hạng</div>
-          <div className="text-[13px] text-[#9a9a9a]">
+          <div className="text-[13px] text-mute">
             Cần ít nhất 1 truyện được xuất bản để tính bảng xếp hạng.
           </div>
         </div>
@@ -237,7 +237,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
             {isReal
               ? realRows.slice(0, 3).map((b, i) => {
                   const dl = formatRealDelta(b.delta, b.isNew);
-                  const cardBackground = i === 0 ? "var(--color-brand-ink-dark)" : "var(--color-brand-ink)";
+                  const cardBackground = i === 0 ? "var(--color-brand-ink-dark)" : "var(--color-brand-navy)";
                   const palette = !b.coverUrl
                     ? buildCoverSpec({ id: b.id, title: b.title, author: b.authorNickname, genre: b.genre }).palette
                     : null;
@@ -292,7 +292,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       </div>
                       <div className="mt-3.5 flex items-center gap-3.5 text-[13px] font-semibold text-brand-gold-light">
                         <span>{b.reads.toLocaleString("vi-VN") + " đọc"}</span>
-                        <span style={{ color: dl.color === "#c9c1b6" ? "#7d94a0" : dl.color }}>
+                        <span style={{ color: dl.color === "#c9c1b6" ? "light-dark(#7d94a0, var(--color-stone))" : dl.color }}>
                           {dl.txt}
                         </span>
                       </div>
@@ -307,7 +307,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       key={b.title}
                       href="/read"
                       style={{
-                        background: i === 0 ? "var(--color-brand-ink-dark)" : "var(--color-brand-ink)",
+                        background: i === 0 ? "var(--color-brand-ink-dark)" : "var(--color-brand-navy)",
                         minHeight: i === 0 ? "360px" : "330px",
                         border: i === 0 ? "1px solid rgba(217,164,65,.5)" : "1px solid transparent",
                       }}
@@ -327,7 +327,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       <div className="mt-[5px] text-[13.5px] text-sidebar-text-dim-2">{f.byline}</div>
                       <div className="mt-3.5 flex items-center gap-3.5 text-[13px] font-semibold text-brand-gold-light">
                         <span>{f.reads}</span>
-                        <span style={{ color: dl.color === "#c9c1b6" ? "#7d94a0" : dl.color }}>
+                        <span style={{ color: dl.color === "#c9c1b6" ? "light-dark(#7d94a0, var(--color-stone))" : dl.color }}>
                           {dl.txt}
                         </span>
                       </div>
@@ -339,7 +339,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
           <div className="grid grid-cols-1 gap-11 px-4 pb-2.5 pt-[30px] sm:px-6 lg:grid-cols-[1fr_320px] lg:px-11">
             <div>
               {hasRows && (
-                <div className="grid grid-cols-[40px_1fr_90px] gap-3.5 border-b border-[#f1efec] px-4 pb-2.5 text-[11.5px] font-semibold tracking-[.7px] text-stone-light sm:grid-cols-[56px_1fr_130px_110px_90px]">
+                <div className="grid grid-cols-[40px_1fr_90px] gap-3.5 border-b border-line-soft px-4 pb-2.5 text-[11.5px] font-semibold tracking-[.7px] text-stone-light sm:grid-cols-[56px_1fr_130px_110px_90px]">
                   <div>HẠNG</div>
                   <div>{colItem}</div>
                   <div className="hidden sm:block">{colGenre}</div>
@@ -354,7 +354,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       <Link
                         key={b.id}
                         href={`/truyen/${b.slug}`}
-                        className="grid grid-cols-[40px_1fr_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] px-4 py-3.5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[56px_1fr_130px_110px_90px]"
+                        className="grid grid-cols-[40px_1fr_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] dark:border-line-soft px-4 py-3.5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[56px_1fr_130px_110px_90px]"
                       >
                         <div className="text-xl font-extrabold text-[#c1b9ae]">{b.rank}</div>
                         <div className="flex min-w-0 items-center gap-3.5">
@@ -399,7 +399,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                       <Link
                         key={b.title}
                         href="/read"
-                        className="grid grid-cols-[40px_1fr_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] px-4 py-3.5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[56px_1fr_130px_110px_90px]"
+                        className="grid grid-cols-[40px_1fr_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] dark:border-line-soft px-4 py-3.5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[56px_1fr_130px_110px_90px]"
                       >
                         <div className="text-xl font-extrabold text-[#c1b9ae]">{b.rank}</div>
                         <div className="flex min-w-0 items-center gap-3.5">
@@ -433,7 +433,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                   type="button"
                   onClick={() => setLimit((l) => l + 5)}
                   style={{ color: exhausted ? "#b3aaa0" : "var(--color-brand-ink)" }}
-                  className="flex cursor-pointer items-center gap-2 rounded-full border border-[#e2ded7] px-7 py-3 text-sm font-semibold"
+                  className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-7 py-3 text-sm font-semibold"
                 >
                   {exhausted
                     ? "Đã hiển thị hết bảng này"

@@ -66,7 +66,7 @@ export default async function ContestHubPage() {
 
   return (
     <div className="flex-1 bg-neutral-bg">
-      <div className="mx-auto max-w-[1280px] bg-white">
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader />
         <main className="flex flex-col gap-9 px-4 pb-12 pt-7 sm:px-8 lg:px-11">
           <div>
@@ -90,7 +90,7 @@ export default async function ContestHubPage() {
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 {journeys.map(({ contest: c, passport: p }) => (
                   <Link key={c.id} href={`/cuoc-thi/${c.slug}`}
-                    className="flex items-center justify-between gap-3 rounded-[12px] bg-white px-3.5 py-2.5 no-underline sm:min-w-[260px]">
+                    className="flex items-center justify-between gap-3 rounded-[12px] bg-surface px-3.5 py-2.5 no-underline sm:min-w-[260px]">
                     <span className="min-w-0 truncate text-sm font-semibold text-ink">{c.title}</span>
                     <span className="shrink-0 text-[12.5px] font-semibold text-cream-gold-text">
                       {p.completedAt ? PASSPORT_BADGE_NAME : `${p.doneCount}/${p.milestones.length} mốc`}

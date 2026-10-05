@@ -138,14 +138,14 @@ export function ChatBubbleWindow({
   };
 
   return (
-    <div className="flex h-[420px] w-[300px] flex-col overflow-hidden rounded-t-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.2)]">
-      <div className="flex items-center gap-2.5 bg-brand-ink px-3.5 py-2.5">
+    <div className="flex h-[420px] w-[300px] flex-col overflow-hidden rounded-t-2xl border border-cream bg-surface shadow-[0_14px_34px_rgba(0,0,0,.2)]">
+      <div className="flex items-center gap-2.5 bg-brand-navy px-3.5 py-2.5">
         <UserAvatar userId={conv.userId} nickname={conv.nickname} avatarUrl={conv.avatarUrl} size={30} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <div className="truncate text-[13px] font-semibold text-white">{conv.nickname}</div>
             {conv.isModerationThread && (
-              <span className="shrink-0 rounded-full bg-brand-gold px-1.5 py-0.5 text-[9px] font-semibold text-brand-ink">
+              <span className="shrink-0 rounded-full bg-brand-gold px-1.5 py-0.5 text-[9px] font-semibold text-brand-navy">
                 Kiểm duyệt
               </span>
             )}
@@ -169,12 +169,12 @@ export function ChatBubbleWindow({
         </button>
       </div>
       {order && <OrderSummaryChip order={order} threadHref={chatThreadHref(conv.userId, conv.context)} />}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-[#fdfdfc] px-3 py-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-surface-soft px-3 py-3">
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
             <div
               style={{
-                background: m.mine ? "var(--color-brand-ink)" : "#f2f1ee",
+                background: m.mine ? "var(--color-brand-navy)" : "light-dark(#f2f1ee, var(--color-surface-muted))",
                 color: m.mine ? "#fff" : "var(--color-ink)",
                 borderRadius: m.mine ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
               }}
@@ -208,7 +208,7 @@ export function ChatBubbleWindow({
           tiết đầy đủ xem comment tương tự ở chat-tab.tsx (cùng lỗi, cùng
           cách sửa). textarea cho tự giãn dòng khi soạn tin dài, tối đa
           COMPOSER_MAX_HEIGHT_PX rồi tự cuộn bên trong. */}
-      <div className="flex items-end gap-2 border-t border-[#f0f0ef] bg-white px-2.5 py-2">
+      <div className="flex items-end gap-2 border-t border-line-faint bg-surface px-2.5 py-2">
         <textarea
           ref={composerRef}
           value={draft}
@@ -231,7 +231,7 @@ export function ChatBubbleWindow({
           onClick={handleSend}
           disabled={sending || !draft.trim()}
           aria-label="Gửi"
-          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-ink transition-transform hover:brightness-[1.08] active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55"
+          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand-gold text-brand-navy transition-transform hover:brightness-[1.08] active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-55"
         >
           <PaperPlaneRightIcon weight="fill" size={14} />
         </button>

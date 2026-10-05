@@ -35,8 +35,8 @@ export default async function NewAudioNarrationPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className={`${lora.variable} flex-1 bg-[#f2f2f3]`}>
-      <div className="mx-auto max-w-[1280px] bg-white">
+    <div className={`${lora.variable} flex-1 bg-surface-muted`}>
+      <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader showSearch={false} />
         <main className="mx-auto max-w-[640px] px-6 py-12 sm:px-11">
           <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">

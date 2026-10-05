@@ -60,7 +60,7 @@ const STATUS_CHIP: Record<BookStatus, { className: string; Icon: typeof CheckCir
     Icon: PencilSimpleLineIcon,
   },
   tam_ngung: {
-    className: "border-cream bg-white text-stone-dark",
+    className: "border-cream bg-surface text-stone-dark",
     Icon: PauseCircleIcon,
   },
 };
@@ -136,10 +136,10 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
   const reach = Math.ceil(slotsAcross / 2) + 1;
 
   return (
-    <section className="bg-gradient-to-b from-[#fafaf9] to-white px-4 pb-2.5 sm:px-8 lg:px-11">
+    <section className="bg-gradient-to-b from-surface-soft-alt to-surface px-4 pb-2.5 sm:px-8 lg:px-11">
       <nav
         data-tour="tour-nav"
-        className="-mx-4 mb-[26px] flex items-center gap-[26px] overflow-x-auto bg-brand-ink px-4 py-3.5 text-[15px] font-medium [scrollbar-width:none] sm:-mx-8 sm:px-8 lg:-mx-11 lg:px-11 [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 mb-[26px] flex items-center gap-[26px] overflow-x-auto bg-brand-navy px-4 py-3.5 text-[15px] font-medium [scrollbar-width:none] sm:-mx-8 sm:px-8 lg:-mx-11 lg:px-11 [&::-webkit-scrollbar]:hidden"
       >
         <NavBarContent />
       </nav>
@@ -152,9 +152,9 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
       </div>
 
       {n === 0 || !current || !status ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#e7e5e4] bg-white/60 py-16 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line-alt bg-surface/60 py-16 text-center">
           <div className="text-base font-semibold text-ink">Chưa có tác phẩm nào được xuất bản</div>
-          <div className="text-sm text-[#78716c]">Mục này sẽ hiện tác phẩm thật ngay khi có sách đầu tiên được publish.</div>
+          <div className="text-sm text-[#78716c] dark:text-ink-muted">Mục này sẽ hiện tác phẩm thật ngay khi có sách đầu tiên được publish.</div>
         </div>
       ) : (
         <div
@@ -165,7 +165,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
         >
           {/* Thẻ lớn: bìa (crossfade) + thông tin tác phẩm đang chọn */}
           <div
-            className="relative mt-2.5 flex touch-pan-y flex-col overflow-hidden rounded-[22px] border border-[#efe9df] bg-[#FAF6EE] sm:min-h-[420px] sm:flex-row"
+            className="relative mt-2.5 flex touch-pan-y flex-col overflow-hidden rounded-[22px] border border-[#efe9df] dark:border-gold-soft bg-[#FAF6EE] dark:bg-surface-warm sm:min-h-[420px] sm:flex-row"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             aria-roledescription="carousel"
@@ -212,12 +212,12 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
               </Link>
               {/* Truyện 18+: không hiện tóm tắt ở trang chủ (trang truyện ẩn tóm tắt với người chưa xác thực tuổi). */}
               {current.synopsis && current.ageRating !== "18" && (
-                <p className="mt-3.5 max-w-[560px] text-[15px] leading-[1.6] text-pretty text-[#57534e] sm:text-base">
+                <p className="mt-3.5 max-w-[560px] text-[15px] leading-[1.6] text-pretty text-[#57534e] dark:text-ink-soft sm:text-base">
                   {truncateWords(current.synopsis, DESC_MAX_WORDS)}
                 </p>
               )}
 
-              <div className="mt-[22px] flex flex-wrap gap-2 text-[#3a3430]">
+              <div className="mt-[22px] flex flex-wrap gap-2 text-[#3a3430] dark:text-ink">
                 {current.ageRating && current.ageRating !== "all" && (
                   <div
                     className={`${CHIP} font-bold ${
@@ -230,7 +230,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                   </div>
                 )}
                 {current.genre && (
-                  <div className={`${CHIP} border-[#cfc6b8]`}>
+                  <div className={`${CHIP} border-line-strong`}>
                     <BookmarkSimpleIcon />
                     {current.genre}
                   </div>
@@ -239,15 +239,15 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                   <status.Icon weight={current.status === "hoan_thanh" ? "fill" : "regular"} />
                   {BOOK_STATUS_LABEL[current.status]}
                 </div>
-                <div className={`${CHIP} border-[#cfc6b8]`}>
+                <div className={`${CHIP} border-line-strong`}>
                   <EyeIcon />
                   {formatCount(current.viewCount)}
                 </div>
-                <div className={`${CHIP} border-[#cfc6b8]`}>
+                <div className={`${CHIP} border-line-strong`}>
                   <BookOpenIcon />
                   {current.chapterCount} chương
                 </div>
-                <div className={`${CHIP} border-[#cfc6b8]`}>
+                <div className={`${CHIP} border-line-strong`}>
                   <UserIcon />
                   {current.authorNickname ?? "Ẩn danh"}
                 </div>
@@ -256,13 +256,13 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
               <div className="mt-[26px] flex flex-wrap gap-2.5">
                 <Link
                   href={`/truyen/${current.slug}`}
-                  className="flex items-center gap-2 rounded-full bg-brand-ink px-6 py-3 text-sm font-semibold whitespace-nowrap text-white no-underline"
+                  className="flex items-center gap-2 rounded-full bg-brand-navy px-6 py-3 text-sm font-semibold whitespace-nowrap text-white no-underline"
                 >
                   Đọc ngay <CaretRightIcon weight="bold" />
                 </Link>
                 <Link
                   href="/audio/now-playing"
-                  className="flex items-center gap-2 rounded-full border border-[#cfc6b8] px-[22px] py-3 text-sm font-semibold whitespace-nowrap text-ink no-underline"
+                  className="flex items-center gap-2 rounded-full border border-line-strong px-[22px] py-3 text-sm font-semibold whitespace-nowrap text-ink no-underline"
                 >
                   <HeadphonesIcon size={16} /> Nghe
                 </Link>
@@ -326,7 +326,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                     >
                       {book.title}
                     </div>
-                    <div className="mt-1 truncate text-xs text-[#8a8580] sm:text-[13px]">
+                    <div className="mt-1 truncate text-xs text-[#8a8580] dark:text-stone sm:text-[13px]">
                       {book.authorNickname ?? "Ẩn danh"}
                     </div>
                   </>
@@ -367,7 +367,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                   type="button"
                   onClick={() => step(dir)}
                   aria-label={label}
-                  className={`absolute z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[#e7e5e4] bg-white/95 text-[#57534e] shadow-[0_6px_16px_rgba(0,0,0,.14)] transition-colors hover:border-brand-gold hover:text-brand-gold-dark sm:h-11 sm:w-11 ${side}`}
+                  className={`absolute z-10 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-line-alt bg-surface/95 text-[#57534e] dark:text-ink-soft shadow-[0_6px_16px_rgba(0,0,0,.14)] transition-colors hover:border-brand-gold hover:text-brand-gold-dark sm:h-11 sm:w-11 ${side}`}
                   style={{ top: STRIP_RING_SPACE + coverHeight / 2 }}
                 >
                   <Icon size={18} weight="bold" />
@@ -391,7 +391,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                     style={{
                       width: i === active ? 22 : 7,
                       height: 7,
-                      background: i === active ? "var(--color-brand-gold)" : "#d6d3d1",
+                      background: i === active ? "var(--color-brand-gold)" : "light-dark(#d6d3d1, var(--color-surface-muted))",
                     }}
                     className="block rounded-full transition-all duration-[350ms]"
                   />

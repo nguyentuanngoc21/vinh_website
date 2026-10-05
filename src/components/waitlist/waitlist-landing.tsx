@@ -51,7 +51,7 @@ export function WaitlistLanding() {
             href={GOOGLE_FORM_URLS.reader}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-1 items-center justify-center gap-2.5 rounded-[12px] bg-brand-gold px-6 py-4 text-[15px] font-bold text-brand-ink transition-transform active:scale-[.99]"
+            className="flex flex-1 items-center justify-center gap-2.5 rounded-[12px] bg-brand-gold px-6 py-4 text-[15px] font-bold text-brand-navy transition-transform active:scale-[.99]"
           >
             <BookOpenTextIcon weight="bold" size={19} />
             Tôi là độc giả

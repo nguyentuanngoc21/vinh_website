@@ -14,7 +14,7 @@ export function BookContestSection({ bookId, panel }: { bookId: string; panel: B
   const eligibleCount = panel.open.filter((o) => o.eligibility.eligible).length;
 
   return (
-    <section className="mb-6 rounded-[14px] border border-cream-border bg-white p-4 sm:p-5">
+    <section className="mb-6 rounded-[14px] border border-cream-border bg-surface p-4 sm:p-5">
       <div className="mb-3 flex items-center gap-2 text-xs font-bold tracking-[1px] text-brand-gold-dark">
         <TrophyIcon size={16} weight="fill" /> CUỘC THI
       </div>

@@ -85,7 +85,7 @@ export function MessengerBell({ open, onOpenChange }: { open: boolean; onOpenCha
         type="button"
         onClick={() => onOpenChange(!open)}
         aria-label="Tin nhắn"
-        className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#3a3a3a] transition-colors hover:text-brand-gold-dark"
+        className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-soft transition-colors hover:text-brand-gold-dark"
       >
         <ChatCircleIcon size={21} />
         {unreadConversationsCount > 0 && (
@@ -115,11 +115,11 @@ export function MessengerBell({ open, onOpenChange }: { open: boolean; onOpenCha
           "Xem tất cả". 140px ước lượng top(124) + biên dưới — không ràng
           buộc trên desktop (viewport luôn thừa cao hơn nhiều). */}
       {open && (
-        <div className="fixed inset-x-3 top-[124px] z-[60] flex max-h-[calc(100vh-140px)] w-auto flex-col overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_14px_34px_rgba(0,0,0,.16)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[46px] sm:w-[360px]">
-          <div className="shrink-0 border-b border-[#f1efec] px-[18px] py-3">
+        <div className="fixed inset-x-3 top-[124px] z-[60] flex max-h-[calc(100vh-140px)] w-auto flex-col overflow-hidden rounded-2xl border border-cream bg-surface shadow-[0_14px_34px_rgba(0,0,0,.16)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[46px] sm:w-[360px]">
+          <div className="shrink-0 border-b border-line-soft px-[18px] py-3">
             <div className="text-[14.5px] font-semibold text-ink">Chat</div>
           </div>
-          <div className="flex shrink-0 border-b border-[#f1efec] px-2">
+          <div className="flex shrink-0 border-b border-line-soft px-2">
             {TABS.map((t) => {
               const isActive = t.id === activeTab;
               return (
@@ -152,7 +152,7 @@ export function MessengerBell({ open, onOpenChange }: { open: boolean; onOpenCha
                 // Desktop: handleRowClick chặn điều hướng để mở bong bóng —
                 // báo NavigationOverlay đừng bật lớp phủ "đang tải".
                 data-no-nav-overlay={isDesktop ? "" : undefined}
-                className="flex items-center gap-3 border-b border-[#f5f4f2] px-[18px] py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card"
+                className="flex items-center gap-3 border-b border-line-softer px-[18px] py-3 no-underline transition-colors last:border-b-0 hover:bg-cream-card"
               >
                 <UserAvatar userId={c.userId} nickname={c.nickname} avatarUrl={c.avatarUrl} size={40} />
                 <div className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ export function MessengerBell({ open, onOpenChange }: { open: boolean; onOpenCha
                         {c.nickname}
                       </div>
                       {c.isModerationThread && (
-                        <span className="shrink-0 rounded-full bg-brand-ink px-1.5 py-0.5 text-[9px] font-semibold text-brand-gold-light">
+                        <span className="shrink-0 rounded-full bg-brand-navy px-1.5 py-0.5 text-[9px] font-semibold text-brand-gold-light">
                           Kiểm duyệt
                         </span>
                       )}
@@ -192,7 +192,7 @@ export function MessengerBell({ open, onOpenChange }: { open: boolean; onOpenCha
           <Link
             href="/ca-nhan?tab=chat"
             onClick={() => onOpenChange(false)}
-            className="block shrink-0 border-t border-[#f1efec] px-[18px] py-3 text-center text-[12.5px] font-semibold text-brand-gold-dark no-underline hover:bg-cream-card"
+            className="block shrink-0 border-t border-line-soft px-[18px] py-3 text-center text-[12.5px] font-semibold text-brand-gold-dark no-underline hover:bg-cream-card"
           >
             Xem tất cả trong Hội thoại
           </Link>

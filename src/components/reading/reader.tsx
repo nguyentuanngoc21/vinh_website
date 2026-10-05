@@ -844,7 +844,7 @@ export function Reader({
         <button
           type="button"
           onClick={() => openParagraphComments(i)}
-          className="relative cursor-pointer whitespace-nowrap rounded-full bg-brand-ink-dark px-9 py-2.5 font-sans text-[12px] font-semibold tracking-[.6px] text-white shadow-[0_8px_20px_rgba(0,0,0,.22)] transition-colors hover:bg-brand-ink"
+          className="relative cursor-pointer whitespace-nowrap rounded-full bg-brand-ink-dark px-9 py-2.5 font-sans text-[12px] font-semibold tracking-[.6px] text-white shadow-[0_8px_20px_rgba(0,0,0,.22)] transition-colors hover:bg-brand-navy"
         >
           BÌNH LUẬN
           <span
@@ -877,6 +877,10 @@ export function Reader({
 
   return (
     <div
+      // Trang đọc có bộ theme riêng (kem/sepia/tối, THEMES ở trên) — giữ
+      // token màu ở giá trị sáng bên trong, không bị chế độ tối toàn site
+      // (data-theme="dark" trên <html>, xem globals.css) làm lệch màu.
+      data-theme="light"
       style={{ background: c.pageBg, ["--comments-w" as string]: `${PARAGRAPH_COMMENTS_PANEL_WIDTH}px` }}
       // Mở "Chú thích đoạn văn" trên desktop: chừa chỗ bên phải cho cột bình
       // luận để trang truyện dồn sang trái (không bị che) — điện thoại thì
@@ -1255,7 +1259,7 @@ export function Reader({
           )}
 
           {isPenaltyActive && (
-            <div className="mb-6 rounded-[14px] border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-sm text-[#475569]">
+            <div className="mb-6 rounded-[14px] border border-[#E2E8F0] dark:border-line bg-[#F8FAFC] dark:bg-info-bg px-4 py-3 text-sm text-[#475569] dark:text-ink-soft">
               Với phạt đang áp dụng, truyện này đang bị khóa vì vi phạm chụp màn hình.
             </div>
           )}
@@ -1372,7 +1376,7 @@ export function Reader({
               })}
             </div>
             {isPenaltyActive && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-[14px] bg-white/90 p-6 text-center text-sm font-semibold text-[#7f1d1d] shadow-[0_10px_30px_rgba(0,0,0,.12)]">
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-[14px] bg-surface/90 p-6 text-center text-sm font-semibold text-[#7f1d1d] dark:text-error shadow-[0_10px_30px_rgba(0,0,0,.12)]">
                 <div>Nội dung đang bị khóa do vi phạm chụp màn hình. Vui lòng chờ hết hạn phạt hoặc</div>
                 <a href={supportMailto("Hỗ trợ phạt chụp màn hình")} className="underline hover:text-brand-ink">
                   liên hệ hỗ trợ
@@ -1462,12 +1466,12 @@ export function Reader({
             {nextChapterId ? (
               <Link
                 href={`/read/${bookSlug}/${nextChapterId}`}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-brand-ink bg-brand-ink py-[15px] text-sm font-semibold text-white no-underline"
+                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-brand-ink bg-brand-navy py-[15px] text-sm font-semibold text-white no-underline"
               >
                 Chương sau <ArrowRightIcon />
               </Link>
             ) : (
-              <div className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border border-brand-ink bg-brand-ink py-[15px] text-sm font-semibold text-white opacity-55">
+              <div className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border border-brand-ink bg-brand-navy py-[15px] text-sm font-semibold text-white opacity-55">
                 Chương sau <ArrowRightIcon />
               </div>
             )}
@@ -1576,7 +1580,7 @@ export function Reader({
         />
       )}
       {removeError && (
-        <div className="fixed inset-x-4 bottom-20 z-[80] mx-auto max-w-[420px] rounded-lg border border-error-border bg-[#fdf1f1] px-4 py-2.5 text-center text-[13px] font-medium text-error shadow-[0_8px_24px_rgba(0,0,0,.15)] sm:bottom-6">
+        <div className="fixed inset-x-4 bottom-20 z-[80] mx-auto max-w-[420px] rounded-lg border border-error-border bg-[#fdf1f1] dark:bg-error-bg px-4 py-2.5 text-center text-[13px] font-medium text-error shadow-[0_8px_24px_rgba(0,0,0,.15)] sm:bottom-6">
           {removeError}
         </div>
       )}
@@ -1610,7 +1614,7 @@ export function Reader({
             left: pendingHighlight.left,
             transform: "translateX(-50%)",
           }}
-          className="z-[70] flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-ink px-3.5 py-2 text-xs font-semibold text-brand-gold-light shadow-[0_8px_20px_rgba(0,0,0,.25)] disabled:opacity-60"
+          className="z-[70] flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-navy px-3.5 py-2 text-xs font-semibold text-brand-gold-light shadow-[0_8px_20px_rgba(0,0,0,.25)] disabled:opacity-60"
         >
           <HighlighterIcon size={14} weight="fill" /> {highlightPending ? "Đang lưu…" : "Đánh dấu"}
         </button>

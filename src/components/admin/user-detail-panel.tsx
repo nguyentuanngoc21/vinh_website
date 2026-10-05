@@ -142,12 +142,12 @@ export function UserDetailPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+      <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
         <div className="mb-1 flex items-center gap-2">
           <div className="text-xl font-bold text-brand-ink">{user.nickname}</div>
           {user.cccdVerified && <CheckCircleIcon weight="fill" size={18} color="#2C7453" />}
           {user.screenshotPenaltyBanned && (
-            <span className="rounded-full bg-[#F8D7DA] px-2.5 py-0.5 text-[11px] font-semibold text-error">
+            <span className="rounded-full bg-[#F8D7DA] dark:bg-error-bg px-2.5 py-0.5 text-[11px] font-semibold text-error">
               Đã cấm do chụp màn hình
             </span>
           )}
@@ -183,7 +183,7 @@ export function UserDetailPanel({
               <span className="text-[12.5px] text-stone-alt">Chỉ Super Admin được đổi quyền</span>
             </>
           )}
-          {roleSaved && <span className="text-[12.5px] font-medium text-[#2C7453]">Đã lưu</span>}
+          {roleSaved && <span className="text-[12.5px] font-medium text-success-text">Đã lưu</span>}
           {roleError && <span className="text-[12.5px] font-medium text-error">{roleError}</span>}
         </div>
 
@@ -212,7 +212,7 @@ export function UserDetailPanel({
         </div>
       </div>
 
-      <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+      <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
         <div className="mb-3.5 text-base font-bold text-brand-ink">Độ uy tín</div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Đơn hoàn thành" value={user.trust.ordersCompleted} />
@@ -222,7 +222,7 @@ export function UserDetailPanel({
         </div>
       </div>
 
-      <div className="rounded-[14px] border border-cream-border bg-white p-[22px]">
+      <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
         <div className="mb-3.5 text-base font-bold text-brand-ink">Cấp thưởng token</div>
         <p className="mb-3 text-[13px] text-stone-alt">
           Cấp thẳng từ ngân sách nền tảng (giải thưởng cuộc thi...) — không trừ vào ai khác, không
