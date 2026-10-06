@@ -346,6 +346,32 @@ create index anchored_comments_chapter_id_idx on public.anchored_comments (chapt
 create index anchored_comments_quest_idx on public.anchored_comments (quest_id, quest_source) where quest_id is not null;
 create index anchored_comments_parent_idx on public.anchored_comments (parent_comment_id) where parent_comment_id is not null;
 
+-- Tác giả ghim TỐI ĐA 1 bình luận chương (paragraph_index NULL) mỗi chương —
+-- chỉ server (service-role) ghi được cột này, trigger chặn anon/authenticated.
+-- Xem migrations/20261006_chapter_pinned_comment.sql.
+alter table public.anchored_comments add column pinned_at timestamptz;
+
+create unique index anchored_comments_one_pin_per_chapter
+  on public.anchored_comments (chapter_id)
+  where pinned_at is not null;
+
+create or replace function public.anchored_comments_guard_pin()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('anon', 'authenticated')
+     and new.pinned_at is distinct from (case when tg_op = 'UPDATE' then old.pinned_at else null end) then
+    raise exception 'pinned_at chỉ được ghi qua server' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger anchored_comments_guard_pin
+  before insert or update on public.anchored_comments
+  for each row execute function public.anchored_comments_guard_pin();
+
 alter table public.anchored_comments enable row level security;
 
 -- Nội dung công khai dưới chương — ai cũng xem được, không cần đăng nhập.

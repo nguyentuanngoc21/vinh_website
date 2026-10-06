@@ -45,7 +45,7 @@ export function POST(request: Request, context: Ctx) {
     const params = await context.params;
     switch (body?.action) {
       case 'comment':
-        return addComment(forward(request, 'POST', { content: body.content, paragraphIndex: body.paragraphIndex, parentCommentId: body.parentCommentId ?? null }), context);
+        return addComment(forward(request, 'POST', { content: body.content, paragraphIndex: body.paragraphIndex, scope: body.scope, parentCommentId: body.parentCommentId ?? null }), context);
       case 'delete-comment':
         return deleteComment(forward(request, 'DELETE'), { params: Promise.resolve({ ...params, commentId: id(body.commentId) }) });
       case 'highlight':

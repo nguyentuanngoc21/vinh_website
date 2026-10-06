@@ -25,11 +25,8 @@ import { AuthorPanel } from "./author-panel";
 import type { RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { ReadingGate } from "./reading-gate";
 import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
-import {
-  groupParagraphComments,
-  PARAGRAPH_COMMENTS_PANEL_WIDTH,
-  type ParagraphComment,
-} from "@/lib/reading/paragraph-comments";
+import { ChapterCommentsSection } from "./chapter-comments-section";
+import { PARAGRAPH_COMMENTS_PANEL_WIDTH } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { splitParagraphAroundDesignImages } from "@/lib/design/share-link";
 import { shareOrCopy } from "@/lib/share";
@@ -306,11 +303,10 @@ export function Reader({
   const { penalty, isPenaltyActive, warningMessage } = useScreenshotPenalty(paragraphRefs, { exempt: viewerIsAdmin });
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Bình luận theo đoạn (tham khảo Wattpad) — 1 lần fetch TOÀN BỘ bình
-  // luận của chương này khi mount (không phải 1 API/đoạn), client tự
-  // nhóm theo paragraph_index. Xem src/lib/reading/paragraph-comments.ts
-  // + api/chapters/[chapterId]/comments/route.ts.
-  const [paragraphComments, setParagraphComments] = useState<ParagraphComment[]>([]);
+  // Bình luận theo đoạn (tham khảo Wattpad) — khi mount chỉ tải SỐ bình
+  // luận mỗi đoạn (huy hiệu trên đoạn văn); nội dung từng đoạn do panel tự
+  // tải theo trang khi mở. Xem api/chapters/[chapterId]/comments/route.ts.
+  const [commentCounts, setCommentCounts] = useState<Record<number, number>>({});
   const [openCommentsParagraph, setOpenCommentsParagraph] = useState<number | null>(null);
   const commentsOpen = openCommentsParagraph !== null;
   // Điện thoại không có hover: NHẤN GIỮ 1 đoạn (~450ms, không kéo) để tô sáng
@@ -357,19 +353,14 @@ export function Reader({
       window.removeEventListener("scroll", onScroll);
     };
   }, [pressedParagraph]);
-  const { countByParagraph, threadsByParagraph } = useMemo(
-    () => groupParagraphComments(paragraphComments),
-    [paragraphComments]
-  );
-
   useEffect(() => {
     if (!chapterId) return;
     let cancelled = false;
-    fetch(`/api/chapters/${chapterId}/comments`)
+    fetch(`/api/chapters/${chapterId}/comments?scope=counts`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        setParagraphComments(data.comments ?? []);
+        setCommentCounts(data.counts ?? {});
       });
     return () => {
       cancelled = true;
@@ -377,9 +368,9 @@ export function Reader({
   }, [chapterId]);
 
   // Highlight (bôi đen đoạn văn) — RIÊNG TƯ, chỉ của chính viewer (khác
-  // paragraphComments công khai) — xem src/lib/reading/highlights.ts +
+  // bình luận theo đoạn công khai) — xem src/lib/reading/highlights.ts +
   // api/chapters/[chapterId]/highlights/route.ts. 1 lần fetch toàn bộ
-  // highlight của chương khi mount, giống paragraphComments.
+  // highlight của chương khi mount, giống số bình luận theo đoạn.
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const highlightsByParagraph = useMemo(() => {
     const map = new Map<number, Highlight[]>();
@@ -1294,7 +1285,7 @@ export function Reader({
                   // đen xuyên qua 1 tấm ảnh không có ý nghĩa rõ ràng) —
                   // vẫn giữ nút bình luận theo đúng chỉ số đoạn `i` như
                   // mọi đoạn khác.
-                  const count = countByParagraph.get(i) ?? 0;
+                  const count = commentCounts[i] ?? 0;
                   return (
                     <div key={i} {...paragraphShellProps(i)}>
                       {renderCommentPill(i)}
@@ -1327,7 +1318,7 @@ export function Reader({
                   );
                 }
 
-                const count = countByParagraph.get(i) ?? 0;
+                const count = commentCounts[i] ?? 0;
                 const segments = buildHighlightSegments(p, highlightsByParagraph.get(i) ?? []);
                 return (
                   <div key={i} {...paragraphShellProps(i)}>
@@ -1476,6 +1467,16 @@ export function Reader({
               </div>
             )}
           </div>
+
+          {chapterId && (
+            <ChapterCommentsSection
+              chapterId={chapterId}
+              returnTo={`/read/${bookSlug}/${chapterId}`}
+              isLoggedIn={isLoggedIn}
+              canComment={isLoggedIn && accessGate === "none"}
+              c={c}
+            />
+          )}
         </div>
           </div>
 
@@ -1587,13 +1588,15 @@ export function Reader({
 
       {openCommentsParagraph !== null && (
         <ParagraphCommentsPanel
+          key={openCommentsParagraph}
           chapterId={chapterId}
           paragraphIndex={openCommentsParagraph}
-          threads={threadsByParagraph.get(openCommentsParagraph) ?? []}
           onClose={() => setOpenCommentsParagraph(null)}
-          onCommentCreated={(c) => setParagraphComments((prev) => [...prev, c])}
-          onCommentDeleted={(id) =>
-            setParagraphComments((prev) => prev.filter((c) => c.id !== id && c.parentCommentId !== id))
+          onCountChange={(delta) =>
+            setCommentCounts((prev) => ({
+              ...prev,
+              [openCommentsParagraph]: Math.max(0, (prev[openCommentsParagraph] ?? 0) + delta),
+            }))
           }
         />
       )}

@@ -23,6 +23,7 @@ import { getAuthedViewer } from "@/lib/wallet/session";
 import { resolveAgeGate } from "@/lib/age-rating-access";
 import { Age16Confirm, Age18Notice, AgeRatingBadge, ContentWarningList } from "@/components/story/age-gate";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { loadPinnedChapterComments } from "@/lib/reading/pinned-comments";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -121,7 +122,7 @@ export default async function StoryPage({
 
   // Các query dưới đây chỉ phụ thuộc book/viewerId/chapterIds, không phụ
   // thuộc lẫn nhau — chạy song song.
-  const [contestCards, coverUrl, { data: voteRows }, { data: progress }, characters] = await Promise.all([
+  const [contestCards, coverUrl, { data: voteRows }, { data: progress }, characters, pinnedByChapter] = await Promise.all([
     // Contest card (dự thi / đạt giải) — suy ra từ contest_submissions /
     // contest_awards, không lưu cờ trên books. Lỗi ở đây không làm hỏng trang truyện.
     getStoryContestCards(serviceClient, { bookId: book.id, viewerId }).catch((error) => {
@@ -137,6 +138,8 @@ export default async function StoryPage({
       ? serviceClient.from("book_progress").select("chapter_id").eq("book_id", book.id).eq("user_id", viewerId).maybeSingle()
       : Promise.resolve({ data: null }),
     loadCharacters(supabase, serviceClient, book.id, viewerId),
+    // Bình luận tác giả ghim mỗi chương — hiện khi hover chương ở tab "Chương".
+    loadPinnedChapterComments(serviceClient, chapterIds),
   ]);
 
   const firstChapter = publishedChapters[0] ?? null;
@@ -164,6 +167,7 @@ export default async function StoryPage({
     title: c.title,
     createdAt: c.created_at,
     voteCount: voteByChapter.get(c.id) ?? 0,
+    pinnedComment: pinnedByChapter.get(c.id) ?? null,
   }));
 
   return (

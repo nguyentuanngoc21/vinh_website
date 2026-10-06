@@ -1,25 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { XIcon, TrashIcon, ChatCircleIcon, PaperPlaneRightIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert } from "@/components/ui";
 import { relativeTimeLabel } from "@/lib/format-time";
-import {
-  PARAGRAPH_COMMENTS_PANEL_WIDTH,
-  type ParagraphComment,
-  type ParagraphCommentThread,
-} from "@/lib/reading/paragraph-comments";
+import { PARAGRAPH_COMMENTS_PANEL_WIDTH, type ParagraphComment } from "@/lib/reading/paragraph-comments";
+import { appendReply, useCommentPages } from "./use-comment-pages";
+import { CommentPagination } from "./comment-pagination";
 
 type ParagraphCommentsPanelProps = {
   chapterId: string;
   paragraphIndex: number;
-  threads: ParagraphCommentThread[];
   onClose: () => void;
-  /** paragraphIndex cố định (bình luận gốc) — reader.tsx tự thêm bình
-   * luận mới vào state chung sau khi API trả về, không phải panel tự giữ
-   * state riêng, để huy hiệu số đếm ở reader.tsx luôn khớp ngay. */
-  onCommentCreated: (comment: ParagraphComment) => void;
-  onCommentDeleted: (commentId: string) => void;
+  /** Báo reader.tsx cộng/trừ số bình luận của đoạn (huy hiệu số trên đoạn
+   * văn) ngay sau khi gửi/xoá, không phải tải lại số đếm. */
+  onCountChange: (delta: number) => void;
 };
 
 /**
@@ -32,15 +27,22 @@ type ParagraphCommentsPanelProps = {
  * KHÔNG có nút "Trả lời" trên chính 1 reply (API cũng chặn ở server, xem
  * api/chapters/[chapterId]/comments/route.ts). Reply thu gọn mặc định sau
  * nút "Xem N lời trả lời".
+ *
+ * Phân trang ở server (8 bình luận gốc/trang, mới nhất trước) — panel tự tải
+ * từng trang của đoạn đang mở (`?scope=paragraph`), cùng cơ chế với section
+ * "Bình luận chương" (use-comment-pages.ts).
  */
 export function ParagraphCommentsPanel({
   chapterId,
   paragraphIndex,
-  threads,
   onClose,
-  onCommentCreated,
-  onCommentDeleted,
+  onCountChange,
 }: ParagraphCommentsPanelProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const { data, setData, page, setPage, totalPages, loading, loadError, now, reload } = useCommentPages(
+    `/api/chapters/${chapterId}/comments?scope=paragraph&paragraphIndex=${paragraphIndex}`
+  );
+  const threads = data?.threads ?? [];
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<{ id: string; authorName: string } | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
@@ -48,11 +50,15 @@ export function ParagraphCommentsPanel({
   const [sending, setSending] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // 1 mốc "bây giờ" cho cả danh sách, lấy lúc mở panel (không gọi Date.now()
-  // khi render — react-hooks/purity).
-  const [now] = useState(() => Date.now());
 
-  const total = threads.reduce((sum, t) => sum + 1 + t.replies.length, 0);
+  const total = data?.totalComments ?? 0;
+
+  const goToPage = (next: number) => {
+    setPage(next);
+    setReplyTo(null);
+    setReplyDraft("");
+    listRef.current?.scrollTo({ top: 0 });
+  };
 
   // Esc để đóng — cột bên desktop không có nền mờ để bấm ra ngoài.
   useEffect(() => {
@@ -77,14 +83,18 @@ export function ParagraphCommentsPanel({
         setError((data && typeof data.error === "string" && data.error) || "Gửi bình luận thất bại.");
         return;
       }
-      onCommentCreated(data.comment);
+      onCountChange(1);
       if (parentCommentId) {
+        setData((prev) => appendReply(prev, data.comment as ParagraphComment));
         setReplyTo(null);
         setReplyDraft("");
         // Mở luôn nhánh reply vừa trả lời để thấy bình luận mình vừa gửi.
         setExpanded((prev) => new Set(prev).add(parentCommentId));
       } else {
+        // Bình luận gốc mới nằm đầu trang 1 (mới nhất trước).
         setDraft("");
+        if (page === 1) reload();
+        else goToPage(1);
       }
     } catch {
       setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
@@ -104,7 +114,10 @@ export function ParagraphCommentsPanel({
         setError((data && typeof data.error === "string" && data.error) || "Xoá bình luận thất bại.");
         return;
       }
-      onCommentDeleted(commentId);
+      // Xoá bình luận gốc xoá luôn reply của nó (FK cascade).
+      const thread = threads.find((t) => t.top.id === commentId);
+      onCountChange(-(thread ? 1 + thread.replies.length : 1));
+      reload();
     } catch {
       setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
     } finally {
@@ -226,8 +239,15 @@ export function ParagraphCommentsPanel({
           </Alert>
         )}
 
-        <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-8">
-          {threads.length === 0 ? (
+        <div
+          ref={listRef}
+          className={`flex-1 overflow-y-auto overscroll-contain px-6 pb-8 transition-opacity ${loading && data ? "opacity-60" : ""}`}
+        >
+          {!data ? (
+            <div className="py-10 text-center text-[13.5px] text-stone-light">
+              {loadError ? "Không tải được bình luận." : "Đang tải bình luận…"}
+            </div>
+          ) : threads.length === 0 ? (
             <div className="py-10 text-center text-[13.5px] text-stone-light">
               Chưa có bình luận nào cho đoạn này — hãy là người đầu tiên.
             </div>
@@ -296,6 +316,11 @@ export function ParagraphCommentsPanel({
             })
           )}
         </div>
+        {totalPages > 1 && (
+          <div className="shrink-0 border-t border-cream px-6 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+            <CommentPagination page={page} totalPages={totalPages} disabled={loading} onChange={goToPage} />
+          </div>
+        )}
       </aside>
     </>
   );

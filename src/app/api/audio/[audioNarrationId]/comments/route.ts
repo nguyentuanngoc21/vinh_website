@@ -141,6 +141,13 @@ export async function POST(
     }
   }
 
+  // Kèm tên/avatar — panel render ngay `authorName[0]` từ object này.
+  const { data: profile } = await supabase
+    .from("author_public_profiles")
+    .select("nickname, avatar_url")
+    .eq("id", userId)
+    .maybeSingle();
+
   return NextResponse.json({
     comment: {
       id: comment.id,
@@ -148,6 +155,8 @@ export async function POST(
       parentCommentId,
       createdAt: comment.created_at,
       authorId: userId,
+      authorName: profile?.nickname ?? "Người dùng ẩn danh",
+      authorAvatarUrl: profile?.avatar_url ?? null,
       isOwn: true,
       likeCount: 0,
       liked: false,

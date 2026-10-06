@@ -1617,6 +1617,9 @@ export type Database = {
           // parent_comment_id null, enforce ở route, không phải DB). Xem
           // migrations/archive/20260910_add_anchored_comment_replies.sql.
           parent_comment_id: string | null;
+          // not null = bình luận chương được tác giả ghim (tối đa 1/chương,
+          // chỉ server ghi). Xem migrations/20261006_chapter_pinned_comment.sql.
+          pinned_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -1630,6 +1633,7 @@ export type Database = {
           quest_id?: string | null;
           quest_source?: QuestSource | null;
           parent_comment_id?: string | null;
+          pinned_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["anchored_comments"]["Insert"]>;
         Relationships: [];
