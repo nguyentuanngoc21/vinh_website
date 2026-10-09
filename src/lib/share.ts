@@ -7,8 +7,14 @@ export type SharePayload = { title: string; text: string; url: string };
  * không có web share-intent URL để làm nút trực tiếp được). Rơi xuống
  * clipboard trên desktop (không có navigator.share). Người gọi chỉ hiện
  * thông báo "Đã sao chép liên kết" khi kết quả là "copied".
+ *
+ * copyText: nhánh clipboard chép cả text lẫn url (mặc định chỉ url) — cho
+ * nơi mà text chính là thứ được chia sẻ (đoạn trích ở trang đọc).
  */
-export async function shareOrCopy(payload: SharePayload): Promise<"shared" | "copied" | "failed"> {
+export async function shareOrCopy(
+  payload: SharePayload,
+  options: { copyText?: boolean } = {}
+): Promise<"shared" | "copied" | "failed"> {
   if (typeof navigator !== "undefined" && "share" in navigator) {
     try {
       await navigator.share(payload);
@@ -22,7 +28,8 @@ export async function shareOrCopy(payload: SharePayload): Promise<"shared" | "co
   }
 
   try {
-    await navigator.clipboard.writeText(payload.url);
+    const text = options.copyText && payload.text ? `${payload.text}\n\n${payload.url}` : payload.url;
+    await navigator.clipboard.writeText(text);
     return "copied";
   } catch {
     return "failed";

@@ -33,7 +33,7 @@ export function RandomPick({ pool, variant = "card" }: { pool: HomepageBook[]; v
   );
 
   const picked = pick && (
-    <Link href={`/truyen/${pick.slug}?from=cuoc-thi`} className="flex items-center gap-3 rounded-[14px] bg-surface p-2.5 no-underline">
+    <Link href={`/truyen/${pick.id}?from=cuoc-thi`} className="flex items-center gap-3 rounded-[14px] bg-surface p-2.5 no-underline">
       <div className="h-[62px] w-[46px] shrink-0 overflow-hidden rounded-lg">
         <BookCover id={pick.id} title={pick.title} genre={pick.genre} coverUrl={pick.coverUrl} ageRating={pick.ageRating} className="h-full w-full" />
       </div>

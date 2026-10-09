@@ -104,7 +104,7 @@ export type HomepageData = {
   // Sách #1 trong `featured` — dùng cho hero-trending.tsx. null nếu chưa
   // có sách nào publish.
   trending: HomepageBook | null;
-  // "Truyện mới cập nhật" (new-works-grid.tsx) — publish gần đây nhất.
+  // "Truyện mới cập nhật" — xếp theo thời điểm xuất bản chương mới nhất.
   newest: HomepageBook[];
   // "Bảng xếp hạng tuần" (ranking-genres.tsx) — top 4 của `featured`.
   weeklyRanking: HomepageBook[];
@@ -127,16 +127,22 @@ export async function getHomepageData(
       .order("created_at", { ascending: false })
       .limit(FEATURED_LIMIT),
     supabase
-      .from("books")
-      .select(HOMEPAGE_BOOK_COLUMNS)
-      .eq("published", true)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
+      .from("book_chapter_stats")
+      .select("book_id, latest_published_chapter_at")
+      .order("latest_published_chapter_at", { ascending: false })
+      .order("book_id", { ascending: true })
       .limit(NEWEST_LIMIT),
   ]);
 
   const trendingRows = byViews ?? [];
-  const newestRows = byNewest ?? [];
+  const newestIds = (byNewest ?? []).map((row) => row.book_id);
+  const { data: updatedBooks } = newestIds.length
+    ? await supabase.from("books").select(HOMEPAGE_BOOK_COLUMNS)
+        .in("id", newestIds).eq("published", true).is("deleted_at", null)
+    : { data: [] };
+  const updatedById = new Map((updatedBooks ?? []).map((row) => [row.id, row]));
+  const newestRows = newestIds.map((id) => updatedById.get(id))
+    .filter((row): row is HomepageBookRow => row !== undefined);
 
   // Dedup trước khi resolve author/chapter/cover — 2 danh sách trên
   // thường lấn nhau (sách mới xuất bản cũng có thể đang trending), gộp

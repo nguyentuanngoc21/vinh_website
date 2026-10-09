@@ -533,7 +533,7 @@ function Results({ awards, publishedAt, visible }: { awards: PublicAward[]; publ
                 );
                 const cls = `flex flex-col items-center rounded-[20px] border text-center ${big ? "order-first border-cream-gold-border bg-cream-card px-5 pb-6 pt-7 md:order-none" : "border-border-light bg-neutral-bg/60 px-5 pb-5 pt-5"}`;
                 return a.book && !a.revoked ? (
-                  <Link key={a.id} href={`/truyen/${a.book.slug}?from=cuoc-thi`} className={`${cls} no-underline`}>{inner}</Link>
+                  <Link key={a.id} href={`/truyen/${a.book.id}?from=cuoc-thi`} className={`${cls} no-underline`}>{inner}</Link>
                 ) : (
                   <div key={a.id} className={cls}>{inner}</div>
                 );

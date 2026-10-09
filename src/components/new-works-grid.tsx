@@ -17,14 +17,14 @@ export function NewWorksGrid({ books }: { books: HomepageBook[] }) {
       {books.length === 0 ? (
         <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-line-alt bg-surface-soft-alt py-10 text-center">
           <div className="text-sm font-semibold text-ink">Chưa có truyện mới</div>
-          <div className="text-[13px] text-mute">Truyện vừa xuất bản sẽ hiện ở đây.</div>
+          <div className="text-[13px] text-mute">Truyện vừa đăng chương mới sẽ hiện ở đây.</div>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
           {books.map((book) => (
             <Link
               key={book.id}
-              href={`/truyen/${book.slug}`}
+              href={`/truyen/${book.id}`}
               className="cursor-pointer overflow-hidden rounded-xl no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,.12)]"
             >
               <div className="relative aspect-[2/3] overflow-hidden rounded-xl">

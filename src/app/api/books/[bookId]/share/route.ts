@@ -3,8 +3,8 @@ import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { RewardEngine } from "@/lib/quests/reward-engine";
 
 /**
- * POST /api/books/:bookId/share — gọi từ reader.tsx (handleShareStory,
- * handleShareExcerpt) SAU KHI shareOrCopy() thành công (Web Share API mở
+ * POST /api/books/:bookId/share — gọi từ reader.tsx (handleShareExcerpt —
+ * nút "Chia sẻ" cuối chương và ở AuthorPanel) SAU KHI shareOrCopy() thành công (Web Share API mở
  * được share sheet, hoặc rơi xuống clipboard) — chỉ để ghi nhận tiến
  * trình nhiệm vụ reader_share_story, không lưu gì về nội dung/nơi đã
  * chia sẻ (Web Share API không cho biết người dùng chọn app nào, hoặc có

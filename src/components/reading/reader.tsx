@@ -127,6 +127,8 @@ const READER_PREFS_KEY = "vinh_reader_prefs";
 type ReaderPrefs = { fontSize: number; theme: ThemeName; lineHeight: number };
 
 const DEFAULT_LINE_HEIGHT = 2;
+// Độ dài tối đa đoạn trích khi chia sẻ (handleShareExcerpt).
+const SHARE_EXCERPT_MAX_CHARS = 300;
 
 // Nhớ cỡ chữ/nền/giãn dòng người đọc đã chọn giữa các chương — không thì
 // mỗi lần sang chương mới, panel lại reset về mặc định (19px/cream/giãn
@@ -519,25 +521,31 @@ export function Reader({
     fetch(`/api/books/${bookId}/share`, { method: "POST" }).catch(() => {});
   };
 
-  const handleShareStory = async () => {
-    if (!bookSlug || typeof window === "undefined") return;
-    const result = await shareOrCopy({
-      title: `${chapterTitle} - ${bookTitle} - ${authorName}`,
-      text: bookSynopsis ?? "",
-      url: `${window.location.origin}/truyen/${bookSlug}`,
-    });
-    if (result === "copied") toast.show("Đã sao chép liên kết", "success");
-    if (result !== "failed") trackShareQuest();
-  };
-
+  // Cả nút "Chia sẻ" cuối chương lẫn "Chia sẻ đoạn này" ở AuthorPanel đều
+  // chia sẻ ĐOẠN ĐANG ĐỌC (visibleParagraph), không phải mô tả truyện. Chỉ
+  // rơi về mô tả khi chương không có đoạn nào (chương VIP chưa mua —
+  // content="" nên paragraphs rỗng). copyText: desktop không có
+  // navigator.share vẫn sao chép được đoạn trích, không chỉ mỗi link.
   const handleShareExcerpt = async () => {
     if (!bookSlug || !chapterId || typeof window === "undefined") return;
-    const result = await shareOrCopy({
-      title: chapterTitle,
-      text: visibleParagraph,
-      url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
-    });
-    if (result === "copied") toast.show("Đã sao chép liên kết", "success");
+    // Cắt ~300 ký tự (lùi về khoảng trắng gần nhất để không đứt giữa từ) —
+    // không để 1 đoạn dài của chương VIP bị chia sẻ nguyên văn.
+    const fullExcerpt = visibleParagraph.trim();
+    const cut = fullExcerpt.slice(0, SHARE_EXCERPT_MAX_CHARS);
+    const lastSpace = cut.lastIndexOf(" ");
+    const excerpt =
+      fullExcerpt.length <= SHARE_EXCERPT_MAX_CHARS
+        ? fullExcerpt
+        : `${(lastSpace > SHARE_EXCERPT_MAX_CHARS * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+    const result = await shareOrCopy(
+      {
+        title: `${chapterTitle} - ${bookTitle} - ${authorName}`,
+        text: excerpt ? `“${excerpt}”` : (bookSynopsis ?? ""),
+        url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
+      },
+      { copyText: true }
+    );
+    if (result === "copied") toast.show(excerpt ? "Đã sao chép đoạn trích và liên kết" : "Đã sao chép liên kết", "success");
     if (result !== "failed") trackShareQuest();
   };
 
@@ -1417,7 +1425,7 @@ export function Reader({
             <VoteButton variant="full" voted={voted} voteCount={voteCount} pending={voting} onToggle={handleToggleVote} />
             <button
               type="button"
-              onClick={handleShareStory}
+              onClick={handleShareExcerpt}
               style={{ borderColor: c.hair, color: c.ink }}
               className="flex cursor-pointer items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors hover:border-brand-ink"
             >

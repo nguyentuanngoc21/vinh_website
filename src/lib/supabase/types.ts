@@ -537,6 +537,8 @@ export type Database = {
           content: string;
           order_index: number;
           published: boolean;
+          /** First publication time, maintained by the database trigger. */
+          published_at: string | null;
           // Số token đọc chương, 0 = miễn phí. Giá niêm yết — chưa tự
           // động nối vào create_purchase()/purchase_transactions.
           price: number;

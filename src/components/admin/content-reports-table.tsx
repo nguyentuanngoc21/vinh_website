@@ -99,7 +99,7 @@ function ReportRow({ row, reviewerUsername }: { row: ContentReport; reviewerUser
         </a>
       )}
       <div className="flex flex-wrap items-center gap-4 text-sm font-semibold text-brand-ink">
-        <Link className="underline" href={row.chapter_id ? `/read/${row.book_slug}/${row.chapter_id}` : `/truyen/${row.book_slug}`}>
+        <Link className="underline" href={row.chapter_id ? `/read/${row.book_id}/${row.chapter_id}` : `/truyen/${row.book_id}`}>
           Xem nội dung
         </Link>
         <Link className="underline" href={`/admin/noi-dung/${row.book_id}`}>

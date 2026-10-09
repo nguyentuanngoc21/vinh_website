@@ -92,6 +92,27 @@ export function BookOverview({
   contestSection,
 }: BookOverviewProps) {
   const router = useRouter();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(bookTitle);
+  const [savingTitle, setSavingTitle] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const saveTitle = async () => {
+    if (savingTitle || !titleDraft.trim()) return;
+    setSavingTitle(true);
+    setTitleError(null);
+    try {
+      const response = await fetch(`/api/authoring/books/${bookId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: titleDraft.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Không thể đổi tên truyện.");
+      setEditingTitle(false);
+      router.refresh();
+    } catch (error) {
+      setTitleError(error instanceof Error ? error.message : "Không thể đổi tên truyện.");
+    } finally { setSavingTitle(false); }
+  };
   const [creatingChapter, setCreatingChapter] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -310,6 +331,16 @@ export function BookOverview({
             <div className="break-words font-[family-name:var(--font-lora)] text-2xl font-bold text-brand-ink sm:text-[27px]">
               {bookTitle}
             </div>
+            {editingTitle ? (
+              <form className="mt-2 flex flex-wrap items-center gap-2" onSubmit={(event) => { event.preventDefault(); void saveTitle(); }}>
+                <input aria-label="Tên truyện mới" autoFocus value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} disabled={savingTitle} className="min-w-0 rounded-lg border border-cream-border bg-surface px-3 py-2 text-sm" />
+                <button type="submit" disabled={savingTitle || !titleDraft.trim()} className="text-sm font-semibold text-brand-ink disabled:opacity-50">{savingTitle ? "Đang lưu…" : "Lưu tên"}</button>
+                <button type="button" disabled={savingTitle} onClick={() => { setEditingTitle(false); setTitleError(null); }} className="text-sm text-stone-alt">Huỷ</button>
+              </form>
+            ) : (
+              <button type="button" onClick={() => { setTitleDraft(bookTitle); setEditingTitle(true); }} className="mt-2 inline-flex items-center gap-1 text-sm text-stone-alt hover:text-brand-ink"><PencilSimpleIcon size={14} /> Đổi tên truyện</button>
+            )}
+            {titleError && <p role="alert" className="mt-1 text-sm text-red-600">{titleError}</p>}
             <div className="mt-1 text-[13.5px] text-stone-alt">
               {chapters.length} chương · {publishedCount} đã đăng
             </div>

@@ -174,7 +174,7 @@ export function RankingBoard({
             {showChange && <span className="text-right">THAY ĐỔI</span>}
           </div>
           {items.map((r) => (
-            <Link key={r.submission_id} href={`/truyen/${r.book.slug}?from=cuoc-thi`}
+            <Link key={r.submission_id} href={`/truyen/${r.book.id}?from=cuoc-thi`}
               className={`grid grid-cols-[44px_44px_minmax(0,1fr)] items-center gap-3 border-t border-neutral-bg px-4 py-3 no-underline first:border-t-0 sm:gap-3.5 sm:px-5 sm:first:border-t ${cols}`}>
               <span className={`text-lg font-extrabold sm:text-xl ${r.rank === 1 ? "text-brand-gold" : r.rank <= 3 ? "text-brand-gold-light" : "text-stone-light"}`}>
                 {r.rank}

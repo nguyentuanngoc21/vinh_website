@@ -224,7 +224,7 @@ export function ContentTable({
             <span className="truncate">{r.title}</span>
             {r.published && !r.deletedAt && (
               <Link
-                href={`/truyen/${r.slug}`}
+                href={`/truyen/${r.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="shrink-0 text-stone-alt transition-colors hover:text-brand-ink"

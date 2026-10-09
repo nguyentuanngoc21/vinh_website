@@ -31,7 +31,7 @@ export function RankingGenres({ weeklyRanking }: { weeklyRanking: HomepageBook[]
             {weeklyRanking.map((book, i) => (
               <Link
                 key={book.id}
-                href={`/truyen/${book.slug}`}
+                href={`/truyen/${book.id}`}
                 className="flex items-center gap-4 no-underline"
               >
                 <div className="w-[26px] text-2xl font-extrabold" style={{ color: RANK_COLORS[i] ?? "#9a9a9a" }}>
