@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChapterEditor } from "@/components/author/chapter-editor";
+import { ChapterEditor, type SaveStatus } from "@/components/author/chapter-editor";
+import { useTextHistory } from "@/components/author/use-text-history";
+import { clearChapterDraft, readChapterDraft, writeChapterDraft, type ChapterDraft } from "@/lib/authoring/chapter-draft";
 import { PublishPanel } from "@/components/author/publish-panel";
 import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
 import { ChapterCharactersPanel } from "@/components/author/chapter-characters-panel";
+import { ChapterBackgroundPanel } from "@/components/author/chapter-background-panel";
 import type { ManagedCharacter } from "@/components/author/character-manager";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import type { BookGenre } from "@/lib/supabase/types";
@@ -24,7 +27,18 @@ export type WorkspaceChapter = {
   audio_url: string | null;
   audio_price: number;
   is_last_chapter: boolean;
+  /** Public URL (đã resolve từ background_image_path ở page.tsx). */
+  background_url: string | null;
+  /** chapters.content_version — gửi kèm mỗi lần lưu để phát hiện xung đột. */
+  content_version: number;
 };
+
+/** Nháp (chưa xuất bản) tự lưu lên máy chủ sau khoảng lặng này. */
+const AUTOSAVE_MS = 3000;
+const AUTOSAVE_RETRY_MS = 15000;
+const LOCAL_DRAFT_MS = 800;
+type ServerCopy = { title: string; content: string; version: number };
+const timeLabel = (d: Date | number) => new Date(d).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 
 type AuthorWorkspaceProps = {
   bookId: string;
@@ -56,6 +70,15 @@ type AuthorWorkspaceProps = {
  * biệt (author/[bookId]/[chapterId]/page.tsx là Server Component, không
  * giữ được useState) — wrapper mỏng này giữ state chung, 2 component con
  * chỉ còn là UI thuần nhận props, không tự useState nội dung chương nữa.
+ *
+ * Lưu nội dung (title + content):
+ *   - Luôn giữ bản nháp trên máy (localStorage, chapter-draft.ts) khi có thay
+ *     đổi chưa lưu; mở lại trang thì hỏi khôi phục.
+ *   - Chương NHÁP tự lưu lên máy chủ sau AUTOSAVE_MS không gõ. Chương ĐANG
+ *     ĐĂNG không tự lưu — sửa xong bấm "Cập nhật" (tránh độc giả thấy bản
+ *     viết dở); bản sửa vẫn được giữ trên máy.
+ *   - Mỗi lần lưu gửi expected_version; máy chủ trả 409 kèm bản của nó nếu
+ *     tab/thiết bị khác đã lưu trước → tác giả chọn giữ bản nào.
  */
 export function AuthorWorkspace({
   bookId,
@@ -87,7 +110,16 @@ export function AuthorWorkspace({
   // client không tự biết trừ khi cập nhật state này ngay lúc đó.
   const [isBookPublished, setIsBookPublished] = useState(bookPublished);
   const [title, setTitle] = useState(chapter.title);
-  const [content, setContent] = useState(chapter.content);
+  const history = useTextHistory(chapter.content);
+  const content = history.value;
+  // Bản đã nằm trên máy chủ — dirty = khác bản này.
+  const [saved, setSaved] = useState<ServerCopy>({ title: chapter.title, content: chapter.content, version: chapter.content_version });
+  const [conflict, setConflict] = useState<ServerCopy | null>(null);
+  const [draftOffer, setDraftOffer] = useState<ChapterDraft | null>(null);
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [autosaveError, setAutosaveError] = useState(false);
+  const saveLock = useRef(false);
+  const [hasBackground, setHasBackground] = useState(chapter.background_url !== null);
   const [published, setPublished] = useState(chapter.published);
   const [price, setPrice] = useState(chapter.price);
   const [audioUrl, setAudioUrl] = useState(chapter.audio_url ?? "");
@@ -105,6 +137,7 @@ export function AuthorWorkspace({
   const [isLastChapterLocked, setIsLastChapterLocked] = useState(chapter.is_last_chapter);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const dirty = title !== saved.title || content !== saved.content;
   const [error, setError] = useState<string | null>(null);
   // Server chặn "Xuất bản" (403 kèm missingAgreementIds — xem
   // src/lib/authoring/exclusivity-agreement.ts) khi sách đang độc quyền
@@ -114,49 +147,193 @@ export function AuthorWorkspace({
   // các lỗi lưu khác vì cần UI có link "Đi tới Cam kết & Thỏa thuận".
   const [missingAgreementIds, setMissingAgreementIds] = useState<string[] | null>(null);
 
-  const save = async (nextPublished: boolean) => {
-    if (saving) return;
+  // Lõi lưu chung cho tự lưu và nút "Lưu nháp"/"Xuất bản". `versionOverride`
+  // dùng khi tác giả chọn ghi đè sau xung đột.
+  const persist = async (mode: { publish: boolean } | "autosave", versionOverride?: number) => {
+    if (saveLock.current) return;
+    saveLock.current = true;
     setSaving(true);
-    setError(null);
+    if (mode !== "autosave") setError(null);
+    // Route bỏ qua tiêu đề rỗng — giữ tiêu đề cũ trong ảnh chụp đã gửi.
+    const sent = { title: title.trim() ? title : saved.title, content };
+    const expected = versionOverride ?? saved.version;
+    const body =
+      mode === "autosave"
+        ? { title: sent.title, content: sent.content, expected_version: expected }
+        : {
+            title: sent.title,
+            content: sent.content,
+            published: mode.publish,
+            price,
+            audio_url: audioUrl.trim(),
+            audio_price: audioPrice,
+            is_last_chapter: isLastChapter,
+            expected_version: expected,
+          };
 
-    let res: Response;
     try {
-      res = await fetch(`/api/authoring/chapters/${chapter.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          content,
-          published: nextPublished,
-          price,
-          audio_url: audioUrl.trim(),
-          audio_price: audioPrice,
-          is_last_chapter: isLastChapter,
-        }),
-      });
-    } catch {
-      setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
-      setSaving(false);
-      return;
-    }
-
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      if (Array.isArray(data?.missingAgreementIds) && data.missingAgreementIds.length > 0) {
-        setMissingAgreementIds(data.missingAgreementIds);
-      } else {
-        setError((data && typeof data.error === "string" && data.error) || "Lưu thất bại. Vui lòng thử lại.");
+      let res: Response;
+      try {
+        res = await fetch(`/api/authoring/chapters/${chapter.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } catch {
+        if (mode === "autosave") setAutosaveError(true);
+        else setError("Không thể kết nối máy chủ. Bản viết vẫn được giữ trên máy này — vui lòng thử lại.");
+        return;
       }
-      setSaving(false);
-      return;
-    }
 
-    setPublished(nextPublished);
-    if (nextPublished) setIsBookPublished(true);
-    if (isLastChapter) setIsLastChapterLocked(true);
-    setSavedAt(new Date());
-    setSaving(false);
+      const data = await res.json().catch(() => null);
+      if (res.status === 409 && data?.conflict) {
+        setConflict(data.conflict);
+        return;
+      }
+      if (!res.ok) {
+        if (mode === "autosave") {
+          setAutosaveError(true);
+        } else if (Array.isArray(data?.missingAgreementIds) && data.missingAgreementIds.length > 0) {
+          setMissingAgreementIds(data.missingAgreementIds);
+        } else {
+          setError((data && typeof data.error === "string" && data.error) || "Lưu thất bại. Vui lòng thử lại.");
+        }
+        return;
+      }
+
+      setSaved({ ...sent, version: typeof data?.content_version === "number" ? data.content_version : expected });
+      setAutosaveError(false);
+      setConflict(null);
+      setSavedAt(new Date());
+      if (mode !== "autosave") {
+        setPublished(mode.publish);
+        if (mode.publish) setIsBookPublished(true);
+        if (isLastChapter) setIsLastChapterLocked(true);
+      }
+    } finally {
+      saveLock.current = false;
+      setSaving(false);
+    }
   };
+
+  const save = (nextPublished: boolean) => persist({ publish: nextPublished });
+
+  // Hỏi khôi phục nháp trên máy (1 lần lúc mở). setTimeout(0): đọc
+  // localStorage chỉ có ở client, tránh setState đồng bộ trong effect.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const draft = readChapterDraft(chapter.id);
+      if (draft && (draft.content !== chapter.content || draft.title !== chapter.title)) setDraftOffer(draft);
+      else if (draft) clearChapterDraft(chapter.id);
+      setDraftChecked(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [chapter.id, chapter.content, chapter.title]);
+
+  // Ghi/xoá nháp trên máy theo thay đổi — chờ xong bước hỏi khôi phục để
+  // không xoá mất bản nháp tác giả chưa kịp chọn.
+  useEffect(() => {
+    if (!draftChecked || draftOffer) return;
+    const timer = setTimeout(() => {
+      if (dirty) writeChapterDraft(chapter.id, { title, content, savedAt: Date.now(), baseVersion: saved.version });
+      else clearChapterDraft(chapter.id);
+    }, LOCAL_DRAFT_MS);
+    return () => clearTimeout(timer);
+  }, [draftChecked, draftOffer, dirty, title, content, saved.version, chapter.id]);
+
+  // Tự lưu lên máy chủ — chỉ chương nháp.
+  useEffect(() => {
+    if (published || !dirty || conflict || draftOffer || saving) return;
+    const timer = setTimeout(() => void persist("autosave"), autosaveError ? AUTOSAVE_RETRY_MS : AUTOSAVE_MS);
+    return () => clearTimeout(timer);
+    // persist đọc state mới nhất qua closure của lần render này.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [published, dirty, conflict, draftOffer, saving, autosaveError, title, content]);
+
+  // Cảnh báo khi đóng/tải lại tab lúc còn thay đổi chưa lên máy chủ.
+  useEffect(() => {
+    if (!dirty && !saving) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty, saving]);
+
+  const restoreDraft = () => {
+    if (!draftOffer) return;
+    setTitle(draftOffer.title);
+    history.set(draftOffer.content, { start: draftOffer.content.length, end: draftOffer.content.length }, "edit");
+    setDraftOffer(null);
+  };
+  const discardDraft = () => {
+    clearChapterDraft(chapter.id);
+    setDraftOffer(null);
+  };
+  const keepMineAfterConflict = () => {
+    if (!conflict) return;
+    const version = conflict.version;
+    // Ghi đè: lưu lại đúng chế độ hiện tại (nháp tự lưu / chương đang đăng bấm Cập nhật).
+    void persist(published ? { publish: true } : "autosave", version);
+  };
+  const useServerAfterConflict = () => {
+    if (!conflict) return;
+    setTitle(conflict.title);
+    // Đi qua lịch sử: tác giả bấm Hoàn tác là lấy lại bản của mình.
+    history.set(conflict.content, { start: 0, end: 0 }, "edit");
+    setSaved(conflict);
+    setConflict(null);
+  };
+
+  const saveStatus: SaveStatus | null = conflict
+    ? { tone: "error", label: "Xung đột phiên bản" }
+    : saving
+      ? { tone: "busy", label: "Đang lưu…" }
+      : autosaveError && dirty
+        ? { tone: "error", label: "Chưa lưu được · đã giữ trên máy" }
+        : dirty && published
+          ? { tone: "warn", label: "Có thay đổi chưa cập nhật" }
+          : dirty
+            ? { tone: "busy", label: "Chưa lưu…" }
+            : savedAt
+              ? { tone: "ok", label: `Đã lưu · ${timeLabel(savedAt)}` }
+              : null;
+
+  const notice = conflict ? (
+    <div role="alert" className="border-b border-error-border bg-error-bg px-4 py-3 text-[13px] leading-[1.6] text-error lg:px-7">
+      <p className="font-semibold">Chương đã được sửa ở tab hoặc thiết bị khác sau khi bạn mở.</p>
+      <p className="text-brand-ink">Chọn bản muốn giữ. Bản của bạn vẫn được lưu trên máy này cho tới khi lưu xong.</p>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <button type="button" onClick={keepMineAfterConflict} disabled={saving}
+          className="min-h-10 rounded-lg bg-brand-navy px-3 font-semibold text-white disabled:opacity-60">
+          Giữ bản của tôi (ghi đè)
+        </button>
+        <button type="button" onClick={useServerAfterConflict} disabled={saving}
+          className="min-h-10 rounded-lg border border-border-light bg-surface px-3 font-semibold text-brand-ink disabled:opacity-60">
+          Dùng bản trên máy chủ (có thể Hoàn tác)
+        </button>
+      </div>
+    </div>
+  ) : draftOffer ? (
+    <div role="status" className="border-b border-cream-border bg-info-bg px-4 py-3 text-[13px] leading-[1.6] text-brand-ink lg:px-7">
+      <p>
+        <span className="font-semibold">Có bản viết chưa lưu trên máy này</span> (lúc {timeLabel(draftOffer.savedAt)}).
+        {draftOffer.baseVersion !== chapter.content_version &&
+          " Bản trên máy chủ đã thay đổi sau thời điểm đó — khôi phục sẽ thay bản hiện tại."}
+      </p>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <button type="button" onClick={restoreDraft}
+          className="min-h-10 rounded-lg bg-brand-navy px-3 font-semibold text-white">
+          Khôi phục bản trên máy
+        </button>
+        <button type="button" onClick={discardDraft}
+          className="min-h-10 rounded-lg border border-border-light bg-surface px-3 font-semibold text-brand-ink">
+          Bỏ bản này
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   // Không optimistic-rollback-lặng-lẽ như handleGenreChange/handleTagsChange
   // — đổi độc quyền có thể bị SERVER chặn (khoá 3 ngày, xem
@@ -194,20 +371,29 @@ export function AuthorWorkspace({
     publishedAt: bookPublishedAt,
   });
 
-  const handleGenreChange = async (nextGenre: BookGenre) => {
-    setGenre(nextGenre);
+  // PATCH 1 trường của truyện; lỗi (mạng hoặc 4xx/5xx) thì báo và trả về false
+  // để nơi gọi hoàn lại giá trị cũ — trước đây lỗi bị nuốt lặng lẽ, giao
+  // diện hiện giá trị chưa hề được lưu.
+  const patchBook = async (body: Record<string, unknown>, failure: string): Promise<boolean> => {
     try {
-      await fetch(`/api/authoring/books/${bookId}`, {
+      const res = await fetch(`/api/authoring/books/${bookId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ genre: nextGenre }),
+        body: JSON.stringify(body),
       });
+      if (res.ok) return true;
+      const data = await res.json().catch(() => null);
+      setError((data && typeof data.error === "string" && data.error) || failure);
     } catch {
-      // Đổi thể loại là thao tác phụ, không chặn luồng viết/lưu chương
-      // nếu lỗi mạng — bỏ qua lặng lẽ, giá trị hiển thị vẫn đổi (optimistic),
-      // lần đổi tiếp theo hoặc F5 sẽ tự đồng bộ lại nếu request này thật
-      // sự thất bại.
+      setError(`${failure} Không kết nối được máy chủ.`);
     }
+    return false;
+  };
+
+  const handleGenreChange = async (nextGenre: BookGenre) => {
+    const previous = genre;
+    setGenre(nextGenre);
+    if (!(await patchBook({ genre: nextGenre }, "Chưa lưu được thể loại."))) setGenre(previous);
   };
 
   const handleBookTitleCommit = async () => {
@@ -244,16 +430,8 @@ export function AuthorWorkspace({
     // rỗng vẫn hợp lệ (bỏ tóm tắt), không cần rollback về giá trị cũ.
     const trimmed = synopsis.trim();
     setSynopsis(trimmed);
-    try {
-      await fetch(`/api/authoring/books/${bookId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ synopsis: trimmed }),
-      });
-    } catch {
-      // Cùng cách xử lý với handleGenreChange — thao tác phụ, không chặn
-      // luồng viết/lưu chương nếu lỗi mạng.
-    }
+    // Giữ nguyên chữ trong ô khi lỗi để tác giả thử lại, không mất nội dung.
+    await patchBook({ synopsis: trimmed }, "Chưa lưu được tóm tắt.");
   };
 
   // Khác genre/tags (lỗi mạng bỏ qua lặng lẽ): nhãn độ tuổi quyết định ai
@@ -284,17 +462,9 @@ export function AuthorWorkspace({
   };
 
   const handleTagsChange = async (nextTags: string[]) => {
+    const previous = tags;
     setTags(nextTags);
-    try {
-      await fetch(`/api/authoring/books/${bookId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tags: nextTags }),
-      });
-    } catch {
-      // Cùng cách xử lý với handleGenreChange — thao tác phụ, không chặn
-      // luồng viết/lưu chương nếu lỗi mạng.
-    }
+    if (!(await patchBook({ tags: nextTags }, "Chưa lưu được thẻ."))) setTags(previous);
   };
 
   return (
@@ -304,8 +474,14 @@ export function AuthorWorkspace({
         title={title}
         onTitleChange={setTitle}
         content={content}
-        onContentChange={setContent}
-        savedAt={savedAt}
+        onContentChange={history.set}
+        onUndo={history.undo}
+        onRedo={history.redo}
+        canUndo={history.canUndo}
+        canRedo={history.canRedo}
+        onSaveShortcut={() => void save(published)}
+        saveStatus={saveStatus}
+        notice={notice}
         isLastChapter={isLastChapter}
         onIsLastChapterToggle={() => setIsLastChapter((v) => !v)}
         isLastChapterLocked={isLastChapterLocked}
@@ -316,7 +492,7 @@ export function AuthorWorkspace({
         chapterId={chapter.id}
         linkedAudio={linkedAudio}
         published={published}
-        saving={saving}
+        saving={saving || conflict !== null}
         error={error}
         onSaveDraft={() => save(false)}
         onPublish={() => save(true)}
@@ -346,6 +522,18 @@ export function AuthorWorkspace({
         onAgeRatingChange={handleAgeRatingChange}
         ageRatingLocked={ageRatingLocked}
         ageRatingError={ageRatingError}
+        chapterBackground={{
+          done: hasBackground,
+          node: (
+            <ChapterBackgroundPanel
+              chapterId={chapter.id}
+              bookSlug={bookSlug}
+              chapterPublished={published}
+              initialUrl={chapter.background_url}
+              onChange={(url) => setHasBackground(url !== null)}
+            />
+          ),
+        }}
         chapterCharacters={{
           done: taggedCount > 0,
           node: (

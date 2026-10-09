@@ -5,6 +5,7 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getBookContestLocks } from "@/lib/contests/author-service";
 import { AuthorWorkspace } from "@/components/author/author-workspace";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
+import { chapterBackgroundUrl } from "@/lib/chapter-background";
 
 export async function generateMetadata({
   params,
@@ -58,7 +59,7 @@ export default async function AuthorChapterPage({
   // sách đã kiểm ngay trên và chương được lọc theo đúng book_id đó.
   const { data: chapter } = await createServiceRoleClient()
     .from("chapters")
-    .select("id, title, content, published, price, audio_url, audio_price, is_last_chapter")
+    .select("id, title, content, published, price, audio_url, audio_price, is_last_chapter, background_image_path, content_version")
     .eq("id", chapterId)
     .eq("book_id", bookId)
     .maybeSingle();
@@ -89,7 +90,7 @@ export default async function AuthorChapterPage({
       bookPublished={book.published}
       bookIsExclusive={book.is_exclusive}
       bookPublishedAt={book.published_at}
-      chapter={chapter}
+      chapter={{ ...chapter, background_url: chapterBackgroundUrl(supabase, chapter.background_image_path) }}
       linkedAudio={linkedAudio}
       bookCharacters={bookCharacters ?? []}
       initialTaggedCharacterIds={(taggedRows ?? []).map((r) => r.character_id)}

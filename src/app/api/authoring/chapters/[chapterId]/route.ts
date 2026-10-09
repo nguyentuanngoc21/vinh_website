@@ -65,6 +65,11 @@ export async function PATCH(
     update.audio_price = Math.round(body.audio_price);
   }
   if (typeof body.is_last_chapter === "boolean") update.is_last_chapter = body.is_last_chapter;
+  // Trình soạn thảo gửi phiên bản nội dung nó đang sửa (chapters.content_version,
+  // migrations/20261009_chapter_content_version.sql) — lệch thì trả 409 kèm bản
+  // trên máy chủ thay vì âm thầm ghi đè (tab khác / thiết bị khác vừa lưu).
+  const expectedVersion =
+    Number.isInteger(body.expected_version) && body.expected_version >= 0 ? (body.expected_version as number) : null;
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Không có gì để cập nhật." }, { status: 400 });
@@ -91,7 +96,7 @@ export async function PATCH(
   // action=restore) mới gỡ được cờ này.
   const { data: currentChapter } = await supabase
     .from("chapters")
-    .select("removed_at, removed_reason_detail, published")
+    .select("removed_at, removed_reason_detail, published, content_version")
     .eq("id", chapterId)
     .maybeSingle();
   // Dùng để phát hiện chiều nháp -> xuất bản THẬT (không phải sửa nội
@@ -158,14 +163,36 @@ export async function PATCH(
     }
   }
 
-  const { data, error } = await supabase
-    .from("chapters")
-    .update(update)
-    .eq("id", chapterId)
+  // Bản trên máy chủ cho hộp thoại xung đột. content bị REVOKE SELECT khỏi
+  // authenticated nên đọc bằng service-role — chỉ sau khi `currentChapter`
+  // (client RLS của chính tác giả) đã xác nhận chương thuộc về họ.
+  const conflictResponse = async () => {
+    const { data: server } = await admin()
+      .from("chapters")
+      .select("title, content, content_version")
+      .eq("id", chapterId)
+      .maybeSingle();
+    return NextResponse.json(
+      {
+        error: "Chương đã được sửa ở nơi khác (tab hoặc thiết bị khác) sau khi bạn mở. Chọn giữ bản nào trước khi lưu tiếp.",
+        conflict: server ? { title: server.title, content: server.content, version: server.content_version } : null,
+      },
+      { status: 409 }
+    );
+  };
+  if (currentChapter && expectedVersion !== null && currentChapter.content_version !== expectedVersion) {
+    return conflictResponse();
+  }
+
+  let query = supabase.from("chapters").update(update).eq("id", chapterId);
+  // Điều kiện trong chính câu UPDATE — chặn cả trường hợp 2 lần lưu chen nhau
+  // giữa bước kiểm tra ở trên và lúc ghi.
+  if (expectedVersion !== null) query = query.eq("content_version", expectedVersion);
+  const { data, error } = await query
     // Không lấy `content` trong RETURNING: anon/authenticated không còn quyền
     // SELECT cột này (migrations/20261002_chapter_content_access.sql). Nội
     // dung vừa lưu được trả lại từ chính request (client đã có sẵn).
-    .select("id, book_id, title, published, price, audio_url, audio_price, is_last_chapter")
+    .select("id, book_id, title, published, price, audio_url, audio_price, is_last_chapter, content_version")
     .maybeSingle();
 
   if (error) {
@@ -184,6 +211,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Lưu thất bại. Vui lòng thử lại." }, { status: 500 });
   }
   if (!data) {
+    if (currentChapter && expectedVersion !== null) return conflictResponse();
     return NextResponse.json(
       { error: "Không tìm thấy chương hoặc bạn không có quyền sửa." },
       { status: 404 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { STORY_ROLE_LABEL, type StoryRole } from "@/lib/characters";
 import { HeartIcon } from "@phosphor-icons/react/dist/ssr";
 import type { CharacterRole } from "@/lib/supabase/types";
+import { CharacterAppearancePopover, loadPublicAppearances } from "./character-appearance-popover";
 
 export type StoryCharacter = {
   id: string;
@@ -72,7 +73,9 @@ export function CharacterList({ characters: initial }: { characters: StoryCharac
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {c.avatar_url && <img src={c.avatar_url} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-10 w-10 rounded-full object-cover" />}
-            <span className="truncate text-[13.5px] font-semibold text-brand-ink">{c.name}</span>
+            <CharacterAppearancePopover label={c.name} load={() => loadPublicAppearances(c.id)}
+              chapterHref={(bookId, chapterId) => `/read/${bookId}/${chapterId}`} bookHref={bookId => `/truyen/${bookId}`}
+              className="text-[13.5px] font-semibold text-brand-ink" />
             <span className="text-xs text-stone-alt">{STORY_ROLE_LABEL[c.story_role]}</span>
             {c.role && <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${ROLE_STYLE[c.role]}`}>
               {ROLE_LABEL[c.role]}

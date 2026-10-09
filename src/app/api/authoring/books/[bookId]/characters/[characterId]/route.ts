@@ -14,13 +14,37 @@ export async function GET(request: Request, { params }: Context) {
   const { data: character, error } = await auth.supabase.from("characters").select("id").eq("id", characterId).eq("book_id", bookId).maybeSingle();
   if (error) return NextResponse.json({ error: "Không tải được nhân vật." }, { status: 500 });
   if (!character) return NextResponse.json({ error: "Không tìm thấy nhân vật." }, { status: 404 });
-  const links = await auth.supabase.from("chapter_characters").select("chapter_id").eq("character_id", characterId);
-  if (links.error) return NextResponse.json({ error: "Không tải được chương." }, { status: 500 });
-  const ids = (links.data ?? []).map(c => c.chapter_id);
-  if (!ids.length) return NextResponse.json({ chapters: [] });
-  const chapters = await auth.supabase.from("chapters").select("id, title, order_index, published").eq("book_id", bookId).in("id", ids).order("order_index");
-  if (chapters.error) return NextResponse.json({ error: "Không tải được chương." }, { status: 500 });
-  return NextResponse.json({ chapters: chapters.data }, { headers: { "Cache-Control": "private, no-store" } });
+  const [links, reviews, bookLinks] = await Promise.all([
+    auth.supabase.from("chapter_characters").select("chapter_id").eq("character_id", characterId),
+    auth.supabase.from("character_chapter_reviews").select("chapter_id, decision").eq("character_id", characterId),
+    auth.supabase.from("character_book_links").select("book_id, appearance").eq("character_id", characterId),
+  ]);
+  if (links.error || reviews.error || bookLinks.error) return NextResponse.json({ error: "Không tải được chương." }, { status: 500 });
+  const ids = [...(links.data ?? []).map(c => c.chapter_id), ...(reviews.data ?? []).map(r => r.chapter_id)];
+  const bookIds = (bookLinks.data ?? []).map(l => l.book_id);
+  const [chapters, books] = await Promise.all([
+    ids.length ? auth.supabase.from("chapters").select("id, book_id, title, order_index, published").in("id", ids).order("order_index")
+      : Promise.resolve({ data: [] as { id: string; book_id: string; title: string; order_index: number; published: boolean }[], error: null }),
+    bookIds.length ? auth.supabase.from("books").select("id, title").in("id", bookIds).is("deleted_at", null)
+      : Promise.resolve({ data: [] as { id: string; title: string }[], error: null }),
+  ]);
+  if (chapters.error || books.error) return NextResponse.json({ error: "Không tải được chương." }, { status: 500 });
+  const decision = new Map((reviews.data ?? []).map(r => [r.chapter_id, r.decision]));
+  const bookTitle = new Map((books.data ?? []).map(b => [b.id, b.title]));
+  const all = chapters.data ?? [];
+  const pick = ({ id, title, order_index, published }: (typeof all)[number]) => ({ id, title, order_index, published });
+  // `chapters` keeps its original meaning (own-book tags) for older clients.
+  return NextResponse.json({
+    chapters: all.filter(c => c.book_id === bookId && !decision.has(c.id)).map(pick),
+    otherBooks: (bookLinks.data ?? []).filter(l => l.appearance !== "dismissed" && bookTitle.has(l.book_id)).map(l => ({
+      id: l.book_id, title: bookTitle.get(l.book_id)!, appearance: l.appearance,
+      chapters: l.appearance === "main" ? all.filter(c => c.book_id === l.book_id && decision.get(c.id) === "confirmed").map(pick) : [],
+    })),
+    dismissed: {
+      chapters: all.filter(c => decision.get(c.id) === "dismissed").map(c => ({ ...pick(c), book_id: c.book_id, book_title: c.book_id === bookId ? null : bookTitle.get(c.book_id) ?? null })),
+      books: (bookLinks.data ?? []).filter(l => l.appearance === "dismissed" && bookTitle.has(l.book_id)).map(l => ({ id: l.book_id, title: bookTitle.get(l.book_id)! })),
+    },
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PATCH(request: Request, { params }: Context) {

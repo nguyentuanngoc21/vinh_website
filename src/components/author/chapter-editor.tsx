@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowSquareOutIcon,
+  ArrowUUpLeftIcon,
+  ArrowUUpRightIcon,
   CaretRightIcon,
   CloudCheckIcon,
+  CloudArrowUpIcon,
+  WarningCircleIcon,
   QuotesIcon,
   MinusIcon,
   TextHTwoIcon,
@@ -13,6 +17,11 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { Button, Checkbox, Field } from "@/components/ui";
 import { isDesignShareLinkShape } from "@/lib/design/share-link";
+import type { ChangeKind, HistoryEntry, Selection } from "@/lib/authoring/text-history";
+
+export type SaveStatus = { tone: "ok" | "busy" | "warn" | "error"; label: string };
+const HEADING_PREFIX = /^#{1,3}\s+/;
+const QUOTE_PREFIX = /^>\s?/;
 
 /**
  * Tìm [start, end) của đúng 1 "block/đoạn" (đơn vị `\n\n`-split, khớp
@@ -43,8 +52,18 @@ type ChapterEditorProps = {
   title: string;
   onTitleChange: (title: string) => void;
   content: string;
-  onContentChange: (content: string) => void;
-  savedAt: Date | null;
+  /** selection = vị trí con trỏ SAU thay đổi (để undo/redo đặt lại);
+   * kind "type" = gõ phím (gộp thành 1 bước undo), "edit" = thao tác khác. */
+  onContentChange: (content: string, selection?: Selection, kind?: ChangeKind) => void;
+  onUndo: () => HistoryEntry | null;
+  onRedo: () => HistoryEntry | null;
+  canUndo: boolean;
+  canRedo: boolean;
+  /** Ctrl/Cmd+S. */
+  onSaveShortcut?: () => void;
+  saveStatus: SaveStatus | null;
+  /** Thông báo phục hồi nháp / xung đột phiên bản, hiện ngay dưới thanh trên cùng. */
+  notice?: ReactNode;
   isLastChapter: boolean;
   onIsLastChapterToggle: () => void;
   /** true nếu chương này đã từng lưu is_last_chapter=true — checkbox
@@ -58,12 +77,15 @@ type ChapterEditorProps = {
 };
 
 /**
- * Toolbar B/I/H2/quote/gạch ngang giờ thao tác THẬT trên đoạn đang chọn
- * trong textarea (bọc/chèn markdown) — trước đây toàn bộ là <div> không
- * onClick. Bỏ 2 nút cũ: "align-left" (không có khái niệm căn lề với
- * content lưu dạng text thuần) và ảnh (cần bucket/route upload riêng,
- * việc khác ngoài phạm vi sửa lần này) — giữ nút giả vờ hoạt động còn tệ
- * hơn không có nút.
+ * Toolbar B/I/H2/quote/ngắt cảnh ghi ký hiệu vào content (text thuần);
+ * trang đọc hiển thị đúng định dạng qua src/lib/reading/chapter-format.ts —
+ * thêm ký hiệu mới thì sửa CẢ hai nơi. Tiêu đề/trích dẫn áp cho cả ĐOẠN
+ * (khối tách bằng dòng trống) vì trang đọc xét định dạng theo đoạn.
+ *
+ * Undo/redo do trình soạn thảo tự giữ (use-text-history.ts): textarea bị
+ * React điều khiển và toolbar ghi đè value nên undo gốc của trình duyệt
+ * không dùng được — Ctrl/Cmd+Z, Ctrl+Shift+Z/Ctrl+Y và lệnh undo của hệ
+ * điều hành (beforeinput historyUndo) đều đi qua lịch sử riêng.
  */
 export function ChapterEditor({
   bookTitle,
@@ -71,7 +93,13 @@ export function ChapterEditor({
   onTitleChange,
   content,
   onContentChange,
-  savedAt,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  onSaveShortcut,
+  saveStatus,
+  notice,
   isLastChapter,
   onIsLastChapterToggle,
   isLastChapterLocked,
@@ -119,31 +147,92 @@ export function ChapterEditor({
     const selected = content.slice(selectionStart, selectionEnd);
     const next =
       content.slice(0, selectionStart) + marker + selected + marker + content.slice(selectionEnd);
-    onContentChange(next);
+    const selection = { start: selectionStart + marker.length, end: selectionStart + marker.length + selected.length };
+    onContentChange(next, selection, "edit");
+    placeCursor(selection);
+  };
+
+  const placeCursor = (selection: Selection) => {
+    const el = textareaRef.current;
+    if (!el) return;
     requestAnimationFrame(() => {
       el.focus();
-      el.setSelectionRange(selectionStart + marker.length, selectionStart + marker.length + selected.length);
+      el.setSelectionRange(selection.start, selection.end);
     });
   };
 
-  const prefixCurrentLine = (prefix: string) => {
+  // Bật/tắt tiêu đề hoặc trích dẫn cho cả đoạn chứa con trỏ.
+  const toggleBlock = (kind: "heading" | "quote") => {
     const el = textareaRef.current;
     if (!el) return;
     const { selectionStart, selectionEnd } = el;
-    const lineStart = content.lastIndexOf("\n", selectionStart - 1) + 1;
-    const next = content.slice(0, lineStart) + prefix + content.slice(lineStart);
-    onContentChange(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(selectionStart + prefix.length, selectionEnd + prefix.length);
-    });
+    const { start, end } = findParagraphRange(content, selectionStart);
+    const block = content.slice(start, end);
+    let nextBlock: string;
+    if (kind === "heading") {
+      nextBlock = HEADING_PREFIX.test(block) ? block.replace(HEADING_PREFIX, "") : `## ${block.replace(/\n+/g, " ")}`;
+    } else {
+      const lines = block.split("\n");
+      const quoted = block.trim() !== "" && lines.filter((l) => l.trim()).every((l) => QUOTE_PREFIX.test(l));
+      nextBlock = lines.map((l) => (quoted ? l.replace(QUOTE_PREFIX, "") : `> ${l}`)).join("\n");
+    }
+    const delta = nextBlock.length - block.length;
+    const shift = (pos: number) => Math.max(start, Math.min(start + nextBlock.length, pos + delta));
+    const selection = { start: shift(selectionStart), end: shift(selectionEnd) };
+    onContentChange(content.slice(0, start) + nextBlock + content.slice(end), selection, "edit");
+    placeCursor(selection);
   };
 
   const insertDivider = () => {
     const el = textareaRef.current;
     const pos = el?.selectionStart ?? content.length;
-    onContentChange(`${content.slice(0, pos)}\n\n---\n\n${content.slice(pos)}`);
+    const selection = { start: pos + 7, end: pos + 7 };
+    onContentChange(`${content.slice(0, pos)}\n\n***\n\n${content.slice(pos)}`, selection, "edit");
+    placeCursor(selection);
   };
+
+  const applyHistory = (entry: HistoryEntry | null) => {
+    if (entry) placeCursor(entry.selection);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const key = e.key.toLowerCase();
+    if (key === "z" && !e.shiftKey) {
+      e.preventDefault();
+      applyHistory(onUndo());
+    } else if ((key === "z" && e.shiftKey) || key === "y") {
+      e.preventDefault();
+      applyHistory(onRedo());
+    } else if (key === "b") {
+      e.preventDefault();
+      wrapSelection("**");
+    } else if (key === "i") {
+      e.preventDefault();
+      wrapSelection("*");
+    } else if (key === "s") {
+      e.preventDefault();
+      onSaveShortcut?.();
+    }
+  };
+
+  // Lệnh "Hoàn tác" của menu trình duyệt / bàn phím ảo không đi qua keydown.
+  const historyHandlers = useRef({ onUndo, onRedo });
+  useEffect(() => {
+    historyHandlers.current = { onUndo, onRedo };
+  });
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const onBeforeInput = (e: InputEvent) => {
+      if (e.inputType !== "historyUndo" && e.inputType !== "historyRedo") return;
+      e.preventDefault();
+      const entry = e.inputType === "historyUndo" ? historyHandlers.current.onUndo() : historyHandlers.current.onRedo();
+      if (entry) requestAnimationFrame(() => el.setSelectionRange(entry.selection.start, entry.selection.end));
+    };
+    el.addEventListener("beforeinput", onBeforeInput);
+    return () => el.removeEventListener("beforeinput", onBeforeInput);
+  }, []);
 
   // "Chèn ảnh thiết kế" — validate link chia sẻ (POST /api/design/resolve-link)
   // TRƯỚC khi chèn, rồi chèn marker `[[thiet-ke:<id>]]`, KHÔNG PHẢI url gốc.
@@ -173,7 +262,9 @@ export function ChapterEditor({
     }
     const el = textareaRef.current;
     const pos = el?.selectionStart ?? content.length;
-    onContentChange(`${content.slice(0, pos)}\n\n[[thiet-ke:${data.designItemId}]]\n\n${content.slice(pos)}`);
+    const inserted = `\n\n[[thiet-ke:${data.designItemId}]]\n\n`;
+    const after = pos + inserted.length;
+    onContentChange(`${content.slice(0, pos)}${inserted}${content.slice(pos)}`, { start: after, end: after }, "edit");
     setImageLinkInput("");
     setImagePromptOpen(false);
   };
@@ -220,7 +311,7 @@ export function ChapterEditor({
           // tiếp content đổi (ví dụ người dùng gõ thêm 1 ký tự rồi xoá).
         }
       }
-      if (changed) onContentChange(nextParagraphs.join("\n\n"));
+      if (changed) onContentChange(nextParagraphs.join("\n\n"), undefined, "edit");
     }, 600);
     return () => clearTimeout(timer);
   }, [content, onContentChange]);
@@ -259,16 +350,16 @@ export function ChapterEditor({
         if (ok && data?.designItemId) {
           const marker = `[[thiet-ke:${data.designItemId}]]`;
           const next = content.slice(0, paragraphStart) + marker + "\n\n" + content.slice(paragraphEnd);
-          onContentChange(next);
           const newPos = paragraphStart + marker.length + 2;
+          onContentChange(next, { start: newPos, end: newPos }, "edit");
           requestAnimationFrame(() => {
             el.focus();
             el.setSelectionRange(newPos, newPos);
           });
         } else {
           const next = content.slice(0, selectionStart) + pasted + content.slice(selectionEnd);
-          onContentChange(next);
           const newPos = selectionStart + pasted.length;
+          onContentChange(next, { start: newPos, end: newPos }, "edit");
           requestAnimationFrame(() => {
             el.focus();
             el.setSelectionRange(newPos, newPos);
@@ -296,14 +387,24 @@ export function ChapterEditor({
               Xem trang truyện <ArrowSquareOutIcon size={13} />
             </Link>
           )}
-          {savedAt && (
-            <span className="flex items-center gap-1">
-              <CloudCheckIcon color="#3B9B6F" /> Đã lưu ·{" "}
-              {savedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+          {saveStatus && (
+            <span
+              role="status"
+              className={`flex items-center gap-1 ${saveStatus.tone === "error" ? "text-error" : saveStatus.tone === "warn" ? "text-brand-gold-dark" : ""}`}
+            >
+              {saveStatus.tone === "ok" ? (
+                <CloudCheckIcon className="text-success-text" />
+              ) : saveStatus.tone === "busy" ? (
+                <CloudArrowUpIcon />
+              ) : (
+                <WarningCircleIcon />
+              )}
+              {saveStatus.label}
             </span>
           )}
         </div>
       </div>
+      {notice}
 
       <div data-editor-scroll className="flex flex-1 flex-col py-6 lg:overflow-y-auto lg:py-9">
         <div className="mx-auto flex w-full max-w-[660px] flex-1 flex-col px-4 lg:px-7">
@@ -328,11 +429,32 @@ export function ChapterEditor({
             </Checkbox>
           </div>
 
-          <div className="sticky top-0 z-[5] mb-5 flex items-center gap-1 border-b border-cream-border bg-surface-warm py-2">
+          <div className="sticky top-0 z-[5] mb-5 flex items-center gap-1 overflow-x-auto border-b border-cream-border bg-surface-warm py-2">
+            <button
+              type="button"
+              onClick={() => applyHistory(onUndo())}
+              disabled={!canUndo}
+              title="Hoàn tác (Ctrl+Z)"
+              aria-label="Hoàn tác"
+              className="min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent"
+            >
+              <ArrowUUpLeftIcon size={17} />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyHistory(onRedo())}
+              disabled={!canRedo}
+              title="Làm lại (Ctrl+Shift+Z)"
+              aria-label="Làm lại"
+              className="min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent"
+            >
+              <ArrowUUpRightIcon size={17} />
+            </button>
+            <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
             <button
               type="button"
               onClick={() => wrapSelection("**")}
-              title="Đậm"
+              title="Đậm (Ctrl+B)"
               className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-bold transition-colors hover:bg-info-bg"
             >
               B
@@ -340,24 +462,24 @@ export function ChapterEditor({
             <button
               type="button"
               onClick={() => wrapSelection("*")}
-              title="Nghiêng"
+              title="Nghiêng (Ctrl+I)"
               className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-medium italic transition-colors hover:bg-info-bg"
             >
               I
             </button>
             <button
               type="button"
-              onClick={() => prefixCurrentLine("## ")}
-              title="Tiêu đề nhỏ"
+              onClick={() => toggleBlock("heading")}
+              title="Tiêu đề nhỏ (cả đoạn)"
               className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
             >
               <TextHTwoIcon size={17} />
             </button>
-            <div className="mx-1.5 h-5 w-px bg-cream-border" />
+            <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
             <button
               type="button"
-              onClick={() => prefixCurrentLine("> ")}
-              title="Trích dẫn"
+              onClick={() => toggleBlock("quote")}
+              title="Trích dẫn (cả đoạn)"
               className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
             >
               <QuotesIcon size={17} />
@@ -365,12 +487,12 @@ export function ChapterEditor({
             <button
               type="button"
               onClick={insertDivider}
-              title="Chèn gạch ngang"
+              title="Chèn ngắt cảnh (***)"
               className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
             >
               <MinusIcon size={17} />
             </button>
-            <div className="mx-1.5 h-5 w-px bg-cream-border" />
+            <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
             <button
               type="button"
               onClick={() => {
@@ -418,7 +540,13 @@ export function ChapterEditor({
             ref={textareaRef}
             className="min-h-[460px] w-full flex-1 resize-none overflow-hidden border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] dark:text-ink outline-none"
             value={content}
-            onChange={(e) => onContentChange(e.target.value)}
+            onChange={(e) => {
+              // Dán / cắt / kéo-thả là 1 bước undo riêng, không gộp với chữ đang gõ.
+              const inputType = (e.nativeEvent as InputEvent).inputType ?? "";
+              const kind = /^(insertFromPaste|insertFromDrop|deleteByCut|deleteByDrag)/.test(inputType) ? "edit" : "type";
+              onContentChange(e.target.value, { start: e.target.selectionStart, end: e.target.selectionEnd }, kind);
+            }}
+            onKeyDown={handleKeyDown}
             onPaste={handleContentPaste}
             placeholder="Bắt đầu viết…"
           />

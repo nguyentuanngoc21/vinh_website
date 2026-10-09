@@ -113,6 +113,8 @@ export type AchievementMetric =
 // characters.role — phân loại rộng, KHÁC characters.trope (free-text, tác
 // giả tự gõ). Xem migrations/archive/20260919_add_characters.sql.
 export type CharacterRole = "hero" | "villain" | "neutral";
+/** Cách nhân vật xuất hiện ở truyện KHÁC của cùng tác giả (character_book_links). */
+export type CharacterBookAppearance = "main" | "cameo" | "dismissed";
 export type CharacterProfile = {
   id: string; name: string; role: CharacterRole; trope: string | null;
   archived_at: string | null; is_public: boolean; show_role: boolean;
@@ -570,6 +572,12 @@ export type Database = {
           // not null = content đã bị rỗng hoá do gỡ/xoá quá 30 ngày — xem
           // migrations/archive/20260908_add_content_purge_retention.sql.
           content_purged_at: string | null;
+          // migrations/20261009_chapter_background_image.sql — path trong bucket
+          // design-images, chỉ ghi qua api/authoring/chapters/[chapterId]/background.
+          background_image_path: string | null;
+          // migrations/20261009_chapter_content_version.sql — trigger tự tăng khi
+          // title/content đổi; client không ghi được (chỉ gửi expected_version).
+          content_version: number;
           created_at: string;
         };
         Insert: {
@@ -577,6 +585,7 @@ export type Database = {
           book_id: string;
           title: string;
           content: string;
+          background_image_path?: string | null;
           order_index: number;
           published?: boolean;
           price?: number;
@@ -605,6 +614,19 @@ export type Database = {
         Row: { chapter_id: string; character_id: string };
         Insert: { chapter_id: string; character_id: string };
         // Không update — chỉ insert (gắn) hoặc delete (gỡ).
+        Update: never;
+        Relationships: [];
+      };
+      // migrations/20261009_character_appearance_reviews.sql — chỉ ghi qua RPC review_character_appearances.
+      character_book_links: {
+        Row: { character_id: string; book_id: string; appearance: CharacterBookAppearance; created_at: string; updated_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      character_chapter_reviews: {
+        Row: { character_id: string; chapter_id: string; decision: "confirmed" | "dismissed"; created_at: string };
+        Insert: never;
         Update: never;
         Relationships: [];
       };
@@ -2569,6 +2591,20 @@ export type Database = {
       set_chapter_characters: {
         Args: { p_chapter_id: string; p_character_ids: string[]; p_expected_character_ids?: string[] };
         Returns: string[];
+      };
+      review_character_appearances: {
+        Args: {
+          p_character_id: string; p_confirm_chapter_ids?: string[]; p_dismiss_chapter_ids?: string[]; p_reset_chapter_ids?: string[];
+          p_main_book_ids?: string[]; p_cameo_book_ids?: string[]; p_dismiss_book_ids?: string[]; p_reset_book_ids?: string[];
+        };
+        Returns: void;
+      };
+      public_character_appearances: {
+        Args: { p_character_id: string };
+        Returns: {
+          book_id: string; book_title: string; appearance: "own" | "main" | "cameo";
+          chapter_id: string | null; chapter_title: string | null; order_index: number | null;
+        }[];
       };
       delete_recent_character: {
         Args: { p_book_id: string; p_character_id: string };

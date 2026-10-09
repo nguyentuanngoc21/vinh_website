@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChapterEditor } from "@/components/author/chapter-editor";
+import { useTextHistory } from "@/components/author/use-text-history";
+import { clearChapterDraft, readChapterDraft, writeChapterDraft, type ChapterDraft } from "@/lib/authoring/chapter-draft";
 import { PublishPanel } from "@/components/author/publish-panel";
 import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
 import type { BookGenre } from "@/lib/supabase/types";
@@ -21,13 +23,20 @@ import type { AgeRating } from "@/lib/age-rating";
  * replace (không push) để nút Back của trình duyệt không quay lại trang
  * rỗng này nữa.
  */
+// Truyện chưa có id — nháp trên máy dùng 1 khoá chung cho "tác phẩm mới".
+const NEW_WORK_DRAFT_ID = "new-work";
+
 export function NewWorkWorkspace() {
   const router = useRouter();
 
   const [bookTitle, setBookTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const history = useTextHistory("");
+  const content = history.value;
+  const [draftOffer, setDraftOffer] = useState<ChapterDraft | null>(null);
+  const [draftChecked, setDraftChecked] = useState(false);
+  const created = useRef(false);
   const [price, setPrice] = useState(0);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioPrice, setAudioPrice] = useState(0);
@@ -93,11 +102,66 @@ export function NewWorkWorkspace() {
       return;
     }
 
+    created.current = true;
+    clearChapterDraft(NEW_WORK_DRAFT_ID);
     router.replace(`/author/${data.bookId}/${data.chapterId}`);
     // Không setSaving(false) ở nhánh thành công — trang điều hướng đi
     // ngay, giữ saving=true để nút không nhấp nháy lại trong khoảnh khắc
     // chuyển trang (cùng lý do useCreateWork cũ đã làm trước khi bị bỏ).
   };
+
+  // Nháp trên máy cho chương đầu tiên (chưa có trên máy chủ) — cùng cơ chế
+  // author-workspace.tsx: hỏi khôi phục 1 lần, rồi ghi theo thay đổi.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const draft = readChapterDraft(NEW_WORK_DRAFT_ID);
+      if (draft && (draft.title || draft.content.trim())) setDraftOffer(draft);
+      setDraftChecked(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const hasText = title.trim() !== "" || content.trim() !== "";
+  useEffect(() => {
+    if (!draftChecked || draftOffer || created.current) return;
+    const timer = setTimeout(() => {
+      if (hasText) writeChapterDraft(NEW_WORK_DRAFT_ID, { title, content, savedAt: Date.now(), baseVersion: 0 });
+      else clearChapterDraft(NEW_WORK_DRAFT_ID);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [draftChecked, draftOffer, hasText, title, content]);
+  useEffect(() => {
+    if (!hasText) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (created.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasText]);
+
+  const notice = draftOffer ? (
+    <div role="status" className="border-b border-cream-border bg-info-bg px-4 py-3 text-[13px] leading-[1.6] text-brand-ink lg:px-7">
+      <p>
+        <span className="font-semibold">Có bản viết chưa lưu trên máy này</span> (lúc{" "}
+        {new Date(draftOffer.savedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}).
+      </p>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <button type="button" className="min-h-10 rounded-lg bg-brand-navy px-3 font-semibold text-white"
+          onClick={() => {
+            setTitle(draftOffer.title);
+            history.set(draftOffer.content, { start: draftOffer.content.length, end: draftOffer.content.length }, "edit");
+            setDraftOffer(null);
+          }}>
+          Khôi phục bản trên máy
+        </button>
+        <button type="button" className="min-h-10 rounded-lg border border-border-light bg-surface px-3 font-semibold text-brand-ink"
+          onClick={() => { clearChapterDraft(NEW_WORK_DRAFT_ID); setDraftOffer(null); }}>
+          Bỏ bản này
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -106,8 +170,14 @@ export function NewWorkWorkspace() {
         title={title}
         onTitleChange={setTitle}
         content={content}
-        onContentChange={setContent}
-        savedAt={null}
+        onContentChange={history.set}
+        onUndo={history.undo}
+        onRedo={history.redo}
+        canUndo={history.canUndo}
+        canRedo={history.canRedo}
+        onSaveShortcut={() => void save(false)}
+        saveStatus={hasText && !draftOffer ? { tone: "warn", label: "Chưa tạo truyện · đã giữ trên máy" } : null}
+        notice={notice}
         isLastChapter={isLastChapter}
         onIsLastChapterToggle={() => setIsLastChapter((v) => !v)}
         isLastChapterLocked={false}

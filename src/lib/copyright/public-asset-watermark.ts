@@ -18,7 +18,7 @@ import { injectPngXmp } from "@/lib/orders/xmp";
  * trường này. Luôn ép ảnh về PNG (giống applyIllustrationWatermark) vì
  * sharp không có API ghi XMP tuỳ ý cho JPEG/WEBP.
  */
-function buildPublicNoAiXmpPacket(rightsHolderLabel: string): string {
+export function buildPublicNoAiXmpPacket(rightsHolderLabel: string): string {
   const rights = `Tác phẩm của ${rightsHolderLabel} trên Vịnh. Không sử dụng để huấn luyện mô hình AI/máy học dưới bất kỳ hình thức nào.`;
   return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">

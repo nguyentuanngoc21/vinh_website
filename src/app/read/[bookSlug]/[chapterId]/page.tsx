@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { chapterBackgroundUrl } from "@/lib/chapter-background";
 import { bookReferenceColumn } from "@/lib/story/book-reference";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
@@ -37,7 +38,7 @@ const loadReadChapter = cache(async (bookSlug: string, chapterId: string) => {
       .maybeSingle(),
     serviceClient
       .from("chapters")
-      .select("id, book_id, title, content, order_index, published, price")
+      .select("id, book_id, title, content, order_index, published, price, background_image_path")
       .eq("id", chapterId)
       .maybeSingle(),
   ]);
@@ -259,6 +260,7 @@ export default async function ReadChapterPage({
         chapterPosition={chapterPosition}
         content={content}
         designImages={designImages}
+        backgroundImageUrl={chapterBackgroundUrl(createServiceRoleClient(), chapter.background_image_path)}
         prevChapterId={prevChapterId}
         nextChapterId={nextChapterId}
         chapters={ordered.map((c, i) => ({ id: c.id, title: c.title, position: i + 1 }))}

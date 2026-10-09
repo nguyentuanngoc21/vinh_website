@@ -49,9 +49,11 @@ type PublishPanelProps = {
   ageRatingError?: string | null;
   /** Mục "Nhân vật trong chương" — chỉ có khi chương đã tồn tại (author-workspace.tsx). */
   chapterCharacters?: { node: ReactNode; done: boolean };
+  /** Ảnh nền chương — tuỳ chọn, panel tự lưu ngay khi tải lên/gỡ. */
+  chapterBackground?: { node: ReactNode; done: boolean };
 };
 
-type SectionId = "info" | "classify" | "characters" | "monetize" | "copyright";
+type SectionId = "info" | "classify" | "characters" | "background" | "monetize" | "copyright";
 
 function ChecklistSection({
   id,
@@ -134,11 +136,13 @@ export function PublishPanel({
   ageRatingLocked = false,
   ageRatingError = null,
   chapterCharacters,
+  chapterBackground,
 }: PublishPanelProps) {
   const [openSections, setOpenSections] = useState<Record<SectionId, boolean>>({
     info: true,
     classify: true,
     characters: true,
+    background: false,
     monetize: false,
     copyright: false,
   });
@@ -248,6 +252,18 @@ export function PublishPanel({
             onToggle={toggleSection}
           >
             {chapterCharacters.node}
+          </ChecklistSection>
+        )}
+
+        {chapterBackground && (
+          <ChecklistSection
+            id="background"
+            title="Ảnh nền chương"
+            done={chapterBackground.done}
+            open={openSections.background}
+            onToggle={toggleSection}
+          >
+            {chapterBackground.node}
           </ChecklistSection>
         )}
 

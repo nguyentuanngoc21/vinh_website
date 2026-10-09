@@ -27,8 +27,9 @@ import { ReadingGate } from "./reading-gate";
 import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
 import { ChapterCommentsSection } from "./chapter-comments-section";
 import { PARAGRAPH_COMMENTS_PANEL_WIDTH } from "@/lib/reading/paragraph-comments";
-import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
+import { textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { splitParagraphAroundDesignImages } from "@/lib/design/share-link";
+import { buildStyledSegments, displayText, parseBlock } from "@/lib/reading/chapter-format";
 import { shareOrCopy } from "@/lib/share";
 import { Alert, VinhMark, useToast } from "@/components/ui";
 import { supportMailto } from "@/lib/support";
@@ -124,7 +125,12 @@ const PARAGRAPHS = [
 
 const READER_PREFS_KEY = "vinh_reader_prefs";
 
-type ReaderPrefs = { fontSize: number; theme: ThemeName; lineHeight: number };
+type ReaderPrefs = { fontSize: number; theme: ThemeName; lineHeight: number; showBackground: boolean };
+
+// Độ phủ màu nền giao diện đọc lên ảnh nền chương — đủ đậm để chữ luôn đọc
+// được; tác giả không chỉnh được. Nền kem khớp bản xem trước ở
+// components/author/chapter-background-panel.tsx.
+const BACKGROUND_SCRIM: Record<ThemeName, number> = { cream: 0.84, sepia: 0.84, dark: 0.82 };
 
 const DEFAULT_LINE_HEIGHT = 2;
 // Độ dài tối đa đoạn trích khi chia sẻ (handleShareExcerpt).
@@ -144,7 +150,9 @@ function getReaderPrefs(): ReaderPrefs | null {
     // giãn dòng) sẽ không có field này, rơi về mặc định thay vì coi cả
     // object là hỏng.
     const lineHeight = typeof parsed.lineHeight === "number" ? parsed.lineHeight : DEFAULT_LINE_HEIGHT;
-    return { fontSize: parsed.fontSize, theme: parsed.theme, lineHeight };
+    // showBackground cũng thêm sau — mặc định bật.
+    const showBackground = parsed.showBackground !== false;
+    return { fontSize: parsed.fontSize, theme: parsed.theme, lineHeight, showBackground };
   } catch {
     return null;
   }
@@ -222,6 +230,9 @@ export type ReaderProps = {
    * "Chèn ảnh thiết kế"). Reader chỉ tra map, không tự gọi API — id không
    * có trong map (ảnh đã xoá/bị gỡ) thì đoạn đó bị bỏ qua, không lỗi. */
   designImages?: Record<string, { imageUrl: string; altText: string | null }>;
+  /** Ảnh nền chương do tác giả tải lên (chapters.background_image_path) —
+   * null thì không có lớp ảnh nền và ẩn công tắc trong panel cài đặt. */
+  backgroundImageUrl?: string | null;
 };
 
 export function Reader({
@@ -253,6 +264,7 @@ export function Reader({
   tropeCandidates = [],
   initialTropeVoteCharacterId = null,
   designImages = {},
+  backgroundImageUrl = null,
 }: ReaderProps) {
   const router = useRouter();
   const toast = useToast();
@@ -260,8 +272,10 @@ export function Reader({
   const [fontSize, setFontSize] = useState(19);
   const [theme, setTheme] = useState<ThemeName>("cream");
   const [lineHeight, setLineHeight] = useState(DEFAULT_LINE_HEIGHT);
+  const [showBackground, setShowBackground] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const c = THEMES[theme];
+  const backgroundOn = !!backgroundImageUrl && showBackground;
 
   // content="" khi accessGate="purchase" (chương VIP chưa mua — page.tsx
   // cắt về rỗng, không có gì để hiện) — "".split("\n\n") vẫn ra [""], sẽ vẽ
@@ -530,7 +544,7 @@ export function Reader({
     if (!bookSlug || !chapterId || typeof window === "undefined") return;
     // Cắt ~300 ký tự (lùi về khoảng trắng gần nhất để không đứt giữa từ) —
     // không để 1 đoạn dài của chương VIP bị chia sẻ nguyên văn.
-    const fullExcerpt = visibleParagraph.trim();
+    const fullExcerpt = displayText(visibleParagraph).trim();
     const cut = fullExcerpt.slice(0, SHARE_EXCERPT_MAX_CHARS);
     const lastSpace = cut.lastIndexOf(" ");
     const excerpt =
@@ -633,6 +647,7 @@ export function Reader({
         setFontSize(prefs.fontSize);
         setTheme(prefs.theme);
         setLineHeight(prefs.lineHeight);
+        setShowBackground(prefs.showBackground);
       } else if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
         setTheme("dark");
       }
@@ -641,8 +656,8 @@ export function Reader({
   }, []);
 
   useEffect(() => {
-    saveReaderPrefs({ fontSize, theme, lineHeight });
-  }, [fontSize, theme, lineHeight]);
+    saveReaderPrefs({ fontSize, theme, lineHeight, showBackground });
+  }, [fontSize, theme, lineHeight, showBackground]);
 
   // Đóng panel cỡ chữ/nền hoặc panel chọn chương bằng phím Esc — cùng với
   // backdrop bấm-ra-ngoài-để-đóng bên dưới, đây là 2 cách đóng ngoài việc
@@ -884,8 +899,21 @@ export function Reader({
       // Mở "Chú thích đoạn văn" trên desktop: chừa chỗ bên phải cho cột bình
       // luận để trang truyện dồn sang trái (không bị che) — điện thoại thì
       // panel đè lên (xem paragraph-comments-panel.tsx).
-      className={`min-h-screen transition-[padding] duration-300 ${commentsOpen ? "lg:pr-[var(--comments-w)]" : ""}`}
+      // isolate: lớp ảnh nền (-z-10, fixed) vẽ trên nền trang nhưng dưới mọi nội dung.
+      className={`min-h-screen transition-[padding] duration-300 ${backgroundOn ? "isolate" : ""} ${commentsOpen ? "lg:pr-[var(--comments-w)]" : ""}`}
     >
+      {backgroundOn && (
+        // Fixed thay vì kéo giãn theo chiều cao cả chương (chương dài vài
+        // trăm nghìn ký tự), và không dùng background-attachment: fixed vì
+        // iOS Safari không hỗ trợ. Thứ tự lớp: ảnh → lớp phủ màu → watermark → chữ.
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url("${backgroundImageUrl}")` }}
+          />
+          <div className="absolute inset-0" style={{ background: c.pageBg, opacity: BACKGROUND_SCRIM[theme] }} />
+        </div>
+      )}
       {/* Bọc header + progress bar + 2 panel nổi trong 1 wrapper sticky
           chung: panel định vị bằng "absolute top-full" thay vì toạ độ px
           cứng (top-[58px] cũ) — tự khớp chiều cao thật của header trên mọi
@@ -1110,6 +1138,19 @@ export function Reader({
                 />
               ))}
             </div>
+            {backgroundImageUrl && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showBackground}
+                onClick={() => setShowBackground((v) => !v)}
+                style={{ borderColor: c.hair, color: c.ink }}
+                className="mt-4 flex min-h-11 w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-[14px] font-semibold"
+              >
+                Ảnh nền của tác giả
+                <span style={{ color: c.inkSoft }} className="text-[13px] font-bold">{showBackground ? "BẬT" : "TẮT"}</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -1301,7 +1342,7 @@ export function Reader({
                         if (part.type === "text") {
                           return part.text ? (
                             <p key={pi} className="whitespace-pre-wrap">
-                              {part.text}
+                              {displayText(part.text)}
                             </p>
                           ) : null;
                         }
@@ -1327,11 +1368,42 @@ export function Reader({
                 }
 
                 const count = commentCounts[i] ?? 0;
-                const segments = buildHighlightSegments(p, highlightsByParagraph.get(i) ?? []);
+                // Định dạng của thanh công cụ trình soạn thảo (**đậm**,
+                // *nghiêng*, ## tiêu đề, > trích dẫn, --- ngắt cảnh) — xem
+                // src/lib/reading/chapter-format.ts. Chỉ số đoạn `i` giữ
+                // nguyên; offset bôi đen tính trên chữ hiển thị (đã bỏ ký hiệu).
+                const block = parseBlock(p);
+                if (block.kind === "divider") {
+                  return (
+                    <div key={i} {...paragraphShellProps(i)}>
+                      <p
+                        ref={(el) => {
+                          paragraphRefs.current[i] = el;
+                        }}
+                        data-paragraph-index={i}
+                        role="separator"
+                        aria-label="Ngắt cảnh"
+                        style={{ color: c.inkSoft }}
+                        className="select-none text-center tracking-[0.6em]"
+                      >
+                        ***
+                      </p>
+                    </div>
+                  );
+                }
+                const segments = buildStyledSegments(block.text, block.ranges, highlightsByParagraph.get(i) ?? []);
+                const blockClass =
+                  block.kind === "heading"
+                    ? "text-[1.2em] font-semibold"
+                    : block.kind === "quote"
+                      ? "whitespace-pre-wrap border-l-[3px] pl-4 italic"
+                      : "";
                 return (
                   <div key={i} {...paragraphShellProps(i)}>
                     {renderCommentPill(i)}
                     <p
+                      className={blockClass || undefined}
+                      style={block.kind === "quote" ? { borderColor: c.hair } : block.kind === "heading" ? { color: c.ink } : undefined}
                       ref={(el) => {
                         paragraphRefs.current[i] = el;
                       }}
@@ -1350,8 +1422,12 @@ export function Reader({
                           xoá luôn (đơn giản, không cần menu xác nhận cho
                           1 ghi chú cá nhân). Xem
                           src/lib/reading/highlights.ts. */}
-                      {segments.map((seg, si) =>
-                        seg.highlightId ? (
+                      {segments.map((seg, si) => {
+                        const styled = seg.bold && seg.italic ? <strong><em>{seg.text}</em></strong>
+                          : seg.bold ? <strong>{seg.text}</strong>
+                          : seg.italic ? <em>{seg.text}</em>
+                          : seg.text;
+                        return seg.highlightId ? (
                           <mark
                             key={si}
                             onClick={(e) => {
@@ -1362,12 +1438,12 @@ export function Reader({
                             style={{ background: "rgba(233,192,116,.45)", color: "inherit" }}
                             className="cursor-pointer rounded-[2px]"
                           >
-                            {seg.text}
+                            {styled}
                           </mark>
                         ) : (
-                          <span key={si}>{seg.text}</span>
-                        )
-                      )}
+                          <span key={si}>{styled}</span>
+                        );
+                      })}
                       {renderCommentCount(i, count)}
                     </p>
                   </div>

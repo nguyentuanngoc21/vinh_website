@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Field } from "@/components/ui";
 import { CharacterForm, type CharacterDraft } from "./character-form";
+import { CharacterAppearanceDetails, CharacterScanPanel, loadAuthorAppearances, saveReview, toPopoverBooks, type AuthorAppearances } from "./character-scan";
+import { CharacterAppearancePopover } from "@/components/story/character-appearance-popover";
 import { DELETE_WINDOW_MS, ROLE_LABEL, STORY_ROLE_LABEL, type CharacterProfile } from "@/lib/characters";
+import type { ScanResult } from "@/lib/authoring/character-scan";
 
 export type ManagedCharacter = CharacterProfile;
-type Appearance = { id: string; title: string; order_index: number; published: boolean };
 
 export function CharacterManager({ bookId, initialCharacters }: { bookId: string; initialCharacters: ManagedCharacter[] }) {
   const [characters, setCharacters] = useState(initialCharacters);
@@ -20,8 +21,9 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
   const [filter, setFilter] = useState("active");
   const [role, setRole] = useState("all");
   const [sort, setSort] = useState("created");
-  const [appearances, setAppearances] = useState<Record<string, Appearance[]>>({});
+  const [appearances, setAppearances] = useState<Record<string, AuthorAppearances>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [scan, setScan] = useState<{ id: string; result: ScanResult } | null>(null);
   // Client clock only decides whether to offer the button; the RPC enforces the window.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -64,10 +66,32 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
     if (lock.current) return;
     lock.current = true; setBusy(true); setError(null);
     try {
-      const res = await fetch(url(id)); const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Không tải được chương.");
-      setAppearances(prev => ({ ...prev, [id]: data.chapters })); setExpanded(id);
+      const data = await loadAuthorAppearances(bookId, id);
+      setAppearances(prev => ({ ...prev, [id]: data })); setExpanded(id);
     } catch (e) { setError(e instanceof Error ? e.message : "Không tải được chương."); }
+    finally { lock.current = false; setBusy(false); }
+  };
+  // Reload after a review so the expanded list and the hover popover stay current.
+  const refreshAppearances = async (id: string) => {
+    try { const data = await loadAuthorAppearances(bookId, id); setAppearances(prev => ({ ...prev, [id]: data })); }
+    catch { setAppearances(prev => { const next = { ...prev }; delete next[id]; return next; }); }
+  };
+  const runScan = async (c: ManagedCharacter) => {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setError(null); setStatus(""); setScan(null);
+    try {
+      const res = await fetch(`${url(c.id)}/scan`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ownBook) throw new Error(data?.error || "Không quét được truyện.");
+      setScan({ id: c.id, result: data });
+    } catch (e) { setError(e instanceof Error ? e.message : "Không kết nối được máy chủ."); }
+    finally { lock.current = false; setBusy(false); }
+  };
+  const resetReview = async (id: string, review: Parameters<typeof saveReview>[2], message: string) => {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setError(null); setStatus("");
+    try { await saveReview(bookId, id, review); await refreshAppearances(id); setStatus(message); }
+    catch (e) { setError(e instanceof Error ? e.message : "Không kết nối được máy chủ."); }
     finally { lock.current = false; setBusy(false); }
   };
   const shown = characters.filter(c => {
@@ -103,7 +127,11 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
       <div className="flex items-start gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {c.avatar_url && <img src={c.avatar_url} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-12 w-12 rounded-full object-cover" />}
-        <div className="min-w-0"><h3 className="break-words font-semibold">{c.name}</h3><p className="text-xs text-stone-alt">{STORY_ROLE_LABEL[c.story_role]} · {ROLE_LABEL[c.role]} · {c.archived_at ? "Đã lưu trữ" : c.is_public ? "Công khai" : "Riêng tư"}{!c.show_role && " · Ẩn chính/phản diện"}</p>
+        <div className="min-w-0"><h3 className="break-words font-semibold">
+          <CharacterAppearancePopover label={c.name} chapterHref={(b, ch) => `/author/${b}/${ch}`}
+            books={appearances[c.id] && toPopoverBooks(bookId, appearances[c.id])}
+            load={async () => { const data = await loadAuthorAppearances(bookId, c.id); setAppearances(prev => ({ ...prev, [c.id]: data })); return toPopoverBooks(bookId, data); }} />
+        </h3><p className="text-xs text-stone-alt">{STORY_ROLE_LABEL[c.story_role]} · {ROLE_LABEL[c.role]} · {c.archived_at ? "Đã lưu trữ" : c.is_public ? "Công khai" : "Riêng tư"}{!c.show_role && " · Ẩn chính/phản diện"}</p>
           {c.aliases && <p className="text-sm">Tên khác: {c.aliases}</p>}{c.trope && <p className="text-sm">Mẫu hình: {c.trope}</p>}</div>
       </div>
       {c.description && <p className="mt-2 whitespace-pre-wrap break-words text-sm">{c.description}</p>}
@@ -116,14 +144,15 @@ export function CharacterManager({ bookId, initialCharacters }: { bookId: string
         }} className="disabled:opacity-50">{c.archived_at ? "Khôi phục" : "Lưu trữ"}</button>
         {minutesLeft(c) > 0 && <button type="button" disabled={busy || editing !== null} onClick={() => remove(c)}
           className="text-error disabled:opacity-50">Xoá (còn {minutesLeft(c)} phút)</button>}
-        <button type="button" disabled={busy} aria-expanded={expanded === c.id} onClick={() => loadAppearances(c.id)} className="disabled:opacity-50">{appearances[c.id] ? `${appearances[c.id].length} chương xuất hiện` : "Xem chương xuất hiện"}</button>
+        <button type="button" disabled={busy} aria-expanded={expanded === c.id} onClick={() => loadAppearances(c.id)} className="disabled:opacity-50">{appearances[c.id] ? `${appearances[c.id].chapters.length} chương xuất hiện` : "Xem chương xuất hiện"}</button>
+        {!c.archived_at && <button type="button" disabled={busy || editing !== null} onClick={() => runScan(c)}
+          className="font-semibold text-brand-gold-dark disabled:opacity-50">Nhận diện nhân vật</button>}
       </div>
-      {expanded === c.id && <div className="mt-3 border-t pt-3 text-sm">
-        {!appearances[c.id]?.length ? <p>Chưa gắn vào chương nào.</p> : <>
-          <p className="mb-2 text-stone-alt">{appearances[c.id].length} chương · Đầu: {appearances[c.id][0].title} · Cuối: {appearances[c.id].at(-1)?.title}</p>
-          <ul className="flex flex-col gap-2">{appearances[c.id].map(ch => <li key={ch.id}><Link href={`/author/${bookId}/${ch.id}`} className="text-brand-gold-dark underline">{ch.title || "Chương chưa đặt tên"}</Link>{!ch.published && " (Nháp)"}</li>)}</ul>
-        </>}
-      </div>}
+      {scan?.id === c.id && <CharacterScanPanel bookId={bookId} characterId={c.id} characterName={c.name} result={scan.result}
+        onClose={() => setScan(null)}
+        onSaved={async message => { setScan(null); setStatus(message); await refreshAppearances(c.id); setExpanded(c.id); }} />}
+      {expanded === c.id && appearances[c.id] && <CharacterAppearanceDetails bookId={bookId} characterId={c.id} data={appearances[c.id]} busy={busy}
+        onReset={(review, message) => resetReview(c.id, review, message)} />}
     </article>)}</div>
   </section>;
 }

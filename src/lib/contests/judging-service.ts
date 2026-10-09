@@ -10,6 +10,7 @@
  * Mọi hàm nhận service-role client; route đã xác thực admin / người dùng.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { displayText, parseBlock } from "@/lib/reading/chapter-format";
 import type { ContestStatus, Database, JudgeScorecardStatus } from "@/lib/supabase/types";
 import { getContestBySlug } from "@/lib/contests/contest-service";
 import { ContestError, throwIfError } from "@/lib/contests/errors";
@@ -406,7 +407,9 @@ export async function getJudgeEntry(
       .from("contest_submission_snapshot_chapters").select("title, content").eq("snapshot_id", snap.id)
       .order("order_index").range(target.index - 1, target.index - 1).maybeSingle();
     throwIfError(rowError, "load snapshot chapter");
-    if (row) chapter = { index: target.index, title: row.title, paragraphs: row.content.split("\n\n").filter((p) => p.trim() !== "") };
+    if (row) chapter = { index: target.index, title: row.title, paragraphs: row.content.split("\n\n").filter((p) => p.trim() !== "")
+      // Bỏ ký hiệu định dạng của trình soạn thảo (xem src/lib/reading/chapter-format.ts).
+      .map((p) => (parseBlock(p).kind === "divider" ? "***" : displayText(p))) };
   }
 
   const { data: card, error: cardError } = await client
