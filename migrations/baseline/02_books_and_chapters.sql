@@ -10,13 +10,13 @@
 --     books, chapters, character_follows, character_trope_votes,
 --     chapter_moderation_actions, book_moderation_actions,
 --     book_exclusivity_events, character_book_links,
---     character_chapter_reviews
+--     character_chapter_reviews, story_terms
 --   Hàm:
 --     increment_book_view_count, set_book_published_at,
 --     reorder_book_chapters, log_book_exclusivity_event,
 --     admin_set_book_exclusive, review_character_appearances,
 --     public_character_appearances, check_chapter_background_path,
---     bump_chapter_content_version
+--     bump_chapter_content_version, touch_story_term
 --
 -- Gộp từ migration (migrations/archive/):
 --   20260819_add_book_genre.sql, 20260820_add_chapter_price.sql,
@@ -34,6 +34,7 @@
 --   + migrations/20261009_character_appearance_reviews.sql
 --   + migrations/20261009_chapter_background_image.sql
 --   + migrations/20261009_chapter_content_version.sql
+--   + migrations/20261009_story_terms.sql
 --
 -- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql
 -- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
@@ -1028,4 +1029,45 @@ end $$;
 drop trigger if exists chapter_content_version_bump on public.chapters;
 create trigger chapter_content_version_bump before insert or update on public.chapters
 for each row execute function public.bump_chapter_content_version();
+
+
+-- Story terms (editor quick insert): 20261009_story_terms.sql
+
+create table if not exists public.story_terms (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  kind text not null default 'other' check (kind in ('place', 'item', 'skill', 'organization', 'other')),
+  name text not null check (char_length(btrim(name)) between 1 and 60),
+  aliases text check (char_length(aliases) <= 200),
+  description text check (char_length(description) <= 2000),
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (book_id, name)
+);
+create index if not exists story_terms_book_id_idx on public.story_terms (book_id);
+
+alter table public.story_terms enable row level security;
+drop policy if exists "authors manage terms in their own books" on public.story_terms;
+create policy "authors manage terms in their own books" on public.story_terms for all
+  using (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid() and b.deleted_at is null))
+  with check (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid() and b.deleted_at is null));
+
+revoke all on public.story_terms from anon;
+revoke truncate, references, trigger on public.story_terms from public, authenticated;
+grant select, insert, delete on public.story_terms to authenticated;
+-- A term never moves to another book; only these columns are editable.
+revoke update on public.story_terms from authenticated;
+grant update (kind, name, aliases, description, pinned) on public.story_terms to authenticated;
+grant all on public.story_terms to service_role;
+
+create or replace function public.touch_story_term() returns trigger
+language plpgsql set search_path = public, pg_temp as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+drop trigger if exists story_terms_touch on public.story_terms;
+create trigger story_terms_touch before update on public.story_terms
+for each row execute function public.touch_story_term();
 

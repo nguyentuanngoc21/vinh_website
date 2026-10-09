@@ -6,6 +6,7 @@ import { getBookContestLocks } from "@/lib/contests/author-service";
 import { AuthorWorkspace } from "@/components/author/author-workspace";
 import { getChapterAudio } from "@/lib/audio/get-chapter-audio";
 import { chapterBackgroundUrl } from "@/lib/chapter-background";
+import { TERM_FIELDS } from "@/lib/story-terms";
 
 export async function generateMetadata({
   params,
@@ -68,12 +69,13 @@ export default async function AuthorChapterPage({
     notFound();
   }
 
-  const [linkedAudio, { data: bookCharacters }, { data: taggedRows }, contestLock] = await Promise.all([
+  const [linkedAudio, { data: bookCharacters }, { data: taggedRows }, contestLock, { data: storyTerms }] = await Promise.all([
     getChapterAudio(supabase, chapter.id),
     supabase.from("characters").select(CHARACTER_FIELDS).eq("book_id", bookId).order("created_at", { ascending: true }),
     supabase.from("chapter_characters").select("character_id").eq("chapter_id", chapterId),
     // D8 / D11 — cùng điều kiện với 2 trigger trong DB (DB vẫn là chốt chặn thật).
     getBookContestLocks(createServiceRoleClient(), bookId),
+    supabase.from("story_terms").select(TERM_FIELDS).eq("book_id", bookId).order("created_at", { ascending: true }),
   ]);
 
   return (
@@ -93,6 +95,7 @@ export default async function AuthorChapterPage({
       chapter={{ ...chapter, background_url: chapterBackgroundUrl(supabase, chapter.background_image_path) }}
       linkedAudio={linkedAudio}
       bookCharacters={bookCharacters ?? []}
+      storyTerms={storyTerms ?? []}
       initialTaggedCharacterIds={(taggedRows ?? []).map((r) => r.character_id)}
       contestLock={contestLock}
     />

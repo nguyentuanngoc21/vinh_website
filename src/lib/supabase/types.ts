@@ -115,6 +115,10 @@ export type AchievementMetric =
 export type CharacterRole = "hero" | "villain" | "neutral";
 /** Cách nhân vật xuất hiện ở truyện KHÁC của cùng tác giả (character_book_links). */
 export type CharacterBookAppearance = "main" | "cameo" | "dismissed";
+export type StoryTermKind = "place" | "item" | "skill" | "organization" | "other";
+export type StoryTerm = {
+  id: string; kind: StoryTermKind; name: string; aliases: string | null; description: string | null; pinned: boolean;
+};
 export type CharacterProfile = {
   id: string; name: string; role: CharacterRole; trope: string | null;
   archived_at: string | null; is_public: boolean; show_role: boolean;
@@ -615,6 +619,48 @@ export type Database = {
         Insert: { chapter_id: string; character_id: string };
         // Không update — chỉ insert (gắn) hoặc delete (gỡ).
         Update: never;
+        Relationships: [];
+      };
+      // migrations/20261009_content_flag_terms.sql — admin sửa trong Supabase; chỉ service-role đọc.
+      content_flag_terms: {
+        Row: { id: string; term: string; note: string | null; active: boolean; created_at: string };
+        Insert: { id?: string; term: string; note?: string | null; active?: boolean };
+        Update: { term?: string; note?: string | null; active?: boolean };
+        Relationships: [];
+      };
+      // migrations/20261009_chapter_notes.sql — ghi chú/dàn ý riêng của tác giả cho 1 chương.
+      chapter_notes: {
+        Row: { chapter_id: string; notes: string; updated_at: string };
+        Insert: { chapter_id: string; notes: string; updated_at?: string };
+        Update: { notes?: string; updated_at?: string };
+        Relationships: [];
+      };
+      // migrations/20261009_chapter_versions.sql — chỉ trigger ghi, chỉ service-role đọc (như chapters.content).
+      chapter_versions: {
+        Row: { id: string; chapter_id: string; title: string; content: string; word_count: number; content_version: number; created_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // migrations/20261009_author_daily_words.sql — mục tiêu viết mỗi ngày (không thưởng token).
+      author_writing_goals: {
+        Row: { user_id: string; daily_words: number; updated_at: string };
+        Insert: { user_id: string; daily_words: number; updated_at?: string };
+        Update: { daily_words?: number; updated_at?: string };
+        Relationships: [];
+      };
+      // Chỉ trigger record_chapter_words ghi; tác giả đọc dòng của mình.
+      author_daily_words: {
+        Row: { user_id: string; day: string; words: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // migrations/20261009_story_terms.sql — địa danh/vật phẩm/… cho "Nhập nhanh"; chỉ tác giả (RLS).
+      story_terms: {
+        Row: StoryTerm & { book_id: string; created_at: string; updated_at: string };
+        Insert: { id?: string; book_id: string; name: string } & Partial<Omit<StoryTerm, "id" | "name">>;
+        Update: Partial<Omit<StoryTerm, "id">>;
         Relationships: [];
       };
       // migrations/20261009_character_appearance_reviews.sql — chỉ ghi qua RPC review_character_appearances.

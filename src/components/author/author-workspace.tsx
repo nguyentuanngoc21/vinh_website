@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChapterEditor, type SaveStatus } from "@/components/author/chapter-editor";
 import { useTextHistory } from "@/components/author/use-text-history";
 import { clearChapterDraft, readChapterDraft, writeChapterDraft, type ChapterDraft } from "@/lib/authoring/chapter-draft";
+import { TermManagerModal, type QuickAddKind } from "@/components/author/quick-insert";
+import { useWritingGoal } from "@/components/author/writing-goal-card";
+import { Button, Modal } from "@/components/ui";
+import type { FlagMatch } from "@/lib/authoring/flag-terms";
+import { buildQuickItems, bumpQuickUsage, readQuickUsage, type QuickUsage, type StoryTerm } from "@/lib/story-terms";
 import { PublishPanel } from "@/components/author/publish-panel";
 import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
 import { ChapterCharactersPanel } from "@/components/author/chapter-characters-panel";
 import { ChapterBackgroundPanel } from "@/components/author/chapter-background-panel";
+import { ChapterNotesPanel } from "@/components/author/chapter-notes-panel";
 import type { ManagedCharacter } from "@/components/author/character-manager";
 import { isExclusivityLocked } from "@/lib/authoring/exclusivity-lock";
 import type { BookGenre } from "@/lib/supabase/types";
@@ -59,6 +65,8 @@ type AuthorWorkspaceProps = {
   chapter: WorkspaceChapter;
   linkedAudio: AudioTrack[];
   bookCharacters: ManagedCharacter[];
+  /** Địa danh / vật phẩm / … cho "Nhập nhanh" (story_terms). */
+  storyTerms: StoryTerm[];
   initialTaggedCharacterIds: string[];
   /** Truyện đang dự thi: khoá giá chương (D8) / tắt độc quyền (D11). */
   contestLock?: { prices: string | null; exclusive: string | null };
@@ -96,6 +104,7 @@ export function AuthorWorkspace({
   chapter,
   linkedAudio,
   bookCharacters,
+  storyTerms,
   initialTaggedCharacterIds,
   contestLock,
 }: AuthorWorkspaceProps) {
@@ -119,7 +128,19 @@ export function AuthorWorkspace({
   const [draftChecked, setDraftChecked] = useState(false);
   const [autosaveError, setAutosaveError] = useState(false);
   const saveLock = useRef(false);
+  // "Nhập nhanh" — tên mới thêm từ trình soạn thảo cập nhật ngay danh sách chip.
+  const [quickCharacters, setQuickCharacters] = useState(bookCharacters);
+  const [terms, setTerms] = useState(storyTerms);
+  const [usage, setUsage] = useState<QuickUsage>({});
+  const [termManagerOpen, setTermManagerOpen] = useState(false);
+  const writingGoal = useWritingGoal();
+  const notebookProps = useMemo(
+    () => ({ characters: quickCharacters, terms, onManageTerms: () => setTermManagerOpen(true) }),
+    [quickCharacters, terms]
+  );
+  const quickItems = useMemo(() => buildQuickItems(quickCharacters, terms, usage), [quickCharacters, terms, usage]);
   const [hasBackground, setHasBackground] = useState(chapter.background_url !== null);
+  const [hasNotes, setHasNotes] = useState(false);
   const [published, setPublished] = useState(chapter.published);
   const [price, setPrice] = useState(chapter.price);
   const [audioUrl, setAudioUrl] = useState(chapter.audio_url ?? "");
@@ -202,6 +223,8 @@ export function AuthorWorkspace({
       }
 
       setSaved({ ...sent, version: typeof data?.content_version === "number" ? data.content_version : expected });
+      // Số chữ hôm nay do trigger DB cộng lúc lưu — tải lại để dòng mục tiêu cập nhật.
+      if (sent.content !== saved.content) void writingGoal.refresh();
       setAutosaveError(false);
       setConflict(null);
       setSavedAt(new Date());
@@ -216,7 +239,56 @@ export function AuthorWorkspace({
     }
   };
 
-  const save = (nextPublished: boolean) => persist({ publish: nextPublished });
+  // Trước khi xuất bản/cập nhật: cảnh báo (KHÔNG chặn) nếu chương có từ trong
+  // danh sách content_flag_terms admin quản lý. Lỗi mạng → bỏ qua, vẫn lưu.
+  const [flagWarning, setFlagWarning] = useState<FlagMatch[] | null>(null);
+  const save = async (nextPublished: boolean) => {
+    if (nextPublished && !saveLock.current) {
+      try {
+        const res = await fetch("/api/authoring/flag-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, content }),
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && Array.isArray(data?.matches) && data.matches.length) {
+          setFlagWarning(data.matches);
+          return;
+        }
+      } catch {
+        // Chỉ là cảnh báo — không để lỗi kiểm tra chặn việc xuất bản.
+      }
+    }
+    return persist({ publish: nextPublished });
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => setUsage(readQuickUsage(bookId)), 0);
+    return () => clearTimeout(timer);
+  }, [bookId]);
+
+  // Thêm nhanh từ trình soạn thảo: nhân vật → bảng characters (riêng tư, sửa
+  // đầy đủ ở trang truyện); loại khác → story_terms. Trả về lỗi để hiện tại chỗ.
+  const addQuickName = async (rawName: string, kind: QuickAddKind): Promise<string | null> => {
+    const name = rawName.normalize("NFC").trim().replace(/\s+/g, " ");
+    if (!name) return "Vui lòng nhập tên.";
+    if (quickItems.some((i) => i.text === name)) return "Tên này đã có trong nhập nhanh.";
+    const url = kind === "character" ? `/api/authoring/books/${bookId}/characters` : `/api/authoring/books/${bookId}/terms`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(kind === "character" ? { name } : { name, kind }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return (data && typeof data.error === "string" && data.error) || "Không thêm được.";
+      if (kind === "character") setQuickCharacters((prev) => [...prev, data.character]);
+      else setTerms((prev) => [...prev, data.term]);
+      return null;
+    } catch {
+      return "Không kết nối được máy chủ.";
+    }
+  };
 
   // Hỏi khôi phục nháp trên máy (1 lần lúc mở). setTimeout(0): đọc
   // localStorage chỉ có ở client, tránh setState đồng bộ trong effect.
@@ -482,6 +554,16 @@ export function AuthorWorkspace({
         onSaveShortcut={() => void save(published)}
         saveStatus={saveStatus}
         notice={notice}
+        quickItems={quickItems}
+        dailyGoal={{ summary: writingGoal.summary, setGoal: writingGoal.setGoal }}
+        chapterId={chapter.id}
+        bookId={bookId}
+        notebook={notebookProps}
+        quickInsert={{
+          onAdd: addQuickName,
+          onManage: () => setTermManagerOpen(true),
+          onUsed: (item) => setUsage(bumpQuickUsage(bookId, item.key)),
+        }}
         isLastChapter={isLastChapter}
         onIsLastChapterToggle={() => setIsLastChapter((v) => !v)}
         isLastChapterLocked={isLastChapterLocked}
@@ -522,6 +604,10 @@ export function AuthorWorkspace({
         onAgeRatingChange={handleAgeRatingChange}
         ageRatingLocked={ageRatingLocked}
         ageRatingError={ageRatingError}
+        chapterNotes={{
+          done: hasNotes,
+          node: <ChapterNotesPanel chapterId={chapter.id} onHasNotes={setHasNotes} />,
+        }}
         chapterBackground={{
           done: hasBackground,
           node: (
@@ -546,6 +632,35 @@ export function AuthorWorkspace({
             />
           ),
         }}
+      />
+      <Modal open={flagWarning !== null} onClose={() => setFlagWarning(null)} panelClassName="max-w-[480px] p-6">
+        <h2 className="text-lg font-bold text-brand-ink">Có từ cần xem lại</h2>
+        <p className="mt-1 text-[13.5px] leading-[1.6] text-stone-dark">
+          Chương có các từ trong danh sách cần cân nhắc của Vịnh. Đây chỉ là nhắc nhở — bạn vẫn có thể {published ? "cập nhật" : "xuất bản"}.
+          Dùng Ctrl+F trong trình soạn thảo để tìm từng chỗ.
+        </p>
+        <ul className="mt-3 flex max-h-[40vh] flex-col gap-1.5 overflow-y-auto text-[13.5px]">
+          {flagWarning?.map((m) => (
+            <li key={m.term} className="rounded-md bg-cream-card px-3 py-2">
+              <span className="font-semibold text-brand-ink">{m.term}</span>
+              <span className="text-stone-alt"> · {m.count} chỗ</span>
+              {m.note && <p className="text-[12.5px] text-stone-dark">{m.note}</p>}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
+          <Button size="sm" fullWidth={false} className="min-h-10" onClick={() => { setFlagWarning(null); void persist({ publish: true }); }}>
+            Vẫn {published ? "cập nhật" : "xuất bản"}
+          </Button>
+          <Button size="sm" variant="ghost" fullWidth={false} className="min-h-10" onClick={() => setFlagWarning(null)}>Xem lại</Button>
+        </div>
+      </Modal>
+      <TermManagerModal
+        open={termManagerOpen}
+        onClose={() => setTermManagerOpen(false)}
+        bookId={bookId}
+        terms={terms}
+        onChange={setTerms}
       />
       {missingAgreementIds && (
         <RequiredAgreementsModal

@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowSquareOutIcon,
+  ArrowsInIcon,
+  ArrowsOutIcon,
+  BookOpenTextIcon,
+  ClockCounterClockwiseIcon,
+  SlidersHorizontalIcon,
+  TextAaIcon,
+  KeyboardIcon,
+  MagicWandIcon,
+  MagnifyingGlassIcon,
   ArrowUUpLeftIcon,
   ArrowUUpRightIcon,
   CaretRightIcon,
@@ -18,6 +27,43 @@ import {
 import { Button, Checkbox, Field } from "@/components/ui";
 import { isDesignShareLinkShape } from "@/lib/design/share-link";
 import type { ChangeKind, HistoryEntry, Selection } from "@/lib/authoring/text-history";
+import { suggestAt, type QuickItem, type Suggestion } from "@/lib/story-terms";
+import { QuickInsertBar, type QuickAddKind } from "@/components/author/quick-insert";
+import {
+  FindReplacePanel, INITIAL_FIND, ShortcutHelp, TidyPanel, ToolbarCustomizer, WordGoal, type FindState,
+} from "@/components/author/editor-tools";
+import { findMatches, replaceMatches } from "@/lib/authoring/find-replace";
+import { tidyChapterText } from "@/lib/authoring/tidy-text";
+import {
+  DEFAULT_TOOLBAR, readToolbarPrefs, TOOLBAR_ITEMS, TOOLBAR_LABEL, visibleItems, writeToolbarPrefs,
+  type ToolbarItemId, type ToolbarPrefs,
+} from "@/lib/authoring/toolbar-prefs";
+import type { WritingGoalSummary } from "@/lib/authoring/writing-goal";
+import { namesFrom, type NameIssue } from "@/lib/authoring/name-check";
+import type { StoryTerm } from "@/lib/story-terms";
+import type { ManagedCharacter } from "@/components/author/character-manager";
+import { NameCheckPanel, StoryNotebook, VersionHistoryModal } from "@/components/author/story-notebook";
+
+const countWords = (text: string) => (text.trim().match(/\S+/g) ?? []).length;
+
+/** Khoảng cách từ mép trên textarea tới dòng chứa vị trí `index` (đo bằng 1 bản sao ẩn). */
+function caretOffsetTop(el: HTMLTextAreaElement, index: number) {
+  const cs = getComputedStyle(el);
+  const mirror = document.createElement("div");
+  const copy = ["fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "wordSpacing", "paddingTop",
+    "paddingLeft", "paddingRight", "borderTopWidth", "borderLeftWidth", "borderRightWidth", "boxSizing"] as const;
+  for (const prop of copy) mirror.style[prop] = cs[prop];
+  Object.assign(mirror.style, { position: "absolute", visibility: "hidden", top: "0", left: "-9999px",
+    whiteSpace: "pre-wrap", overflowWrap: "break-word", width: `${el.offsetWidth}px` });
+  mirror.textContent = el.value.slice(0, index);
+  const marker = document.createElement("span");
+  marker.textContent = "\u200b";
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+  const top = marker.offsetTop;
+  mirror.remove();
+  return top;
+}
 
 export type SaveStatus = { tone: "ok" | "busy" | "warn" | "error"; label: string };
 const HEADING_PREFIX = /^#{1,3}\s+/;
@@ -64,6 +110,21 @@ type ChapterEditorProps = {
   saveStatus: SaveStatus | null;
   /** Thông báo phục hồi nháp / xung đột phiên bản, hiện ngay dưới thanh trên cùng. */
   notice?: ReactNode;
+  /** Có ở trang sửa chương (không có ở màn tạo truyện mới): lịch sử phiên bản, kiểm tra cả truyện. */
+  chapterId?: string;
+  bookId?: string;
+  /** Sổ tay truyện + nguồn tên cho "Kiểm tra tên riêng". */
+  notebook?: { characters: ManagedCharacter[]; terms: StoryTerm[]; onManageTerms: () => void };
+  /** Mục tiêu viết mỗi ngày (không truyền ở màn tạo truyện mới). */
+  dailyGoal?: { summary: WritingGoalSummary | null; setGoal: (n: number | null) => Promise<boolean> };
+  /** "Nhập nhanh": tên nhân vật + địa danh/thuật ngữ (src/lib/story-terms.ts). */
+  quickItems?: QuickItem[];
+  /** Không truyền ở màn tạo truyện mới — chưa có truyện để lưu tên. */
+  quickInsert?: {
+    onAdd: (name: string, kind: QuickAddKind) => Promise<string | null>;
+    onManage: () => void;
+    onUsed: (item: QuickItem) => void;
+  };
   isLastChapter: boolean;
   onIsLastChapterToggle: () => void;
   /** true nếu chương này đã từng lưu is_last_chapter=true — checkbox
@@ -100,6 +161,12 @@ export function ChapterEditor({
   onSaveShortcut,
   saveStatus,
   notice,
+  quickItems = [],
+  quickInsert,
+  dailyGoal,
+  chapterId,
+  bookId,
+  notebook,
   isLastChapter,
   onIsLastChapterToggle,
   isLastChapterLocked,
@@ -136,9 +203,54 @@ export function ChapterEditor({
     return () => window.removeEventListener("resize", fit);
   }, [content]);
 
-  const words = (content.trim().match(/\S+/g) ?? []).length;
-  const wordCount = words.toLocaleString("vi-VN");
+  const words = countWords(content);
   const readMin = Math.max(1, Math.round(words / 200));
+  const [startWords] = useState(() => countWords(content));
+
+  // Công cụ phụ dưới thanh toolbar: tìm/thay thế, chỉnh định dạng, phím tắt.
+  const [tool, setTool] = useState<null | "find" | "tidy" | "keys" | "names" | "toolbar">(null);
+  const [toolbarPrefs, setToolbarPrefs] = useState<ToolbarPrefs>(DEFAULT_TOOLBAR);
+  useEffect(() => {
+    const timer = setTimeout(() => setToolbarPrefs(readToolbarPrefs()), 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const [toolNotice, setToolNotice] = useState<string | null>(null);
+  const [notebookOpen, setNotebookOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const names = useMemo(() => (notebook ? namesFrom(notebook.characters, notebook.terms) : []), [notebook]);
+  const [find, setFind] = useState<FindState>(INITIAL_FIND);
+  const [findMessage, setFindMessage] = useState<string | null>(null);
+  const matches = useMemo(
+    () => (tool === "find" && find.query ? findMatches(content, find.query, find.options) : []),
+    [tool, find.query, find.options, content]
+  );
+  const current = matches.length ? Math.min(find.current, matches.length - 1) : 0;
+  const currentMarkRef = useRef<HTMLElement | null>(null);
+  // Cuộn tới kết quả khi đổi kết quả/từ khoá — không theo từng phím gõ trong bài.
+  const hasMatches = matches.length > 0;
+  useEffect(() => {
+    if (tool === "find" && hasMatches) currentMarkRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [tool, current, hasMatches, find.query, find.options]);
+
+  // Chế độ tập trung: phủ toàn màn hình, ẩn panel bên, dòng đang gõ ở giữa.
+  const [focusMode, setFocusMode] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusMode) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [focusMode]);
+  useEffect(() => {
+    const el = textareaRef.current, scroller = scrollerRef.current;
+    if (!focusMode || !el || !scroller || document.activeElement !== el) return;
+    const frame = requestAnimationFrame(() => {
+      const caretY = el.getBoundingClientRect().top + caretOffsetTop(el, el.selectionStart);
+      const target = scroller.getBoundingClientRect().top + scroller.clientHeight * 0.45;
+      scroller.scrollTop += caretY - target;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [content, focusMode]);
 
   const wrapSelection = (marker: string) => {
     const el = textareaRef.current;
@@ -195,7 +307,113 @@ export function ChapterEditor({
     if (entry) placeCursor(entry.selection);
   };
 
+  // Chèn tại con trỏ (thay vùng đang chọn); có `close` thì bọc vùng chọn.
+  const insertAtCursor = (open: string, close = "") => {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? content.length;
+    const end = el?.selectionEnd ?? start;
+    const selected = close ? content.slice(start, end) : "";
+    const caretAt = start + open.length + selected.length;
+    const selection = close && selected ? { start: start + open.length, end: caretAt } : { start: caretAt, end: caretAt };
+    onContentChange(content.slice(0, start) + open + selected + close + content.slice(end), selection, "edit");
+    placeCursor(selection);
+  };
+  const insertQuickItem = (item: QuickItem) => {
+    insertAtCursor(item.text);
+    quickInsert?.onUsed(item);
+  };
+
+  // Gợi ý tên theo chữ ngay trước con trỏ; Esc ẩn cho tới lần sửa tiếp theo.
+  const [caret, setCaret] = useState<number | null>(null);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const suggestions = useMemo(
+    () => (caret === null || dismissedFor === content ? [] : suggestAt(content, caret, quickItems)),
+    [caret, content, quickItems, dismissedFor]
+  );
+  const trackCaret = (el: HTMLTextAreaElement) => setCaret(el.selectionStart === el.selectionEnd ? el.selectionStart : null);
+  const acceptSuggestion = (s: Suggestion) => {
+    if (caret === null) return;
+    const after = s.replaceFrom + s.item.text.length;
+    onContentChange(content.slice(0, s.replaceFrom) + s.item.text + content.slice(caret), { start: after, end: after }, "edit");
+    setCaret(after);
+    placeCursor({ start: after, end: after });
+    quickInsert?.onUsed(s.item);
+  };
+
+  const openFind = (withReplace: boolean) => {
+    const el = textareaRef.current;
+    const selected = el ? content.slice(el.selectionStart, el.selectionEnd) : "";
+    setFind((f) => ({
+      ...f,
+      query: selected && selected.length <= 100 && !selected.includes("\n") ? selected : f.query,
+      showReplace: withReplace || f.showReplace,
+      current: 0,
+    }));
+    setFindMessage(null);
+    setTool("find");
+  };
+  const closeTool = () => {
+    const m = tool === "find" ? matches[current] : undefined;
+    setTool(null);
+    if (m) placeCursor({ start: m.start, end: m.end });
+    else textareaRef.current?.focus();
+  };
+  const replaceCurrent = () => {
+    const m = matches[current];
+    if (!m) return;
+    const end = m.start + find.replacement.length;
+    onContentChange(content.slice(0, m.start) + find.replacement + content.slice(m.end), { start: m.start, end }, "edit");
+    setFindMessage(null);
+  };
+  const replaceAll = () => {
+    if (!matches.length) return;
+    onContentChange(replaceMatches(content, matches, find.replacement), { start: 0, end: 0 }, "edit");
+    setFindMessage(`Đã thay ${matches.length.toLocaleString("vi-VN")} chỗ. Bấm Hoàn tác nếu muốn trả lại.`);
+  };
+  // "Xem" ở kiểm tra tên: mở Tìm với đúng cách viết sai, khớp chính xác.
+  const showNameIssue = (issue: NameIssue) => {
+    setFind((f) => ({
+      ...f, query: issue.found, current: 0, showReplace: true, replacement: issue.expected,
+      options: { matchCase: true, matchDiacritics: true, wholeWord: true },
+    }));
+    setFindMessage(null);
+    setTool("find");
+  };
+  const applyTidy = (linesAsParagraphs: boolean) => {
+    const result = tidyChapterText(content, { linesAsParagraphs });
+    if (!result.changed) return "Văn bản đã gọn, không có gì cần chỉnh.";
+    onContentChange(result.text, { start: 0, end: 0 }, "edit");
+    return "Đã chỉnh. Bấm Hoàn tác nếu muốn trả lại.";
+  };
+  // Phím tắt cấp trình soạn thảo — chỉ khi con trỏ đang trong khung soạn
+  // thảo, nên Ctrl+F ở chỗ khác trên trang vẫn là tìm của trình duyệt.
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+    const key = e.key.toLowerCase();
+    if (mod && key === "f" && e.shiftKey) {
+      e.preventDefault();
+      setFocusMode((v) => !v);
+    } else if (mod && (key === "f" || key === "h") && !e.shiftKey) {
+      e.preventDefault();
+      openFind(key === "h");
+    } else if (e.key === "Escape" && !e.defaultPrevented && focusMode && tool === null) {
+      setFocusMode(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggestions.length && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === "Tab" && !e.shiftKey) {
+        e.preventDefault();
+        acceptSuggestion(suggestions[0]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setDismissedFor(content);
+        return;
+      }
+    }
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const key = e.key.toLowerCase();
     if (key === "z" && !e.shiftKey) {
@@ -368,8 +586,44 @@ export function ChapterEditor({
       });
   };
 
+  // Các nút của thanh công cụ — thứ tự/ẩn hiện theo tuỳ chỉnh của tác giả (toolbar-prefs.ts).
+  type ToolItem = { title: string; icon: ReactNode; onClick: () => void; disabled?: boolean; pressed?: boolean; className?: string };
+  const toolbarItems: Partial<Record<ToolbarItemId, ToolItem>> = {
+    undo: { title: "Hoàn tác (Ctrl+Z)", icon: <ArrowUUpLeftIcon size={17} />, onClick: () => applyHistory(onUndo()), disabled: !canUndo },
+    redo: { title: "Làm lại (Ctrl+Shift+Z)", icon: <ArrowUUpRightIcon size={17} />, onClick: () => applyHistory(onRedo()), disabled: !canRedo },
+    bold: { title: "Đậm (Ctrl+B)", icon: "B", onClick: () => wrapSelection("**"), className: "font-[family-name:var(--font-lora)] text-[15px] font-bold" },
+    italic: { title: "Nghiêng (Ctrl+I)", icon: "I", onClick: () => wrapSelection("*"), className: "font-[family-name:var(--font-lora)] text-[15px] font-medium italic" },
+    heading: { title: "Tiêu đề nhỏ (cả đoạn)", icon: <TextHTwoIcon size={17} />, onClick: () => toggleBlock("heading") },
+    quote: { title: "Trích dẫn (cả đoạn)", icon: <QuotesIcon size={17} />, onClick: () => toggleBlock("quote") },
+    divider: { title: "Chèn ngắt cảnh (***)", icon: <MinusIcon size={17} />, onClick: insertDivider },
+    image: {
+      title: "Chèn ảnh thiết kế", icon: <ImageSquareIcon size={17} />, pressed: imagePromptOpen,
+      onClick: () => { setImagePromptOpen((cur) => !cur); setImageLinkError(null); },
+    },
+    find: { title: "Tìm và thay thế (Ctrl+F / Ctrl+H)", icon: <MagnifyingGlassIcon size={17} />, pressed: tool === "find", onClick: () => (tool === "find" ? closeTool() : openFind(false)) },
+    tidy: { title: "Chỉnh định dạng", icon: <MagicWandIcon size={17} />, pressed: tool === "tidy", onClick: () => setTool((t) => (t === "tidy" ? null : "tidy")) },
+    ...(notebook ? {
+      notebook: { title: "Sổ tay truyện: nhân vật, địa danh, thuật ngữ", icon: <BookOpenTextIcon size={17} />, onClick: () => setNotebookOpen(true) },
+      names: {
+        title: "Kiểm tra tên riêng viết lệch", icon: <TextAaIcon size={17} />, pressed: tool === "names",
+        onClick: () => { setToolNotice(null); setTool((t) => (t === "names" ? null : "names")); },
+      },
+    } : {}),
+    ...(chapterId ? { history: { title: "Lịch sử phiên bản", icon: <ClockCounterClockwiseIcon size={17} />, onClick: () => setHistoryOpen(true) } } : {}),
+    keys: { title: "Phím tắt", icon: <KeyboardIcon size={17} />, pressed: tool === "keys", onClick: () => setTool((t) => (t === "keys" ? null : "keys")) },
+  };
+  const availableToolbar = TOOLBAR_ITEMS.filter((id) => toolbarItems[id]);
+  const visibleToolbar = visibleItems(toolbarPrefs, availableToolbar);
+
   return (
-    <div className="flex flex-col bg-surface-warm lg:overflow-hidden">
+    <div
+      onKeyDown={handleEditorKeyDown}
+      className={
+        focusMode
+          ? "fixed inset-0 z-[80] flex flex-col overflow-hidden bg-surface-warm"
+          : "flex flex-col bg-surface-warm lg:overflow-hidden"
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cream-border bg-surface-warm px-4 py-3.5 lg:px-7">
         <div className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-stone-alt">
           <span className="truncate">{bookTitle}</span>
@@ -377,7 +631,16 @@ export function ChapterEditor({
           <span className="truncate font-semibold text-brand-ink">{title || "Chương mới"}</span>
         </div>
         <div className="flex shrink-0 items-center gap-3.5 text-[13px] font-medium text-stone-alt">
-          {bookPublished && (
+          <button
+            type="button"
+            onClick={() => setFocusMode((v) => !v)}
+            title={focusMode ? "Thoát chế độ tập trung (Esc)" : "Chế độ tập trung (Ctrl+Shift+F)"}
+            className="flex min-h-9 items-center gap-1 text-brand-ink transition-colors hover:text-brand-gold-dark"
+          >
+            {focusMode ? <ArrowsInIcon size={14} /> : <ArrowsOutIcon size={14} />}
+            {focusMode ? "Thoát tập trung" : "Tập trung"}
+          </button>
+          {bookPublished && !focusMode && (
             <Link
               href={`/truyen/${bookSlug}`}
               target="_blank"
@@ -406,104 +669,123 @@ export function ChapterEditor({
       </div>
       {notice}
 
-      <div data-editor-scroll className="flex flex-1 flex-col py-6 lg:overflow-y-auto lg:py-9">
+      <div
+        ref={scrollerRef}
+        data-editor-scroll
+        className={focusMode ? "flex min-h-0 flex-1 flex-col overflow-y-auto py-8 lg:py-12" : "flex flex-1 flex-col py-6 lg:overflow-y-auto lg:py-9"}
+      >
         <div className="mx-auto flex w-full max-w-[660px] flex-1 flex-col px-4 lg:px-7">
           <Field
             label={null}
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Tên chương"
+            lang="vi"
+            spellCheck
             // className ghép qua cn() (tailwind-merge) nên p-0/text-[32px] đè được padding/cỡ chữ gốc của Field
             className="mb-1.5 border-none bg-transparent p-0 font-[family-name:var(--font-lora)] text-[32px] font-semibold text-brand-ink outline-none"
           />
-          <div className="mb-[22px] flex items-center gap-3.5 text-[13px] text-stone-alt">
-            <span>{wordCount} chữ</span>
+          <div className="mb-[22px] flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-stone-alt">
+            <WordGoal words={words} sessionWords={words - startWords} daily={dailyGoal} />
             <span>·</span>
             <span>~{readMin} phút đọc</span>
           </div>
 
-          <div className={`mb-[22px] ${isLastChapterLocked ? "opacity-60" : ""}`}>
+          <div className={`mb-[22px] ${isLastChapterLocked ? "opacity-60" : ""} ${focusMode ? "hidden" : ""}`}>
             <Checkbox checked={isLastChapter} onChange={isLastChapterLocked ? () => {} : onIsLastChapterToggle}>
               Đây là chương cuối cùng của truyện
               {isLastChapterLocked && <span className="ml-1 text-stone-alt">(không thể bỏ chọn sau khi lưu)</span>}
             </Checkbox>
           </div>
 
-          <div className="sticky top-0 z-[5] mb-5 flex items-center gap-1 overflow-x-auto border-b border-cream-border bg-surface-warm py-2">
-            <button
-              type="button"
-              onClick={() => applyHistory(onUndo())}
-              disabled={!canUndo}
-              title="Hoàn tác (Ctrl+Z)"
-              aria-label="Hoàn tác"
-              className="min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent"
-            >
-              <ArrowUUpLeftIcon size={17} />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyHistory(onRedo())}
-              disabled={!canRedo}
-              title="Làm lại (Ctrl+Shift+Z)"
-              aria-label="Làm lại"
-              className="min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent"
-            >
-              <ArrowUUpRightIcon size={17} />
-            </button>
+          <div className="sticky top-0 z-[5] mb-5 bg-surface-warm">
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-cream-border py-2">
+            {visibleToolbar.map((id) => {
+              const item = toolbarItems[id]!;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={item.onClick}
+                  disabled={item.disabled}
+                  aria-pressed={item.pressed}
+                  title={item.title}
+                  aria-label={TOOLBAR_LABEL[id]}
+                  className={`min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg aria-pressed:bg-info-bg disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent ${item.className ?? ""}`}
+                >
+                  {item.icon}
+                </button>
+              );
+            })}
             <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
             <button
               type="button"
-              onClick={() => wrapSelection("**")}
-              title="Đậm (Ctrl+B)"
-              className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-bold transition-colors hover:bg-info-bg"
+              onClick={() => setTool((t) => (t === "toolbar" ? null : "toolbar"))}
+              aria-pressed={tool === "toolbar"}
+              title="Tuỳ chỉnh thanh công cụ"
+              aria-label="Tuỳ chỉnh thanh công cụ"
+              className="min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg aria-pressed:bg-info-bg"
             >
-              B
+              <SlidersHorizontalIcon size={17} />
             </button>
-            <button
-              type="button"
-              onClick={() => wrapSelection("*")}
-              title="Nghiêng (Ctrl+I)"
-              className="cursor-pointer rounded-md px-2.5 py-1.5 font-[family-name:var(--font-lora)] text-[15px] font-medium italic transition-colors hover:bg-info-bg"
-            >
-              I
-            </button>
-            <button
-              type="button"
-              onClick={() => toggleBlock("heading")}
-              title="Tiêu đề nhỏ (cả đoạn)"
-              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
-            >
-              <TextHTwoIcon size={17} />
-            </button>
-            <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
-            <button
-              type="button"
-              onClick={() => toggleBlock("quote")}
-              title="Trích dẫn (cả đoạn)"
-              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
-            >
-              <QuotesIcon size={17} />
-            </button>
-            <button
-              type="button"
-              onClick={insertDivider}
-              title="Chèn ngắt cảnh (***)"
-              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
-            >
-              <MinusIcon size={17} />
-            </button>
-            <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
-            <button
-              type="button"
-              onClick={() => {
-                setImagePromptOpen((cur) => !cur);
-                setImageLinkError(null);
+          </div>
+          {tool === "toolbar" && (
+            <ToolbarCustomizer
+              prefs={toolbarPrefs}
+              available={availableToolbar}
+              onChange={(next) => {
+                setToolbarPrefs(next);
+                writeToolbarPrefs(next);
               }}
-              title="Chèn ảnh thiết kế"
-              className="cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg"
-            >
-              <ImageSquareIcon size={17} />
-            </button>
+              onClose={closeTool}
+            />
+          )}
+          {tool === "find" && (
+            <FindReplacePanel
+              state={{ ...find, current }}
+              onChange={(next) => {
+                setFind(next);
+                setFindMessage(null);
+              }}
+              matches={matches}
+              onGo={(index) => setFind((f) => ({ ...f, current: index }))}
+              onReplace={replaceCurrent}
+              onReplaceAll={replaceAll}
+              onClose={closeTool}
+              message={findMessage}
+            />
+          )}
+          {tool === "tidy" && <TidyPanel onApply={applyTidy} onClose={closeTool} />}
+          {tool === "keys" && <ShortcutHelp onClose={closeTool} />}
+          {tool === "names" && (
+            <NameCheckPanel
+              content={content}
+              names={names}
+              bookId={bookId}
+              chapterId={chapterId}
+              onApply={(next, message) => {
+                onContentChange(next, { start: 0, end: 0 }, "edit");
+                setToolNotice(message);
+              }}
+              onShow={showNameIssue}
+              onClose={closeTool}
+            />
+          )}
+          {tool === "names" && toolNotice && <p role="status" className="mb-2 text-[13px] text-stone-alt">{toolNotice}</p>}
+          <QuickInsertBar
+            items={quickItems}
+            suggestions={suggestions}
+            onInsert={insertQuickItem}
+            onPunctuation={insertAtCursor}
+            onAcceptSuggestion={acceptSuggestion}
+            canAdd={!!quickInsert}
+            onAdd={quickInsert?.onAdd ?? (async () => null)}
+            onManage={quickInsert?.onManage ?? (() => {})}
+            getSelectedText={() => {
+              const el = textareaRef.current;
+              return el ? content.slice(el.selectionStart, el.selectionEnd) : "";
+            }}
+          />
           </div>
 
           {imagePromptOpen && (
@@ -536,22 +818,76 @@ export function ChapterEditor({
             </div>
           )}
 
+          <div className="relative flex flex-1 flex-col">
+          {/* Lớp tô kết quả tìm: cùng font/độ rộng/xuống dòng với textarea
+              (nền trong suốt) nên các <mark> nằm đúng dưới chữ. */}
+          {tool === "find" && matches.length > 0 && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-transparent"
+            >
+              {matches.map((m, i) => (
+                <span key={m.start}>
+                  {content.slice(i === 0 ? 0 : matches[i - 1].end, m.start)}
+                  <mark
+                    ref={i === current ? (el) => { currentMarkRef.current = el; } : undefined}
+                    className={`rounded-[2px] text-transparent ${i === current ? "bg-brand-gold" : "bg-brand-gold/35"}`}
+                  >
+                    {content.slice(m.start, m.end)}
+                  </mark>
+                </span>
+              ))}
+              {content.slice(matches[matches.length - 1].end)}
+              {"\u200b"}
+            </div>
+          )}
           <textarea
             ref={textareaRef}
-            className="min-h-[460px] w-full flex-1 resize-none overflow-hidden border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] dark:text-ink outline-none"
+            className="relative min-h-[460px] w-full flex-1 resize-none overflow-hidden border-none bg-transparent font-[family-name:var(--font-lora)] text-lg leading-[1.95] text-[#2b2925] dark:text-ink outline-none"
             value={content}
             onChange={(e) => {
               // Dán / cắt / kéo-thả là 1 bước undo riêng, không gộp với chữ đang gõ.
               const inputType = (e.nativeEvent as InputEvent).inputType ?? "";
               const kind = /^(insertFromPaste|insertFromDrop|deleteByCut|deleteByDrag)/.test(inputType) ? "edit" : "type";
               onContentChange(e.target.value, { start: e.target.selectionStart, end: e.target.selectionEnd }, kind);
+              trackCaret(e.target);
             }}
             onKeyDown={handleKeyDown}
+            onSelect={(e) => trackCaret(e.currentTarget)}
+            onBlur={() => setCaret(null)}
             onPaste={handleContentPaste}
+            // Chính tả: dùng kiểm tra có sẵn của trình duyệt / bàn phím điện thoại (tiếng Việt).
+            spellCheck
+            lang="vi"
             placeholder="Bắt đầu viết…"
           />
+          </div>
         </div>
       </div>
+      {notebook && bookId && (
+        <StoryNotebook
+          open={notebookOpen}
+          onClose={() => setNotebookOpen(false)}
+          bookId={bookId}
+          characters={notebook.characters}
+          terms={notebook.terms}
+          onInsert={(text) => insertAtCursor(text)}
+          onManageTerms={() => { setNotebookOpen(false); notebook.onManageTerms(); }}
+        />
+      )}
+      {chapterId && (
+        <VersionHistoryModal
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          chapterId={chapterId}
+          currentTitle={title}
+          currentContent={content}
+          onRestore={(restoredTitle, restoredContent) => {
+            onTitleChange(restoredTitle);
+            onContentChange(restoredContent, { start: 0, end: 0 }, "edit");
+          }}
+        />
+      )}
     </div>
   );
 }

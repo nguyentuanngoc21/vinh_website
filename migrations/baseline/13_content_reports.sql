@@ -27,4 +27,18 @@ alter table public.content_reports enable row level security;
 -- and check the current admin role. Reporter identity is never public.
 revoke all on public.content_reports from public, anon, authenticated;
 grant select, insert, update on public.content_reports to service_role;
+
+-- Content flag terms (warn before publishing): 20261009_content_flag_terms.sql
+create table if not exists public.content_flag_terms (
+  id uuid primary key default gen_random_uuid(),
+  term text not null unique check (char_length(btrim(term)) between 1 and 100),
+  -- Shown to the author next to the match, e.g. "Cân nhắc dán nhãn 18+".
+  note text check (char_length(note) <= 300),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table public.content_flag_terms enable row level security;
+revoke all on public.content_flag_terms from public, anon, authenticated;
+grant all on public.content_flag_terms to service_role;
 commit;

@@ -521,13 +521,13 @@ grant execute on function public.admin_set_user_role(uuid, uuid, public.user_rol
 --     books, chapters, character_follows, character_trope_votes,
 --     chapter_moderation_actions, book_moderation_actions,
 --     book_exclusivity_events, character_book_links,
---     character_chapter_reviews
+--     character_chapter_reviews, story_terms
 --   Hàm:
 --     increment_book_view_count, set_book_published_at,
 --     reorder_book_chapters, log_book_exclusivity_event,
 --     admin_set_book_exclusive, review_character_appearances,
 --     public_character_appearances, check_chapter_background_path,
---     bump_chapter_content_version
+--     bump_chapter_content_version, touch_story_term
 --
 -- Gộp từ migration (migrations/archive/):
 --   20260819_add_book_genre.sql, 20260820_add_chapter_price.sql,
@@ -545,6 +545,7 @@ grant execute on function public.admin_set_user_role(uuid, uuid, public.user_rol
 --   + migrations/20261009_character_appearance_reviews.sql
 --   + migrations/20261009_chapter_background_image.sql
 --   + migrations/20261009_chapter_content_version.sql
+--   + migrations/20261009_story_terms.sql
 --
 -- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql
 -- Chỉ dùng cho project MỚI, TRỐNG — xem migrations/baseline/README.md.
@@ -1539,6 +1540,47 @@ end $$;
 drop trigger if exists chapter_content_version_bump on public.chapters;
 create trigger chapter_content_version_bump before insert or update on public.chapters
 for each row execute function public.bump_chapter_content_version();
+
+
+-- Story terms (editor quick insert): 20261009_story_terms.sql
+
+create table if not exists public.story_terms (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books (id) on delete cascade,
+  kind text not null default 'other' check (kind in ('place', 'item', 'skill', 'organization', 'other')),
+  name text not null check (char_length(btrim(name)) between 1 and 60),
+  aliases text check (char_length(aliases) <= 200),
+  description text check (char_length(description) <= 2000),
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (book_id, name)
+);
+create index if not exists story_terms_book_id_idx on public.story_terms (book_id);
+
+alter table public.story_terms enable row level security;
+drop policy if exists "authors manage terms in their own books" on public.story_terms;
+create policy "authors manage terms in their own books" on public.story_terms for all
+  using (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid() and b.deleted_at is null))
+  with check (exists (select 1 from public.books b where b.id = book_id and b.author_id = auth.uid() and b.deleted_at is null));
+
+revoke all on public.story_terms from anon;
+revoke truncate, references, trigger on public.story_terms from public, authenticated;
+grant select, insert, delete on public.story_terms to authenticated;
+-- A term never moves to another book; only these columns are editable.
+revoke update on public.story_terms from authenticated;
+grant update (kind, name, aliases, description, pinned) on public.story_terms to authenticated;
+grant all on public.story_terms to service_role;
+
+create or replace function public.touch_story_term() returns trigger
+language plpgsql set search_path = public, pg_temp as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+drop trigger if exists story_terms_touch on public.story_terms;
+create trigger story_terms_touch before update on public.story_terms
+for each row execute function public.touch_story_term();
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/03_reading.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -2780,13 +2822,15 @@ create index if not exists purchase_transactions_chapter_idx
 --     task_templates, user_daily_tasks, quest_examples_pool, hidden_quests,
 --     user_hidden_quest_progress, quest_reset_events, streak_milestones,
 --     user_streak_milestone_claims, user_quest_pool, quest_generation_jobs,
---     achievement_templates, user_achievements
+--     achievement_templates, user_achievements, author_writing_goals,
+--     author_daily_words, chapter_word_marks, chapter_versions
 --   Hàm:
 --     increment_task_progress, set_task_progress, claim_daily_task,
 --     complete_hidden_quest, enforce_quest_streak_authority,
 --     claim_streak_milestone, sync_reading_streak,
 --     rescue_streak_with_tokens, create_quest_pool_for_today,
---     reset_quest_pool_slot, sync_user_achievements
+--     reset_quest_pool_slot, sync_user_achievements, chapter_word_count,
+--     record_chapter_words, snapshot_chapter_version
 --   Thêm cột vào bảng của file trước:
 --     profiles.{current_quest_streak, streak_updated_at,
 --     streak_rest_days_banked, streak_at_risk_since}
@@ -2813,6 +2857,8 @@ create index if not exists purchase_transactions_chapter_idx
 --   20260919_add_characters.sql,
 --   20260919_add_reading_behavior_achievements.sql,
 --   20260927_add_contest_quests.sql
+--   + migrations/20261009_author_daily_words.sql
+--   + migrations/20261009_chapter_versions.sql
 --
 -- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
 --   02_books_and_chapters.sql, 03_reading.sql, 04_wallet_and_payments.sql
@@ -3984,6 +4030,135 @@ $$ language plpgsql security definer;
 
 revoke execute on function public.sync_user_achievements from public, anon, authenticated;
 grant execute on function public.sync_user_achievements to service_role;
+
+-- Daily writing goal (author words per day): 20261009_author_daily_words.sql
+
+create table if not exists public.author_writing_goals (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  daily_words integer not null check (daily_words between 50 and 50000),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.author_daily_words (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  day date not null default current_date,
+  words integer not null default 0 check (words >= 0),
+  primary key (user_id, day)
+);
+
+create table if not exists public.chapter_word_marks (
+  chapter_id uuid primary key references public.chapters (id) on delete cascade,
+  max_words integer not null check (max_words >= 0)
+);
+
+alter table public.author_writing_goals enable row level security;
+alter table public.author_daily_words enable row level security;
+alter table public.chapter_word_marks enable row level security;
+
+drop policy if exists "users manage their own writing goal" on public.author_writing_goals;
+create policy "users manage their own writing goal" on public.author_writing_goals for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "users read their own daily words" on public.author_daily_words;
+create policy "users read their own daily words" on public.author_daily_words for select
+  using (user_id = auth.uid());
+-- chapter_word_marks: no policy — only the trigger (security definer) touches it.
+
+revoke all on public.author_writing_goals, public.author_daily_words, public.chapter_word_marks from anon;
+revoke all on public.chapter_word_marks from authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.author_daily_words from public, authenticated;
+revoke truncate, references, trigger on public.author_writing_goals from public, authenticated;
+grant select on public.author_daily_words to authenticated;
+grant select, insert, update, delete on public.author_writing_goals to authenticated;
+grant all on public.author_writing_goals, public.author_daily_words, public.chapter_word_marks to service_role;
+
+-- Same rule as countWords() in src/lib/authoring/split-chapters.ts (/\S+/g),
+-- incl. Unicode spaces (see contest_word_count in 11_contests.sql).
+create or replace function public.chapter_word_count(p text)
+returns integer language sql immutable parallel safe as $$
+  select count(*)::integer
+  from regexp_matches(
+    regexp_replace(coalesce(p, ''), '[   -     　﻿]', ' ', 'g'),
+    '\S+', 'g'
+  );
+$$;
+
+create or replace function public.record_chapter_words() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_author uuid;
+  v_new integer;
+  v_mark integer;
+begin
+  if new.content is not distinct from old.content then return new; end if;
+  select author_id into v_author from public.books where id = new.book_id;
+  if v_author is null then return new; end if;
+  v_new := public.chapter_word_count(new.content);
+
+  -- First edit since this feature shipped: the chapter's old length is the baseline.
+  insert into public.chapter_word_marks (chapter_id, max_words)
+    values (new.id, public.chapter_word_count(old.content))
+    on conflict (chapter_id) do nothing;
+  select max_words into v_mark from public.chapter_word_marks where chapter_id = new.id for update;
+
+  if v_new > v_mark then
+    update public.chapter_word_marks set max_words = v_new where chapter_id = new.id;
+    insert into public.author_daily_words (user_id, day, words) values (v_author, current_date, v_new - v_mark)
+      on conflict (user_id, day) do update set words = public.author_daily_words.words + excluded.words;
+  end if;
+  return new;
+end $$;
+revoke all on function public.record_chapter_words() from public, anon, authenticated;
+
+drop trigger if exists chapter_record_words on public.chapters;
+create trigger chapter_record_words after update of content on public.chapters
+for each row execute function public.record_chapter_words();
+
+
+-- Chapter version history: 20261009_chapter_versions.sql
+
+create table if not exists public.chapter_versions (
+  id uuid primary key default gen_random_uuid(),
+  chapter_id uuid not null references public.chapters (id) on delete cascade,
+  title text not null,
+  content text not null,
+  word_count integer not null,
+  content_version integer not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists chapter_versions_chapter_created_idx on public.chapter_versions (chapter_id, created_at desc);
+
+alter table public.chapter_versions enable row level security;
+revoke all on public.chapter_versions from public, anon, authenticated;
+grant all on public.chapter_versions to service_role;
+
+create or replace function public.snapshot_chapter_version() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  v_last timestamptz;
+  v_old integer := char_length(coalesce(old.content, ''));
+  v_new integer := char_length(coalesce(new.content, ''));
+begin
+  if new.content_purged_at is not null and old.content_purged_at is null then
+    delete from public.chapter_versions where chapter_id = new.id;
+    return new;
+  end if;
+  if new.content is not distinct from old.content or new.removed_at is not null or btrim(coalesce(old.content, '')) = '' then
+    return new;
+  end if;
+  select max(created_at) into v_last from public.chapter_versions where chapter_id = new.id;
+  if v_last is null or v_last < now() - interval '10 minutes' or abs(v_new - v_old) > greatest(200, v_old / 5) then
+    insert into public.chapter_versions (chapter_id, title, content, word_count, content_version)
+      values (old.id, old.title, old.content, public.chapter_word_count(old.content), old.content_version);
+    delete from public.chapter_versions where chapter_id = new.id and id not in (
+      select id from public.chapter_versions where chapter_id = new.id order by created_at desc limit 50);
+  end if;
+  return new;
+end $$;
+revoke all on function public.snapshot_chapter_version() from public, anon, authenticated;
+
+drop trigger if exists chapter_snapshot_version on public.chapters;
+create trigger chapter_snapshot_version after update of content on public.chapters
+for each row execute function public.snapshot_chapter_version();
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/06_social_and_messaging.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -10182,12 +10357,16 @@ create index if not exists contest_awards_payout_txn_idx
 -- purge-deleted-content).
 --
 -- Đối tượng tạo trong file này:
+--   Bảng: chapter_notes (đặt ở đây vì trigger dọn ghi chú cần cột
+--     content_purged_at của file này)
+--   Hàm: purge_chapter_notes
 --   Thêm cột vào bảng của file trước:
 --     chapters.content_purged_at, books.content_purged_at
 --
 -- Gộp từ migration (migrations/archive/):
 --   20260908_add_content_purge_retention.sql
 --   + migrations/20260929_add_hot_path_indexes.sql (phần của file này)
+--   + migrations/20261009_chapter_notes.sql
 --
 -- Phụ thuộc (phải chạy trước): 01_extensions_and_accounts.sql,
 --   02_books_and_chapters.sql
@@ -10210,6 +10389,40 @@ create index if not exists chapters_pending_purge_idx
   on public.chapters (removed_at) where removed_at is not null and content_purged_at is null;
 create index if not exists books_pending_purge_idx
   on public.books (deleted_at) where deleted_at is not null and content_purged_at is null;
+
+-- Chapter notes / outline: 20261009_chapter_notes.sql
+
+create table if not exists public.chapter_notes (
+  chapter_id uuid primary key references public.chapters (id) on delete cascade,
+  notes text not null default '' check (char_length(notes) <= 10000),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.chapter_notes enable row level security;
+drop policy if exists "authors manage notes on their own chapters" on public.chapter_notes;
+create policy "authors manage notes on their own chapters" on public.chapter_notes for all
+  using (exists (select 1 from public.chapters c join public.books b on b.id = c.book_id
+    where c.id = chapter_id and b.author_id = auth.uid() and b.deleted_at is null))
+  with check (exists (select 1 from public.chapters c join public.books b on b.id = c.book_id
+    where c.id = chapter_id and b.author_id = auth.uid() and b.deleted_at is null));
+
+revoke all on public.chapter_notes from anon;
+revoke truncate, references, trigger on public.chapter_notes from public, authenticated;
+grant select, insert, update, delete on public.chapter_notes to authenticated;
+grant all on public.chapter_notes to service_role;
+
+create or replace function public.purge_chapter_notes() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.content_purged_at is not null and old.content_purged_at is null then
+    delete from public.chapter_notes where chapter_id = new.id;
+  end if;
+  return new;
+end $$;
+revoke all on function public.purge_chapter_notes() from public, anon, authenticated;
+drop trigger if exists chapter_purge_notes on public.chapters;
+create trigger chapter_purge_notes after update of content_purged_at on public.chapters
+for each row execute function public.purge_chapter_notes();
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/13_content_reports.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -10242,6 +10455,20 @@ alter table public.content_reports enable row level security;
 -- and check the current admin role. Reporter identity is never public.
 revoke all on public.content_reports from public, anon, authenticated;
 grant select, insert, update on public.content_reports to service_role;
+
+-- Content flag terms (warn before publishing): 20261009_content_flag_terms.sql
+create table if not exists public.content_flag_terms (
+  id uuid primary key default gen_random_uuid(),
+  term text not null unique check (char_length(btrim(term)) between 1 and 100),
+  -- Shown to the author next to the match, e.g. "Cân nhắc dán nhãn 18+".
+  note text check (char_length(note) <= 300),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table public.content_flag_terms enable row level security;
+revoke all on public.content_flag_terms from public, anon, authenticated;
+grant all on public.content_flag_terms to service_role;
 commit;
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>> migrations/baseline/14_age_ratings.sql <<<<<<<<<<<<<<<<<<<<<<<<<<<<

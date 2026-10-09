@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { WritingGoalCard } from "@/components/author/writing-goal-card";
 import Link from "next/link";
 import {
   FlameIcon,
@@ -193,6 +194,8 @@ export function DailyTasksTab() {
           </div>
         )}
       </div>
+
+      <WritingGoalCard />
 
       {slots.length === 0 ? (
         <div className="mt-[18px] rounded-2xl border border-cream px-5 py-[18px] text-[13.5px] text-stone-dark">

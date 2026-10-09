@@ -51,9 +51,11 @@ type PublishPanelProps = {
   chapterCharacters?: { node: ReactNode; done: boolean };
   /** Ảnh nền chương — tuỳ chọn, panel tự lưu ngay khi tải lên/gỡ. */
   chapterBackground?: { node: ReactNode; done: boolean };
+  /** Ghi chú & dàn ý riêng — tự lưu, không đi qua nút lưu chương. */
+  chapterNotes?: { node: ReactNode; done: boolean };
 };
 
-type SectionId = "info" | "classify" | "characters" | "background" | "monetize" | "copyright";
+type SectionId = "info" | "classify" | "characters" | "notes" | "background" | "monetize" | "copyright";
 
 function ChecklistSection({
   id,
@@ -137,11 +139,13 @@ export function PublishPanel({
   ageRatingError = null,
   chapterCharacters,
   chapterBackground,
+  chapterNotes,
 }: PublishPanelProps) {
   const [openSections, setOpenSections] = useState<Record<SectionId, boolean>>({
     info: true,
     classify: true,
     characters: true,
+    notes: false,
     background: false,
     monetize: false,
     copyright: false,
@@ -252,6 +256,18 @@ export function PublishPanel({
             onToggle={toggleSection}
           >
             {chapterCharacters.node}
+          </ChecklistSection>
+        )}
+
+        {chapterNotes && (
+          <ChecklistSection
+            id="notes"
+            title="Ghi chú & dàn ý (riêng tư)"
+            done={chapterNotes.done}
+            open={openSections.notes}
+            onToggle={toggleSection}
+          >
+            {chapterNotes.node}
           </ChecklistSection>
         )}
 
