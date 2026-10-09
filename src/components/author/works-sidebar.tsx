@@ -84,7 +84,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[264px] -translate-x-full flex-col overflow-hidden bg-brand-ink-dark text-sidebar-text transition-transform duration-200 lg:static lg:z-auto lg:w-auto lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[264px] -translate-x-full flex-col overflow-hidden bg-brand-ink-dark text-sidebar-text transition-transform duration-200 lg:static lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-y-auto ${
           mobileOpen ? "translate-x-0" : ""
         }`}
       >

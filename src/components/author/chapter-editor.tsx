@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowSquareOutIcon,
@@ -23,7 +23,11 @@ import {
   MinusIcon,
   TextHTwoIcon,
   ImageSquareIcon,
+  ArrowsHorizontalIcon,
+  ArrowsInLineHorizontalIcon,
+  ColumnsIcon,
 } from "@phosphor-icons/react/dist/ssr";
+import { ChapterPreview } from "@/components/author/chapter-preview";
 import { Button, Checkbox, Field } from "@/components/ui";
 import { isDesignShareLinkShape } from "@/lib/design/share-link";
 import type { ChangeKind, HistoryEntry, Selection } from "@/lib/authoring/text-history";
@@ -35,8 +39,9 @@ import {
 import { findMatches, replaceMatches } from "@/lib/authoring/find-replace";
 import { tidyChapterText } from "@/lib/authoring/tidy-text";
 import {
-  DEFAULT_TOOLBAR, readToolbarPrefs, TOOLBAR_ITEMS, TOOLBAR_LABEL, visibleItems, writeToolbarPrefs,
-  type ToolbarItemId, type ToolbarPrefs,
+  DEFAULT_LAYOUT, DEFAULT_TOOLBAR, PREVIEW_FONT_MAX, PREVIEW_FONT_MIN, readLayoutPrefs, readToolbarPrefs, TOOLBAR_ITEMS,
+  TOOLBAR_LABEL, visibleItems, writeLayoutPrefs, writeToolbarPrefs,
+  type EditorLayoutPrefs, type ToolbarItemId, type ToolbarPrefs,
 } from "@/lib/authoring/toolbar-prefs";
 import type { WritingGoalSummary } from "@/lib/authoring/writing-goal";
 import { namesFrom, type NameIssue } from "@/lib/authoring/name-check";
@@ -179,30 +184,6 @@ export function ChapterEditor({
   const [imageLinkPending, setImageLinkPending] = useState(false);
   const [imageLinkError, setImageLinkError] = useState<string | null>(null);
 
-  // Ô nội dung giãn theo độ dài chương (không cuộn bên trong 1 khung cố
-  // định) — tối thiểu bằng phần còn trống của cột (textarea flex-1, cột
-  // editor cao bằng sidebar PublishPanel nhờ grid stretch), dài hơn thì
-  // đẩy cả cột/trang dài ra. minHeight (không phải height) vì height bị
-  // flex-1 bỏ qua. Reset về "" (min-h-[460px] gốc) trước khi đo để co lại
-  // được khi xoá bớt chữ; giữ nguyên vị trí cuộn vì lúc reset trang co tạm
-  // thời, trình duyệt có thể kéo scroll lên.
-  useLayoutEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const fit = () => {
-      const scroller = el.closest<HTMLElement>("[data-editor-scroll]");
-      const scrollerTop = scroller?.scrollTop ?? 0;
-      const windowY = window.scrollY;
-      el.style.minHeight = "";
-      el.style.minHeight = `${el.scrollHeight}px`;
-      if (scroller) scroller.scrollTop = scrollerTop;
-      window.scrollTo({ top: windowY });
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [content]);
-
   const words = countWords(content);
   const readMin = Math.max(1, Math.round(words / 200));
   const [startWords] = useState(() => countWords(content));
@@ -210,10 +191,20 @@ export function ChapterEditor({
   // Công cụ phụ dưới thanh toolbar: tìm/thay thế, chỉnh định dạng, phím tắt.
   const [tool, setTool] = useState<null | "find" | "tidy" | "keys" | "names" | "toolbar">(null);
   const [toolbarPrefs, setToolbarPrefs] = useState<ToolbarPrefs>(DEFAULT_TOOLBAR);
+  // Trang rộng / chia đôi xem trước — chỉ có tác dụng từ lg trở lên (nút ẩn trên điện thoại).
+  const [layout, setLayout] = useState<EditorLayoutPrefs>(DEFAULT_LAYOUT);
   useEffect(() => {
-    const timer = setTimeout(() => setToolbarPrefs(readToolbarPrefs()), 0);
+    const timer = setTimeout(() => {
+      setToolbarPrefs(readToolbarPrefs());
+      setLayout(readLayoutPrefs());
+    }, 0);
     return () => clearTimeout(timer);
   }, []);
+  const updateLayout = (patch: Partial<EditorLayoutPrefs>) => {
+    const next = { ...layout, ...patch };
+    setLayout(next);
+    writeLayoutPrefs(next);
+  };
   const [toolNotice, setToolNotice] = useState<string | null>(null);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -251,6 +242,31 @@ export function ChapterEditor({
     });
     return () => cancelAnimationFrame(frame);
   }, [content, focusMode]);
+
+  // Ô nội dung giãn theo độ dài chương (không cuộn bên trong 1 khung cố
+  // định) — tối thiểu bằng phần còn trống của cột (textarea flex-1, cột
+  // editor cao bằng sidebar PublishPanel nhờ grid stretch), dài hơn thì
+  // đẩy cả cột/trang dài ra. minHeight (không phải height) vì height bị
+  // flex-1 bỏ qua. Reset về "" (min-h-[460px] gốc) trước khi đo để co lại
+  // được khi xoá bớt chữ; giữ nguyên vị trí cuộn vì lúc reset trang co tạm
+  // thời, trình duyệt có thể kéo scroll lên.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const fit = () => {
+      const scroller = el.closest<HTMLElement>("[data-editor-scroll]");
+      const scrollerTop = scroller?.scrollTop ?? 0;
+      const windowY = window.scrollY;
+      el.style.minHeight = "";
+      el.style.minHeight = `${el.scrollHeight}px`;
+      if (scroller) scroller.scrollTop = scrollerTop;
+      window.scrollTo({ top: windowY });
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+    // Đổi trang rộng / xem trước / tập trung làm đổi bề ngang textarea mà không có sự kiện resize — đo lại.
+  }, [content, layout.wide, layout.preview, focusMode]);
 
   const wrapSelection = (marker: string) => {
     const el = textareaRef.current;
@@ -330,7 +346,18 @@ export function ChapterEditor({
     () => (caret === null || dismissedFor === content ? [] : suggestAt(content, caret, quickItems)),
     [caret, content, quickItems, dismissedFor]
   );
-  const trackCaret = (el: HTMLTextAreaElement) => setCaret(el.selectionStart === el.selectionEnd ? el.selectionStart : null);
+  // previewCaret giữ vị trí cuối cùng kể cả khi rời khung soạn, để bản xem trước không mất đoạn đang tô.
+  const [previewCaret, setPreviewCaret] = useState<number | null>(null);
+  const trackCaret = (el: HTMLTextAreaElement) => {
+    setCaret(el.selectionStart === el.selectionEnd ? el.selectionStart : null);
+    setPreviewCaret(el.selectionStart);
+  };
+  // Bản xem trước dựng lại toàn chương mỗi lần đổi — để React ưu tiên phím gõ, xem trước theo sau.
+  const deferredContent = useDeferredValue(layout.preview ? content : "");
+  const activeParagraph = useMemo(
+    () => (layout.preview && previewCaret !== null ? content.slice(0, previewCaret).split("\n\n").length - 1 : null),
+    [layout.preview, previewCaret, content]
+  );
   const acceptSuggestion = (s: Suggestion) => {
     if (caret === null) return;
     const after = s.replaceFrom + s.item.text.length;
@@ -396,6 +423,10 @@ export function ChapterEditor({
     } else if (mod && (key === "f" || key === "h") && !e.shiftKey) {
       e.preventDefault();
       openFind(key === "h");
+    } else if (mod && key === "s" && !e.shiftKey) {
+      // Ở cấp khung soạn (không chỉ textarea) để Ctrl+S cũng lưu khi đang ở ô tên chương.
+      e.preventDefault();
+      onSaveShortcut?.();
     } else if (e.key === "Escape" && !e.defaultPrevented && focusMode && tool === null) {
       setFocusMode(false);
     }
@@ -428,9 +459,6 @@ export function ChapterEditor({
     } else if (key === "i") {
       e.preventDefault();
       wrapSelection("*");
-    } else if (key === "s") {
-      e.preventDefault();
-      onSaveShortcut?.();
     }
   };
 
@@ -612,6 +640,11 @@ export function ChapterEditor({
     ...(chapterId ? { history: { title: "Lịch sử phiên bản", icon: <ClockCounterClockwiseIcon size={17} />, onClick: () => setHistoryOpen(true) } } : {}),
     keys: { title: "Phím tắt", icon: <KeyboardIcon size={17} />, pressed: tool === "keys", onClick: () => setTool((t) => (t === "keys" ? null : "keys")) },
   };
+  // Trang rộng / xem trước cần đủ chỗ: thường thì cột soạn kẹp giữa 2 sidebar nên từ xl,
+  // ở chế độ tập trung có cả màn hình nên từ lg. Dưới mốc đó nút ẩn và bố cục về như cũ.
+  const wideScreenFlex = focusMode ? "lg:flex" : "xl:flex";
+  const pageWidth = layout.wide && !layout.preview ? (focusMode ? "lg:max-w-none" : "xl:max-w-none") : "";
+  const previewPane = focusMode ? "lg:block" : "xl:block";
   const availableToolbar = TOOLBAR_ITEMS.filter((id) => toolbarItems[id]);
   const visibleToolbar = visibleItems(toolbarPrefs, availableToolbar);
 
@@ -624,111 +657,99 @@ export function ChapterEditor({
           : "flex flex-col bg-surface-warm lg:overflow-hidden"
       }
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-cream-border bg-surface-warm px-4 py-3.5 lg:px-7">
-        <div className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-stone-alt">
-          <span className="truncate">{bookTitle}</span>
-          <CaretRightIcon size={12} className="shrink-0" />
-          <span className="truncate font-semibold text-brand-ink">{title || "Chương mới"}</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-3.5 text-[13px] font-medium text-stone-alt">
-          <button
-            type="button"
-            onClick={() => setFocusMode((v) => !v)}
-            title={focusMode ? "Thoát chế độ tập trung (Esc)" : "Chế độ tập trung (Ctrl+Shift+F)"}
-            className="flex min-h-9 items-center gap-1 text-brand-ink transition-colors hover:text-brand-gold-dark"
-          >
-            {focusMode ? <ArrowsInIcon size={14} /> : <ArrowsOutIcon size={14} />}
-            {focusMode ? "Thoát tập trung" : "Tập trung"}
-          </button>
-          {bookPublished && !focusMode && (
-            <Link
-              href={`/truyen/${bookSlug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-brand-gold-dark no-underline transition-colors hover:text-brand-ink"
-            >
-              Xem trang truyện <ArrowSquareOutIcon size={13} />
-            </Link>
-          )}
-          {saveStatus && (
-            <span
-              role="status"
-              className={`flex items-center gap-1 ${saveStatus.tone === "error" ? "text-error" : saveStatus.tone === "warn" ? "text-brand-gold-dark" : ""}`}
-            >
-              {saveStatus.tone === "ok" ? (
-                <CloudCheckIcon className="text-success-text" />
-              ) : saveStatus.tone === "busy" ? (
-                <CloudArrowUpIcon />
-              ) : (
-                <WarningCircleIcon />
-              )}
-              {saveStatus.label}
-            </span>
-          )}
-        </div>
-      </div>
-      {notice}
-
-      <div
-        ref={scrollerRef}
-        data-editor-scroll
-        className={focusMode ? "flex min-h-0 flex-1 flex-col overflow-y-auto py-8 lg:py-12" : "flex flex-1 flex-col py-6 lg:overflow-y-auto lg:py-9"}
-      >
-        <div className="mx-auto flex w-full max-w-[660px] flex-1 flex-col px-4 lg:px-7">
-          <Field
-            label={null}
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            placeholder="Tên chương"
-            lang="vi"
-            spellCheck
-            // className ghép qua cn() (tailwind-merge) nên p-0/text-[32px] đè được padding/cỡ chữ gốc của Field
-            className="mb-1.5 border-none bg-transparent p-0 font-[family-name:var(--font-lora)] text-[32px] font-semibold text-brand-ink outline-none"
-          />
-          <div className="mb-[22px] flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-stone-alt">
-            <WordGoal words={words} sessionWords={words - startWords} daily={dailyGoal} />
-            <span>·</span>
-            <span>~{readMin} phút đọc</span>
+      {/*
+        ── Sticky top bar (2 tầng): luôn hiển thị dù cuộn nội dung ──
+        Đặt BÊN NGOÀI scrollerRef — không bị overflow-y-auto nuốt vào.
+        Tầng 1: breadcrumb + actions (focus mode, trang rộng, xem trước, xem truyện).
+        Tầng 2: toolbar buttons + tool panels + QuickInsertBar.
+      */}
+      <div className={`z-10 flex flex-col border-b border-cream-border bg-surface-warm/95 shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] backdrop-blur-sm ${focusMode ? "relative" : "sticky top-0"}`}>
+        {/* Tầng 1 — header */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 lg:px-7">
+          <div className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-stone-alt">
+            <span className="truncate">{bookTitle}</span>
+            <CaretRightIcon size={12} className="shrink-0" />
+            <span className="truncate font-semibold text-brand-ink">{title || "Chương mới"}</span>
           </div>
-
-          <div className={`mb-[22px] ${isLastChapterLocked ? "opacity-60" : ""} ${focusMode ? "hidden" : ""}`}>
-            <Checkbox checked={isLastChapter} onChange={isLastChapterLocked ? () => {} : onIsLastChapterToggle}>
-              Đây là chương cuối cùng của truyện
-              {isLastChapterLocked && <span className="ml-1 text-stone-alt">(không thể bỏ chọn sau khi lưu)</span>}
-            </Checkbox>
-          </div>
-
-          <div className="sticky top-0 z-[5] mb-5 bg-surface-warm">
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-cream-border py-2">
-            {visibleToolbar.map((id) => {
-              const item = toolbarItems[id]!;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={item.onClick}
-                  disabled={item.disabled}
-                  aria-pressed={item.pressed}
-                  title={item.title}
-                  aria-label={TOOLBAR_LABEL[id]}
-                  className={`min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg aria-pressed:bg-info-bg disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent ${item.className ?? ""}`}
-                >
-                  {item.icon}
-                </button>
-              );
-            })}
-            <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
+          <div className="flex shrink-0 items-center gap-3.5 text-[13px] font-medium text-stone-alt">
             <button
               type="button"
-              onClick={() => setTool((t) => (t === "toolbar" ? null : "toolbar"))}
-              aria-pressed={tool === "toolbar"}
-              title="Tuỳ chỉnh thanh công cụ"
-              aria-label="Tuỳ chỉnh thanh công cụ"
-              className="min-h-10 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg aria-pressed:bg-info-bg"
+              onClick={() => setFocusMode((v) => !v)}
+              title={focusMode ? "Thoát chế độ tập trung (Esc)" : "Chế độ tập trung (Ctrl+Shift+F)"}
+              className="flex min-h-9 items-center gap-1 text-brand-ink transition-colors hover:text-brand-gold-dark"
             >
-              <SlidersHorizontalIcon size={17} />
+              {focusMode ? <ArrowsInIcon size={14} /> : <ArrowsOutIcon size={14} />}
+              {focusMode ? "Thoát tập trung" : "Tập trung"}
             </button>
+            {!layout.preview && (
+              <button
+                type="button"
+                onClick={() => updateLayout({ wide: !layout.wide })}
+                aria-pressed={layout.wide}
+                title={layout.wide ? "Thu về độ rộng chuẩn (dễ đọc)" : "Mở rộng trang viết hết khung"}
+                className={`hidden min-h-9 items-center gap-1 text-brand-ink transition-colors hover:text-brand-gold-dark ${wideScreenFlex}`}
+              >
+                {layout.wide ? <ArrowsInLineHorizontalIcon size={14} /> : <ArrowsHorizontalIcon size={14} />}
+                {layout.wide ? "Trang chuẩn" : "Trang rộng"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => updateLayout({ preview: !layout.preview })}
+              aria-pressed={layout.preview}
+              title={layout.preview ? "Tắt xem trước" : "Chia đôi: soạn bên trái, xem như độc giả bên phải"}
+              className={`hidden min-h-9 items-center gap-1 rounded-md px-1.5 text-brand-ink transition-colors hover:text-brand-gold-dark aria-pressed:bg-info-bg ${wideScreenFlex}`}
+            >
+              <ColumnsIcon size={14} />
+              Xem trước
+            </button>
+            {bookPublished && !focusMode && (
+              <Link
+                href={`/truyen/${bookSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden items-center gap-1 text-brand-gold-dark no-underline transition-colors hover:text-brand-ink xl:flex"
+              >
+                Xem trang truyện <ArrowSquareOutIcon size={13} />
+              </Link>
+            )}
           </div>
+        </div>
+
+        {/* Tầng 2 — toolbar buttons */}
+        <div className="flex items-center gap-1 overflow-x-auto border-t border-cream-border/60 px-4 py-1 lg:px-7">
+          {visibleToolbar.map((id) => {
+            const item = toolbarItems[id]!;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={item.onClick}
+                disabled={item.disabled}
+                aria-pressed={item.pressed}
+                title={item.title}
+                aria-label={TOOLBAR_LABEL[id]}
+                className={`min-h-9 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg aria-pressed:bg-info-bg disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent ${item.className ?? ""}`}
+              >
+                {item.icon}
+              </button>
+            );
+          })}
+          <div className="mx-1.5 h-5 w-px shrink-0 bg-cream-border" />
+          <button
+            type="button"
+            onClick={() => setTool((t) => (t === "toolbar" ? null : "toolbar"))}
+            aria-pressed={tool === "toolbar"}
+            title="Tuỳ chỉnh thanh công cụ"
+            aria-label="Tuỳ chỉnh thanh công cụ"
+            className="min-h-9 shrink-0 cursor-pointer rounded-md px-2.5 py-1.5 transition-colors hover:bg-info-bg aria-pressed:bg-info-bg"
+          >
+            <SlidersHorizontalIcon size={17} />
+          </button>
+        </div>
+
+        {/* Tool panels (find/replace, tidy, keys, names) — vẫn nằm trong sticky bar */}
+        <div className="px-4 lg:px-7">
           {tool === "toolbar" && (
             <ToolbarCustomizer
               prefs={toolbarPrefs}
@@ -786,6 +807,39 @@ export function ChapterEditor({
               return el ? content.slice(el.selectionStart, el.selectionEnd) : "";
             }}
           />
+        </div>
+      </div>
+      {/* notice nằm ngoài sticky bar để không đẩy toolbar xuống khi notice hiện */}
+      {notice}
+
+      <div className="flex min-h-0 flex-1">
+      <div
+        ref={scrollerRef}
+        data-editor-scroll
+        className={focusMode ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto py-8 lg:py-12" : "flex min-w-0 flex-1 flex-col py-6 lg:overflow-y-auto lg:py-9"}
+      >
+        <div className={`mx-auto flex w-full max-w-[660px] flex-1 flex-col px-4 lg:px-7 ${pageWidth}`}>
+          <Field
+            label={null}
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            placeholder="Tên chương"
+            lang="vi"
+            spellCheck
+            // className ghép qua cn() (tailwind-merge) nên p-0/text-[32px] đè được padding/cỡ chữ gốc của Field
+            className="mb-1.5 border-none bg-transparent p-0 font-[family-name:var(--font-lora)] text-[32px] font-semibold text-brand-ink outline-none"
+          />
+          <div className="mb-[22px] flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-stone-alt">
+            <WordGoal words={words} sessionWords={words - startWords} daily={dailyGoal} />
+            <span>·</span>
+            <span>~{readMin} phút đọc</span>
+          </div>
+
+          <div className={`mb-[22px] ${isLastChapterLocked ? "opacity-60" : ""} ${focusMode ? "hidden" : ""}`}>
+            <Checkbox checked={isLastChapter} onChange={isLastChapterLocked ? () => {} : onIsLastChapterToggle}>
+              Đây là chương cuối cùng của truyện
+              {isLastChapterLocked && <span className="ml-1 text-stone-alt">(không thể bỏ chọn sau khi lưu)</span>}
+            </Checkbox>
           </div>
 
           {imagePromptOpen && (
@@ -863,6 +917,63 @@ export function ChapterEditor({
           />
           </div>
         </div>
+      </div>
+      {layout.preview && (
+        <aside
+          aria-label="Xem trước như độc giả"
+          className={`hidden w-1/2 min-w-0 shrink-0 overflow-y-auto border-l border-cream-border bg-surface ${previewPane}`}
+        >
+          <div className="sticky top-0 z-[1] flex items-center justify-between gap-2 border-b border-cream-border bg-surface/95 px-5 py-1.5 text-[12px] font-medium text-stone-alt backdrop-blur-sm lg:px-7">
+            <span>Xem trước như độc giả</span>
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => updateLayout({ previewFontSize: Math.max(PREVIEW_FONT_MIN, layout.previewFontSize - 1) })}
+                disabled={layout.previewFontSize <= PREVIEW_FONT_MIN}
+                aria-label="Giảm cỡ chữ xem trước"
+                className="min-h-8 min-w-8 rounded-md px-1.5 font-semibold text-brand-ink hover:bg-info-bg disabled:opacity-35"
+              >
+                A−
+              </button>
+              <span className="w-9 text-center tabular-nums">{layout.previewFontSize}px</span>
+              <button
+                type="button"
+                onClick={() => updateLayout({ previewFontSize: Math.min(PREVIEW_FONT_MAX, layout.previewFontSize + 1) })}
+                disabled={layout.previewFontSize >= PREVIEW_FONT_MAX}
+                aria-label="Tăng cỡ chữ xem trước"
+                className="min-h-8 min-w-8 rounded-md px-1.5 text-[14px] font-semibold text-brand-ink hover:bg-info-bg disabled:opacity-35"
+              >
+                A+
+              </button>
+            </span>
+          </div>
+          <ChapterPreview title={title} content={deferredContent} fontSize={layout.previewFontSize} activeParagraph={activeParagraph} />
+        </aside>
+      )}
+      </div>
+      {/* Thanh trạng thái chân trang: số chữ, thời gian đọc, trạng thái lưu — luôn ở đáy khung soạn. */}
+      <div className={`z-10 flex min-h-8 items-center justify-end gap-x-3 border-t border-cream-border bg-surface-warm/95 px-4 py-1 text-[12px] text-stone-alt backdrop-blur-sm lg:px-7 ${focusMode ? "" : "sticky bottom-0"}`}>
+        <span className="tabular-nums">{words.toLocaleString("vi-VN")} chữ</span>
+        <span aria-hidden="true">·</span>
+        <span>~{readMin} phút đọc</span>
+        {saveStatus && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span
+              role="status"
+              className={`flex min-w-0 items-center gap-1 ${saveStatus.tone === "error" ? "text-error" : saveStatus.tone === "warn" ? "text-brand-gold-dark" : ""}`}
+            >
+              {saveStatus.tone === "ok" ? (
+                <CloudCheckIcon className="shrink-0 text-success-text" />
+              ) : saveStatus.tone === "busy" ? (
+                <CloudArrowUpIcon className="shrink-0" />
+              ) : (
+                <WarningCircleIcon className="shrink-0" />
+              )}
+              <span className="truncate">{saveStatus.label}</span>
+            </span>
+          </>
+        )}
       </div>
       {notebook && bookId && (
         <StoryNotebook

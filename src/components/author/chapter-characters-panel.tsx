@@ -96,22 +96,41 @@ export function ChapterCharactersPanel({
       {!characters.length && <p className="mb-3 text-sm text-stone-alt">Truyện chưa có nhân vật. Thêm nhân vật để bắt đầu.</p>}
       <p role="status" className="mb-2 text-xs text-stone-alt">{saving ? "Đang lưu…" : `Đã gắn ${tagged.size} nhân vật`}</p>
       <div className="flex flex-wrap gap-2">
-        {characters.filter(c => (!c.archived_at || tagged.has(c.id)) && `${c.name} ${c.aliases ?? ""}`.toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi"))).map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            disabled={saving || creating}
-            onClick={() => toggle(c.id)}
-            aria-pressed={tagged.has(c.id)}
-            className={`min-h-9 rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 ${
-              tagged.has(c.id)
-                ? "border-brand-gold bg-brand-gold text-brand-navy"
-                : "border-cream-border bg-surface text-stone-dark"
-            }`}
-          >
-            {c.name} <span className="font-normal opacity-70">· {ROLE_LABEL[c.role]}{c.archived_at ? " · Đã lưu trữ" : !c.is_public ? " · Riêng tư" : ""}</span>
-          </button>
-        ))}
+        {characters.filter(c => (!c.archived_at || tagged.has(c.id)) && `${c.name} ${c.aliases ?? ""}`.toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi"))).map((c) => {
+          const label = <>{c.name} <span className="font-normal opacity-70">· {ROLE_LABEL[c.role]}{c.archived_at ? " · Đã lưu trữ" : !c.is_public ? " · Riêng tư" : ""}</span></>;
+          // Chip đã gắn: chỉ nút x mới gỡ được — bấm nhầm vào tên không làm mất nhân vật.
+          if (tagged.has(c.id)) return (
+            <span
+              key={c.id}
+              className={`inline-flex min-h-9 items-center gap-1 rounded-full border border-brand-gold bg-brand-gold py-0.5 pl-3.5 pr-0.5 text-[12.5px] font-semibold text-brand-navy ${saving || creating ? "opacity-60" : ""}`}
+            >
+              <span>{label}</span>
+              <button
+                type="button"
+                disabled={saving || creating}
+                onClick={() => toggle(c.id)}
+                aria-label={`Bỏ gắn ${c.name}`}
+                title={`Bỏ gắn ${c.name}`}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-brand-navy/10 disabled:cursor-not-allowed"
+              >
+                <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" />
+                </svg>
+              </button>
+            </span>
+          );
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={saving || creating}
+              onClick={() => toggle(c.id)}
+              className="min-h-9 rounded-full border border-cream-border bg-surface px-3.5 py-1.5 text-[12.5px] font-semibold text-stone-dark transition-colors disabled:opacity-60"
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       {error && <div role="alert" className="mt-2.5 text-[12.5px] font-medium text-error">{error}</div>}
     </div>

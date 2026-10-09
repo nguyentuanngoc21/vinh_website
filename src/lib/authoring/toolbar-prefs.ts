@@ -52,3 +52,25 @@ export function readToolbarPrefs(): ToolbarPrefs {
 export function writeToolbarPrefs(prefs: ToolbarPrefs) {
   try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
 }
+
+/** Bố cục trang viết trên desktop: trang rộng, chia đôi xem trước, cỡ chữ bản xem trước (khớp A−/A+ của reader.tsx). */
+export type EditorLayoutPrefs = { wide: boolean; preview: boolean; previewFontSize: number };
+export const DEFAULT_LAYOUT: EditorLayoutPrefs = { wide: false, preview: false, previewFontSize: 19 };
+export const PREVIEW_FONT_MIN = 15;
+export const PREVIEW_FONT_MAX = 26;
+
+export function normalizeLayout(raw: unknown): EditorLayoutPrefs {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof EditorLayoutPrefs, unknown>>;
+  const size = typeof r.previewFontSize === "number" && Number.isFinite(r.previewFontSize)
+    ? Math.min(PREVIEW_FONT_MAX, Math.max(PREVIEW_FONT_MIN, Math.round(r.previewFontSize)))
+    : DEFAULT_LAYOUT.previewFontSize;
+  return { wide: r.wide === true, preview: r.preview === true, previewFontSize: size };
+}
+
+const LAYOUT_KEY = "vinh_editor_layout_v1";
+export function readLayoutPrefs(): EditorLayoutPrefs {
+  try { return normalizeLayout(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null")); } catch { return DEFAULT_LAYOUT; }
+}
+export function writeLayoutPrefs(prefs: EditorLayoutPrefs) {
+  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
+}

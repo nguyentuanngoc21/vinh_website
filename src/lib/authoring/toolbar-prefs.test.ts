@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TOOLBAR, moveItem, normalizeToolbar, toggleHidden, TOOLBAR_ITEMS, visibleItems } from "./toolbar-prefs";
+import { DEFAULT_LAYOUT, DEFAULT_TOOLBAR, moveItem, normalizeLayout, normalizeToolbar, toggleHidden, TOOLBAR_ITEMS, visibleItems } from "./toolbar-prefs";
 
 describe("toolbar prefs", () => {
   it("drops unknown/duplicate ids and appends new buttons", () => {
@@ -19,5 +19,17 @@ describe("toolbar prefs", () => {
   it("shows only available, non-hidden items in order", () => {
     const p = toggleHidden(moveItem(DEFAULT_TOOLBAR, "find", -1), "bold");
     expect(visibleItems(p, ["undo", "bold", "find", "image", "tidy"])).toEqual(["undo", "find", "image", "tidy"]);
+  });
+});
+
+describe("editor layout prefs", () => {
+  it("falls back to defaults for missing or malformed values", () => {
+    expect(normalizeLayout(null)).toEqual(DEFAULT_LAYOUT);
+    expect(normalizeLayout({ wide: "yes", preview: 1, previewFontSize: "big" })).toEqual(DEFAULT_LAYOUT);
+  });
+  it("keeps valid flags and clamps the preview font size", () => {
+    expect(normalizeLayout({ wide: true, preview: true, previewFontSize: 40 })).toEqual({ wide: true, preview: true, previewFontSize: 26 });
+    expect(normalizeLayout({ previewFontSize: 3 }).previewFontSize).toBe(15);
+    expect(normalizeLayout({ previewFontSize: 20.6 }).previewFontSize).toBe(21);
   });
 });
