@@ -227,7 +227,7 @@ function SubmissionRow({
       {open && (
         <div className="flex flex-col gap-4 border-t border-cream-border bg-cream-card/40 px-4 py-4">
           {s.book_slug && !s.book_removed && (
-            <Link href={`/truyen/${s.book_slug}`} target="_blank" rel="noopener noreferrer"
+            <Link href={`/truyen/${s.book_id}`} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 self-start text-[13px] font-semibold text-brand-gold-dark">
               Xem truyện <ArrowSquareOutIcon size={13} />
             </Link>

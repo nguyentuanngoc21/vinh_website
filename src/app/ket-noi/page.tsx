@@ -27,11 +27,12 @@ export const metadata: Metadata = {
 // thì cả build sập luôn thay vì rơi về dynamic rendering êm như mong đợi.
 export const dynamic = "force-dynamic";
 
-export default async function ConnectPage() {
+export default async function ConnectPage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
+  const { p } = await searchParams;
   const supabase = createServiceRoleClient();
   const viewerId = await getAuthedUserId(supabase);
   // Truy vấn nằm ở src/lib/connect/directory.ts — dùng chung với app mobile.
-  const connectPeople = await loadConnectDirectory(supabase, viewerId);
+  const connectPeople = await loadConnectDirectory(supabase, viewerId, p);
 
   return (
     <div className={`${lora.variable} flex-1 bg-surface-muted`}>
@@ -39,7 +40,7 @@ export default async function ConnectPage() {
         <SiteHeader showSearch={false} />
         <main>
           <Suspense fallback={null}>
-            <ConnectDirectory people={connectPeople} viewerId={viewerId} />
+            <ConnectDirectory key={p ?? "directory"} people={connectPeople} viewerId={viewerId} />
           </Suspense>
         </main>
       </div>

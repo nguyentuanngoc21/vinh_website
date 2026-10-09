@@ -92,7 +92,7 @@ export default async function AuthorBookOverviewPage({
       bookTitle={book.title}
       bookSynopsis={book.synopsis}
       bookGenre={book.genre}
-      bookSlug={book.slug}
+      bookSlug={book.id}
       bookPublished={book.published}
       bookIsExclusive={book.is_exclusive}
       coverUrl={coverUrl}

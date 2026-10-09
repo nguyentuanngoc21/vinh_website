@@ -58,6 +58,9 @@ export async function PATCH(
     age_rating?: AgeRating;
     content_warnings?: string[];
   } = {};
+  if ("title" in body && (typeof body.title !== "string" || !body.title.trim())) {
+    return NextResponse.json({ error: "Tên truyện không được để trống." }, { status: 400 });
+  }
   if (typeof body.title === "string" && body.title.trim()) {
     update.title = body.title.trim();
   }
@@ -145,6 +148,8 @@ export async function PATCH(
     .from("books")
     .update(update)
     .eq("id", bookId)
+    .eq("author_id", userId)
+    .is("deleted_at", null)
     .select("id, title, synopsis, genre, tags, is_exclusive, age_rating, content_warnings")
     .maybeSingle();
 

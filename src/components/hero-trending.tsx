@@ -74,7 +74,7 @@ export function HeroTrending({ book }: { book: HomepageBook | null }) {
           </div>
           <div className="mt-7 flex flex-col sm:flex-row gap-3">
             <Link
-              href={`/truyen/${book.slug}`}
+              href={`/truyen/${book.id}`}
               className="w-full sm:w-auto text-center rounded-full bg-brand-gold px-[30px] py-3.5 text-[15px] font-semibold text-brand-navy no-underline"
             >
               Đọc ngay

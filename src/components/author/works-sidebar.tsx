@@ -155,7 +155,7 @@ export function WorksSidebar({ books }: { books: SidebarBook[] }) {
               </Link>
               {book.published && (
                 <Link
-                  href={`/truyen/${book.slug}`}
+                  href={`/truyen/${book.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Xem trang truyện (tab mới)"

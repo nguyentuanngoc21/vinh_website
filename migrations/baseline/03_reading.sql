@@ -346,6 +346,32 @@ create index anchored_comments_chapter_id_idx on public.anchored_comments (chapt
 create index anchored_comments_quest_idx on public.anchored_comments (quest_id, quest_source) where quest_id is not null;
 create index anchored_comments_parent_idx on public.anchored_comments (parent_comment_id) where parent_comment_id is not null;
 
+-- Tác giả ghim TỐI ĐA 1 bình luận chương (paragraph_index NULL) mỗi chương —
+-- chỉ server (service-role) ghi được cột này, trigger chặn anon/authenticated.
+-- Xem migrations/20261006_chapter_pinned_comment.sql.
+alter table public.anchored_comments add column pinned_at timestamptz;
+
+create unique index anchored_comments_one_pin_per_chapter
+  on public.anchored_comments (chapter_id)
+  where pinned_at is not null;
+
+create or replace function public.anchored_comments_guard_pin()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('anon', 'authenticated')
+     and new.pinned_at is distinct from (case when tg_op = 'UPDATE' then old.pinned_at else null end) then
+    raise exception 'pinned_at chỉ được ghi qua server' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger anchored_comments_guard_pin
+  before insert or update on public.anchored_comments
+  for each row execute function public.anchored_comments_guard_pin();
+
 alter table public.anchored_comments enable row level security;
 
 -- Nội dung công khai dưới chương — ai cũng xem được, không cần đăng nhập.
@@ -501,11 +527,38 @@ grant execute on function public.book_read_counts_between(timestamptz, timestamp
 -- chapters để đếm (home, rankings, thẻ truyện). Chạy với quyền owner nên
 -- lọc ĐÚNG điều kiện công khai của policy "published chapters follow their
 -- book's visibility": chương published của sách published, chưa xoá.
+-- Track first publication, rather than draft creation or metadata edits.
+alter table public.chapters add column if not exists published_at timestamptz;
+
+-- Historical publication times were not recorded; created_at is the fallback.
+update public.chapters set published_at = created_at
+where published and published_at is null;
+
+create or replace function public.set_chapter_published_at()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    new.published_at := case when new.published then now() else null end;
+  else
+    new.published_at := old.published_at;
+    if new.published and not old.published and old.published_at is null then
+      new.published_at := now();
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists set_chapter_published_at on public.chapters;
+create trigger set_chapter_published_at
+before insert or update on public.chapters
+for each row execute function public.set_chapter_published_at();
+
 create or replace view public.book_chapter_stats as
   select c.book_id,
          count(*)::integer as published_chapter_count,
          bool_or(c.is_last_chapter) as has_published_last_chapter,
-         max(c.created_at) as latest_published_chapter_at
+         max(coalesce(c.published_at, c.created_at)) as latest_published_chapter_at
   from public.chapters c
   join public.books b on b.id = c.book_id
   where c.published and b.published and b.deleted_at is null

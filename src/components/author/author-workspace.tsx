@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChapterEditor } from "@/components/author/chapter-editor";
 import { PublishPanel } from "@/components/author/publish-panel";
 import { RequiredAgreementsModal } from "@/components/author/required-agreements-modal";
@@ -75,6 +76,8 @@ export function AuthorWorkspace({
   initialTaggedCharacterIds,
   contestLock,
 }: AuthorWorkspaceProps) {
+  const router = useRouter();
+  const savedBookTitle = useRef(initialBookTitle);
   const [taggedCount, setTaggedCount] = useState(initialTaggedCharacterIds.length);
   const [bookTitle, setBookTitle] = useState(initialBookTitle);
   const [synopsis, setSynopsis] = useState(bookSynopsis ?? "");
@@ -212,19 +215,27 @@ export function AuthorWorkspace({
     if (!trimmed) {
       // Không cho lưu tên rỗng — quay lại giá trị trước đó thay vì để
       // sách không tên (title not null ở DB, PATCH rỗng cũng bị API bỏ qua).
-      setBookTitle(initialBookTitle);
+      setBookTitle(savedBookTitle.current);
+      setError("Tên truyện không được để trống.");
       return;
     }
+    if (trimmed === savedBookTitle.current) return;
     setBookTitle(trimmed);
     try {
-      await fetch(`/api/authoring/books/${bookId}`, {
+      const response = await fetch(`/api/authoring/books/${bookId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: trimmed }),
       });
-    } catch {
-      // Cùng cách xử lý với handleGenreChange — thao tác phụ, không chặn
-      // luồng viết/lưu chương nếu lỗi mạng.
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Không thể đổi tên truyện.");
+      savedBookTitle.current = data.title;
+      setBookTitle(data.title);
+      setError(null);
+      router.refresh();
+    } catch (error) {
+      setBookTitle(savedBookTitle.current);
+      setError(error instanceof Error ? error.message : "Không thể đổi tên truyện.");
     }
   };
 

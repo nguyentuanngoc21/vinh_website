@@ -66,7 +66,7 @@ function formatDuration(seconds: number | null): string {
  * Dùng chung cho trang web /ket-noi và route mobile /api/mobile/connect —
  * `supabase` là service-role client của đúng dự án người gọi (web hoặc mobile).
  */
-export async function loadConnectDirectory(supabase: Client, viewerId: string | null): Promise<ConnectPerson[]> {
+export async function loadConnectDirectory(supabase: Client, viewerId: string | null, linkedId?: string | null): Promise<ConnectPerson[]> {
   const { data: profileRows, error: profilesError } = await supabase
     .from("author_public_profiles")
     .select("id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags")
@@ -81,6 +81,12 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
     console.error("[ket-noi] author_public_profiles query failed:", profilesError);
   }
   const people = profileRows ?? [];
+  if (linkedId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(linkedId) && !people.some((p) => p.id === linkedId)) {
+    const { data: linkedProfile } = await supabase.from("author_public_profiles")
+      .select("id, username, nickname, avatar_url, cover_image_url, bio, created_at, creator_tags")
+      .eq("id", linkedId).maybeSingle();
+    if (linkedProfile) people.unshift(linkedProfile);
+  }
   const peopleIds = people.map((p) => p.id);
 
   const [
@@ -169,7 +175,7 @@ export async function loadConnectDirectory(supabase: Client, viewerId: string | 
       title: b.title,
       meta: b.genre ?? "Truyện chữ",
       date: formatShortDate(b.created_at),
-      href: `/truyen/${b.slug}`,
+      href: `/truyen/${b.id}`,
       imageUrl: bookCoverUrls[i],
     };
     if (!b.is_ghostwritten) {

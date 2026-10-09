@@ -25,11 +25,8 @@ import { AuthorPanel } from "./author-panel";
 import type { RemoveChapterPayload } from "@/components/admin/remove-chapter-modal";
 import { ReadingGate } from "./reading-gate";
 import { TropeVotePanel, type TropeCandidate } from "./trope-vote-panel";
-import {
-  groupParagraphComments,
-  PARAGRAPH_COMMENTS_PANEL_WIDTH,
-  type ParagraphComment,
-} from "@/lib/reading/paragraph-comments";
+import { ChapterCommentsSection } from "./chapter-comments-section";
+import { PARAGRAPH_COMMENTS_PANEL_WIDTH } from "@/lib/reading/paragraph-comments";
 import { buildHighlightSegments, textOffsetWithin, type Highlight } from "@/lib/reading/highlights";
 import { splitParagraphAroundDesignImages } from "@/lib/design/share-link";
 import { shareOrCopy } from "@/lib/share";
@@ -130,6 +127,8 @@ const READER_PREFS_KEY = "vinh_reader_prefs";
 type ReaderPrefs = { fontSize: number; theme: ThemeName; lineHeight: number };
 
 const DEFAULT_LINE_HEIGHT = 2;
+// Độ dài tối đa đoạn trích khi chia sẻ (handleShareExcerpt).
+const SHARE_EXCERPT_MAX_CHARS = 300;
 
 // Nhớ cỡ chữ/nền/giãn dòng người đọc đã chọn giữa các chương — không thì
 // mỗi lần sang chương mới, panel lại reset về mặc định (19px/cream/giãn
@@ -306,11 +305,10 @@ export function Reader({
   const { penalty, isPenaltyActive, warningMessage } = useScreenshotPenalty(paragraphRefs, { exempt: viewerIsAdmin });
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Bình luận theo đoạn (tham khảo Wattpad) — 1 lần fetch TOÀN BỘ bình
-  // luận của chương này khi mount (không phải 1 API/đoạn), client tự
-  // nhóm theo paragraph_index. Xem src/lib/reading/paragraph-comments.ts
-  // + api/chapters/[chapterId]/comments/route.ts.
-  const [paragraphComments, setParagraphComments] = useState<ParagraphComment[]>([]);
+  // Bình luận theo đoạn (tham khảo Wattpad) — khi mount chỉ tải SỐ bình
+  // luận mỗi đoạn (huy hiệu trên đoạn văn); nội dung từng đoạn do panel tự
+  // tải theo trang khi mở. Xem api/chapters/[chapterId]/comments/route.ts.
+  const [commentCounts, setCommentCounts] = useState<Record<number, number>>({});
   const [openCommentsParagraph, setOpenCommentsParagraph] = useState<number | null>(null);
   const commentsOpen = openCommentsParagraph !== null;
   // Điện thoại không có hover: NHẤN GIỮ 1 đoạn (~450ms, không kéo) để tô sáng
@@ -357,19 +355,14 @@ export function Reader({
       window.removeEventListener("scroll", onScroll);
     };
   }, [pressedParagraph]);
-  const { countByParagraph, threadsByParagraph } = useMemo(
-    () => groupParagraphComments(paragraphComments),
-    [paragraphComments]
-  );
-
   useEffect(() => {
     if (!chapterId) return;
     let cancelled = false;
-    fetch(`/api/chapters/${chapterId}/comments`)
+    fetch(`/api/chapters/${chapterId}/comments?scope=counts`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        setParagraphComments(data.comments ?? []);
+        setCommentCounts(data.counts ?? {});
       });
     return () => {
       cancelled = true;
@@ -377,9 +370,9 @@ export function Reader({
   }, [chapterId]);
 
   // Highlight (bôi đen đoạn văn) — RIÊNG TƯ, chỉ của chính viewer (khác
-  // paragraphComments công khai) — xem src/lib/reading/highlights.ts +
+  // bình luận theo đoạn công khai) — xem src/lib/reading/highlights.ts +
   // api/chapters/[chapterId]/highlights/route.ts. 1 lần fetch toàn bộ
-  // highlight của chương khi mount, giống paragraphComments.
+  // highlight của chương khi mount, giống số bình luận theo đoạn.
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const highlightsByParagraph = useMemo(() => {
     const map = new Map<number, Highlight[]>();
@@ -528,25 +521,31 @@ export function Reader({
     fetch(`/api/books/${bookId}/share`, { method: "POST" }).catch(() => {});
   };
 
-  const handleShareStory = async () => {
-    if (!bookSlug || typeof window === "undefined") return;
-    const result = await shareOrCopy({
-      title: `${chapterTitle} - ${bookTitle} - ${authorName}`,
-      text: bookSynopsis ?? "",
-      url: `${window.location.origin}/truyen/${bookSlug}`,
-    });
-    if (result === "copied") toast.show("Đã sao chép liên kết", "success");
-    if (result !== "failed") trackShareQuest();
-  };
-
+  // Cả nút "Chia sẻ" cuối chương lẫn "Chia sẻ đoạn này" ở AuthorPanel đều
+  // chia sẻ ĐOẠN ĐANG ĐỌC (visibleParagraph), không phải mô tả truyện. Chỉ
+  // rơi về mô tả khi chương không có đoạn nào (chương VIP chưa mua —
+  // content="" nên paragraphs rỗng). copyText: desktop không có
+  // navigator.share vẫn sao chép được đoạn trích, không chỉ mỗi link.
   const handleShareExcerpt = async () => {
     if (!bookSlug || !chapterId || typeof window === "undefined") return;
-    const result = await shareOrCopy({
-      title: chapterTitle,
-      text: visibleParagraph,
-      url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
-    });
-    if (result === "copied") toast.show("Đã sao chép liên kết", "success");
+    // Cắt ~300 ký tự (lùi về khoảng trắng gần nhất để không đứt giữa từ) —
+    // không để 1 đoạn dài của chương VIP bị chia sẻ nguyên văn.
+    const fullExcerpt = visibleParagraph.trim();
+    const cut = fullExcerpt.slice(0, SHARE_EXCERPT_MAX_CHARS);
+    const lastSpace = cut.lastIndexOf(" ");
+    const excerpt =
+      fullExcerpt.length <= SHARE_EXCERPT_MAX_CHARS
+        ? fullExcerpt
+        : `${(lastSpace > SHARE_EXCERPT_MAX_CHARS * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+    const result = await shareOrCopy(
+      {
+        title: `${chapterTitle} - ${bookTitle} - ${authorName}`,
+        text: excerpt ? `“${excerpt}”` : (bookSynopsis ?? ""),
+        url: `${window.location.origin}/read/${bookSlug}/${chapterId}`,
+      },
+      { copyText: true }
+    );
+    if (result === "copied") toast.show(excerpt ? "Đã sao chép đoạn trích và liên kết" : "Đã sao chép liên kết", "success");
     if (result !== "failed") trackShareQuest();
   };
 
@@ -1294,7 +1293,7 @@ export function Reader({
                   // đen xuyên qua 1 tấm ảnh không có ý nghĩa rõ ràng) —
                   // vẫn giữ nút bình luận theo đúng chỉ số đoạn `i` như
                   // mọi đoạn khác.
-                  const count = countByParagraph.get(i) ?? 0;
+                  const count = commentCounts[i] ?? 0;
                   return (
                     <div key={i} {...paragraphShellProps(i)}>
                       {renderCommentPill(i)}
@@ -1327,7 +1326,7 @@ export function Reader({
                   );
                 }
 
-                const count = countByParagraph.get(i) ?? 0;
+                const count = commentCounts[i] ?? 0;
                 const segments = buildHighlightSegments(p, highlightsByParagraph.get(i) ?? []);
                 return (
                   <div key={i} {...paragraphShellProps(i)}>
@@ -1426,7 +1425,7 @@ export function Reader({
             <VoteButton variant="full" voted={voted} voteCount={voteCount} pending={voting} onToggle={handleToggleVote} />
             <button
               type="button"
-              onClick={handleShareStory}
+              onClick={handleShareExcerpt}
               style={{ borderColor: c.hair, color: c.ink }}
               className="flex cursor-pointer items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors hover:border-brand-ink"
             >
@@ -1476,6 +1475,16 @@ export function Reader({
               </div>
             )}
           </div>
+
+          {chapterId && (
+            <ChapterCommentsSection
+              chapterId={chapterId}
+              returnTo={`/read/${bookSlug}/${chapterId}`}
+              isLoggedIn={isLoggedIn}
+              canComment={isLoggedIn && accessGate === "none"}
+              c={c}
+            />
+          )}
         </div>
           </div>
 
@@ -1587,13 +1596,15 @@ export function Reader({
 
       {openCommentsParagraph !== null && (
         <ParagraphCommentsPanel
+          key={openCommentsParagraph}
           chapterId={chapterId}
           paragraphIndex={openCommentsParagraph}
-          threads={threadsByParagraph.get(openCommentsParagraph) ?? []}
           onClose={() => setOpenCommentsParagraph(null)}
-          onCommentCreated={(c) => setParagraphComments((prev) => [...prev, c])}
-          onCommentDeleted={(id) =>
-            setParagraphComments((prev) => prev.filter((c) => c.id !== id && c.parentCommentId !== id))
+          onCountChange={(delta) =>
+            setCommentCounts((prev) => ({
+              ...prev,
+              [openCommentsParagraph]: Math.max(0, (prev[openCommentsParagraph] ?? 0) + delta),
+            }))
           }
         />
       )}

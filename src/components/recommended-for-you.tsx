@@ -24,7 +24,7 @@ export function RecommendedForYou({ books }: { books: HomepageBook[] }) {
         {books.map((book) => (
           <Link
             key={book.id}
-            href={`/truyen/${book.slug}?from=goi-y`}
+            href={`/truyen/${book.id}?from=goi-y`}
             className="cursor-pointer overflow-hidden rounded-xl no-underline transition-[transform,box-shadow] duration-[250ms] hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,.12)]"
           >
             <div className="relative aspect-[2/3] overflow-hidden rounded-xl">

@@ -177,7 +177,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
             <div className="flex shrink-0 justify-center px-5 pt-6 sm:items-center sm:py-6 sm:pr-2 sm:pl-6">
               <Link
                 key={pos}
-                href={`/truyen/${current.slug}`}
+                href={`/truyen/${current.id}`}
                 aria-label={`Đọc ${current.title}`}
                 style={slideFrom}
                 className="vn-slide-in relative block aspect-[2/3] w-[160px] overflow-hidden rounded-2xl shadow-[0_18px_40px_rgba(0,0,0,.22)] sm:w-[260px]"
@@ -205,7 +205,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
                 {pad(active + 1)} / {pad(n)}
               </div>
               <Link
-                href={`/truyen/${current.slug}`}
+                href={`/truyen/${current.id}`}
                 className="mt-2.5 text-[28px] leading-[1.1] font-bold tracking-[-0.8px] text-balance text-ink no-underline transition-colors hover:text-brand-gold-dark sm:text-[44px] sm:tracking-[-1.2px]"
               >
                 {current.title}
@@ -255,7 +255,7 @@ export function BookCoverflow({ books: allBooks }: { books: HomepageBook[] }) {
 
               <div className="mt-[26px] flex flex-wrap gap-2.5">
                 <Link
-                  href={`/truyen/${current.slug}`}
+                  href={`/truyen/${current.id}`}
                   className="flex items-center gap-2 rounded-full bg-brand-navy px-6 py-3 text-sm font-semibold whitespace-nowrap text-white no-underline"
                 >
                   Đọc ngay <CaretRightIcon weight="bold" />

@@ -100,7 +100,7 @@ export default async function SearchPage({
                   {books.map((b) => (
                     <Link
                       key={b.id}
-                      href={`/truyen/${b.slug}`}
+                      href={`/truyen/${b.id}`}
                       className="no-underline transition-transform duration-[250ms] hover:-translate-y-1"
                     >
                       <div className="relative aspect-[2/3] overflow-hidden rounded-[10px] bg-neutral-bg">

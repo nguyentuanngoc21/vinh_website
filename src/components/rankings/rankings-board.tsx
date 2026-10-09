@@ -244,7 +244,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                   return (
                     <Link
                       key={b.id}
-                      href={`/truyen/${b.slug}`}
+                      href={`/truyen/${b.id}`}
                       style={{
                         background: cardBackground,
                         minHeight: i === 0 ? "360px" : "330px",
@@ -353,7 +353,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                     return (
                       <Link
                         key={b.id}
-                        href={`/truyen/${b.slug}`}
+                        href={`/truyen/${b.id}`}
                         className="grid grid-cols-[40px_1fr_90px] items-center gap-3.5 rounded-[10px] border-b border-[#f6f4f1] dark:border-line-soft px-4 py-3.5 no-underline transition-colors hover:bg-cream-card sm:grid-cols-[56px_1fr_130px_110px_90px]"
                       >
                         <div className="text-xl font-extrabold text-[#c1b9ae]">{b.rank}</div>

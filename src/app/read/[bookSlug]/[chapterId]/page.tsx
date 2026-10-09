@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { bookReferenceColumn } from "@/lib/story/book-reference";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { cache } from "react";
@@ -32,7 +33,7 @@ const loadReadChapter = cache(async (bookSlug: string, chapterId: string) => {
     supabase
       .from("books")
       .select("id, slug, title, synopsis, author_id, published, age_rating")
-      .eq("slug", bookSlug)
+      .eq(bookReferenceColumn(bookSlug), bookSlug)
       .maybeSingle(),
     serviceClient
       .from("chapters")
@@ -130,7 +131,7 @@ export default async function ReadChapterPage({
             <AgeRatingBadge rating={book.age_rating} />
           </div>
           <h1 className="mb-6 text-[24px] font-bold leading-tight text-brand-ink sm:text-[28px]">{chapter.title}</h1>
-          <Age18Notice reason={ageGate.reason} nextPath={`/read/${book.slug}/${chapter.id}`} />
+          <Age18Notice reason={ageGate.reason} nextPath={`/read/${book.id}/${chapter.id}`} />
         </main>
       </div>
     );
@@ -243,7 +244,7 @@ export default async function ReadChapterPage({
     <>
       {ageGate.gate === "confirm16" && <Age16Confirm />}
       <Reader
-        bookSlug={book.slug}
+        bookSlug={book.id}
         bookId={book.id}
         bookTitle={book.title}
         bookSynopsis={book.synopsis}

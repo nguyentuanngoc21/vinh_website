@@ -85,7 +85,7 @@ export default async function AuthorChapterPage({
       bookAgeRating={book.age_rating}
       bookContentWarnings={book.content_warnings}
       bookAgeRatingLocked={book.age_rating_locked_at !== null}
-      bookSlug={book.slug}
+      bookSlug={book.id}
       bookPublished={book.published}
       bookIsExclusive={book.is_exclusive}
       bookPublishedAt={book.published_at}

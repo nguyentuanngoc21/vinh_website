@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { bookReferenceColumn } from "@/lib/story/book-reference";
+import Link from "next/link";
 import { Lora } from "next/font/google";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
@@ -23,6 +25,7 @@ import { getAuthedViewer } from "@/lib/wallet/session";
 import { resolveAgeGate } from "@/lib/age-rating-access";
 import { Age16Confirm, Age18Notice, AgeRatingBadge, ContentWarningList } from "@/components/story/age-gate";
 import { RewardEngine } from "@/lib/quests/reward-engine";
+import { loadPinnedChapterComments } from "@/lib/reading/pinned-comments";
 
 const lora = Lora({
   variable: "--font-lora",
@@ -40,7 +43,7 @@ const getBookBySlug = cache(async (slug: string) => {
     .select(
       "id, slug, title, synopsis, genre, tags, view_count, author_id, cover_design_item_id, published, is_exclusive, age_rating, content_warnings"
     )
-    .eq("slug", slug)
+    .eq(bookReferenceColumn(slug), slug)
     .maybeSingle();
   return data;
 });
@@ -90,7 +93,7 @@ export default async function StoryPage({
     // trang khi cổng 18+ đóng (xem ageGate bên dưới).
     serviceClient
       .from("chapters")
-      .select("id, title, order_index, created_at, is_last_chapter")
+      .select("id, title, order_index, created_at, published_at, is_last_chapter")
       .eq("book_id", book.id)
       .eq("published", true)
       .order("order_index", { ascending: true }),
@@ -121,7 +124,7 @@ export default async function StoryPage({
 
   // Các query dưới đây chỉ phụ thuộc book/viewerId/chapterIds, không phụ
   // thuộc lẫn nhau — chạy song song.
-  const [contestCards, coverUrl, { data: voteRows }, { data: progress }, characters] = await Promise.all([
+  const [contestCards, coverUrl, { data: voteRows }, { data: progress }, characters, pinnedByChapter] = await Promise.all([
     // Contest card (dự thi / đạt giải) — suy ra từ contest_submissions /
     // contest_awards, không lưu cờ trên books. Lỗi ở đây không làm hỏng trang truyện.
     getStoryContestCards(serviceClient, { bookId: book.id, viewerId }).catch((error) => {
@@ -137,13 +140,18 @@ export default async function StoryPage({
       ? serviceClient.from("book_progress").select("chapter_id").eq("book_id", book.id).eq("user_id", viewerId).maybeSingle()
       : Promise.resolve({ data: null }),
     loadCharacters(supabase, serviceClient, book.id, viewerId),
+    // Bình luận tác giả ghim mỗi chương — hiện khi hover chương ở tab "Chương".
+    loadPinnedChapterComments(serviceClient, chapterIds),
   ]);
 
   const firstChapter = publishedChapters[0] ?? null;
   const lastChapter = publishedChapters.at(-1) ?? null;
 
   const latestCreatedAt = publishedChapters.length
-    ? publishedChapters.reduce((max, c) => (c.created_at > max ? c.created_at : max), publishedChapters[0].created_at)
+    ? publishedChapters.reduce((max, c) => {
+        const publishedAt = c.published_at ?? c.created_at;
+        return publishedAt > max ? publishedAt : max;
+      }, publishedChapters[0].published_at ?? publishedChapters[0].created_at)
     : null;
 
   const status = computeBookStatus({
@@ -162,8 +170,9 @@ export default async function StoryPage({
   const chaptersAscending = publishedChapters.map((c) => ({
     id: c.id,
     title: c.title,
-    createdAt: c.created_at,
+    createdAt: c.published_at ?? c.created_at,
     voteCount: voteByChapter.get(c.id) ?? 0,
+    pinnedComment: pinnedByChapter.get(c.id) ?? null,
   }));
 
   return (
@@ -195,7 +204,7 @@ export default async function StoryPage({
               <h1 className="font-[family-name:var(--font-lora)] text-2xl font-bold leading-tight text-brand-ink sm:text-[28px]">
                 {book.title}
               </h1>
-              {authorProfile?.nickname && <p className="mt-1 text-sm text-stone-alt">bởi {authorProfile.nickname}</p>}
+              {authorProfile?.nickname && <p className="mt-1 text-sm text-stone-alt">bởi <Link href={`/ket-noi?p=${book.author_id}`} className="underline underline-offset-4 hover:text-brand-ink">{authorProfile.nickname}</Link></p>}
               {(book.is_exclusive || book.age_rating !== "all") && (
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <AgeRatingBadge rating={book.age_rating} />
@@ -218,10 +227,10 @@ export default async function StoryPage({
 
               <div className="mt-5">
                 {ageGate.gate === "verify18" ? (
-                  <Age18Notice reason={ageGate.reason} nextPath={`/truyen/${book.slug}`} />
+                  <Age18Notice reason={ageGate.reason} nextPath={`/truyen/${book.id}`} />
                 ) : (
                   <StoryCtaButtons
-                    bookSlug={book.slug}
+                    bookSlug={book.id}
                     firstChapterId={firstChapter?.id ?? null}
                     lastChapterId={lastChapter?.id ?? null}
                     continueChapterId={continueChapterId}
@@ -254,7 +263,7 @@ export default async function StoryPage({
           {!age18Blocked && (
             <div className="mt-8 max-w-[900px] sm:mt-10">
               <StoryTabs
-                bookSlug={book.slug}
+                bookSlug={book.id}
                 status={status}
                 lastUpdatedLabel={latestCreatedAt ? new Date(latestCreatedAt).toLocaleDateString("vi-VN") : null}
                 genre={book.genre}
