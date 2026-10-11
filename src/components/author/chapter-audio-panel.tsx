@@ -11,9 +11,9 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDurationShort, type AudioTrack } from "@/lib/audio/get-audio-catalog";
 import { readDurationSeconds } from "@/lib/audio/read-duration";
+import { AUDIO_MAX_BYTES, AUDIO_MIME_EXT, AUDIO_SIZE_ERROR } from "@/lib/audio/upload-rules";
+import { uploadAudioFile } from "@/lib/audio/upload-audio";
 import { Alert, Button, Field } from "@/components/ui";
-
-const AUDIO_MAX_BYTES = 60 * 1024 * 1024;
 
 type ChapterAudioPanelProps = {
   chapterId: string;
@@ -50,12 +50,14 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0] ?? null;
     if (!picked) return;
-    if (!picked.type.startsWith("audio/")) {
-      setError("Chỉ nhận file audio.");
+    setFile(null);
+    setDurationSeconds(null);
+    if (!AUDIO_MIME_EXT[picked.type]) {
+      setError("Chỉ nhận file MP3, M4A, WAV hoặc OGG.");
       return;
     }
     if (picked.size > AUDIO_MAX_BYTES) {
-      setError("File audio tối đa 60MB.");
+      setError(AUDIO_SIZE_ERROR);
       return;
     }
     setError(null);
@@ -70,27 +72,39 @@ export function ChapterAudioPanel({ chapterId, initialLinkedAudio: linked }: Cha
     }
     setPending(true);
     setError(null);
-    const body = new FormData();
-    body.set("audio", file);
-    if (title.trim()) body.set("title", title.trim());
-    if (durationSeconds != null) body.set("durationSeconds", String(durationSeconds));
+    try {
+      const uploaded = await uploadAudioFile(file);
+      if ("error" in uploaded) {
+        setPending(false);
+        setError(uploaded.error);
+        return;
+      }
 
-    const res = await fetch(`/api/authoring/chapters/${chapterId}/audio/record`, { method: "POST", body });
-    const data = await res.json().catch(() => null);
-    setPending(false);
-    if (!res.ok) {
-      setError((data && data.error) || "Gắn audio thất bại.");
-      return;
+      const res = await fetch(`/api/authoring/chapters/${chapterId}/audio/record`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: uploaded.path, title: title.trim(), durationSeconds }),
+      });
+      const data = await res.json().catch(() => null);
+      setPending(false);
+      if (!res.ok) {
+        setError((data && data.error) || "Gắn audio thất bại.");
+        return;
+      }
+      setFile(null);
+      setTitle("");
+      setDurationSeconds(null);
+      setMode(null);
+      // router.refresh() (không phải window.location.reload()) — chỉ nạp
+      // lại dữ liệu Server Component, KHÔNG xoá nội dung chương đang gõ dở
+      // trong ChapterEditor (state đó nằm ở AuthorWorkspace, chỉ khởi tạo 1
+      // lần từ props nên không bị reset khi props refetch).
+      router.refresh();
+    } catch {
+      setError("Kết nối bị gián đoạn. Vui lòng thử đăng audio lại.");
+    } finally {
+      setPending(false);
     }
-    setFile(null);
-    setTitle("");
-    setDurationSeconds(null);
-    setMode(null);
-    // router.refresh() (không phải window.location.reload()) — chỉ nạp
-    // lại dữ liệu Server Component, KHÔNG xoá nội dung chương đang gõ dở
-    // trong ChapterEditor (state đó nằm ở AuthorWorkspace, chỉ khởi tạo 1
-    // lần từ props nên không bị reset khi props refetch).
-    router.refresh();
   };
 
   const submitLink = async () => {

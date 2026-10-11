@@ -4983,7 +4983,10 @@ begin
   return v_new_token;
 end;
 $$ language plpgsql security definer;
-insert into storage.buckets (id, name, public) values ('audio-narrations', 'audio-narrations', true)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('audio-narrations', 'audio-narrations', true, 52428800,
+  array['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a',
+        'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg'])
   on conflict (id) do nothing;
 
 create policy "audio narrations are publicly readable"
