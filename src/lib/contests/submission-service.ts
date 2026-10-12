@@ -15,6 +15,8 @@ import { getContestViewer, type ContestRow } from "@/lib/contests/contest-servic
 import { evaluateEligibility } from "@/lib/contests/eligibility/engine";
 import type { EligibilityContext, EligibilityResult } from "@/lib/contests/eligibility/types";
 import { ContestError, throwIfError } from "@/lib/contests/errors";
+import { countWords } from "@/lib/authoring/split-chapters";
+import { isChapterInContestWindow, selectedChapterChecks, type ContestChapter } from "@/lib/contests/chapter-selection";
 
 type Client = SupabaseClient<Database>;
 type SubmissionRow = Database["public"]["Tables"]["contest_submissions"]["Row"];
@@ -22,7 +24,7 @@ type SubmissionRow = Database["public"]["Tables"]["contest_submissions"]["Row"];
 const ACTIVE = new Set(["submitted", "eligible", "shortlisted"]);
 const FINISHED = new Set(["results", "archived"]);
 
-export type BookEligibility = { bookId: string; title: string; result: EligibilityResult };
+export type BookEligibility = { bookId: string; title: string; result: EligibilityResult; chapters?: ContestChapter[] };
 
 /**
  * Nạp ngữ cảnh eligibility cho nhiều sách của cùng 1 người xem trong 1 cuộc
@@ -30,7 +32,7 @@ export type BookEligibility = { bookId: string; title: string; result: Eligibili
  */
 export async function loadEligibilityContexts(
   client: Client,
-  input: { contest: ContestRow; viewerId: string; bookIds: string[]; acceptedRulesVersion?: string | null; now?: Date }
+  input: { contest: ContestRow; viewerId: string; bookIds: string[]; chapterIds?: string[]; acceptedRulesVersion?: string | null; now?: Date }
 ): Promise<EligibilityContext[]> {
   const { contest, viewerId, bookIds } = input;
   const now = input.now ?? new Date();
@@ -59,6 +61,18 @@ export async function loadEligibilityContexts(
   throwIfError(bookSubs.error, "load book submissions");
   throwIfError(authorSubs.error, "load author submissions");
   throwIfError(profile.error, "load profile");
+  let selectedStats: EligibilityContext["stats"] | undefined;
+  let chapterChecks: EligibilityResult["checks"] | undefined;
+  if (input.chapterIds !== undefined) {
+    const chapters = await loadContestChapters(client, bookIds, viewerId);
+    chapterChecks = selectedChapterChecks(chapters, input.chapterIds, contest.submission_start, contest.submission_end);
+    const selected = chapters.filter((c) => input.chapterIds!.includes(c.id));
+    selectedStats = {
+      published_chapter_count: selected.length,
+      total_words: selected.reduce((sum, c) => sum + c.word_count, 0),
+      priced_chapter_count: selected.filter((c) => c.price > 0 || c.audio_price > 0).length,
+    };
+  }
 
   // Cuộc thi khác mà các sách đang/đã tham gia, và giải của các sách đó.
   const otherSubs = (bookSubs.data ?? []).filter((s) => s.contest_id !== contest.id);
@@ -103,7 +117,7 @@ export async function loadEligibilityContexts(
       rules,
       viewer: { userId: viewerId, emailVerified: viewer.emailVerified, dateOfBirth: profile.data?.date_of_birth ?? null },
       book,
-      stats: {
+      stats: selectedStats ?? {
         published_chapter_count: st?.published_chapter_count ?? 0,
         total_words: st?.total_words ?? 0,
         priced_chapter_count: st?.priced_chapter_count ?? 0,
@@ -115,14 +129,27 @@ export async function loadEligibilityContexts(
       priorAwards: subs.filter((s) => awardedSubmissions.has(s.id)).length,
       authorOtherActiveEntries: authorActiveBooks.filter((id) => id !== book.id).length,
       acceptedRulesVersion: input.acceptedRulesVersion ?? null,
+      chapterChecks,
     } satisfies EligibilityContext;
   });
+}
+
+async function loadContestChapters(client: Client, bookIds: string[], viewerId: string): Promise<ContestChapter[]> {
+  // Never return draft contents belonging to another author.
+  const owned = await client.from("books").select("id").in("id", bookIds).eq("author_id", viewerId);
+  throwIfError(owned.error, "load owned books");
+  if (!owned.data?.length) return [];
+  const { data, error } = await client.from("chapters")
+    .select("id, book_id, title, order_index, created_at, published_at, published, removed_at, price, audio_price, content")
+    .in("book_id", owned.data.map((b) => b.id)).order("order_index");
+  throwIfError(error, "load contest chapters");
+  return (data ?? []).map(({ content, ...chapter }) => ({ ...chapter, word_count: countWords(content) }));
 }
 
 /** Xem trước điều kiện: 1 sách (bookId) hoặc mọi sách chưa xoá của người xem. */
 export async function previewEligibility(
   client: Client,
-  input: { contest: ContestRow; viewerId: string; bookId?: string | null }
+  input: { contest: ContestRow; viewerId: string; bookId?: string | null; chapterIds?: string[] }
 ): Promise<BookEligibility[]> {
   let bookIds: string[];
   if (input.bookId) {
@@ -137,20 +164,24 @@ export async function previewEligibility(
     throwIfError(error, "list author books");
     bookIds = (data ?? []).map((b) => b.id);
   }
-  const contexts = await loadEligibilityContexts(client, { contest: input.contest, viewerId: input.viewerId, bookIds });
+  const contexts = await loadEligibilityContexts(client, { contest: input.contest, viewerId: input.viewerId, bookIds, chapterIds: input.chapterIds });
   if (input.bookId && contexts.length === 0) throw new ContestError("book_not_found");
-  return contexts.map((ctx) => ({ bookId: ctx.book.id, title: ctx.book.title, result: evaluateEligibility(ctx, "preview") }));
+  const chapters = await loadContestChapters(client, bookIds, input.viewerId);
+  return contexts.map((ctx) => ({ bookId: ctx.book.id, title: ctx.book.title,
+    result: evaluateEligibility(ctx, "preview"), chapters: chapters.filter((ch) => ch.book_id === ctx.book.id)
+      .map((ch) => ({ ...ch, eligible_for_contest: isChapterInContestWindow(ch, input.contest.submission_start, input.contest.submission_end) })) }));
 }
 
 export async function submitEntry(
   client: Client,
-  input: { contest: ContestRow; viewerId: string; bookId: string; acceptedRulesVersion: string }
+  input: { contest: ContestRow; viewerId: string; bookId: string; chapterIds?: string[]; acceptedRulesVersion: string }
 ): Promise<{ submission: SubmissionRow; eligibility: EligibilityResult }> {
   const [ctx] = await loadEligibilityContexts(client, {
     contest: input.contest,
     viewerId: input.viewerId,
     bookIds: [input.bookId],
     acceptedRulesVersion: input.acceptedRulesVersion,
+    chapterIds: input.chapterIds,
   });
   if (!ctx) throw new ContestError("book_not_found");
 
@@ -163,6 +194,7 @@ export async function submitEntry(
     p_user_id: input.viewerId,
     p_rules_version: input.acceptedRulesVersion,
     p_eligibility_result: eligibility.checks,
+    p_chapter_ids: input.chapterIds,
   });
   throwIfError(error, "submit_contest_entry");
   return { submission: data as SubmissionRow, eligibility };

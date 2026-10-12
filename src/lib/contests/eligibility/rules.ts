@@ -155,6 +155,7 @@ export const ELIGIBILITY_RULES: EligibilityRule[] = [
     phases: ["preview", "submit"],
     evaluate: (ctx) => {
       const after = ctx.rules.first_published_after;
+      if (ctx.chapterChecks) return null;
       if (after === null) return null;
       const at = ctx.book.published_at;
       const ok = at !== null && Date.parse(at) >= Date.parse(after);

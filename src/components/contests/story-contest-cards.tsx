@@ -41,6 +41,9 @@ export function StoryContestCards({ cards }: { cards: StoryContestCard[] }) {
                 Xem cuộc thi <ArrowRightIcon size={13} weight="bold" />
               </Link>
             </div>
+            {card.chapters && <details className="mt-2 text-sm"><summary className="cursor-pointer font-semibold text-brand-gold-dark">Các chương dự thi ({card.chapters.length})</summary>
+              <ul className="mt-2 flex flex-col gap-1">{card.chapters.map((ch) => <li key={ch.id}><Link href={ch.href} className="text-brand-ink">{ch.title}</Link></li>)}</ul>
+            </details>}
             {card.vote && <VoteButton slug={card.contest.slug} submissionId={card.submission_id} initial={card.vote} />}
           </div>
         )

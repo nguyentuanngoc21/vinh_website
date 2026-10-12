@@ -20,5 +20,6 @@ export function evaluateEligibility(
     .filter((r) => r.phases.includes(phase))
     .map((r) => r.evaluate(ctx))
     .filter((c): c is NonNullable<typeof c> => c !== null);
+  if (phase !== "close" && ctx.chapterChecks) checks.push(...ctx.chapterChecks);
   return { eligible: checks.every((c) => c.passed || !c.blocking), checks };
 }

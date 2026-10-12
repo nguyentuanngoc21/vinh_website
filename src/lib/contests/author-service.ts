@@ -39,6 +39,7 @@ function brief(c: ContestRow): ContestBrief {
 }
 
 export type AuthorEntry = {
+  selected_chapter_ids?: string[] | null;
   submission_id: string;
   book_id: string;
   book_title: string;
@@ -57,7 +58,7 @@ export type AuthorEntry = {
 async function loadAuthorEntries(client: Client, input: { viewerId: string; bookId?: string; now: Date }): Promise<AuthorEntry[]> {
   let query = client
     .from("contest_submissions")
-    .select("id, contest_id, book_id, status, status_reason, review_flags, submitted_at")
+    .select("id, contest_id, book_id, status, status_reason, review_flags, submitted_at, selected_chapter_ids")
     .eq("author_id", input.viewerId)
     .order("submitted_at", { ascending: false });
   if (input.bookId) query = query.eq("book_id", input.bookId);
@@ -96,6 +97,7 @@ async function loadAuthorEntries(client: Client, input: { viewerId: string; book
     const resultsVisible = areResultsVisible(c, input.now);
     return {
       submission_id: s.id,
+      selected_chapter_ids: s.selected_chapter_ids,
       book_id: s.book_id,
       book_title: titleByBook.get(s.book_id) ?? "—",
       contest: brief(c),
@@ -162,8 +164,8 @@ export type BookContestLocks = {
 };
 
 /** Khoá cho form giá chương / nút độc quyền — cùng điều kiện với 2 trigger trong DB. */
-export async function getBookContestLocks(client: Client, bookId: string): Promise<BookContestLocks> {
-  const { data: subs, error } = await client.from("contest_submissions").select("contest_id, status").eq("book_id", bookId).in("status", ACTIVE);
+export async function getBookContestLocks(client: Client, bookId: string, chapterId?: string): Promise<BookContestLocks> {
+  const { data: subs, error } = await client.from("contest_submissions").select("contest_id, status, selected_chapter_ids").eq("book_id", bookId).in("status", ACTIVE);
   throwIfError(error, "load book locks");
   if (!subs?.length) return { prices: null, exclusive: null };
   const { data: contests, error: cError } = await client
@@ -174,8 +176,10 @@ export async function getBookContestLocks(client: Client, bookId: string): Promi
   const active = (contests ?? []).filter((c) => !FINISHED.includes(c.status));
   if (active.length === 0) return { prices: null, exclusive: null };
   const exclusive = active.filter((c) => readContestConfig(c).eligibility.require_exclusive);
+  const priceContests = active.filter((c) => subs.some((s) => s.contest_id === c.id &&
+    (s.selected_chapter_ids === null || (chapterId !== undefined && s.selected_chapter_ids.includes(chapterId)))));
   return {
-    prices: `Truyện đang dự thi "${active.map((c) => c.title).join('", "')}" — mọi chương phải miễn phí (cả giá đọc và giá audio) đến khi công bố kết quả.`,
+    prices: priceContests.length ? "Chương dự thi phải miễn phí (cả giá đọc và giá audio) đến khi công bố kết quả." : null,
     exclusive: exclusive.length
       ? `Truyện đang dự "${exclusive.map((c) => c.title).join('", "')}" — cuộc thi yêu cầu Độc quyền trên Vịnh, không tắt được đến khi công bố kết quả.`
       : null,

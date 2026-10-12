@@ -48,6 +48,13 @@ const failed = (c: EligibilityContext, phase: "preview" | "submit" | "close" = "
   evaluateEligibility(c, phase).checks.filter((x) => !x.passed).map((x) => x.code);
 
 describe("evaluateEligibility", () => {
+  it("allows an old story with new selected chapters despite first-publication restriction", () => {
+    const c = ctx({ chapterChecks: [{ code: "selected_chapters", passed: true, blocking: true, message: "OK" }] },
+      { first_published_after: "2026-10-09T00:00:00Z" });
+    expect(evaluateEligibility(c, "preview").eligible).toBe(true);
+    expect(evaluateEligibility({ ...c, chapterChecks: [{ code: "selected_chapters", passed: false, blocking: true, message: "Invalid" }] }, "preview").eligible).toBe(false);
+    expect(evaluateEligibility({ ...c, chapterChecks: undefined }, "preview").eligible).toBe(false);
+  });
   it("sách đủ điều kiện", () => {
     expect(evaluateEligibility(ctx(), "preview").eligible).toBe(true);
   });

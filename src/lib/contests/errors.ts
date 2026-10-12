@@ -5,6 +5,7 @@
  * route web và mobile.
  */
 const CATALOG = {
+  invalid_chapter_selection: [422, "Chọn các chương của truyện được tạo và xuất bản trong thời gian mở nhận bài."],
   contest_not_found: [404, "Không tìm thấy cuộc thi."],
   submission_not_found: [404, "Không tìm thấy bài dự thi."],
   book_not_found: [404, "Không tìm thấy truyện."],

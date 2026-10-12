@@ -74,7 +74,7 @@ export default async function AuthorChapterPage({
     supabase.from("characters").select(CHARACTER_FIELDS).eq("book_id", bookId).order("created_at", { ascending: true }),
     supabase.from("chapter_characters").select("character_id").eq("chapter_id", chapterId),
     // D8 / D11 — cùng điều kiện với 2 trigger trong DB (DB vẫn là chốt chặn thật).
-    getBookContestLocks(createServiceRoleClient(), bookId),
+    getBookContestLocks(createServiceRoleClient(), bookId, chapterId),
     supabase.from("story_terms").select(TERM_FIELDS).eq("book_id", bookId).order("created_at", { ascending: true }),
   ]);
 

@@ -2101,6 +2101,7 @@ export type Database = {
       };
       contest_submissions: {
         Row: {
+          selected_chapter_ids: string[] | null;
           id: string;
           contest_id: string;
           book_id: string;
@@ -2716,6 +2717,7 @@ export type Database = {
       };
       submit_contest_entry: {
         Args: {
+          p_chapter_ids?: string[];
           p_contest_id: string;
           p_book_id: string;
           p_user_id: string;

@@ -373,7 +373,7 @@ export async function POST(
     isParagraphComment: paragraphIndex !== null,
   });
   // Nhiệm vụ sự kiện cuộc thi (Slice 3.1) — chỉ tính khi chương thuộc bài dự thi của cuộc thi hôm nay.
-  await recordContestActivity({ userId, event: "comment", bookId: access.chapter.book_id });
+  await recordContestActivity({ userId, event: "comment", bookId: access.chapter.book_id, chapterId });
 
   // Trả về đủ shape ParagraphComment (kể cả tên/avatar) — UI render ngay
   // `authorName[0]` từ object này, thiếu là vỡ cả trang đọc.

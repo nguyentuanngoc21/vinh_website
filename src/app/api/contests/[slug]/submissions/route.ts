@@ -51,9 +51,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     if (!userId) return unauthorized();
     const body = await readJson(request);
     const bookId = requireUuid(body.bookId, "book_not_found");
+    let chapterIds: string[] | undefined;
+    if (body.chapterIds !== undefined) {
+      if (!Array.isArray(body.chapterIds) || body.chapterIds.length === 0 || body.chapterIds.length > 1000) {
+        throw new ContestError("invalid_chapter_selection");
+      }
+      chapterIds = body.chapterIds.map((id) => requireUuid(id, "invalid_chapter_selection"));
+      if (new Set(chapterIds).size !== chapterIds.length) throw new ContestError("invalid_chapter_selection");
+    }
     const accepted = typeof body.acceptedRulesVersion === "string" ? body.acceptedRulesVersion : "";
     const contest = await getContestBySlug(client, slug);
-    const { submission, eligibility } = await submitEntry(client, { contest, viewerId: userId, bookId, acceptedRulesVersion: accepted });
+    const { submission, eligibility } = await submitEntry(client, { contest, viewerId: userId, bookId, chapterIds, acceptedRulesVersion: accepted });
     return Response.json(
       { submission: { id: submission.id, status: submission.status, submitted_at: submission.submitted_at }, eligibility },
       { status: 201, headers: PRIVATE_NO_STORE }

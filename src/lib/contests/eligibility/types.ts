@@ -36,6 +36,8 @@ export type EligibilityContext = {
     published_at: string | null;
   };
   stats: { published_chapter_count: number; total_words: number; priced_chapter_count: number };
+  /** Present only for an entry consisting of explicitly selected chapters. */
+  chapterChecks?: EligibilityCheck[];
   /** Thỏa thuận "Chính sách độc quyền xuất bản" bản hiện hành (D11). */
   exclusivityAgreementAccepted: boolean;
   /** Bài của chính sách này trong cuộc thi này (nếu có). */

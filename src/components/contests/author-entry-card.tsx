@@ -47,6 +47,7 @@ export function AuthorEntryCard({ entry, showBook }: { entry: AuthorEntry; showB
         </span>
       </div>
 
+      {e.selected_chapter_ids && <div className="text-[13px] text-stone-dark">Dự thi với {e.selected_chapter_ids.length} chương đã chọn</div>}
       {e.status_reason && <div className="text-[13px] text-error">Lý do: {e.status_reason}</div>}
       {e.revision_flags.map((f) => (
         <div key={f.id} className="flex items-start gap-2 text-[13px] text-cream-gold-text">

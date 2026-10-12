@@ -299,6 +299,7 @@ export type StoryContestCard =
       contest: { slug: string; title: string; status: ContestRow["status"] };
       submission_id: string;
       phase_label: string;
+      chapters?: { id: string; title: string; href: string }[];
       vote: ReturnType<typeof getEntryVoteState> | null;
     };
 
@@ -315,7 +316,7 @@ export async function getStoryContestCards(
   const now = input.now ?? new Date();
   const { data: subs, error } = await client
     .from("contest_submissions")
-    .select("id, contest_id, author_id, status")
+    .select("id, contest_id, author_id, status, selected_chapter_ids")
     .eq("book_id", input.bookId)
     .in("status", ["eligible", "shortlisted"]);
   throwIfError(error, "story contest submissions");
@@ -339,7 +340,7 @@ export async function getStoryContestCards(
 
   // "Đã đọc hết ≥ 1 chương đang hiển thị" — cùng điều kiện với cast_contest_vote().
   const readIds = [...new Set((reads.data ?? []).map((r) => r.chapter_id).filter((x): x is string => x !== null))];
-  let completed = false;
+  let visibleReadIds: string[] = [];
   if (readIds.length) {
     const { data: visible, error: vError } = await client
       .from("chapters")
@@ -347,15 +348,18 @@ export async function getStoryContestCards(
       .in("id", readIds)
       .eq("book_id", input.bookId)
       .eq("published", true)
-      .is("removed_at", null)
-      .limit(1);
+      .is("removed_at", null);
     throwIfError(vError, "story visible chapters");
-    completed = (visible ?? []).length > 0;
+    visibleReadIds = (visible ?? []).map((ch) => ch.id);
   }
 
   const voted = new Set((votes.data ?? []).map((v) => v.submission_id));
   const contestById = new Map((contests.data ?? []).map((c) => [c.id, c]));
   const cards: StoryContestCard[] = [];
+  const selectedIds = [...new Set(subs.flatMap((s) => s.selected_chapter_ids ?? []))];
+  const chapterRows = selectedIds.length ? await client.from("chapters").select("id, title, order_index")
+    .in("id", selectedIds).eq("book_id", input.bookId).eq("published", true).is("removed_at", null).order("order_index") : { data: [], error: null };
+  throwIfError(chapterRows.error, "story contest selected chapters");
 
   for (const a of (awards.data ?? []).sort((x, y) => (x.award_rank ?? 99) - (y.award_rank ?? 99))) {
     const c = contestById.get(a.contest_id);
@@ -368,6 +372,8 @@ export async function getStoryContestCards(
     const cd = countdownFor(c);
     cards.push({
       kind: "entry",
+      chapters: s.selected_chapter_ids ? (chapterRows.data ?? []).filter((ch) => s.selected_chapter_ids!.includes(ch.id))
+        .map((ch) => ({ id: ch.id, title: ch.title, href: `/read/${input.bookId}/${ch.id}?from=cuoc-thi` })) : undefined,
       contest: { slug: c.slug, title: c.title, status: c.status },
       submission_id: s.id,
       phase_label: PHASE_COPY[c.status].label + (cd && cd.mode === "countdown" ? ` · ${cd.label} ${formatRemaining(Date.parse(cd.target) - now.getTime())}` : ""),
@@ -378,7 +384,7 @@ export async function getStoryContestCards(
               viewerId: input.viewerId,
               entry: { author_id: s.author_id, status: s.status, book_visible: true },
               hasVoted: voted.has(s.id),
-              hasCompletedChapter: completed,
+              hasCompletedChapter: visibleReadIds.some((id) => s.selected_chapter_ids === null || s.selected_chapter_ids.includes(id)),
               requireCompletedChapter: readContestConfig(c).vote.require_completed_chapter,
             })
           : null,
