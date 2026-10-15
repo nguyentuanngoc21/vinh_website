@@ -8,6 +8,7 @@ export type VinhEvent = {
   venue: string;
   address: string;
   city: string;
+  googleMapsUrl?: string;
   coordinates?: { lat: number; lng: number };
   priceVnd: number | null;
   ticketUrl?: string;
@@ -39,6 +40,7 @@ export function eventTime(value: string): string {
   return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(value));
 }
 export function mapUrl(event: VinhEvent, mode?: VinhEvent["travel"][number]["mode"]): string | null {
+  if (!mode && event.googleMapsUrl) return event.googleMapsUrl;
   // Unannounced addresses must never send visitors to a guessed location.
   if (!event.address.trim()) return null;
   const destination = event.coordinates ? `${event.coordinates.lat},${event.coordinates.lng}` : `${event.venue}, ${event.address}, ${event.city}`;

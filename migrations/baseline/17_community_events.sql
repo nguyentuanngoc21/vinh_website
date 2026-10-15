@@ -14,6 +14,12 @@ create table if not exists public.community_events (
   price_vnd bigint check (price_vnd between 0 and 100000000),
   ticket_url text check (ticket_url is null or (char_length(ticket_url) <= 2000 and ticket_url ~ '^https://')),
   banner_path text check (banner_path is null or banner_path ~ '^[a-f0-9-]+/event-[a-f0-9-]+\.(jpg|png|webp)$'),
+  google_maps_url text check (
+    google_maps_url is null or (
+      char_length(google_maps_url) <= 2000 and
+      google_maps_url ~* '^https://(maps\.app\.goo\.gl/[^/?#]+|goo\.gl/maps/[^/?#]+|(www\.)?google\.com(\.vn)?/maps([/?#]|$)|maps\.google\.com(\.vn)?([/?#]|$))'
+    )
+  ),
   category text not null default 'Cộng đồng' check (char_length(btrim(category)) between 1 and 100),
   organizer_bio text not null default '' check (char_length(organizer_bio) <= 500),
   travel_notes jsonb not null default '{}'::jsonb check (jsonb_typeof(travel_notes) = 'object'),

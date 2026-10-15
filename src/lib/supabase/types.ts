@@ -13,7 +13,7 @@ export type Role = "user" | "admin" | "super_admin";
 export type CommunityEventRow = {
   id: string; organizer_id: string; title: string; summary: string; overview: string;
   starts_at: string; ends_at: string; venue: string; address: string; city: string;
-  price_vnd: number | null; ticket_url: string | null; banner_path: string | null;
+  price_vnd: number | null; ticket_url: string | null; banner_path: string | null; google_maps_url: string | null;
   category: string; organizer_bio: string; travel_notes: Record<string, string>;
   games: { id: string; title: string; description: string }[];
   status: "draft" | "published"; hidden: boolean; created_at: string; updated_at: string;
@@ -272,7 +272,7 @@ export type Database = {
     Tables: {
       community_events: {
         Row: CommunityEventRow;
-        Insert: Omit<CommunityEventRow, "created_at" | "updated_at" | "games" | "hidden"> & { games?: CommunityEventRow["games"]; hidden?: boolean };
+        Insert: Omit<CommunityEventRow, "created_at" | "updated_at" | "games" | "hidden" | "organizer_bio"> & { games?: CommunityEventRow["games"]; hidden?: boolean; organizer_bio?: string };
         Update: Partial<Omit<CommunityEventRow, "id" | "organizer_id" | "created_at">>;
         Relationships: [];
       };

@@ -11,7 +11,7 @@ export const TRAVEL_MODES = [
 
 export async function toEvents(client: SupabaseClient<Database>, rows: CommunityEventRow[]): Promise<VinhEvent[]> {
   if (!rows.length) return [];
-  const { data: profiles, error } = await client.from("author_public_profiles").select("id, username, nickname, avatar_url").in("id", [...new Set(rows.map((row) => row.organizer_id))]);
+  const { data: profiles, error } = await client.from("author_public_profiles").select("id, username, nickname, avatar_url, bio").in("id", [...new Set(rows.map((row) => row.organizer_id))]);
   if (error) throw new Error("Không thể tải thông tin người tổ chức.");
   return rows.map((row) => {
     const profile = profiles?.find((person) => person.id === row.organizer_id);
@@ -19,9 +19,10 @@ export async function toEvents(client: SupabaseClient<Database>, rows: Community
       slug: row.id, organizerId: row.organizer_id, hidden: row.hidden,
       title: row.title, summary: row.summary, startsAt: row.starts_at, endsAt: row.ends_at,
       venue: row.venue, address: row.address, city: row.city, category: row.category,
+      googleMapsUrl: row.google_maps_url ?? undefined,
       priceVnd: row.price_vnd, ticketUrl: row.ticket_url ?? undefined, accent: "sea",
       bannerUrl: row.banner_path ? client.storage.from("event-banners").getPublicUrl(row.banner_path).data.publicUrl : undefined,
-      organizer: { name: profile?.nickname || profile?.username || "Người tổ chức", description: row.organizer_bio,
+      organizer: { name: profile?.nickname || profile?.username || "Người tổ chức", description: profile?.bio || "",
         avatarUrl: profile?.avatar_url ?? undefined },
       overview: [{ heading: "Thông tin tổng quan", paragraphs: row.overview.split(/\n\s*\n/).filter(Boolean) }],
       travel: TRAVEL_MODES.map((item) => ({ ...item, note: row.travel_notes[item.mode] || "Xem tuyến đường phù hợp trên Google Maps." })),

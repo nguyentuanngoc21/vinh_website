@@ -1,8 +1,9 @@
 import type { CommunityEventRow } from "@/lib/supabase/types";
+import { isGoogleMapsUrl } from "./map-link";
 export const EVENT_BANNER_MAX_BYTES = 10 * 1024 * 1024;
 export const EVENT_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 export const UUID = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
-export type EventInput = Omit<CommunityEventRow, "id" | "organizer_id" | "created_at" | "updated_at" | "hidden" | "games">;
+export type EventInput = Omit<CommunityEventRow, "id" | "organizer_id" | "created_at" | "updated_at" | "hidden" | "games" | "organizer_bio">;
 export function parseEventInput(body: unknown): { data: EventInput } | { error: string } {
   if (!body || typeof body !== "object" || Array.isArray(body)) return { error: "Dữ liệu sự kiện không hợp lệ." };
   const raw = body as Record<string, unknown>;
@@ -10,7 +11,7 @@ export function parseEventInput(body: unknown): { data: EventInput } | { error: 
   const limits: [string, number, number, string][] = [
     ["title", 3, 160, "Tên sự kiện"], ["summary", 1, 500, "Giới thiệu ngắn"], ["overview", 1, 20000, "Thông tin tổng quan"],
     ["venue", 1, 200, "Tên địa điểm"], ["address", 1, 500, "Địa chỉ"], ["city", 1, 100, "Tỉnh / thành phố"],
-    ["category", 1, 100, "Chủ đề"], ["organizer_bio", 0, 500, "Giới thiệu người tổ chức"],
+    ["category", 1, 100, "Chủ đề"],
   ];
   for (const [key, min, max, label] of limits) {
     if (text(key).length < min || text(key).length > max) return { error: `${label}: cần từ ${min} đến ${max} ký tự.` };
@@ -29,6 +30,8 @@ export function parseEventInput(body: unknown): { data: EventInput } | { error: 
     catch { return { error: "Liên kết vé phải là một địa chỉ HTTPS hợp lệ." }; }
   }
   if (raw.status !== "draft" && raw.status !== "published") return { error: "Trạng thái sự kiện không hợp lệ." };
+  const mapsUrl = text("google_maps_url");
+  if (mapsUrl && !isGoogleMapsUrl(mapsUrl)) return { error: "Liên kết bản đồ cần là Google Maps hợp lệ (HTTPS)." };
   const notes = raw.travel_notes && typeof raw.travel_notes === "object" && !Array.isArray(raw.travel_notes) ? raw.travel_notes as Record<string, unknown> : {};
   const travel: Record<string, string> = {};
   for (const mode of ["driving", "transit", "bicycling", "walking"]) {
@@ -39,6 +42,6 @@ export function parseEventInput(body: unknown): { data: EventInput } | { error: 
     title: text("title"), summary: text("summary"), overview: text("overview"), starts_at: starts, ends_at: ends,
     venue: text("venue"), address: text("address"), city: text("city"), price_vnd: raw.price_vnd as number | null,
     ticket_url: ticket || null, banner_path: text("banner_path") || null, category: text("category"),
-    organizer_bio: text("organizer_bio"), travel_notes: travel, status: raw.status,
+    google_maps_url: mapsUrl ? new URL(mapsUrl).toString() : null, travel_notes: travel, status: raw.status,
   } };
 }

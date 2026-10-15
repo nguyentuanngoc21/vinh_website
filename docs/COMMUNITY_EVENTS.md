@@ -7,6 +7,10 @@
   cột vé/game sticky trên desktop. Không có mục Good to know.
 - `/su-kien/quan-ly`, `/su-kien/tao-moi`: đăng nhập để tạo, sửa, lưu nháp và xuất bản.
   Bấm **Lưu nháp** trên sự kiện đã công khai để ngừng công bố.
+- Tên, avatar và giới thiệu người tổ chức lấy trực tiếp từ hồ sơ người tạo; không nhập riêng trong sự kiện.
+- Địa chỉ nhập tay kèm nút tìm trên Google Maps. Người tạo dùng **Chia sẻ → Sao chép đường liên kết**
+  và dán link vào form. Bản đồ mở link này; chỉ đường theo phương tiện tìm theo địa chỉ đã nhập.
+  Không sử dụng Places API, không cần API key hoặc bật billing.
 - `/admin/su-kien`: xem cả bản nháp, ẩn/hiện sự kiện và gắn game đã đăng ký trong code.
 - Giá vé là thông tin VNĐ. Liên kết đăng ký HTTPS là tuỳ chọn; chưa có checkout, thu tiền,
   phát hành vé, giới hạn chỗ hay đăng ký tham dự trực tiếp trên Vịnh.
@@ -14,6 +18,8 @@
 ## Triển khai
 
 1. Chạy `migrations/20261015_community_events.sql` trên dev/staging.
+   Tiếp theo chạy `migrations/20261015_event_google_maps_link.sql` để thêm cột liên kết bản đồ.
+   Nếu bảng sự kiện đã tồn tại, chỉ cần chạy migration bổ sung này trước khi deploy bản mới.
 2. Chạy `docs/supabase/tests/20261015_community_events.test.sql` trên staging có tài khoản thử.
    Test rollback dữ liệu, kiểm RLS: chỉ thấy published + không hidden, browser không ghi trực tiếp.
 3. Test hai tài khoản: A tạo nháp, B không xem/sửa được; khách không thấy nháp.

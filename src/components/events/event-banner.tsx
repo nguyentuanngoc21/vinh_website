@@ -29,7 +29,7 @@ export function EventBanner({ event, compact = false }: { event: VinhEvent; comp
           </svg>
           <div className={`relative flex h-full flex-col justify-center text-[#f9efd7] ${compact ? "min-h-full p-6 sm:p-8" : "min-h-[300px] px-7 py-12 sm:px-14"}`}>
             <span className="text-[10px] font-semibold uppercase tracking-[.3em] sm:text-xs">Vịnh · Cùng nhau kể chuyện</span>
-            <div className={`mt-5 line-clamp-3 max-w-[60%] font-serif font-semibold leading-[1.12] tracking-tight ${compact ? "text-2xl" : "text-3xl sm:text-5xl"}`}>{event.title}</div>
+            <div className={`mt-5 line-clamp-3 max-w-[60%] font-sans font-semibold leading-[1.12] tracking-tight ${compact ? "text-2xl" : "text-3xl sm:text-5xl"}`}>{event.title}</div>
             <span className="mt-5 max-w-[55%] text-xs leading-relaxed opacity-75 sm:text-sm">Một cuộc gặp. Muôn câu chuyện.</span>
           </div>
         </>
