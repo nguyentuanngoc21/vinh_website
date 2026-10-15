@@ -6,12 +6,8 @@ import type { AgeRating } from "@/lib/age-rating";
 /**
  * Real, DB-backed ranking data for the "Truyện chữ" tab of /rankings
  * (rankings-board.tsx) — replaces the hardcoded fake NOVEL bank + seeded
- * scores that used to drive it (src/lib/rankings-data.ts). "Audio" and
- * "Blog" tabs stay on that mock bank: audio_narrations has no play-count
- * column and there's no blog-post table yet, so there's nothing real to
- * connect them to (see the note at the top of docs/supabase/schema.sql —
- * same reasoning the "Blog" section of connect-directory.tsx was removed
- * for instead of shown with fabricated numbers).
+ * scores that used to drive it (src/lib/rankings-data.ts).
+ * Audio rankings still use the mock bank behind the development overlay.
  *
  * Deliberately parallel to (not sharing code with) toHomepageBooks() in
  * get-homepage-books.ts: that one resolves a small top-12 subset for the
@@ -23,9 +19,8 @@ import type { AgeRating } from "@/lib/age-rating";
  * the "Audio" tab COULD be wired to real all-time totals now the same way
  * "toanthoigian" ranks books by view_count. It isn't yet: play_count has
  * no day-bucketed history (no audio equivalent of book_read_counts_daily),
- * so only an all-time board would be real, not week/month/quarter — and
- * "Blog" still has nothing to read at all (no blog_posts table). Left as
- * future work rather than wiring one tab of four.
+ * so only an all-time board would be real, not week/month/quarter.
+ * Full Audio period rankings remain future work.
  *
  * "tuan"/"thang"/"quy" are real, day-bucketed windows over
  * book_read_counts_daily (see migrations/archive/20260831_add_book_read_counts_daily.sql

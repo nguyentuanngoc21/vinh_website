@@ -15,7 +15,7 @@ const LINK_COLUMNS: { title: string; links: FooterLink[] }[] = [
     links: [
       { label: "Truyện chữ", href: "/truyen" },
       { label: "Truyện audio", href: "/audio" },
-      { label: "Blog", href: "/blog" },
+      { label: "Sự kiện", href: "/su-kien" },
       { label: "Bảng xếp hạng", href: "/rankings" },
     ],
   },
@@ -49,7 +49,7 @@ export function SiteFooter() {
             Vịnh
           </Link>
           <p className="max-w-[280px] text-sm leading-[1.6]">
-            Nền tảng truyện chữ, truyện audio và blog — nơi tác giả Việt sáng
+            Nền tảng truyện chữ và truyện audio — nơi tác giả Việt sáng
             tác và được bảo hộ bản quyền.
           </p>
           <div className="mt-[18px] flex gap-3.5">

@@ -4,7 +4,7 @@ import { getBookRankings } from '@/lib/rankings/get-book-rankings';
 export { OPTIONS } from '@/lib/mobile/response';
 
 const TOP = 50; // the web ranks every published book and shows 7 at a time; the app needs far fewer
-// Real "Truyện chữ" rankings of the web (tuần / tháng / quý / toàn thời gian). Audio/Blog tabs are still mock on the web.
+// Real "Truyện chữ" rankings of the web (tuần / tháng / quý / toàn thời gian). The Audio tab is still mock on the web.
 export function GET(request: Request) {
   return publicMobileResponse(async () => {
     let auth;

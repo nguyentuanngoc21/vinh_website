@@ -23,7 +23,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: "nav",
     target: '[data-tour="tour-nav"]',
     title: "Menu chuyên mục",
-    body: "Chuyển giữa Truyện chữ, Audio, Blog, Thiết kế, Kết nối và Bảng xếp hạng.",
+    body: "Chuyển giữa Truyện chữ, Cuộc thi, Sự kiện, Audio, Thiết kế, Kết nối và Bảng xếp hạng.",
     placement: "bottom",
   },
   {

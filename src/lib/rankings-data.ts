@@ -62,44 +62,6 @@ export const NOVEL = parseBank({
   ],
 });
 
-export const BLOG = parseBank({
-  "Nghề viết": [
-    "Viết chương mở đầu: bốn cách mở mà biên tập viên không bỏ qua|Lam|8",
-    "Đặt tên nhân vật Việt mà không rơi vào sáo rỗng|An Nhiên|6",
-    "Ba mươi phút mỗi sáng: nhật ký viết của một tác giả web|Trúc Ly|5",
-    "Dựng bối cảnh miền biển bằng năm chi tiết|Minh Khôi|7",
-    "Cắt bản thảo: bỏ 20% để giữ người đọc|Hạ Vũ|6",
-  ],
-  "Bản quyền": [
-    "Watermark động: bảo vệ từng trang đọc|Đội ngũ Vịnh|7",
-    "Dấu thời gian công bố: bằng chứng khi có tranh chấp|Đội ngũ Vịnh|6",
-    "Khi tác phẩm bị đăng lại: xử lý trong 48 giờ|Đội ngũ Vịnh|4",
-    "Hợp đồng xuất bản: sáu điều khoản nên đọc kỹ|Bảo Chi|9",
-    "Đăng ký quyền tác giả ở Việt Nam, từng bước|Lam|8",
-  ],
-  "Phỏng vấn": [
-    "Minh Khôi: “Tôi viết biển như viết về người ở lại”|Hạ Vũ|9",
-    "An Nhiên và mười năm viết trinh thám|Lam|7",
-    "Thu Hà: giọng đọc sau ba trăm chương|Quốc Bảo|6",
-    "Trúc Ly nói về tiểu thuyết lịch sử|Hoài An|8",
-    "Biên tập viên kể chuyện đọc bản thảo|Đội ngũ Vịnh|5",
-  ],
-  Audio: [
-    "Từ bản thảo tới bản thu: quy trình sản xuất audio|Thu Hà|7",
-    "Nghe truyện khi chạy bộ: chương dài bao nhiêu là vừa|Quốc Bảo|4",
-    "Chọn giọng đọc cho nhân vật nữ chính|Lan Chi|6",
-    "Watermark âm thanh hoạt động thế nào|Đội ngũ Vịnh|5",
-    "Thu âm tại nhà: thiết bị tối thiểu|Hữu Tài|8",
-  ],
-  "Cộng đồng": [
-    "Bảng xếp hạng quý III: thị hiếu người đọc đang đổi|Đội ngũ Vịnh|5",
-    "Nhóm đọc thử: 40 người đọc trước mỗi bản thảo|Hoài An|6",
-    "Bình luận tử tế: quy tắc cộng đồng Vịnh|Đội ngũ Vịnh|4",
-    "Câu lạc bộ đọc tháng Bảy|Lam|3",
-    "Tác giả mới nổi tuần này|Hạ Vũ|4",
-  ],
-});
-
 export const GRADS = [
   "linear-gradient(160deg,#7c3aed,#4338ca)",
   "linear-gradient(160deg,#0891b2,#0e7490)",
@@ -117,7 +79,7 @@ export const GRADS = [
 
 export const NARRATORS = ["Thu Hà", "Quốc Bảo", "Lan Chi", "Hữu Tài", "Mai Trâm"];
 
-export const KINDS = ["Truyện chữ", "Audio", "Blog"] as const;
+export const KINDS = ["Truyện chữ", "Audio"] as const;
 export type Kind = (typeof KINDS)[number];
 
 export const PERIODS = [
@@ -141,8 +103,8 @@ export type ScoredWork = {
   mult: number;
 };
 
-export function buildScored(kind: Kind, periodId: PeriodId): ScoredWork[] {
-  const bank = kind === "Blog" ? BLOG : NOVEL;
+export function buildScored(periodId: PeriodId): ScoredWork[] {
+  const bank = NOVEL;
   const period = PERIODS.find((p) => p.id === periodId)!;
   const pf = period.factor;
   const mult = period.mult;
@@ -189,13 +151,6 @@ export function formatReads(kind: Kind, item: ScoredWork, rank: number) {
     return {
       reads: unit(k) + " giờ nghe",
       byline: "Giọng đọc " + item.narrator + " · " + item.num + " chương",
-    };
-  }
-  if (kind === "Blog") {
-    const k = 46 * Math.pow(0.91, rank - 1) * item.mult * jit;
-    return {
-      reads: unit(k) + " đọc",
-      byline: item.author + " · " + item.num + " phút đọc",
     };
   }
   const k = 1450 * Math.pow(0.9, rank - 1) * item.mult * jit;

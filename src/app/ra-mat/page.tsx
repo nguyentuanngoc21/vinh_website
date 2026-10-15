@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 // Trang chờ ra mắt, độc lập với "/" — không dùng SiteHeader/nav (điều
-// hướng tới các mục Audio/Blog/Thiết kế/Kết nối/Bảng xếp hạng chưa hoàn
+// hướng tới các mục Audio/Thiết kế/Kết nối/Bảng xếp hạng chưa hoàn
 // thiện không hợp lý ở đây). Mục đích duy nhất: đo số người đang chờ Vịnh
 // ra mắt, tách theo độc giả/tác giả — xem src/app/api/waitlist/route.ts.
 export default function LaunchWaitlistPage() {

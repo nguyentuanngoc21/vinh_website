@@ -10,6 +10,14 @@
  */
 
 export type Role = "user" | "admin" | "super_admin";
+export type CommunityEventRow = {
+  id: string; organizer_id: string; title: string; summary: string; overview: string;
+  starts_at: string; ends_at: string; venue: string; address: string; city: string;
+  price_vnd: number | null; ticket_url: string | null; banner_path: string | null;
+  category: string; organizer_bio: string; travel_notes: Record<string, string>;
+  games: { id: string; title: string; description: string }[];
+  status: "draft" | "published"; hidden: boolean; created_at: string; updated_at: string;
+};
 export type CreatorTag =
   | "author"
   | "illustrator"
@@ -262,6 +270,12 @@ export type ContestReviewFlag = {
 export type Database = {
   public: {
     Tables: {
+      community_events: {
+        Row: CommunityEventRow;
+        Insert: Omit<CommunityEventRow, "created_at" | "updated_at" | "games" | "hidden"> & { games?: CommunityEventRow["games"]; hidden?: boolean };
+        Update: Partial<Omit<CommunityEventRow, "id" | "organizer_id" | "created_at">>;
+        Relationships: [];
+      };
       // Khai báo tại chỗ (không import từ src/lib/moderation) — file này dùng
       // chung với mobile-vinh, nơi alias "@/..." không phân giải được.
       // Khớp ContentReport ở src/lib/moderation/content-reports.ts.

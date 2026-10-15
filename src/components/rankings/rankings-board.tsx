@@ -7,7 +7,6 @@ import {
   CaretRightIcon,
   ArrowUpRightIcon,
   HeadphonesIcon,
-  ArticleIcon,
   TrendUpIcon,
   ArrowDownIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -21,7 +20,6 @@ import { REAL_PERIODS, type BookRankingsData, type RealPeriodId } from "@/lib/ra
 import {
   KINDS,
   PERIODS,
-  BLOG,
   NOVEL,
   LEADERS,
   buildScored,
@@ -33,8 +31,8 @@ import {
 
 const MEDAL_BG = ["var(--color-brand-gold)", "var(--color-sidebar-text-dim-2)", "#C08552"];
 
-// "Truyện chữ" is real now (see get-book-rankings.ts); "Audio" and "Blog"
-// are still the mock bank, so only those two stay behind the blurred
+// "Truyện chữ" is real now (see get-book-rankings.ts); "Audio"
+// still uses the mock bank, so only that tab stays behind the blurred
 // "Đang phát triển" overlay — page.tsx no longer wraps the whole page in
 // it (see development-overlay.tsx's own "unwrap once wired up" note).
 function MaybeBlurred({ blurred, children }: { blurred: boolean; children: ReactNode }) {
@@ -68,12 +66,12 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
 
   const cats = isReal
     ? ["Tất cả", ...REAL_GENRES.map((g) => g.label)]
-    : ["Tất cả", ...Object.keys(kind === "Blog" ? BLOG : NOVEL)];
+    : ["Tất cả", ...Object.keys(NOVEL)];
 
   const realRows = realPeriod.list
     .filter((b) => genre === "Tất cả" || b.genre === genre)
     .map((b, i) => ({ ...b, rank: i + 1 }));
-  const mockRows = buildScored(kind, mockPeriodId)
+  const mockRows = buildScored(mockPeriodId)
     .filter((b) => genre === "Tất cả" || b.genre === genre)
     .map((b, i) => ({ ...b, rank: i + 1 }));
   const listLength = isReal ? realRows.length : mockRows.length;
@@ -86,15 +84,13 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
   const heading =
     kind === "Truyện chữ"
       ? "Tác phẩm được đọc nhiều nhất"
-      : kind === "Audio"
-        ? "Truyện audio được nghe nhiều nhất"
-        : "Bài blog được đọc nhiều nhất";
+      : "Truyện audio được nghe nhiều nhất";
   const periodRange = isReal ? realPeriod.range : period.range;
   const periodLabel = isReal
     ? (REAL_PERIODS.find((p) => p.id === periodId)?.label ?? "").toLowerCase()
     : period.label.toLowerCase();
   const subheading =
-    (genre === "Tất cả" ? "Tất cả " + (kind === "Blog" ? "chủ đề" : "thể loại") : genre) +
+    (genre === "Tất cả" ? "Tất cả thể loại" : genre) +
     " · " +
     periodLabel +
     " · " +
@@ -102,8 +98,8 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
     " · " +
     listLength +
     " mục";
-  const colItem = kind === "Blog" ? "BÀI VIẾT" : "TÁC PHẨM";
-  const colGenre = kind === "Blog" ? "CHỦ ĐỀ" : "THỂ LOẠI";
+  const colItem = "TÁC PHẨM";
+  const colGenre = "THỂ LOẠI";
   const colReads = kind === "Audio" ? "GIỜ NGHE" : "LƯỢT ĐỌC";
   const formula1 = !isReal
     ? kind === "Audio"
@@ -493,12 +489,6 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                   <Link href="/audio" className="flex items-center justify-between text-brand-ink no-underline">
                     <span className="flex items-center gap-2">
                       <HeadphonesIcon /> Kho truyện audio
-                    </span>
-                    <ArrowUpRightIcon size={13} />
-                  </Link>
-                  <Link href="/blog" className="flex items-center justify-between text-brand-ink no-underline">
-                    <span className="flex items-center gap-2">
-                      <ArticleIcon /> Blog Vịnh
                     </span>
                     <ArrowUpRightIcon size={13} />
                   </Link>

@@ -44,7 +44,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/dang-nhap"
 
         <div className="relative">
           <div className="text-[13px] font-medium tracking-[1.4px] text-brand-gold-light">
-            TRUYỆN CHỮ · AUDIO · BLOG
+            TRUYỆN CHỮ · AUDIO
           </div>
           <div className="mt-4 max-w-[420px] font-[family-name:var(--font-lora)] text-[32px] font-semibold leading-[1.25] sm:text-[38px]">
             Nơi người Việt kể chuyện và giữ được quyền trên chữ của mình.

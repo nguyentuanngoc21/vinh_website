@@ -37,8 +37,7 @@ export default async function SearchPage({
 }) {
   const { q, type } = await searchParams;
   const query = (q ?? "").trim();
-  // type=blog (hoặc bất kỳ giá trị lạ nào) rơi về mặc định "truyen" — Blog
-  // vẫn là dữ liệu mock (src/lib/blog.ts), không có tab kết quả thật.
+  // Unsupported search types fall back to story search.
   const activeTab: SearchType = isSearchType(type) ? type : "truyen";
 
   const supabase = await createClient();

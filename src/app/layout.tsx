@@ -21,9 +21,9 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "Vịnh — Truyện chữ, truyện audio & blog",
+  title: "Vịnh — Truyện chữ và truyện audio",
   description:
-    "Nền tảng truyện chữ, truyện audio và blog tiếng Việt với bảo vệ bản quyền cho tác giả.",
+    "Nền tảng truyện chữ và truyện audio tiếng Việt với bảo vệ bản quyền cho tác giả.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

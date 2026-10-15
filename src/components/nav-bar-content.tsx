@@ -9,7 +9,7 @@ type NavBarContentProps = {
   showSearch?: boolean;
   searchPlaceholder?: string;
   /** Tab mặc định khi trang /tim-kiem mở ra từ ô tìm kiếm này — mỗi khu
-   * vực (Audio/Thiết kế/Blog) có placeholder riêng nhưng đều nộp vào
+   * vực (Audio/Thiết kế) có placeholder riêng nhưng đều nộp vào
    * cùng 1 trang kết quả chung, chỉ khác tab nào được chọn sẵn. */
   searchType?: SearchType;
   /** Chỉ /tim-kiem/page.tsx truyền vào — hiện lại đúng từ khoá vừa tìm
