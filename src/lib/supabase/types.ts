@@ -10,6 +10,11 @@
  */
 
 export type Role = "user" | "admin" | "super_admin";
+export type ManuscriptImportJob = {
+  id: string; owner_id: string; status: "uploading" | "queued" | "processing" | "succeeded" | "failed";
+  input_path: string; output_path: string | null; attempts: number; lease_token: string | null;
+  lease_until: string | null; available_at: string; expires_at: string; error_message: string | null; created_at: string;
+};
 export type CommunityEventRow = {
   id: string; organizer_id: string; title: string; summary: string; overview: string;
   starts_at: string; ends_at: string; venue: string; address: string; city: string;
@@ -270,6 +275,12 @@ export type ContestReviewFlag = {
 export type Database = {
   public: {
     Tables: {
+      manuscript_import_jobs: {
+        Row: ManuscriptImportJob;
+        Insert: never;
+        Update: Partial<Pick<ManuscriptImportJob, "status" | "error_message">>;
+        Relationships: [];
+      };
       community_events: {
         Row: CommunityEventRow;
         Insert: Omit<CommunityEventRow, "created_at" | "updated_at" | "games" | "hidden" | "organizer_bio"> & { games?: CommunityEventRow["games"]; hidden?: boolean; organizer_bio?: string };
@@ -2643,6 +2654,9 @@ export type Database = {
       };
     };
     Functions: {
+      reserve_manuscript_import: { Args: { p_id: string; p_owner: string }; Returns: { created: boolean; job_id: string }[] };
+      claim_manuscript_import: { Args: Record<string, never>; Returns: ManuscriptImportJob[] };
+      finish_manuscript_import: { Args: { p_id: string; p_token: string; p_outcome: string; p_output?: string | null }; Returns: boolean };
       consume_heavy_request_limit: {
         Args: { p_subject: string; p_scope: string; p_limit: number; p_window_seconds: number };
         Returns: { allowed: boolean; retry_after_seconds: number }[];

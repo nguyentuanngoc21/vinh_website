@@ -3,6 +3,7 @@ import mammoth from "mammoth";
 import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import { extractHeadingChapters } from "@/lib/authoring/split-chapters";
 import { limitHeavyRequest } from "@/lib/heavy-request-limit";
+import { enqueueManuscript, IMPORT_JOB_ID } from "@/lib/authoring/manuscript-queue";
 
 // ~4.5MB là giới hạn body thật của Vercel Route Handler cho Route Handlers
 // (không cấu hình được lớn hơn) — giữ dư 0.5MB làm biên an toàn.
@@ -58,6 +59,13 @@ export async function POST(request: Request) {
 
   const limited = await limitHeavyRequest(userId, "manuscript-extract", admin);
   if (limited) return limited;
+  // Opt-in preserves older/mobile synchronous clients until they support job polling.
+  if (process.env.MANUSCRIPT_QUEUE_ENABLED === "true" && form?.get("async") === "1" && !request.headers.has("authorization")) {
+    const id = request.headers.get("x-import-id")?.toLowerCase();
+    if (!id || !IMPORT_JOB_ID.test(id)) return NextResponse.json({ error: "Mã tác vụ không hợp lệ." }, { status: 400 });
+    try { return await enqueueManuscript(admin(), userId, id, file); }
+    catch (error) { return requestError(error); }
+  }
   let text: string;
   let headingChapters: ReturnType<typeof extractHeadingChapters> = [];
   try {

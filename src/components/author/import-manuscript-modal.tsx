@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { importDocx } from "@/lib/authoring/import-docx-client";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -61,6 +62,9 @@ export function ImportManuscriptModal({
   const [rawText, setRawText] = useState("");
   const [sourceLabel, setSourceLabel] = useState("");
   const [extracting, setExtracting] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const extractionRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { extractionRef.current?.abort(); }, [open]);
   const [splitMode, setSplitMode] = useState<ImportSplitMode>("chuong");
   // Chỉ có giá trị sau khi tải lên 1 file .docx thật sự dùng style Heading
   // của Word — xem extractHeadingChapters() trong split-chapters.ts.
@@ -91,6 +95,7 @@ export function ImportManuscriptModal({
       setRawText("");
       setSourceLabel("");
       setExtracting(false);
+      setWaiting(false);
       setSplitMode("chuong");
       setHeadingChapters([]);
       setDestinationMode(destinationBookId ? "existing" : "new");
@@ -136,6 +141,11 @@ export function ImportManuscriptModal({
   };
 
   const handleFile = async (file: File) => {
+    extractionRef.current?.abort();
+    const controller = new AbortController();
+    extractionRef.current = controller;
+    setExtracting(false);
+    setWaiting(false);
     setError(null);
     setEditedChapters(null);
     setActiveChapter(null);
@@ -147,6 +157,7 @@ export function ImportManuscriptModal({
 
     if (lower.endsWith(".txt")) {
       const text = await file.text();
+      if (controller.signal.aborted) return;
       setRawText(text);
       setSourceLabel(file.name);
       setHeadingChapters([]);
@@ -162,14 +173,8 @@ export function ImportManuscriptModal({
 
     setExtracting(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/authoring/manuscripts/extract", { method: "POST", body: formData });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || typeof data?.text !== "string") {
-        setError((data && typeof data.error === "string" && data.error) || "Không đọc được file này.");
-        return;
-      }
+      const data = await importDocx(file, controller.signal, () => setWaiting(true));
+      if (controller.signal.aborted) return;
       const headings: DetectedChapter[] = Array.isArray(data.headingChapters) ? data.headingChapters : [];
       setRawText(data.text);
       setSourceLabel(file.name);
@@ -179,10 +184,10 @@ export function ImportManuscriptModal({
       const markers = splitChapters(data.text, "chuong");
       setSplitMode(headings.length > 0 && (markers.fellBackToSingle || headings.length === markers.chapters.length) ? "heading" : "chuong");
       setStep("review");
-    } catch {
-      setError("Không thể kết nối máy chủ. Vui lòng thử lại sau.");
+    } catch (error) {
+      if (!controller.signal.aborted) setError(error instanceof Error ? error.message : "Không thể kết nối máy chủ. Vui lòng thử lại sau.");
     } finally {
-      setExtracting(false);
+      if (!controller.signal.aborted) { setExtracting(false); setWaiting(false); }
     }
   };
 
@@ -341,7 +346,7 @@ export function ImportManuscriptModal({
                 />
                 <FileArrowUpIcon size={28} color="var(--color-brand-gold)" />
                 <div className="text-[14.5px] font-semibold text-brand-ink">
-                  {extracting ? "Đang đọc file…" : "Kéo thả file vào đây, hoặc bấm để chọn"}
+                  {extracting ? (waiting ? "Đã nhận file, đang chờ xử lý…" : "Đang đọc file…") : "Kéo thả file vào đây, hoặc bấm để chọn"}
                 </div>
                 <div className="text-[12.5px] text-stone-light">Hỗ trợ .docx, .txt · tối đa 4MB</div>
               </label>

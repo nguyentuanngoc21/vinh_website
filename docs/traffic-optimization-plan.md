@@ -89,14 +89,46 @@ Workspace có Git remote và liên kết project Vercel nhưng không có phiên
 
 Lệnh preflight không in key: `node --env-file=.env.prod scripts/verify-heavy-limit.mjs`. Không commit `.env.prod`. Chưa triển khai queue tác vụ nền trong đợt kích hoạt này.
 
+Cập nhật sau đó: commit `377f8df` đã push lên production; kiểm tra trực tiếp website xác nhận `/`, `/audio`, `/su-kien` trả 200 và được phục vụ prerender/ISR; hai API cá nhân trả 401/no-store cho guest. Chủ web đã xác nhận đặt `HEAVY_REQUEST_LIMIT_STORE=supabase`. Kiểm tra đọc lúc 17:18 ngày 16/10/2026 (10:18 UTC) cho thấy bảng bộ đếm còn rỗng; chưa thể xác nhận biến đã được deployment áp dụng hoặc đường authenticated thực sự gọi RPC. Cần redeploy nếu đặt biến sau bản build hiện tại, rồi dùng một file DOCX nhỏ đến bước xem trước để phát sinh một lần extract; không cần tạo truyện/chương hay dùng CCCD thật. Sau đó kiểm tra bucket `manuscript-extract` và kết quả HTTP. Không yêu cầu người dùng gửi cookie/token.
+
 ## Đợt 5 — Queue tác vụ nền
 
-- [ ] Chọn một công việc cụ thể được phép hoàn thành sau (OCR/tạo bìa/thông báo), đo tải trước.
-- [ ] Chọn lưu trữ queue/worker sau khi đối chiếu quota và khả năng chạy của môi trường; chưa thêm dịch vụ trả phí.
-- [ ] Thiết kế job ID, quyền xem, idempotency, giới hạn concurrency/backlog, retry giới hạn và xử lý job lỗi.
-- [ ] Không đưa toàn bộ GET trang vào queue; không chạy worker tùy ý sau response serverless.
+Xác nhận kích hoạt đợt 4: chủ web thử nhập DOCX trên production nhận HTTP 200. Kiểm tra chỉ đọc lúc 17:22 ngày 16/10/2026 (10:22 UTC) thấy bucket `manuscript-extract`, `hits=1`, `reset_at=10:31:10 UTC` (17:31:10 giờ Việt Nam), trong khi lần đọc 17:18 chưa có dòng. Kết hợp thao tác người dùng và bucket mới, xác nhận luồng DOCX đã gọi bộ đếm Supabase. Không suy rộng thành đã kiểm thử chạm quota, mọi endpoint hoặc tính nguyên tử khi chạy đồng thời; các mục SQL/staging còn mở vẫn giữ nguyên. Không tiếp tục gửi DOCX để làm đầy quota của tài khoản thật.
+
+Khảo sát ban đầu: chọn nhập DOCX làm ứng viên đầu tiên vì không cần quyết định xác minh danh tính/thanh toán ngay lập tức, và có modal xem trước để thể hiện trạng thái xử lý. Chưa có số đo CPU/thời gian DOCX production; chưa chọn giải pháp queue để đưa vào chạy thật. Worker Python hiện là skeleton riêng cho quest generation, claim chưa nguyên tử, không tái sử dụng như worker đa-instance nếu chưa sửa cơ chế claim.
+
+Thiết kế dự kiến để review: file tạm trong bucket private, job chỉ lưu đường dẫn và owner (không lưu nội dung bản thảo trong log), API trả job ID và 202 sau khi enqueue bền vững, worker claim nguyên tử có lease/fencing và concurrency giới hạn, trạng thái chỉ owner được đọc. Client poll có backoff/visibility thay vì giữ HTTP chờ. Cần giới hạn file đầu vào/độ nở DOCX, quota dung lượng/backlog, thời hạn xóa file/kết quả, idempotency và retry hữu hạn trước khi đổi luồng đang hoạt động. Cơ chế gọi worker định kỳ bằng Supabase Cron/pg_net là ứng viên dùng hạ tầng sẵn có, chưa được cấu hình. Không dùng nền fire-and-forget sau response Vercel.
+
+- [x] Chọn nhập DOCX; `.txt`/văn bản dán vẫn xử lý tại trình duyệt. Mã mới chỉ enqueue khi `MANUSCRIPT_QUEUE_ENABLED=true`, web gửi `async=1` và UUID `x-import-id`; client cũ/mobile không opt-in vẫn dùng response đồng bộ hiện tại. Vì giữ tương thích, queue chưa phải giới hạn concurrency cho mọi đường parse cũ.
+- [x] Queue bền vững trên Postgres + bucket private `manuscript-imports`, không thêm package/dịch vụ trả phí. Enqueue trả 202 sau reserve/upload/chuyển queued. RPC admission khóa nguyên tử giới hạn 2 job active/tài khoản và 20 active toàn project, idempotent theo job ID + owner; retry cùng ID không tạo job/upload mới nhưng vẫn đi qua limiter thao tác.
+- [x] Worker xác thực CRON_SECRET cả dev, xử lý một job mỗi HTTP call; claim nguyên tử một slot toàn project, lease 180 giây, token mới khi reclaim, max 3 lần thử; transient errors giãn 30/60 giây trước hai lần thử lại, tài liệu không hợp lệ thất bại ngay. Commit dùng token/lease còn hạn, không cho worker cũ ghi đè. Không xóa input/output khi kết quả RPC có thể đã commit nhưng HTTP response bị mất.
+- [x] Chốt giới hạn parse queue: input 4 MiB, tối đa 256 ZIP entries, tổng giải nén thực tế 12 MiB, không ZIP64/multi-volume/encrypted/DTD/entity/path traversal; kiểm tra inflate thực tế trước Mammoth. Text tối đa 500.000 ký tự, 300 heading chapters và JSON kết quả tối đa 2 MiB; không nhúng ảnh hoặc cho truy cập file bên ngoài. Một số DOCX hợp lệ nhưng quá nhiều phần/định dạng sẽ được yêu cầu chia nhỏ.
+- [x] API GET job luôn xác thực, lọc owner, no-store và giới hạn poll best-effort 30/phút/tài khoản. Không lộ đường dẫn Storage. UI đợi kết quả, không poll tab ẩn/offline, backoff lỗi/429, tối đa 30 phút; đóng modal/đổi file abort theo dõi, không tự tạo truyện/chương. Đóng modal không hủy job server: job có thể tiếp tục rồi được dọn theo TTL, ID chưa lưu để phục hồi sau reload.
+- [x] TTL job/kết quả 1 giờ, worker dọn tối đa 10 job hết hạn mỗi call và chỉ xóa metadata sau khi xóa Storage thành công. Queue tắt vẫn cho worker đã xác thực chạy cleanup. Không claim job còn dưới 3 phút trước hạn; uploading gián đoạn quá 5 phút chuyển failed. Xóa auth user không xóa metadata cleanup ngay; nội dung tạm vẫn chỉ accessible qua owner API khi có phiên hợp lệ.
+- [ ] Chạy SQL regression/concurrency và e2e có tài khoản trên staging; đo CPU/thời gian DOCX thực tế, thời gian chờ và tốc độ dọn.
+- [ ] Áp migration, cấu hình cron, deploy và bật cờ sau staging đạt. Chưa áp dụng/bật trong phiên phát triển này.
+
+Kiểm tra local đợt queue: 94 unit tests liên quan đợt 1–5 đã qua (gồm DOCX thật tối giản, ZIP khai gian kích thước, stale lease, commit mất phản hồi, upload thất bại, cleanup lỗi, owner-scoped status, cron authentication, polling hidden/abort/429 và tương thích synchronous/mobile); ESLint, TypeScript, production build và schema check qua. HTTP bản production local xác nhận GET job không đăng nhập trả 401/no-store, worker không có secret trả 401, `/` và `/audio` vẫn cache HIT. Unit tests mock database/storage không thay thế SQL concurrency hoặc luồng enqueue/worker/download thật. Chưa push/deploy code queue, chưa chạy migration/cron mới.
+
+### File và thứ tự triển khai queue
+
+1. Chạy `migrations/20261016_manuscript_import_queue.sql` ở dev/staging; baseline mới là `19_manuscript_import_queue.sql`, schema tổng hợp đã sinh lại. Chạy `docs/supabase/tests/20261016_manuscript_import_queue.test.sql` trên queue staging trống: transaction rollback fixture, kiểm tra owner/global cap, quyền, idempotency, lease và fencing. SQL test chưa được chạy từ workspace.
+2. Deploy code với queue OFF (chưa đặt biến hoặc false). Luồng DOCX cũ tiếp tục nhận 200; frontend mới hiểu cả 200 và 202.
+3. Tạo/kiểm tra CRON_SECRET trên Vercel. Supabase Vault dùng `publication_site_url` và `publication_cron_secret` như cron đăng chương; giá trị secret phải khớp, không gửi qua chat. Chạy `scripts/setup-manuscript-import-cron.sql` trong đúng project web. Script không tự ghi Vault và chạy lại cập nhật cùng tên job.
+4. Đặt Config `MANUSCRIPT_QUEUE_ENABLED=true` ở môi trường staging tương ứng và redeploy. Test file nhỏ: POST 202 → GET queued/processing → succeeded → xem trước; tài khoản khác GET job trả 404, invalid DOCX failed, đóng modal không ghi state muộn. Không dùng bản thảo thật để tạo tải. Preflight chỉ đọc/đầu vào vô hiệu: `node --env-file=.env.prod scripts/verify-manuscript-queue.mjs` (chỉ chạy sau migration đúng môi trường).
+5. Sau staging đạt mới lặp lại production. Cron Supabase mỗi phút, mỗi call một job, nên tốc độ khởi điểm khoảng 1 job/phút với tối đa một worker; queue hấp thụ burst nhưng không tăng năng lực xử lý. Backlog 20 có thể chờ khoảng 20 phút hoặc lâu hơn nếu có retry/timeout. Theo dõi và giảm backlog/tăng worker budget sau khi có số đo, không hứa thời gian hoàn thành cố định.
+
+Nếu cron/secret/mạng bị lỗi, queue và dữ liệu tạm có thể tồn tại quá 1 giờ vì TTL chỉ được thực thi khi cleanup chạy; cần theo dõi HTTP worker, tuổi job cũ nhất và dung lượng bucket. Không coi Cron History “Succeeded” là job xử lý thành công, vì pg_net mới chỉ xếp HTTP. Không có timer/worker chạy trong background của response Vercel, không thêm cron Vercel mỗi phút. Worker chỉ đọc project web; mobile bearer client giữ luồng cũ, không enqueue vào project mobile riêng.
+
+Rollback queue: đặt `MANUSCRIPT_QUEUE_ENABLED=false`, redeploy để nhận đồng bộ; giữ cron/worker hoạt động tối thiểu cho tới khi dọn hết file/job cũ. Không xóa bucket/bảng khi còn jobs, không xóa cron ngay khi tắt cờ vì sẽ ngừng cleanup. Chi phí bổ sung: upload tạm, poll trạng thái, DB updates và worker invocations; cần đo trước khi mở rộng.
 
 ## Điều kiện nghiệm thu và triển khai
+
+### Cập nhật kích hoạt queue ngày 16/10/2026
+
+Chủ web xác nhận đã chạy migration queue, SQL regression trả `Success. No rows returned`, đăng ký cron trả `schedule: 2`, và đặt `MANUSCRIPT_QUEUE_ENABLED=true` trên Vercel. Preflight từ workspace trên project production đã qua: bảng tồn tại, bucket private, guard reserve/finish hoạt động và anon bị từ chối. Đây chưa phải xác nhận cron HTTP hoặc xử lý DOCX thành công.
+
+Code queue được chuẩn bị push lên nhánh production theo yêu cầu tiếp tục triển khai. Sau deployment mới, cần thử một DOCX nhỏ: POST extract trả 202, GET job chuyển sang succeeded và modal hiện bản xem trước. Nếu POST vẫn 200, kiểm tra deployment mới và biến Production; nếu job chờ quá 2–3 phút, kiểm tra worker HTTP/CRON_SECRET và Vault. Không gửi secret qua chat. Các mục chưa nghiệm thu ở trên tiếp tục giữ mở.
 
 Hoàn thành code + kiểm thử local trước; đánh dấu rõ mục còn cần kiểm tra production. Không tự chạy migration/deploy/load test trong đợt sửa code này. Không sửa thay đổi có sẵn trong chapter editor. Đo lại cùng workload, thời lượng và đường mạng ổn định; p95 <= 2 giây, lỗi <= 1% là mục tiêu bài đo, không phải SLA hay số người dùng cam kết.
 
