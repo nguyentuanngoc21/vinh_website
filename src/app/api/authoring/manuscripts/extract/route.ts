@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { getUserContext, requestError } from "@/lib/mobile/request-context";
 import { extractHeadingChapters } from "@/lib/authoring/split-chapters";
+import { limitHeavyRequest } from "@/lib/heavy-request-limit";
 
 // ~4.5MB là giới hạn body thật của Vercel Route Handler cho Route Handlers
 // (không cấu hình được lớn hơn) — giữ dư 0.5MB làm biên an toàn.
@@ -27,8 +28,9 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024;
  */
 export async function POST(request: Request) {
   let userId: string | null;
+  let admin: Awaited<ReturnType<typeof getUserContext>>["admin"];
   try {
-    ({ userId } = await getUserContext(request));
+    ({ userId, admin } = await getUserContext(request));
   } catch (e) {
     return requestError(e);
   }
@@ -54,6 +56,8 @@ export async function POST(request: Request) {
     );
   }
 
+  const limited = await limitHeavyRequest(userId, "manuscript-extract", admin);
+  if (limited) return limited;
   let text: string;
   let headingChapters: ReturnType<typeof extractHeadingChapters> = [];
   try {

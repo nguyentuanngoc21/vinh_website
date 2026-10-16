@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, requireSupabaseUser } from "@/lib/supabase/server";
 import { AUDIO_MAX_BYTES, AUDIO_MIME_EXT, AUDIO_SIZE_ERROR } from "@/lib/audio/upload-rules";
+import { limitHeavyRequest } from "@/lib/heavy-request-limit";
 
 /**
  * POST /api/audio/upload-url — bước 1 của mọi luồng đăng audio (đăng độc
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: AUDIO_SIZE_ERROR }, { status: 413 });
   }
 
+  const limited = await limitHeavyRequest(user.id, "audio-upload");
+  if (limited) return limited;
   const path = `${user.id}/narration-${Date.now()}-${crypto.randomUUID()}.${ext}`;
   const { data, error } = await supabase.storage.from("audio-narrations").createSignedUploadUrl(path);
   if (error || !data) {

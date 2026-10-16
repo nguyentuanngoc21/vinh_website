@@ -4,6 +4,8 @@ const { getRequestContext, validateEventBanner, eq, update, maybeSingle } = vi.h
 }));
 vi.mock("@/lib/mobile/request-context", () => ({ getRequestContext, requestError: () => Response.json({}, { status: 503 }) }));
 vi.mock("@/lib/events/banner-upload", () => ({ validateEventBanner }));
+vi.mock("@/lib/events/cache", () => ({ revalidatePublicEvents: vi.fn() }));
+import { revalidatePublicEvents } from "@/lib/events/cache";
 import { PATCH } from "./route";
 const eventId = "71000000-0000-4000-8000-000000000001";
 const body = { title: "Sự kiện cộng đồng", summary: "Giới thiệu", overview: "Nội dung",
@@ -22,6 +24,7 @@ beforeEach(() => {
 describe("update community event", () => {
   it("uses atomic owner and moderation predicates", async () => {
     expect((await call({ organizer_id: "victim", hidden: false, games: [{ id: "malicious" }] })).status).toBe(200);
+    expect(revalidatePublicEvents).toHaveBeenCalledOnce();
     expect(eq).toHaveBeenCalledWith("id", eventId);
     expect(eq).toHaveBeenCalledWith("organizer_id", "actual-user");
     expect(eq).toHaveBeenCalledWith("hidden", false);
@@ -31,6 +34,7 @@ describe("update community event", () => {
   it("refuses a different owner's event or an admin-hidden event", async () => {
     maybeSingle.mockResolvedValue({ data: null, error: null });
     expect((await call()).status).toBe(403);
+    expect(revalidatePublicEvents).not.toHaveBeenCalled();
   });
   it("requires authentication", async () => {
     getRequestContext.mockResolvedValue({ userId: null });

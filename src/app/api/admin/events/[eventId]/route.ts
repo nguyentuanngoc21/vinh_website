@@ -2,6 +2,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedAdminId } from "@/lib/wallet/session";
 import { UUID } from "@/lib/events/input";
 import { EVENT_GAME_DEFINITIONS } from "@/lib/events/game-definitions";
+import { revalidatePublicEvents } from "@/lib/events/cache";
 import type { Database } from "@/lib/supabase/types";
 export async function PATCH(request: Request, { params }: { params: Promise<{ eventId: string }> }) {
   const client = createServiceRoleClient();
@@ -22,5 +23,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ev
   if (!("hidden" in patch) && !("games" in patch)) return Response.json({ error: "Chưa chọn thay đổi." }, { status: 400 });
   const { data, error } = await client.from("community_events").update(patch).eq("id", eventId).select("id").maybeSingle();
   if (error) { console.error("[admin/events] update", error); return Response.json({ error: "Không cập nhật được sự kiện." }, { status: 500 }); }
+  if (data) revalidatePublicEvents();
   return data ? Response.json(data) : Response.json({ error: "Không tìm thấy sự kiện." }, { status: 404 });
 }

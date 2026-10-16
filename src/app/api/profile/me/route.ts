@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { revalidatePublicAudio, revalidatePublicBooks } from "@/lib/cache/public-data";
+import { revalidatePublicEvents } from "@/lib/events/cache";
 
 const NICKNAME_MAX = 40;
 const BIO_MAX = 280;
@@ -159,6 +160,7 @@ export async function POST(request: Request) {
   }
 
   // Làm mới cache trang công khai (lib/cache/public-data.ts) — thẻ truyện/audio hiện nickname.
+  if (update.nickname !== undefined || update.bio !== undefined) revalidatePublicEvents();
   if (update.nickname !== undefined) {
     revalidatePublicBooks();
     revalidatePublicAudio();

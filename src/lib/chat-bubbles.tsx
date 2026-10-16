@@ -36,6 +36,7 @@ type ChatBubbleContextValue = {
   conversations: Conversation[];
   conversationsLoaded: boolean;
   markThreadRead: (userId: string, context: MessageContext) => void;
+  updateConversations: (update: (items: Conversation[]) => Conversation[]) => void;
   openConversation: (userId: string, context: MessageContext) => void;
   minimize: (userId: string, context: MessageContext) => void;
   expand: (userId: string, context: MessageContext) => void;
@@ -104,7 +105,7 @@ function savePersisted(states: WindowState[]) {
 }
 
 export function ChatBubbleProvider({ children }: { children: ReactNode }) {
-  const { conversations, loaded: conversationsLoaded, markThreadRead } = useConversations();
+  const { conversations, loaded: conversationsLoaded, markThreadRead, updateConversations } = useConversations();
   // Khởi tạo TRỰC TIẾP từ localStorage qua lazy initializer — đọc đồng bộ,
   // không phụ thuộc dữ liệu async nào (không giống việc tính BubbleWindow
   // đầy đủ bên dưới, vốn cần đợi `conversations` tải xong) nên an toàn gọi
@@ -181,6 +182,7 @@ export function ChatBubbleProvider({ children }: { children: ReactNode }) {
         conversations,
         conversationsLoaded,
         markThreadRead,
+        updateConversations,
         openConversation,
         minimize,
         expand,

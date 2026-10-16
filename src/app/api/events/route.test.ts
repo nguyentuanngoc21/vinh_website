@@ -5,6 +5,8 @@ const { getRequestContext, validateEventBanner, insert, single } = vi.hoisted(()
 vi.mock("@/lib/mobile/request-context", () => ({ getRequestContext, requestError: () => Response.json({}, { status: 503 }) }));
 vi.mock("@/lib/events/banner-upload", () => ({ validateEventBanner }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: () => true }));
+vi.mock("@/lib/events/cache", () => ({ revalidatePublicEvents: vi.fn() }));
+import { revalidatePublicEvents } from "@/lib/events/cache";
 import { POST } from "./route";
 const body = { title: "Sự kiện cộng đồng", summary: "Giới thiệu", overview: "Nội dung",
   starts_at: "2026-11-15T14:00:00+07:00", ends_at: "2026-11-15T16:00:00+07:00",
@@ -23,9 +25,11 @@ describe("create community event", () => {
     getRequestContext.mockResolvedValue({ userId: null });
     expect((await call()).status).toBe(401);
     expect(insert).not.toHaveBeenCalled();
+    expect(revalidatePublicEvents).not.toHaveBeenCalled();
   });
   it("binds the organizer to the verified identity and ignores privileged fields", async () => {
     expect((await call({ organizer_id: "victim", hidden: false, games: [{ id: "malicious" }] })).status).toBe(201);
+    expect(revalidatePublicEvents).toHaveBeenCalledOnce();
     const saved = insert.mock.calls[0][0];
     expect(saved.organizer_id).toBe("actual-user");
     expect(saved).not.toHaveProperty("hidden"); expect(saved).not.toHaveProperty("games");
@@ -38,5 +42,10 @@ describe("create community event", () => {
   it("rejects invalid event dates before writing", async () => {
     expect((await call({ ends_at: body.starts_at })).status).toBe(400);
     expect(insert).not.toHaveBeenCalled();
+  });
+  it("does not invalidate when the write fails", async () => {
+    single.mockResolvedValue({ data: null, error: { message: "unavailable" } });
+    expect((await call()).status).toBe(500);
+    expect(revalidatePublicEvents).not.toHaveBeenCalled();
   });
 });

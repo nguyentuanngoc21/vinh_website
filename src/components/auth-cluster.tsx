@@ -252,6 +252,7 @@ export function AuthCluster() {
       )}
       {isLogged && (
         <NotificationBell
+          key={session?.handle}
           open={openFlyout === "notifications"}
           onOpenChange={(next) => setOpenFlyout(next ? "notifications" : null)}
         />

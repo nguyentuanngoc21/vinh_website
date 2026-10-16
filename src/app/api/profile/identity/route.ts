@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { verifyCccdAgainstImages } from "@/lib/ocr";
+import { limitHeavyRequest } from "@/lib/heavy-request-limit";
 
 export async function GET(request: Request) {
   let auth;
@@ -75,6 +76,8 @@ export async function POST(request: Request) {
 
   // Mirror register/route.ts: xác minh tự động qua OCR khớp ảnh, không có
   // màn hình admin duyệt tay ở bản này. Không khớp thì không ghi gì cả.
+  const limited = await limitHeavyRequest(userId, "identity-ocr", () => supabase);
+  if (limited) return limited;
   const isIdentityMatch = await verifyCccdAgainstImages(cccd, front, back);
   if (!isIdentityMatch) {
     return NextResponse.json(

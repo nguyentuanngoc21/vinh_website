@@ -60,15 +60,16 @@ export function ChatBubbleWindow({
 
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
-      fetch(`/api/messages/${conv.userId}?context=${conv.context}`)
+    const load = (signal: AbortSignal) =>
+      fetch(`/api/messages/${conv.userId}?context=${conv.context}`, { signal })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (cancelled || !data) return;
+          if (cancelled || signal.aborted || !data) return false;
           setMessages(data.messages ?? []);
           // GET đã tự đánh dấu đã đọc ở server (side effect) — zero badge
           // ngay ở danh sách chia sẻ (MessengerBell/dock), không chờ poll.
           onThreadReadRef.current(conv.userId, conv.context);
+          return true;
         });
     const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {
@@ -86,11 +87,11 @@ export function ChatBubbleWindow({
   // component này, vòng poll dưới đây tự dừng theo.
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
-      fetch(`/api/orders?withUserId=${conv.userId}`)
+    const load = (signal: AbortSignal) =>
+      fetch(`/api/orders?withUserId=${conv.userId}`, { signal })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (cancelled || !data) return;
+          if (cancelled || signal.aborted || !data) return false;
           const open = (data.orders ?? []).find((o: OrderRow) => o.status !== "cancelled");
           setOrder(
             open
@@ -104,6 +105,7 @@ export function ChatBubbleWindow({
                 }
               : null
           );
+          return true;
         });
     const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {

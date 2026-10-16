@@ -31,25 +31,25 @@ function keyOf(userId: string, context: MessageContext) {
 }
 
 export function useConversations() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const { isLogged, session } = useRole();
+  const owner = isLogged ? session?.handle : undefined;
+  const [snapshot, setSnapshot] = useState<{ owner?: string; items: Conversation[]; loaded: boolean }>({ items: [], loaded: false });
 
   const load = useCallback(
-    () =>
-      fetch("/api/messages")
+    (signal?: AbortSignal) =>
+      fetch("/api/messages", { signal })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (!data) return;
-          setConversations(data.conversations ?? []);
-          setLoaded(true);
+          if (!data || signal?.aborted) return false;
+          setSnapshot({ owner, items: data.conversations ?? [], loaded: true });
+          return true;
         }),
-    []
+    [owner]
   );
 
   // Hook này được mount ở root layout (ChatBubbleProvider) cho MỌI khách —
   // chỉ poll khi đã đăng nhập (khách luôn nhận 401, gọi chỉ tốn function
   // invocation) và khi tab đang hiện; quay lại tab thì tải ngay 1 lần.
-  const { isLogged } = useRole();
   useEffect(() => {
     if (!isLogged) return;
     return startVisiblePolling(load, POLL_MS);
@@ -59,16 +59,21 @@ export function useConversations() {
   // zero badge tức thời thay vì chờ vòng poll 15s tiếp theo, cùng cách
   // chat-tab.tsx tự làm cho tab "Hội thoại" của riêng nó.
   const markThreadRead = useCallback((userId: string, context: MessageContext) => {
-    setConversations((prev) =>
-      prev.map((c) => (keyOf(c.userId, c.context) === keyOf(userId, context) ? { ...c, unreadCount: 0 } : c))
-    );
+    setSnapshot((prev) => ({ ...prev, items:
+      prev.items.map((c) => (keyOf(c.userId, c.context) === keyOf(userId, context) ? { ...c, unreadCount: 0 } : c))
+    }));
   }, []);
+
+  const updateConversations = useCallback((update: (items: Conversation[]) => Conversation[]) => {
+    setSnapshot((prev) => prev.owner === owner ? { ...prev, items: update(prev.items) } : prev);
+  }, [owner]);
 
   // Đăng xuất: ẩn dữ liệu của phiên cũ ngay (không setState trong effect).
   return {
-    conversations: isLogged ? conversations : [],
-    loaded: isLogged && loaded,
+    conversations: owner && snapshot.owner === owner ? snapshot.items : [],
+    loaded: !!owner && snapshot.owner === owner && snapshot.loaded,
     markThreadRead,
+    updateConversations,
     reload: load,
   };
 }

@@ -99,7 +99,7 @@ export function normalizeRateLimitIdentifier(identifier: string): string {
 export function rateLimitedResponse(message: string, retryAfterSec: number): Response {
   return Response.json(
     { error: message },
-    { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
+    { status: 429, headers: { "Retry-After": String(retryAfterSec), "Cache-Control": "private, no-store" } }
   );
 }
 

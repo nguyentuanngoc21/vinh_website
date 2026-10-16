@@ -46,13 +46,14 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
   const [unreadCount, setUnreadCount] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const load = () =>
-    fetch("/api/notifications")
+  const load = (signal: AbortSignal) =>
+    fetch("/api/notifications", { signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!data) return;
+        if (!data || signal.aborted) return false;
         setNotifications(data.notifications ?? []);
         setUnreadCount(data.unreadCount ?? 0);
+        return true;
       });
 
   useEffect(() => {

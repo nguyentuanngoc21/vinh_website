@@ -15,25 +15,10 @@ import { autoGrowTextarea, resetTextareaHeight } from "@/lib/autogrow-textarea";
 import { Field, Alert, Skeleton } from "@/components/ui";
 import { OrderCard, type OrderRow } from "@/components/profile/order-card";
 import { startVisiblePolling } from "@/lib/hooks/visible-polling";
+import { useChatBubbles } from "@/lib/chat-bubbles";
+import type { Conversation } from "@/lib/use-conversations";
 
 type MessageContext = "personal" | "moderation";
-
-type Conversation = {
-  userId: string;
-  context: MessageContext;
-  nickname: string;
-  username: string;
-  avatarUrl: string | null;
-  // Hòm thư "moderation" (tin gỡ chương) — TÁCH theo TIN NHẮN (context),
-  // không phải theo tài khoản: cùng 1 admin có thể vừa có hòm thư này
-  // vừa có hòm thư "personal" riêng nếu họ cũng tự chat bình thường với
-  // cùng tác giả. Chỉ dùng để gắn 1 nhãn nhỏ cạnh tên — danh tính (tên/
-  // avatar) LUÔN hiển thị thật, không che giấu. Xem
-  // migrations/archive/20260908_add_direct_message_context.sql.
-  isModerationThread: boolean;
-  lastMessage: { body: string; createdAt: string; mine: boolean };
-  unreadCount: number;
-};
 
 type ThreadMessage = { id: string; body: string; createdAt: string; mine: boolean; flagged?: boolean };
 
@@ -53,11 +38,8 @@ type ChatTabProps = {
   onBack: () => void;
 };
 
-// Hội thoại refetch mỗi 15s, luồng đang mở refetch mỗi 5s — không có
-// realtime (websocket/Supabase Realtime) trong repo này, polling nhẹ là
-// đủ cho quy mô hiện tại. Cả 2 chỉ chạy khi ChatTab đang mounted (tức tab
-// "Hội thoại" đang mở), tự dừng khi rời tab.
-const CONVERSATIONS_POLL_MS = 15_000;
+// Danh sách dùng chung provider ở layout (15s); chỉ luồng đang mở và đơn
+// hàng có polling riêng (5s). Các nhịp dừng khi ẩn/offline và giãn khi lỗi.
 const THREAD_POLL_MS = 5_000;
 // Ô soạn tin tự giãn tối đa tới đây rồi tự cuộn bên trong (autoGrowTextarea)
 // — không cho giãn vô hạn, tin rất dài sẽ đẩy hết khung tin nhắn phía trên
@@ -103,8 +85,7 @@ function Avatar({
 }
 
 export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView, onBack }: ChatTabProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [conversationsLoaded, setConversationsLoaded] = useState(false);
+  const { conversations, conversationsLoaded, updateConversations: setConversations } = useChatBubbles();
   const [listQuery, setListQuery] = useState("");
 
   const [counterparty, setCounterparty] = useState<(Counterparty & { context: MessageContext }) | null>(null);
@@ -122,19 +103,6 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
   const autoSelectedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
-
-  const loadConversations = () =>
-    fetch("/api/messages")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data) return;
-        setConversations(data.conversations ?? []);
-        setConversationsLoaded(true);
-      });
-
-  useEffect(() => {
-    return startVisiblePolling(loadConversations, CONVERSATIONS_POLL_MS);
-  }, []);
 
   // Chưa chọn ai (vào thẳng tab, không qua ?chat=) nhưng đã có hội thoại
   // — tự chọn hội thoại gần nhất, khớp hành vi cũ (activeConv mặc định 0).
@@ -154,11 +122,11 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
     // chọn tiếp theo mới bị ghi đè.
     if (!activeUserId) return;
     let cancelled = false;
-    const load = () =>
-      fetch(`/api/messages/${activeUserId}?context=${activeContext}`)
+    const load = (signal: AbortSignal) =>
+      fetch(`/api/messages/${activeUserId}?context=${activeContext}`, { signal })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (cancelled || !data) return;
+          if (cancelled || signal.aborted || !data) return false;
           setCounterparty({ ...data.counterparty, context: data.context });
           setMessages(data.messages ?? []);
           // Đã đọc — cập nhật lại badge chưa đọc ở danh sách hội thoại
@@ -169,23 +137,25 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
               c.userId === activeUserId && c.context === activeContext ? { ...c, unreadCount: 0 } : c
             )
           );
+          return true;
         });
     const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {
       cancelled = true;
       stopPolling();
     };
-  }, [activeUserId, activeContext]);
+  }, [activeUserId, activeContext, setConversations]);
 
   useEffect(() => {
     if (!activeUserId) return;
     let cancelled = false;
-    const load = () =>
-      fetch(`/api/orders?withUserId=${activeUserId}`)
+    const load = (signal: AbortSignal) =>
+      fetch(`/api/orders?withUserId=${activeUserId}`, { signal })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (cancelled || !data) return;
+          if (cancelled || signal.aborted || !data) return false;
           setOrders(data.orders ?? []);
+          return true;
         });
     const stopPolling = startVisiblePolling(load, THREAD_POLL_MS);
     return () => {
@@ -239,6 +209,7 @@ export function ChatTab({ activeUserId, activeContext, onSelectUser, mobileView,
         isModerationThread: counterparty?.isModerationThread ?? false,
         lastMessage: data.message,
         unreadCount: 0,
+        hasOrder: false,
       };
       return [{ ...entry, lastMessage: data.message, unreadCount: 0 }, ...withoutThis];
     });

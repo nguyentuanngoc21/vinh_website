@@ -2643,6 +2643,10 @@ export type Database = {
       };
     };
     Functions: {
+      consume_heavy_request_limit: {
+        Args: { p_subject: string; p_scope: string; p_limit: number; p_window_seconds: number };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
       schedule_chapter_publication: {
         Args: { p_id: string; p_book_id: string; p_chapter_ids: string[]; p_starts_at: string; p_interval_days?: number; p_price?: number | null };
         Returns: string;

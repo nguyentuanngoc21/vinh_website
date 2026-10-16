@@ -2,6 +2,7 @@ import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { parseEventInput } from "@/lib/events/input";
 import { validateEventBanner } from "@/lib/events/banner-upload";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { revalidatePublicEvents } from "@/lib/events/cache";
 
 export async function POST(request: Request) {
   try {
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
     if (bannerError) return Response.json({ error: bannerError }, { status: 400 });
     const { data, error } = await client.from("community_events").insert({ ...parsed.data, id: crypto.randomUUID(), organizer_id: userId }).select("id").single();
     if (error) { console.error("[events] create", error); return Response.json({ error: "Không lưu được sự kiện. Vui lòng thử lại." }, { status: 500 }); }
+    revalidatePublicEvents();
     return Response.json(data, { status: 201 });
   } catch (error) { return requestError(error); }
 }

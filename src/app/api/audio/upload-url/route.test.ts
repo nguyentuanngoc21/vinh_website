@@ -8,15 +8,26 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ storage: { from: () => ({ createSignedUploadUrl }) } }),
 }));
 import { POST } from "./route";
+vi.mock("@/lib/heavy-request-limit", () => ({ limitHeavyRequest: vi.fn() }));
+import { limitHeavyRequest } from "@/lib/heavy-request-limit";
 const call = (body: unknown) => POST(new Request("http://localhost/api/audio/upload-url", {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(limitHeavyRequest).mockResolvedValue(null);
   requireSupabaseUser.mockResolvedValue({ user: { id: "narrator" } });
   createSignedUploadUrl.mockImplementation(async (path: string) => ({ data: { path, token: "token" }, error: null }));
 });
 describe("audio direct upload URL", () => {
+  it("does not issue a storage token when throttled", async () => {
+    vi.mocked(limitHeavyRequest).mockResolvedValue(Response.json({}, { status: 429, headers: { "Retry-After": "60" } }));
+    const response = await call({ contentType: "audio/mpeg", size: 100 });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+    expect(limitHeavyRequest).toHaveBeenCalledWith("narrator", "audio-upload");
+  });
   it.each([5 * 1024 * 1024, AUDIO_MAX_BYTES])("accepts %i-byte files via a small JSON request", async (size) => {
     const response = await call({ contentType: "audio/mpeg", size });
     expect(response.status).toBe(200);

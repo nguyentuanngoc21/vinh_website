@@ -9,6 +9,7 @@ import { EditProfileTab } from "@/components/profile/edit-profile-tab";
 import { Skeleton } from "@/components/ui";
 import { PROFILE_TABS, type ProfileTab } from "@/lib/profile";
 import { chatThreadHref } from "@/lib/chat-thread-href";
+import { useRole } from "@/lib/role";
 
 // Mỗi lúc chỉ hiện 1 tab, nên các tab không phải mặc định được tải lười
 // (next/dynamic) — ServicesTab (~1000 dòng), ChatTab, AgreementsTab (kéo
@@ -49,6 +50,7 @@ function isProfileTab(value: string | null): value is ProfileTab {
 }
 
 export function ProfilePage() {
+  const { session } = useRole();
   // ?chat=<userId> — deep link "Nhắn tin" từ /ket-noi hoặc following-tab.tsx
   // (nút đó điều hướng tới đây thay vì mở modal riêng). ?tab=<id> — lối
   // tắt chung sang 1 tab bất kỳ (vd "?tab=agree" từ nút "Đi tới Cam kết &
@@ -173,6 +175,7 @@ export function ProfilePage() {
 
       {tab === "chat" && (
         <ChatTab
+          key={session?.handle}
           activeUserId={activeUserId}
           activeContext={activeContext}
           onSelectUser={(userId, context) => {

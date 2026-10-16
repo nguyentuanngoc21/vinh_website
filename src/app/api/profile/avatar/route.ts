@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestContext, requestError } from "@/lib/mobile/request-context";
 import { revalidatePublicAudio } from "@/lib/cache/public-data";
+import { revalidatePublicEvents } from "@/lib/events/cache";
 
 // Kích thước tối đa (15MB) không còn kiểm ở route này — file giờ đi thẳng
 // từ trình duyệt lên Storage qua signed upload URL, route chỉ cấp URL.
@@ -106,6 +107,7 @@ export async function PATCH(request: Request) {
 
   // Làm mới cache trang công khai (lib/cache/public-data.ts) — catalog audio hiện avatar người đọc.
   revalidatePublicAudio();
+  revalidatePublicEvents();
 
   return NextResponse.json({ ok: true, avatarUrl });
 }
@@ -132,6 +134,7 @@ export async function DELETE(request: Request) {
 
   // Làm mới cache trang công khai (lib/cache/public-data.ts) — catalog audio hiện avatar người đọc.
   revalidatePublicAudio();
+  revalidatePublicEvents();
 
   return NextResponse.json({ ok: true, avatarUrl: null });
 }
