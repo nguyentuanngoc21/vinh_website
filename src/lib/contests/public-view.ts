@@ -6,7 +6,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContestReviewFlag, Database } from "@/lib/supabase/types";
-import { areResultsVisible, getEntryVoteState, type ContestCapabilities, type ContestViewer } from "@/lib/contests/capabilities";
+import { areResultsVisible, getEntryVoteState, isVotingOpen, type ContestCapabilities, type ContestViewer } from "@/lib/contests/capabilities";
 import { countdownFor, formatRemaining, PHASE_COPY } from "@/lib/contests/phase-copy";
 import { readContestConfig, type EligibilityRules, type VoteRules } from "@/lib/contests/config";
 import {
@@ -378,7 +378,7 @@ export async function getStoryContestCards(
       submission_id: s.id,
       phase_label: PHASE_COPY[c.status].label + (cd && cd.mode === "countdown" ? ` · ${cd.label} ${formatRemaining(Date.parse(cd.target) - now.getTime())}` : ""),
       vote:
-        c.status === "community_voting"
+        (c.status === "community_voting" || isVotingOpen(c, now))
           ? getEntryVoteState({
               capabilities: caps,
               viewerId: input.viewerId,

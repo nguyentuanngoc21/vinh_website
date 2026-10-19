@@ -322,6 +322,6 @@ export const QuestPoolService = {
 /** Cùng điều kiện với contest_quest_available() trong SQL (nhiệm vụ bình chọn). */
 function isVotingOpen(c: { status: string; voting_start: string | null; voting_end: string | null }): boolean {
   const now = Date.now();
-  return c.status === "community_voting" && c.voting_start !== null && c.voting_end !== null
+  return ["submission_open", "submission_closed", "community_voting"].includes(c.status) && c.voting_start !== null && c.voting_end !== null
     && now >= Date.parse(c.voting_start) && now < Date.parse(c.voting_end);
 }

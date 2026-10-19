@@ -436,6 +436,27 @@ begin
   execute 'reset role';
 
   -- ===== 8. Bình chọn =====
+  -- Regression: voting may overlap submissions. Roll back this subtransaction
+  -- so the original missing-window and read-history tests below remain isolated.
+  begin
+    update public.contests set voting_start = now() - interval '1 hour', voting_end = now() + interval '1 day',
+      official_scoring_start = now() - interval '1 hour', official_scoring_end = now() + interval '1 day'
+      where id = v_a;
+    if (select status from public.contests where id = v_a) <> 'submission_open' then
+      raise exception 'Expected submission_open for overlapping-voting regression';
+    end if;
+    insert into public.reading_history (user_id, book_id, chapter_id) values (v_voter_old, v_book1, v_ch1);
+    perform public.cast_contest_vote(v_voter_old, v_sub1);
+    if not public.retract_contest_vote(v_voter_old, v_sub1) then
+      raise exception 'Expected successful retraction during submissions';
+    end if;
+    raise exception using message = 'Overlap voting passed; roll back test changes', errcode = 'P0099';
+  exception
+    when sqlstate 'P0099' then
+      v_results := array_append(v_results, 'PASS cast and retract during submission_open with overlapping scoring window');
+    when others then
+      v_results := array_append(v_results, 'FAIL overlapping voting: ' || sqlerrm);
+  end;
   update public.contests set submission_end = now() - interval '1 minute' where id = v_a;
   begin
     perform public.set_contest_submission_status(v_sub1, 'withdrawn', v_author, 'author', null);

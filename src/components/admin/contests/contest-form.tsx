@@ -210,7 +210,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
       </section>
 
       <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
-        <SectionTitle note="Giờ Việt Nam (GMT+7).">Thời gian</SectionTitle>
+        <SectionTitle note="Giờ Việt Nam (GMT+7). Bình chọn có thể mở trong thời gian nhận bài. Đặt khung chấm chính thức bao trùm toàn bộ thời gian bình chọn để ghi nhận dữ liệu tính điểm.">Thời gian</SectionTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {DATE_FIELDS.map(([key, label, required]) => (
             <Field

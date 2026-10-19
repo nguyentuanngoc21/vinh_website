@@ -152,11 +152,9 @@ export function validateTimeline(t: Timeline): string[] {
   if ((v0 === null) !== (v1 === null)) errors.push("Bình chọn cần đủ cả thời gian mở và kết thúc");
   if (v0 !== null && v1 !== null) {
     if (v0 >= v1) errors.push("Kết thúc bình chọn phải sau mở bình chọn");
-    if (s1 !== null && v0 < s1) errors.push("Bình chọn phải mở sau khi đóng nhận bài");
+    if (s0 !== null && v0 < s0) errors.push("Bình chọn không được mở trước khi mở nhận bài");
   }
   if (j0 !== null && j1 !== null && j0 >= j1) errors.push("Kết thúc chấm phải sau bắt đầu chấm");
-  const lastBeforeJudging = v1 ?? s1;
-  if (j0 !== null && lastBeforeJudging !== null && j0 < lastBeforeJudging) errors.push("Chấm giải phải bắt đầu sau khi kết thúc bình chọn / nhận bài");
   const lastBeforeResult = j1 ?? v1 ?? s1;
   if (r !== null && lastBeforeResult !== null && r < lastBeforeResult) errors.push("Ngày công bố phải sau các giai đoạn trước");
 
@@ -165,7 +163,7 @@ export function validateTimeline(t: Timeline): string[] {
   if ((o0 === null) !== (o1 === null)) errors.push("Khung chấm chính thức cần đủ thời gian bắt đầu và kết thúc");
   if (o0 !== null && o1 !== null) {
     if (o0 >= o1) errors.push("Khung chấm chính thức phải kết thúc sau khi bắt đầu");
-    if (s1 !== null && o0 < s1) errors.push("Khung chấm chính thức phải bắt đầu sau khi đóng nhận bài");
+    if (s0 !== null && o0 < s0) errors.push("Khung chấm chính thức không được bắt đầu trước khi mở nhận bài");
     if (v0 !== null && v1 !== null && (v0 < o0 || v1 > o1)) errors.push("Khung bình chọn phải nằm trong khung chấm chính thức");
   }
   return errors;
