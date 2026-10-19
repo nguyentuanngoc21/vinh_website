@@ -45,8 +45,16 @@ describe("parseContestPatch", () => {
 
   it("giải thưởng trong thể lệ", () => {
     const r = parseContestPatch({ prizes_summary: [{ name: " Giải Nhất ", amount_vnd: 20_000_000 }] }, "update");
-    expect(r).toEqual({ ok: true, value: { prizes_summary: [{ name: "Giải Nhất", amount_vnd: 20_000_000, extra: "" }] } });
+    expect(r).toEqual({ ok: true, value: { prizes_summary: [{ name: "Giải Nhất", amount_vnd: 20_000_000, quantity: 1, extra: "" }] } });
     expect(parseContestPatch({ prizes_summary: [{ name: "x", amount_vnd: -1 }] }, "update").ok).toBe(false);
+  });
+
+  it("lưu nhiều giải cùng hạng và giữ số tiền cho mỗi giải", () => {
+    const prize = { name: "Giải Ba", amount_vnd: 1_000_000, quantity: 3, extra: "" };
+    expect(parseContestPatch({ prizes_summary: [prize] }, "update")).toEqual({ ok: true, value: { prizes_summary: [prize] } });
+    for (const quantity of [0, -1, 1.5, "3", null]) {
+      expect(parseContestPatch({ prizes_summary: [{ ...prize, quantity }] }, "update").ok).toBe(false);
+    }
   });
 
   it("lỗi cấu hình eligibility được đưa ra ngoài", () => {

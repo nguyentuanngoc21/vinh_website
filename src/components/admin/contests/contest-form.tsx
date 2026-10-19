@@ -16,7 +16,7 @@ import { isoToVnLocal, vnLocalToIso } from "@/lib/contests/datetime";
 import type { Database } from "@/lib/supabase/types";
 
 type ContestRow = Database["public"]["Tables"]["contests"]["Row"];
-type Prize = { name: string; amount_vnd: string; extra: string };
+type Prize = { name: string; amount_vnd: string; quantity: string; extra: string };
 
 const DATE_FIELDS = [
   ["submission_start", "Mở nhận bài", true],
@@ -67,9 +67,10 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
   const [rulesVersion, setRulesVersion] = useState(contest?.rules_version ?? "1");
   const [rulesContent, setRulesContent] = useState(contest?.rules_content ?? "");
   const [prizes, setPrizes] = useState<Prize[]>(() =>
-    ((contest?.prizes_summary ?? []) as { name: string; amount_vnd: number; extra?: string }[]).map((p) => ({
+    ((contest?.prizes_summary ?? []) as { name: string; amount_vnd: number; quantity?: number; extra?: string }[]).map((p) => ({
       name: p.name,
       amount_vnd: String(p.amount_vnd),
+      quantity: String(p.quantity ?? 1),
       extra: p.extra ?? "",
     }))
   );
@@ -121,7 +122,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
       body.slug = slug;
       body.rules_version = rulesVersion;
       body.rules_content = rulesContent;
-      body.prizes_summary = prizes.map((p) => ({ name: p.name, amount_vnd: Number(p.amount_vnd), extra: p.extra }));
+      body.prizes_summary = prizes.map((p) => ({ name: p.name, amount_vnd: Number(p.amount_vnd), quantity: Number(p.quantity), extra: p.extra }));
       const after = firstPublishedAfter ? vnLocalToIso(firstPublishedAfter) : null;
       if (firstPublishedAfter && !after) errs.push("Đăng lần đầu từ: không hợp lệ");
       body.eligibility_rules = {
@@ -224,7 +225,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
       </section>
 
       <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
-        <SectionTitle note="Thể lệ không đổi sau khi công khai — kiểm tra kỹ trước khi chuyển khỏi bản nháp.">Thể lệ & giải thưởng</SectionTitle>
+        <SectionTitle note="Thể lệ không đổi sau khi công khai — kiểm tra kỹ trước khi chuyển khỏi bản nháp. Số tiền và quà kèm áp dụng cho mỗi giải; hạng được nhận giải được thiết lập riêng trong cấu hình chấm.">Thể lệ & giải thưởng</SectionTitle>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[160px_1fr]">
           <Field label="Phiên bản thể lệ" value={rulesVersion} disabled={locked} onChange={(e) => setRulesVersion(e.target.value)} maxLength={20} />
           <Textarea label="Nội dung thể lệ" rows={8} value={rulesContent} disabled={locked} onChange={(e) => setRulesContent(e.target.value)} />
@@ -232,9 +233,11 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
         <div className="mt-5 flex flex-col gap-3">
           <div className="text-[13px] font-semibold text-slate">Cơ cấu giải (VNĐ — quy đổi token khi trao)</div>
           {prizes.map((p, i) => (
-            <div key={i} className="grid grid-cols-1 gap-2 rounded-[10px] border border-cream-border p-3 sm:grid-cols-[1fr_160px_1.4fr_auto] sm:items-end">
+            <div key={i} className="grid grid-cols-1 gap-2 rounded-[10px] border border-cream-border p-3 sm:grid-cols-2 xl:grid-cols-[1fr_100px_160px_1.4fr_auto] sm:items-end">
               <Field label="Tên giải" value={p.name} disabled={locked} onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-              <Field label="Số tiền (VNĐ)" type="number" min={0} inputMode="numeric" value={p.amount_vnd} disabled={locked}
+              <Field label="Số lượng giải" type="number" min={1} step={1} inputMode="numeric" value={p.quantity} disabled={locked}
+                onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))} />
+              <Field label="Số tiền mỗi giải (VNĐ)" type="number" min={0} inputMode="numeric" value={p.amount_vnd} disabled={locked}
                 onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, amount_vnd: e.target.value } : x)))} />
               <Field label="Quà kèm" value={p.extra} disabled={locked} onChange={(e) => setPrizes((ps) => ps.map((x, j) => (j === i ? { ...x, extra: e.target.value } : x)))} />
               {!locked && (
@@ -248,7 +251,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
           ))}
           {!locked && (
             <Button type="button" variant="ghost" fullWidth={false} size="sm" className="self-start"
-              onClick={() => setPrizes((ps) => [...ps, { name: "", amount_vnd: "0", extra: "" }])}>
+              onClick={() => setPrizes((ps) => [...ps, { name: "", amount_vnd: "0", quantity: "1", extra: "" }])}>
               <PlusIcon size={15} weight="bold" /> Thêm giải
             </Button>
           )}

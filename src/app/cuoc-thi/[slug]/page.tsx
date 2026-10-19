@@ -426,6 +426,7 @@ async function TabContent({
                   className={`flex min-h-[190px] flex-col gap-2 rounded-[18px] border p-5 ${i === 0 ? "border-cream-gold-border bg-cream-card" : "border-border-light bg-surface"}`}>
                   <div className="flex items-center gap-2 text-[13px] font-bold tracking-[.4px] text-brand-gold-dark"><TrophyIcon size={18} weight="fill" /> {p.name}</div>
                   <div className="text-[26px] font-extrabold tracking-[-.5px] text-brand-ink">{vnd(p.amount_vnd)}</div>
+                  <div className="text-sm text-stone-alt">{p.quantity ?? 1} giải · giá trị mỗi giải</div>
                   {p.extra && <div className="text-[13.5px] leading-normal text-slate">{p.extra}</div>}
                   <div className="mt-auto border-t border-cream-border pt-2.5 text-[12.5px] text-stone-alt">
                     {capabilities.results_visible
