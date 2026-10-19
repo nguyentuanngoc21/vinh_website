@@ -41,7 +41,7 @@ export type PublicContest = {
   archived_at: string | null;
   rules_content: string;
   rules_version: string;
-  prizes_summary: { name: string; amount_vnd: number; extra: string }[];
+  prizes_summary: { name: string; amount_vnd: number; quantity?: number; extra: string }[];
   eligibility: EligibilityRules;
   vote: VoteRules;
 };

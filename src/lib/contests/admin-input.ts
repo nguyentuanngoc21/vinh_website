@@ -21,7 +21,7 @@ export type ContestPatch = Omit<
   "id" | "status" | "created_by" | "created_at" | "updated_at" | "archived_at" | "legacy_stats" | "results_published_at" | "scoring_config_version"
 >;
 
-export type PrizeSummaryItem = { name: string; amount_vnd: number; extra: string };
+export type PrizeSummaryItem = { name: string; amount_vnd: number; quantity: number; extra: string };
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 /** Trùng thư mục tĩnh cạnh [slug] (src/app/api/contests/cron, src/app/cuoc-thi/[slug]/gui-bai…) — route tĩnh sẽ che mất cuộc thi. */
@@ -57,7 +57,9 @@ function parsePrizes(v: unknown): PrizeSummaryItem[] | string {
     if (!isObject(p) || typeof p.name !== "string" || p.name.trim() === "") return `giải #${i + 1}: thiếu tên`;
     if (!Number.isInteger(p.amount_vnd) || (p.amount_vnd as number) < 0) return `giải #${i + 1}: số tiền phải là số nguyên ≥ 0`;
     if (p.extra !== undefined && typeof p.extra !== "string") return `giải #${i + 1}: mô tả kèm phải là chuỗi`;
-    out.push({ name: p.name.trim(), amount_vnd: p.amount_vnd as number, extra: typeof p.extra === "string" ? p.extra.trim() : "" });
+    const quantity = p.quantity === undefined ? 1 : p.quantity;
+    if (!Number.isSafeInteger(quantity) || (quantity as number) < 1) return `giải #${i + 1}: số lượng phải là số nguyên ≥ 1`;
+    out.push({ name: p.name.trim(), amount_vnd: p.amount_vnd as number, quantity: quantity as number, extra: typeof p.extra === "string" ? p.extra.trim() : "" });
   }
   return out;
 }
