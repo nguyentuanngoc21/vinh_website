@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ContestImageField } from "./contest-image-field";
 import { useRouter } from "next/navigation";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert, Button, Checkbox, Field, Textarea } from "@/components/ui";
@@ -78,6 +79,8 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
   const [requiredTags, setRequiredTags] = useState(eligibilityInit.required_tags.join(", "));
 
   const [pending, setPending] = useState(false);
+  const [imageUploads, setImageUploads] = useState(0);
+  const onImageBusyChange = (busy: boolean) => setImageUploads((count) => count + (busy ? 1 : -1));
   const [errors, setErrors] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
@@ -132,6 +135,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
   };
 
   const submit = async () => {
+    if (pending || imageUploads > 0) return;
     const built = buildBody();
     if ("errors" in built) {
       setErrors(built.errors);
@@ -194,8 +198,8 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
           />
           <Field label="Mô tả ngắn" wrapperClassName="md:col-span-2" value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} maxLength={280} />
           <Textarea label="Giới thiệu" wrapperClassName="md:col-span-2" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
-          <Field label="Ảnh key visual (URL)" value={keyVisualUrl} onChange={(e) => setKeyVisualUrl(e.target.value)} />
-          <Field label="Ảnh banner (URL)" value={bannerUrl} onChange={(e) => setBannerUrl(e.target.value)} />
+          <ContestImageField label="Ảnh key visual" hint="Ảnh nhận diện chính: đầu trang chi tiết, khu vực nổi bật và thẻ cuộc thi." value={keyVisualUrl} onChange={setKeyVisualUrl} disabled={pending} onBusyChange={onImageBusyChange} />
+          <ContestImageField label="Ảnh banner" hint="Ảnh bìa ngang bổ sung. Hiện được lưu nhưng chưa hiển thị trên trang công khai." value={bannerUrl} onChange={setBannerUrl} disabled={pending} onBusyChange={onImageBusyChange} />
         </div>
         <div className="mt-4">
           <Checkbox checked={isFeatured} onChange={() => setIsFeatured((v) => !v)}>
@@ -316,7 +320,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
       {saved && <Alert tone="success">Đã lưu.</Alert>}
 
       <div className="sticky bottom-0 flex justify-end gap-3 rounded-[14px] border border-cream-border bg-surface/95 p-3 backdrop-blur">
-        <Button type="button" variant="dark" fullWidth={false} className="w-full px-6 sm:w-auto" disabled={pending} onClick={submit}>
+        <Button type="button" variant="dark" fullWidth={false} className="w-full px-6 sm:w-auto" disabled={pending || imageUploads > 0} onClick={submit}>
           {pending ? "Đang lưu…" : contest ? "Lưu thay đổi" : "Tạo cuộc thi (bản nháp)"}
         </Button>
       </div>
