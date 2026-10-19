@@ -55,7 +55,7 @@ create or replace function public.chapter_word_count(p text)
 returns integer language sql immutable parallel safe as $$
   select count(*)::integer
   from regexp_matches(
-    regexp_replace(coalesce(p, ''), '[   -     　﻿]', ' ', 'g'),
+    regexp_replace(coalesce(p, ''), '[   -   　﻿]', ' ', 'g'),
     '\S+', 'g'
   );
 $$;

@@ -835,13 +835,6 @@ export function ChapterEditor({
             <span>~{readMin} phút đọc</span>
           </div>
 
-          <div className={`mb-[22px] ${isLastChapterLocked ? "opacity-60" : ""} ${focusMode ? "hidden" : ""}`}>
-            <Checkbox checked={isLastChapter} onChange={isLastChapterLocked ? () => {} : onIsLastChapterToggle}>
-              Đây là chương cuối cùng của truyện
-              {isLastChapterLocked && <span className="ml-1 text-stone-alt">(không thể bỏ chọn sau khi lưu)</span>}
-            </Checkbox>
-          </div>
-
           {imagePromptOpen && (
             <div className="mb-5 rounded-lg border border-cream-border bg-surface p-3">
               <div className="flex gap-2">
@@ -916,6 +909,15 @@ export function ChapterEditor({
             placeholder="Bắt đầu viết…"
           />
           </div>
+
+          <div className={`mt-8 shrink-0 rounded-lg border border-cream-border bg-surface p-4 ${isLastChapterLocked ? "opacity-60" : ""} ${focusMode ? "hidden" : ""}`}>
+            <p className="mb-3 text-[13px] font-semibold text-stone-alt">Trạng thái hoàn thành truyện</p>
+            <Checkbox checked={isLastChapter} onChange={isLastChapterLocked ? () => {} : onIsLastChapterToggle}>
+              Đây là chương cuối cùng của truyện
+              {isLastChapterLocked && <span className="ml-1 text-stone-alt">(không thể bỏ chọn sau khi lưu)</span>}
+            </Checkbox>
+          </div>
+
         </div>
       </div>
       {layout.preview && (
