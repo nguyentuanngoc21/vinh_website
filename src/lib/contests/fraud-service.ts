@@ -28,7 +28,7 @@ export const FRAUD_THRESHOLDS = {
 } as const;
 
 /** Cuộc thi đang có phiếu mới và chưa chốt điểm. */
-export const FRAUD_SCAN_STATUSES: ContestStatus[] = ["community_voting", "judging"];
+export const FRAUD_SCAN_STATUSES: ContestStatus[] = ["submission_open", "submission_closed", "community_voting", "judging"];
 /** Sau công bố bảng điểm đã chốt — không xét lại được. */
 export const FRAUD_LOCKED_STATUSES: ContestStatus[] = ["results", "archived"];
 

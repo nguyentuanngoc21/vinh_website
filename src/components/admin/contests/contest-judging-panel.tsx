@@ -88,7 +88,7 @@ export function ContestJudgingPanel({
         <p className="mt-1 text-[13px] leading-relaxed text-stone-dark">
           {officialWindow.start
             ? `${formatVnDateTime(officialWindow.start)} → ${formatVnDateTime(officialWindow.end)}. Chỉ lượt đọc, tương tác và phiếu trong khung này vào điểm chung cuộc; khung bình chọn phải nằm trong khung này.`
-            : "Chưa đặt. Đặt ở tab “Thông tin & thể lệ” (sau khi đóng nhận bài; khung bình chọn nằm trong khung chấm). Khoá khi khung chấm bắt đầu."}
+            : "Chưa đặt. Đặt ở tab “Thông tin & thể lệ”; có thể bắt đầu từ lúc mở nhận bài. Khung bình chọn phải nằm trong khung chấm. Khoá khi khung chấm bắt đầu."}
         </p>
       </section>
       <ConfigSection contestId={contestId} initial={initial.config} />

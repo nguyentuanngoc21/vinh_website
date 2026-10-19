@@ -172,7 +172,7 @@ export async function getPopularRanking(
   const { rows } = await popularRankingRows(client, input.contest, input.capabilities, page);
   // Hạng bảng phiếu chỉ biến động trong khung bình chọn (K9).
   const changes =
-    input.contest.status === "community_voting"
+    ["submission_open", "submission_closed", "community_voting"].includes(input.contest.status) && input.capabilities.rankings_visible.popular
       ? await loadRankChanges(client, { contestId: input.contest.id, kind: "popular", rows })
       : null;
   return toRankingPage(client, rows, { limit, valuesVisible: input.capabilities.popular_values_visible, growth: null, changes });

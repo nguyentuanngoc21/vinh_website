@@ -77,7 +77,7 @@ export function isVotingOpen(contest: ContestTimeline, now: Date): boolean {
   const start = t(contest.voting_start);
   const end = t(contest.voting_end);
   const n = now.getTime();
-  return contest.status === "community_voting" && start !== null && end !== null && n >= start && n < end;
+  return isOrAfter(contest.status, "submission_open", "submission_closed", "community_voting") && start !== null && end !== null && n >= start && n < end;
 }
 
 export function isSubmissionOpen(contest: ContestTimeline, now: Date): boolean {
@@ -150,7 +150,9 @@ export function getContestCapabilities(input: {
 
   const results_visible = areResultsVisible(contest, now);
   const votingEnd = t(contest.voting_end);
-  const popularVisible = isOrAfter(contest.status, "community_voting", "judging", "results", "archived");
+  const votingStarted = t(contest.voting_start);
+  const popularVisible = isOrAfter(contest.status, "community_voting", "judging", "results", "archived")
+    || (isOrAfter(contest.status, "submission_open", "submission_closed") && votingStarted !== null && n >= votingStarted);
   const popular_values_visible =
     popularVisible &&
     (isOrAfter(contest.status, "judging", "results", "archived") || (votingEnd !== null && n >= votingEnd));

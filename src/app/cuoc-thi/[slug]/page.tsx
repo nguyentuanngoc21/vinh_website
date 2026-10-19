@@ -17,6 +17,7 @@ import { getAuthedViewer } from "@/lib/wallet/session";
 import { isAdminRole } from "@/lib/roles";
 import { formatVnDateTime } from "@/lib/contests/datetime";
 import { ContestError } from "@/lib/contests/errors";
+import { isVotingOpen } from "@/lib/contests/capabilities";
 import {
   getContestEntries,
   getHiddenGems,
@@ -264,7 +265,7 @@ async function TabContent({
     const sort = SORTS.includes(query.sort as EntrySort) ? (query.sort as EntrySort) : "discover";
     const genre = query.genre && GENRE_LABELS.includes(query.genre) ? query.genre : null;
     const initial = await getContestEntries(supabase, { contest: row, capabilities, sort, genre, limit: 20, viewerId, now });
-    const voting = contest.status === "community_voting";
+    const voting = contest.status === "community_voting" || isVotingOpen(row, now);
     return (
       <div className="flex flex-col gap-5">
         {voting && (

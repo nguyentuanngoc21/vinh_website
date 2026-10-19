@@ -70,8 +70,20 @@ describe("validateTimeline", () => {
     expect(validateTimeline({ ...base, voting_start: "2026-10-23T00:00:00Z", voting_end: "2026-11-15T00:00:00Z", result_at: "2026-12-15T00:00:00Z" })).toEqual([]);
   });
 
-  it("bình chọn phải sau khi đóng nhận bài", () => {
-    expect(validateTimeline({ ...base, voting_start: "2026-10-10T00:00:00Z", voting_end: "2026-11-15T00:00:00Z" })).toHaveLength(1);
+  it("cho phép bình chọn trong thời gian nhận bài khi chưa đặt khung chấm", () => {
+    expect(validateTimeline({ ...base, voting_start: "2026-10-10T00:00:00Z", voting_end: "2026-11-15T00:00:00Z" })).toEqual([]);
+  });
+
+  it("cho phép chấm giải khi vẫn đang nhận bài và bình chọn", () => {
+    expect(validateTimeline({ ...base, voting_start: "2026-10-10T00:00:00Z", voting_end: "2026-11-15T00:00:00Z", judging_start: "2026-10-12T00:00:00Z", judging_end: "2026-11-20T00:00:00Z" })).toEqual([]);
+  });
+
+  it("cho phép chấm giải trước khi đóng nhận bài khi không có bình chọn", () => {
+    expect(validateTimeline({ ...base, judging_start: "2026-10-12T00:00:00Z", judging_end: "2026-11-20T00:00:00Z" })).toEqual([]);
+  });
+
+  it("vẫn yêu cầu kết thúc chấm sau bắt đầu chấm", () => {
+    expect(validateTimeline({ ...base, judging_start: "2026-11-20T00:00:00Z", judging_end: "2026-10-12T00:00:00Z" })).toHaveLength(1);
   });
 
   it("bình chọn thiếu một đầu", () => {
@@ -90,8 +102,12 @@ describe("validateTimeline", () => {
       expect(validateTimeline({ ...base, official_scoring_start: window.official_scoring_start, official_scoring_end: null })).toHaveLength(1);
     });
 
-    it("bắt đầu trước khi đóng nhận bài", () => {
-      expect(validateTimeline({ ...base, official_scoring_start: "2026-10-15T00:00:00Z", official_scoring_end: "2026-11-14T16:59:00Z" })).toHaveLength(1);
+    it("cho phép cả khung chấm và bình chọn bắt đầu trong thời gian nhận bài", () => {
+      expect(validateTimeline({ ...base, official_scoring_start: "2026-10-01T00:00:00Z", official_scoring_end: "2026-11-14T16:59:00Z", voting_start: "2026-10-10T00:00:00Z", voting_end: "2026-11-14T16:59:00Z" })).toEqual([]);
+    });
+
+    it("khung chấm không bắt đầu trước khi mở nhận bài", () => {
+      expect(validateTimeline({ ...base, official_scoring_start: "2026-09-30T00:00:00Z", official_scoring_end: "2026-11-14T16:59:00Z" })).toHaveLength(1);
     });
 
     it("bình chọn vượt ra ngoài khung chấm", () => {

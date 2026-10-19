@@ -894,7 +894,7 @@ begin
   end if;
   select * into v_contest from public.contests where id = v_sub.contest_id;
 
-  if v_contest.status <> 'community_voting'
+  if v_contest.status not in ('submission_open', 'submission_closed', 'community_voting')
      or v_contest.voting_start is null or v_contest.voting_end is null
      or now() < v_contest.voting_start or now() >= v_contest.voting_end then
     raise exception 'Voting is not open' using hint = 'voting_closed';
@@ -963,7 +963,7 @@ begin
     raise exception 'Submission % not found', p_submission_id using hint = 'submission_not_found';
   end if;
 
-  if v_contest.status <> 'community_voting'
+  if v_contest.status not in ('submission_open', 'submission_closed', 'community_voting')
      or v_contest.voting_start is null or v_contest.voting_end is null
      or now() < v_contest.voting_start or now() >= v_contest.voting_end then
     raise exception 'Voting is not open' using hint = 'voting_closed';
@@ -2101,7 +2101,7 @@ begin
   if not found then
     raise exception 'Contest % not found', p_contest_id using hint = 'contest_not_found';
   end if;
-  if v_contest.status not in ('community_voting', 'judging') then
+  if v_contest.status not in ('submission_open', 'submission_closed', 'community_voting', 'judging') then
     return 0;
   end if;
   -- Hai lần quét cùng lúc (admin + cron) không gắn trùng.
@@ -2403,7 +2403,7 @@ do $$ begin
   alter table public.contests add constraint contests_official_scoring_window check (
     (official_scoring_start is null) = (official_scoring_end is null)
     and (official_scoring_start is null or official_scoring_start < official_scoring_end)
-    and (official_scoring_start is null or official_scoring_start >= submission_end));
+    and (official_scoring_start is null or official_scoring_start >= submission_start));
 exception when duplicate_object then null; end $$;
 do $$ begin
   -- J2: khung bình chọn nằm trong khung chấm.
@@ -3238,7 +3238,7 @@ as $$
   select p_template.active and p_template.quest_pool = 'contest'
      and p_contest.status in ('submission_open', 'community_voting')
      and (p_template.contest_action <> 'vote_entry' or (
-           p_contest.status = 'community_voting' and p_contest.voting_start is not null and p_contest.voting_end is not null
+           p_contest.status in ('submission_open', 'community_voting') and p_contest.voting_start is not null and p_contest.voting_end is not null
            and now() >= p_contest.voting_start and now() < p_contest.voting_end));
 $$;
 
@@ -3640,7 +3640,10 @@ begin
 
   -- Bảng phiếu bình chọn: chỉ biến động trong khung bình chọn. Cùng nguồn với
   -- BXH công khai: phiếu đã lọc (popular-v2) hoặc phiếu thô (popular-v1).
-  if v_status = 'community_voting' and not exists (
+  if v_status in ('submission_open', 'submission_closed', 'community_voting') and exists (
+    select 1 from public.contests c where c.id = p_contest_id
+      and c.voting_start is not null and now() >= c.voting_start
+  ) and not exists (
     select 1 from public.contest_rank_snapshots s
      where s.contest_id = p_contest_id and s.kind = 'popular' and s.snapshot_day = v_day
   ) then

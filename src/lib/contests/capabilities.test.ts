@@ -105,6 +105,30 @@ describe("bình chọn", () => {
     expect(caps(voting).can_vote).toBe(true);
   });
 
+  it("vừa nhận bài vừa bình chọn, vẫn cho phép gửi và rút bài", () => {
+    const c = caps({ voting_start: h(-10), voting_end: h(10) }, { sub: { status: "eligible", review_flags: [] } });
+    expect(c.can_submit).toBe(true);
+    expect(c.can_withdraw).toBe(true);
+    expect(c.can_vote).toBe(true);
+    expect(c.rankings_visible.popular).toBe(true);
+    expect(c.popular_values_visible).toBe(false);
+  });
+
+  it("bình chọn tiếp tục sau khi đóng nhận bài trong cùng khung ngày", () => {
+    expect(caps({ ...voting, status: "submission_closed" }).can_vote).toBe(true);
+  });
+
+  it.each(["draft", "announced", "judging", "results", "archived"] as const)("không mở bình chọn ở trạng thái %s", (status) => {
+    expect(caps({ ...voting, status }).can_vote).toBe(false);
+  });
+
+  it("đóng bình chọn đúng hạn ngay cả khi vẫn nhận bài", () => {
+    const c = caps({ voting_start: h(-10), voting_end: h(0) });
+    expect(c.can_submit).toBe(true);
+    expect(c.can_vote).toBe(false);
+    expect(c.popular_values_visible).toBe(true);
+  });
+
   it("tài khoản < 7 ngày", () => {
     const c = caps(voting, { viewer: { userId: "u1", accountCreatedAt: h(-24 * 3) } });
     expect(c.can_vote).toBe(false);
