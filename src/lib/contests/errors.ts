@@ -71,7 +71,7 @@ const CATALOG = {
   score_run_not_final: [409, "Chỉ công bố được lượt tính chính thức."],
   score_run_not_published: [409, "Cần công bố một lượt tính chính thức (tab Chấm điểm) trước khi chuyển sang Đã có kết quả."],
   slug_taken: [409, "Đường dẫn (slug) đã được dùng cho cuộc thi khác."],
-  rules_locked: [409, "Thể lệ đã khoá sau khi cuộc thi công khai."],
+  rules_locked: [409, "Nội dung thể lệ chỉ được sửa trước khi cuộc thi bắt đầu; đường dẫn, giải thưởng và điều kiện dự thi khoá sau khi công khai."],
   scoring_locked: [409, "Công thức chấm đã khoá từ lúc mở bình chọn."],
   config_incomplete: [422, "Cấu hình cuộc thi chưa đủ."],
   voting_window_missing: [422, "Cần đặt thời gian bình chọn trước khi mở bình chọn."],

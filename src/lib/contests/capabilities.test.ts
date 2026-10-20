@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canEditContestRules,
   getContestCapabilities,
   getEntryVoteState,
   type ContestTimeline,
@@ -22,6 +23,20 @@ const base: ContestTimeline = {
 const viewer: ContestViewer = { userId: "u1", accountCreatedAt: h(-24 * 60) };
 const eligibility = { allow_resubmit_after_withdraw: false };
 const vote = { min_account_age_days: 7 };
+
+describe("editing rule text before start", () => {
+  it("allows draft and future announced contests", () => {
+    expect(canEditContestRules({ status: "draft", submission_start: h(-1) }, NOW)).toBe(true);
+    expect(canEditContestRules({ status: "announced", submission_start: h(1) }, NOW)).toBe(true);
+  });
+  it("locks at the exact opening time even if cron has not advanced status", () => {
+    expect(canEditContestRules({ status: "announced", submission_start: h(0) }, NOW)).toBe(false);
+    expect(canEditContestRules({ status: "announced", submission_start: h(-1) }, NOW)).toBe(false);
+  });
+  it.each(["submission_open", "submission_closed", "community_voting", "judging", "results", "archived"] as const)("does not unlock %s by postponing the date", (status) => {
+    expect(canEditContestRules({ status, submission_start: h(24) }, NOW)).toBe(false);
+  });
+});
 
 function caps(over: Partial<ContestTimeline> = {}, opts: { sub?: ViewerSubmission | null; resubmit?: boolean; viewer?: ContestViewer } = {}) {
   return getContestCapabilities({

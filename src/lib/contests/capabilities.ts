@@ -69,6 +69,10 @@ const ACTIVE_SUBMISSION: ContestSubmissionStatus[] = ["submitted", "eligible", "
 
 const t = (iso: string | null): number | null => (iso === null ? null : Date.parse(iso));
 
+export function canEditContestRules(contest: Pick<ContestTimeline, "status" | "submission_start">, now: Date): boolean {
+  return contest.status === "draft" || (contest.status === "announced" && now.getTime() < Date.parse(contest.submission_start));
+}
+
 function isOrAfter(status: ContestStatus, ...statuses: ContestStatus[]): boolean {
   return statuses.includes(status);
 }
