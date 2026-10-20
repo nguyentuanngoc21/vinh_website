@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { canEditContestRules } from "@/lib/contests/capabilities";
 import { ContestImageField } from "./contest-image-field";
 import { useRouter } from "next/navigation";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react/dist/ssr";
@@ -51,6 +52,12 @@ function SectionTitle({ children, note }: { children: React.ReactNode; note?: st
 export function ContestForm({ contest }: { contest: ContestRow | null }) {
   const router = useRouter();
   const locked = contest !== null && contest.status !== "draft";
+  const [rulesLocked, setRulesLocked] = useState(() => contest !== null && !canEditContestRules(contest, new Date()));
+  useEffect(() => {
+    const refresh = () => setRulesLocked(contest !== null && !canEditContestRules(contest, new Date()));
+    const timer = setInterval(refresh, 1000);
+    return () => clearInterval(timer);
+  }, [contest]);
   const eligibilityInit = { ...DEFAULT_ELIGIBILITY_RULES, ...(contest?.eligibility_rules as Partial<EligibilityRules> | undefined) };
   const voteInit = { ...DEFAULT_VOTE_RULES, ...(contest?.vote_rules as Partial<VoteRules> | undefined) };
 
@@ -118,10 +125,12 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
       if (!iso) errs.push(`${label}: không hợp lệ`);
       body[key] = iso;
     }
-    if (!locked) {
-      body.slug = slug;
+    if (!rulesLocked) {
       body.rules_version = rulesVersion;
       body.rules_content = rulesContent;
+    }
+    if (!locked) {
+      body.slug = slug;
       body.prizes_summary = prizes.map((p) => ({ name: p.name, amount_vnd: Number(p.amount_vnd), quantity: Number(p.quantity), extra: p.extra }));
       const after = firstPublishedAfter ? vnLocalToIso(firstPublishedAfter) : null;
       if (firstPublishedAfter && !after) errs.push("Đăng lần đầu từ: không hợp lệ");
@@ -181,7 +190,7 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
     <div className="flex flex-col gap-5">
       {locked && (
         <Alert tone="info">
-          Cuộc thi đã công khai: thể lệ, đường dẫn, giải thưởng và điều kiện dự thi đã khoá. Vẫn sửa được tên, mô tả, hình ảnh và các mốc thời gian.
+          Cuộc thi đã công khai: đường dẫn, giải thưởng và điều kiện dự thi đã khoá. Nội dung và phiên bản thể lệ vẫn sửa được khi cuộc thi đang sắp mở và chưa đến giờ bắt đầu nhận bài.
         </Alert>
       )}
 
@@ -225,10 +234,10 @@ export function ContestForm({ contest }: { contest: ContestRow | null }) {
       </section>
 
       <section className="rounded-[14px] border border-cream-border bg-surface p-4 sm:p-[22px]">
-        <SectionTitle note="Thể lệ không đổi sau khi công khai — kiểm tra kỹ trước khi chuyển khỏi bản nháp. Số tiền và quà kèm áp dụng cho mỗi giải; hạng được nhận giải được thiết lập riêng trong cấu hình chấm.">Thể lệ & giải thưởng</SectionTitle>
+        <SectionTitle note="Nội dung và phiên bản thể lệ có thể sửa trước giờ bắt đầu nhận bài khi cuộc thi còn ở bản nháp hoặc sắp mở. Giải thưởng khoá khi công khai; số tiền và quà kèm áp dụng cho mỗi giải.">Thể lệ & giải thưởng</SectionTitle>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[160px_1fr]">
-          <Field label="Phiên bản thể lệ" value={rulesVersion} disabled={locked} onChange={(e) => setRulesVersion(e.target.value)} maxLength={20} />
-          <Textarea label="Nội dung thể lệ" rows={8} value={rulesContent} disabled={locked} onChange={(e) => setRulesContent(e.target.value)} />
+          <Field label="Phiên bản thể lệ" value={rulesVersion} disabled={rulesLocked} onChange={(e) => setRulesVersion(e.target.value)} maxLength={20} />
+          <Textarea label="Nội dung thể lệ" rows={8} value={rulesContent} disabled={rulesLocked} onChange={(e) => setRulesContent(e.target.value)} />
         </div>
         <div className="mt-5 flex flex-col gap-3">
           <div className="text-[13px] font-semibold text-slate">Cơ cấu giải (VNĐ — quy đổi token khi trao)</div>

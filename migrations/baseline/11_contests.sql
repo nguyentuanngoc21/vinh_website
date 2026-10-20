@@ -292,13 +292,21 @@ begin
 
   if old.status <> 'draft' and (
        new.slug is distinct from old.slug
-    or new.rules_content is distinct from old.rules_content
-    or new.rules_version is distinct from old.rules_version
     or new.eligibility_rules is distinct from old.eligibility_rules
     or new.vote_rules is distinct from old.vote_rules
     or new.prizes_summary is distinct from old.prizes_summary
   ) then
     raise exception 'Contest rules are locked once the contest is public' using hint = 'rules_locked';
+  end if;
+
+  -- Rule text may change while announced, strictly before the original opening time.
+  -- Checking both rows prevents changing the deadline to unlock an already-started contest.
+  if (new.rules_content is distinct from old.rules_content
+      or new.rules_version is distinct from old.rules_version)
+     and old.status <> 'draft'
+     and not (old.status = 'announced' and new.status = 'announced'
+              and now() < old.submission_start and now() < new.submission_start) then
+    raise exception 'Contest rules are locked once the contest has started' using hint = 'rules_locked';
   end if;
 
   if new.scoring_config is distinct from old.scoring_config and (

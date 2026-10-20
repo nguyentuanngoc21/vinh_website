@@ -137,6 +137,27 @@ begin
     v_results := array_append(v_results, case when v_hint = 'not_admin' then 'PASS chỉ admin chuyển trạng thái' else 'FAIL not_admin: ' || sqlerrm end);
   end;
 
+  -- Isolated regression: announced rules remain editable until opening time.
+  begin
+    update public.contests set submission_start = now() + interval '1 day' where id = v_a;
+    perform public.transition_contest_status(v_a, 'announced', v_admin, null);
+    update public.contests set rules_content = 'Updated before opening', rules_version = '2' where id = v_a;
+    update public.contests set submission_start = now() where id = v_a;
+    begin
+      update public.contests set rules_content = 'Must not save at opening time' where id = v_a;
+      raise exception 'Rule text remained editable after opening';
+    exception when others then
+      get stacked diagnostics v_hint = pg_exception_hint;
+      if v_hint is distinct from 'rules_locked' then raise; end if;
+    end;
+    raise exception using message = 'Rule editing regression passed; roll back fixture', errcode = 'P0098';
+  exception
+    when sqlstate 'P0098' then
+      v_results := array_append(v_results, 'PASS announced rules editable before start and locked at start');
+    when others then
+      v_results := array_append(v_results, 'FAIL announced rule editing: ' || sqlerrm);
+  end;
+
   perform public.transition_contest_status(v_a, 'announced', v_admin, null);
   perform public.transition_contest_status(v_a, 'submission_open', null, 'cron');
   perform public.transition_contest_status(v_b, 'announced', v_admin, null);

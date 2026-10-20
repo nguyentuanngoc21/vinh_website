@@ -59,7 +59,7 @@ export async function createContest(client: Client, adminId: string, patch: Cont
   return data!;
 }
 
-/** Thể lệ/slug/cấu hình khoá khi rời draft — trigger trả rules_locked (409). */
+/** Trigger enforces rule text locking at submission start and other public-field locks. */
 export async function updateContest(client: Client, contestId: string, patch: ContestPatch): Promise<ContestRow> {
   const current = await getContestById(client, contestId);
   timelineErrorsOrThrow({ ...current, ...patch });
