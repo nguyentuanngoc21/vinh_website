@@ -2711,6 +2711,10 @@ export type Database = {
         Args: Record<string, never>;
         Returns: boolean;
       };
+      open_due_contest: {
+        Args: { p_contest_id: string };
+        Returns: Database["public"]["Tables"]["contests"]["Row"][];
+      };
       transition_contest_status: {
         Args: { p_contest_id: string; p_to: ContestStatus; p_actor_id: string | null; p_reason?: string | null };
         Returns: Database["public"]["Tables"]["contests"]["Row"];

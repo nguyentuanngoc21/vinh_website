@@ -137,6 +137,28 @@ begin
     v_results := array_append(v_results, case when v_hint = 'not_admin' then 'PASS chỉ admin chuyển trạng thái' else 'FAIL not_admin: ' || sqlerrm end);
   end;
 
+  -- Open-on-access is atomic/idempotent and must not open before the deadline.
+  begin
+    update public.contests set submission_start = now() + interval '1 hour' where id = v_a;
+    perform public.transition_contest_status(v_a, 'announced', v_admin, null);
+    select count(*) into v_count from public.open_due_contest(v_a);
+    if v_count <> 0 then raise exception 'Opened before scheduled time'; end if;
+    update public.contests set submission_start = now() where id = v_a;
+    select count(*) into v_count from public.open_due_contest(v_a);
+    if v_count <> 1 then raise exception 'Did not open at scheduled time'; end if;
+    select count(*) into v_count from public.open_due_contest(v_a);
+    if v_count <> 0 then raise exception 'Opened twice'; end if;
+    select count(*) into v_count from public.contest_status_events
+      where contest_id = v_a and to_status = 'submission_open';
+    if v_count <> 1 then raise exception 'Duplicate opening events'; end if;
+    raise exception using message = 'Scheduled opening regression passed; roll back fixture', errcode = 'P0097';
+  exception
+    when sqlstate 'P0097' then
+      v_results := array_append(v_results, 'PASS scheduled opening is bounded and idempotent');
+    when others then
+      v_results := array_append(v_results, 'FAIL scheduled opening: ' || sqlerrm);
+  end;
+
   -- Isolated regression: announced rules remain editable until opening time.
   begin
     update public.contests set submission_start = now() + interval '1 day' where id = v_a;

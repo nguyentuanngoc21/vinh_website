@@ -8,6 +8,7 @@ import {
 } from "@/lib/contests/capabilities";
 import { readContestConfig } from "@/lib/contests/config";
 import { ContestError, throwIfError } from "@/lib/contests/errors";
+import { ensureScheduledOpening } from "./scheduled-opening";
 
 type Client = SupabaseClient<Database>;
 export type ContestRow = Database["public"]["Tables"]["contests"]["Row"];
@@ -24,7 +25,7 @@ export async function getContestBySlug(client: Client, slug: string, opts: { inc
   const { data, error } = await client.from("contests").select("*").eq("slug", slug).maybeSingle();
   throwIfError(error, "getContestBySlug");
   if (!data || (data.status === "draft" && !opts.includeDraft)) throw new ContestError("contest_not_found");
-  return data;
+  return ensureScheduledOpening(client, data);
 }
 
 /** Người xem cho capability: tuổi tài khoản lấy từ auth.users (service-role). */
@@ -105,7 +106,8 @@ export async function listContestsForHub(client: Client, opts: { finishedLimit?:
   const withCounts = (rows: typeof all): ContestSummary[] =>
     rows.map((c) => ({ ...c, ...(counts.get(c.id) ?? { entry_count: 0, author_count: 0 }) }));
 
-  const runningRows = withCounts(running.data ?? []);
+  const opened = await Promise.all((running.data ?? []).map((c) => ensureScheduledOpening(client, c)));
+  const runningRows = withCounts(opened);
   const featured = runningRows.filter((c) => c.is_featured);
   return {
     // Hero: cuộc thi được đánh dấu nổi bật; nếu chưa đánh dấu cái nào thì

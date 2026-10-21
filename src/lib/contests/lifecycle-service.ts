@@ -19,6 +19,7 @@ import { CLOSE_FLAG_CODE, evaluateCloseChecks } from "@/lib/contests/eligibility
 import { ContestError, throwIfError, toContestError } from "@/lib/contests/errors";
 import { getPublishedRun } from "@/lib/contests/final-scoring-service";
 import { forceRefreshScores, freezeScores } from "@/lib/contests/scores-service";
+import { ensureScheduledOpening } from "./scheduled-opening";
 
 type Client = SupabaseClient<Database>;
 
@@ -185,8 +186,15 @@ export async function advanceDueContests(client: Client, now: Date = new Date())
 
   for (const c of toOpen.data ?? []) {
     try {
-      await transitionContest(client, { contestId: c.id, to: "submission_open", adminId: null, reason: "Tự động: tới giờ mở nhận bài" });
-      result.opened.push(c.slug);
+      // A missed entire submission window must still advance and run close tasks.
+      if (now.getTime() >= Date.parse(c.submission_end)) {
+        await transitionContest(client, { contestId: c.id, to: "submission_open", adminId: null, reason: "Tự động: bắt kịp lịch nhận bài" });
+        const { close } = await transitionWithTasks(client, { contestId: c.id, to: "submission_closed", adminId: null, reason: "Tự động: hết hạn nhận bài" });
+        result.closed.push({ slug: c.slug, snapshots: close?.snapshots ?? 0, flagged: close?.flagged ?? 0 });
+        continue;
+      }
+      const opened = await ensureScheduledOpening(client, c, now);
+      if (opened.status === "submission_open") result.opened.push(c.slug);
     } catch (e) {
       result.errors.push(`${c.slug}: ${e instanceof Error ? e.message : String(e)}`);
     }
