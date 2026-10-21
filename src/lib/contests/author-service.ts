@@ -14,6 +14,7 @@ import { popularRankingRows } from "@/lib/contests/feeds";
 import type { EligibilityResult } from "@/lib/contests/eligibility/types";
 import { throwIfError } from "@/lib/contests/errors";
 import { loadEligibilityContexts } from "@/lib/contests/submission-service";
+import { ensureScheduledOpening } from "./scheduled-opening";
 
 type Client = SupabaseClient<Database>;
 
@@ -139,12 +140,13 @@ export async function getBookContestPanel(client: Client, input: { bookId: strin
   const now = input.now ?? new Date();
   const [entries, openRows] = await Promise.all([
     loadAuthorEntries(client, { viewerId: input.viewerId, bookId: input.bookId, now }),
-    client.from("contests").select("*").eq("status", "submission_open").gt("submission_end", now.toISOString()).order("submission_end"),
+    client.from("contests").select("*").in("status", ["announced", "submission_open"]).lte("submission_start", now.toISOString()).gt("submission_end", now.toISOString()).order("submission_end"),
   ]);
   throwIfError(openRows.error, "load open contests");
 
   const entered = new Map(entries.map((e) => [e.contest.id, e.status]));
-  const candidates = (openRows.data ?? []).filter(
+  const scheduled = await Promise.all((openRows.data ?? []).map((c) => ensureScheduledOpening(client, c, now)));
+  const candidates = scheduled.filter(
     (c) => isSubmissionOpen(c, now) && (!entered.has(c.id) || entered.get(c.id) === "withdrawn")
   );
   const open = await Promise.all(
