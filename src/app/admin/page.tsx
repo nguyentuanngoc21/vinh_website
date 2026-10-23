@@ -9,6 +9,9 @@ import { CopyrightPanel } from "@/components/admin/copyright-panel";
 import { SignupsChart } from "@/components/admin/signups-chart";
 import { RetentionCohort } from "@/components/admin/retention-cohort";
 import { TransactionsTable } from "@/components/admin/transactions-table";
+import { WalletExposurePanel } from "@/components/admin/wallet-exposure-panel";
+import { getWalletExposure } from "@/lib/admin/wallet-exposure";
+import { requireAdmin } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Tổng quan · Vịnh Admin",
@@ -19,13 +22,21 @@ export const metadata: Metadata = {
 // source"). Giờ fetch thật bằng service-role (giống /admin/noi-dung,
 // /admin/tranh-chap) — admin cần thấy xuyên suốt mọi user, RLS thường sẽ
 // chặn hầu hết các bảng liên quan.
-export default async function AdminOverviewPage() {
+export default async function AdminOverviewPage({ searchParams }: {
+  searchParams: Promise<{ walletSearch?: string; walletPage?: string }>;
+}) {
+  await requireAdmin();
+  const params = await searchParams;
+  const search = typeof params.walletSearch === "string" ? params.walletSearch.trim().slice(0, 100) : "";
+  const rawPage = Number(params.walletPage);
+  const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 1000000) : 1;
   const supabase = createServiceRoleClient();
-  const [overview, coverage, postsTrend, signupsTrend] = await Promise.all([
+  const [overview, coverage, postsTrend, signupsTrend, exposure] = await Promise.all([
     getOverviewStats(supabase),
     getCopyrightCoverage(supabase),
     getMonthlyPostsTrend(supabase),
     getWeeklySignupsTrend(supabase),
+    getWalletExposure(supabase, search, page),
   ]);
 
   return (
@@ -38,13 +49,14 @@ export default async function AdminOverviewPage() {
       </div>
 
       <OverviewKpis stats={overview} />
+      <WalletExposurePanel stats={exposure} search={search} page={page} />
 
-      <div className="mb-[18px] grid grid-cols-[1.6fr_1fr] gap-[18px]">
+      <div className="mb-[18px] grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-[18px]">
         <PostsChart points={postsTrend} />
         <CopyrightPanel coverage={coverage} />
       </div>
 
-      <div className="mb-[18px] grid grid-cols-2 gap-[18px]">
+      <div className="mb-[18px] grid grid-cols-1 lg:grid-cols-2 gap-[18px]">
         <SignupsChart points={signupsTrend} />
         <RetentionCohort />
       </div>

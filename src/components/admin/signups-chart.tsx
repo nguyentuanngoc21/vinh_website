@@ -30,6 +30,9 @@ export function SignupsChart({ points }: { points: WeeklySignupsPoint[] }) {
         <polygon fill="rgba(217,164,65,.12)" points={areaPoints} />
         {last && <circle cx={last.x} cy={last.y} r={4} fill="var(--color-brand-gold)" />}
       </svg>
+      <div className="mt-2 flex justify-between gap-1 text-[10px] text-stone-alt">
+        {points.map(point => <span key={point.label}>{point.label}</span>)}
+      </div>
     </div>
   );
 }

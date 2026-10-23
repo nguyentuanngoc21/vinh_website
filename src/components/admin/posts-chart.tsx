@@ -8,7 +8,7 @@ export function PostsChart({ points }: { points: MonthlyPostsPoint[] }) {
 
   return (
     <div className="rounded-[14px] border border-cream-border bg-surface p-[22px]">
-      <div className="mb-[18px] flex items-center justify-between">
+      <div className="mb-[18px] flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-base font-bold text-brand-ink">
             Bài đăng mỗi tháng

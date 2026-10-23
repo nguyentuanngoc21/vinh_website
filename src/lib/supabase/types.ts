@@ -2654,6 +2654,10 @@ export type Database = {
       };
     };
     Functions: {
+      admin_wallet_exposure: {
+        Args: { p_search?: string; p_page?: number; p_page_size?: number };
+        Returns: unknown;
+      };
       reserve_manuscript_import: { Args: { p_id: string; p_owner: string }; Returns: { created: boolean; job_id: string }[] };
       claim_manuscript_import: { Args: Record<string, never>; Returns: ManuscriptImportJob[] };
       finish_manuscript_import: { Args: { p_id: string; p_token: string; p_outcome: string; p_output?: string | null }; Returns: boolean };

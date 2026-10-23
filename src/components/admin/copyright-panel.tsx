@@ -35,7 +35,7 @@ export function CopyrightPanel({ coverage }: { coverage: CopyrightCoverage }) {
       </div>
       <div className="flex flex-col gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="flex items-center justify-between">
+          <div key={stat.label} className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-[13px] font-medium text-[#9fb3bd]">{stat.label}</div>
             <div className="text-xl font-bold text-brand-gold-light">
               {stat.value}

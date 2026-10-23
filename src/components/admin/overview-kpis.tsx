@@ -15,7 +15,7 @@ import { formatVnd } from "@/lib/format-currency";
 export function OverviewKpis({ stats }: { stats: OverviewStats }) {
   const primaryKpis = [
     {
-      label: "Doanh thu 30 ngày",
+      label: "Tiền nạp thành công (30 ngày)",
       value: formatVnd(stats.revenueVnd30d),
       icon: CoinsIcon,
       iconColor: "var(--color-brand-gold)",
@@ -50,7 +50,7 @@ export function OverviewKpis({ stats }: { stats: OverviewStats }) {
 
   return (
     <>
-      <div className="mb-[18px] grid grid-cols-4 gap-[18px]">
+      <div className="mb-[18px] grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-[18px]">
         {primaryKpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
@@ -74,7 +74,7 @@ export function OverviewKpis({ stats }: { stats: OverviewStats }) {
         })}
       </div>
 
-      <div className="mb-6 grid grid-cols-4 gap-[18px]">
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-[18px]">
         {secondaryKpis.map((kpi) => (
           <div
             key={kpi.label}

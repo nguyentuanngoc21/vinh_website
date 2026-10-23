@@ -1,3 +1,4 @@
+import { checkQueryErrors } from "./query-utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
@@ -21,14 +22,15 @@ export async function getCopyrightCoverage(
     supabase
       .from("content_protection_status")
       .select("id", { count: "exact", head: true })
-      .eq("content_type", "design"),
+      .eq("content_type", "design").eq("protected", true),
     supabase.from("audio_narrations").select("id", { count: "exact", head: true }),
     supabase
       .from("content_protection_status")
       .select("id", { count: "exact", head: true })
-      .eq("content_type", "audio"),
+      .eq("content_type", "audio").eq("protected", true),
   ]);
 
+  checkQueryErrors([designTotal, designProtected, audioTotal, audioProtected]);
   return {
     designProtectedCount: designProtected.count ?? 0,
     designTotalCount: designTotal.count ?? 0,
