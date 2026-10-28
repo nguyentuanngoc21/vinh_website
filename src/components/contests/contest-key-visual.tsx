@@ -1,3 +1,5 @@
+import { DisplayImage } from "@/components/ui/display-image";
+
 /**
  * Key visual của cuộc thi — ảnh do BTC tải lên, hoặc nền gradient navy/gold
  * của thương hiệu khi chưa có ảnh (thiết kế: "chỉ key visual thay đổi").
@@ -16,8 +18,7 @@ export function ContestKeyVisual({
   return (
     <div className={`relative overflow-hidden bg-brand-ink-dark ${className}`}>
       {url ? (
-        // eslint-disable-next-line @next/next/no-img-element -- ảnh từ URL do admin nhập (domain không cố định)
-        <img src={url} alt={title} className="absolute inset-0 h-full w-full object-cover" />
+        <DisplayImage src={url} alt={title} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div
           aria-hidden

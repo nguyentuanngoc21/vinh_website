@@ -2,6 +2,7 @@
 
 import { type ImgHTMLAttributes, type SyntheticEvent } from "react";
 import { cn } from "@/lib/cn";
+import { publicImageProps } from "@/lib/media/public-image";
 
 /**
  * Ảnh tác phẩm (thiết kế, ảnh chèn trong chương, bìa do họa sĩ vẽ) — chặn
@@ -26,11 +27,12 @@ import { cn } from "@/lib/cn";
  */
 type ProtectedImageProps = ImgHTMLAttributes<HTMLImageElement> & {
   wrapperClassName?: string;
+  displayWidth?: number;
 };
 
 const block = (e: SyntheticEvent) => e.preventDefault();
 
-export function ProtectedImage({ wrapperClassName, className, alt = "", ...imgProps }: ProtectedImageProps) {
+export function ProtectedImage({ wrapperClassName, className, alt = "", displayWidth = 640, src, loading = "lazy", decoding = "async", ...imgProps }: ProtectedImageProps) {
   return (
     <span
       className={cn("no-copy-image relative block", wrapperClassName)}
@@ -41,6 +43,9 @@ export function ProtectedImage({ wrapperClassName, className, alt = "", ...imgPr
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         {...imgProps}
+        {...(typeof src === "string" && !imgProps.srcSet ? publicImageProps(src, displayWidth) : { src })}
+        loading={loading}
+        decoding={decoding}
         alt={alt}
         draggable={false}
         className={cn("no-copy-image pointer-events-none", className)}

@@ -1,4 +1,5 @@
 import type { VinhEvent } from "@/lib/events/catalog";
+import { publicImageUrl } from "@/lib/media/public-image";
 
 const PALETTES = {
   sea: { background: "#123e49", paper: "#f5dfac", light: "#dbbe73" },
@@ -11,7 +12,7 @@ export function EventBanner({ event, compact = false }: { event: VinhEvent; comp
   return (
     <div className={`relative isolate overflow-hidden ${compact ? "aspect-[16/9]" : "min-h-[300px] sm:aspect-[2.7/1]"}`} style={{ backgroundColor: color.background }}>
       {event.bannerUrl ? (
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(event.bannerUrl)})` }} />
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(publicImageUrl(event.bannerUrl, compact ? 640 : 1280))})` }} />
       ) : (
         <>
           <svg aria-hidden="true" viewBox="0 0 1200 460" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">

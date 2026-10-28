@@ -52,14 +52,10 @@ export function BookCover({ ageRating = "all", ...props }: BookCoverProps) {
 function CoverImage({ id, title, author, genre, coverUrl, className, priority = false }: Omit<BookCoverProps, "ageRating">) {
   if (coverUrl) {
     return (
-      // Ảnh tới từ bucket Supabase Storage của người dùng (project ref
-      // khác nhau giữa dev/production, xem docs/SUPABASE_SETUP.md) —
-      // không đưa wildcard domain Supabase vào next.config.ts
-      // remotePatterns chỉ để dùng next/image cho 1 chỗ này.
-      // Bìa thật là ảnh họa sĩ vẽ (design item) — chặn lưu/kéo/sao chép như
-      // ảnh thiết kế (ProtectedImage).
+      // ProtectedImage serves a cached, resized WebP for public Storage covers.
       <ProtectedImage
         src={coverUrl}
+        displayWidth={320}
         alt={title}
         loading={priority ? "eager" : "lazy"}
         decoding="async"

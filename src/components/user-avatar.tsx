@@ -1,4 +1,5 @@
 import { AVATAR_TONES } from "@/lib/profile";
+import { DisplayImage } from "@/components/ui/display-image";
 
 /**
  * Tô màu avatar fallback (không có avatar_url thật) theo hash(userId) —
@@ -26,9 +27,9 @@ export function UserAvatar({
 }) {
   if (avatarUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <DisplayImage
         src={avatarUrl}
+        displayWidth={size}
         alt={nickname}
         style={{ width: size, height: size }}
         className="shrink-0 rounded-full object-cover"

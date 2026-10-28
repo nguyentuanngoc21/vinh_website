@@ -3,6 +3,7 @@ import { ImageResponse } from "next/og";
 import { createClient } from "@/lib/supabase/server";
 import type { BookGenre } from "@/lib/supabase/types";
 import { resolveBookCoverUrl } from "@/lib/covers/resolve-book-cover";
+import { publicImageUrl } from "@/lib/media/public-image";
 import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import { loadCoverFonts } from "@/lib/covers/fonts";
 import { buildOgCoverElement, OG_HEIGHT, OG_WIDTH } from "@/components/covers/generated-book-cover-og";
@@ -62,7 +63,7 @@ export async function GET(
 
   const coverUrl = await resolveBookCoverUrl(supabase, book);
   if (coverUrl) {
-    return NextResponse.redirect(coverUrl, 302);
+    return NextResponse.redirect(new URL(publicImageUrl(coverUrl, 640), request.url), 302);
   }
 
   const { data: profile } = await supabase

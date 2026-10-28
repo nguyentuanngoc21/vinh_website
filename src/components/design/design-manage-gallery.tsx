@@ -13,6 +13,7 @@ import {
 import { Field, Textarea, Select, Button, Alert, Checkbox } from "@/components/ui";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { useOrigin } from "@/lib/use-origin";
+import { DisplayImage } from "@/components/ui/display-image";
 import type { DesignItemCategory } from "@/lib/supabase/types";
 
 type MyDesignItem = {
@@ -188,8 +189,7 @@ export function DesignManageGallery() {
               className="block w-full cursor-pointer text-left"
               title="Sửa thông tin / lấy link chia sẻ"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.imageUrl} alt={item.title} className="block h-40 w-full object-cover" />
+              <DisplayImage src={item.imageUrl} displayWidth={320} alt={item.title} className="block h-40 w-full object-cover" />
             </button>
             <div className="p-2.5">
               <button
@@ -241,8 +241,7 @@ export function DesignManageGallery() {
             onClick={(e) => e.stopPropagation()}
             className="grid w-full max-w-[880px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-surface shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1fr_1.1fr]"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={editing.imageUrl} alt={editing.title} className="min-h-[220px] w-full object-cover sm:min-h-full" />
+            <DisplayImage src={editing.imageUrl} alt={editing.title} className="min-h-[220px] w-full object-cover sm:min-h-full" />
             <div className="flex min-w-0 flex-col gap-4 p-6">
               <div className="flex items-center justify-between gap-3">
                 <span

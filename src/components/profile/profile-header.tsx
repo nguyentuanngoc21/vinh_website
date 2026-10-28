@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { CameraIcon } from "@phosphor-icons/react/dist/ssr";
 import { Alert } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { publicImageUrl } from "@/lib/media/public-image";
 
 // ImageCropModal kéo theo react-easy-crop — chỉ cần khi người dùng đã chọn
 // ảnh bìa/ảnh đại diện, nên tải lười. ssr: false vì modal chỉ mở sau thao
@@ -223,7 +224,7 @@ export function ProfileHeader({
         className="relative h-[120px] w-full bg-brand-navy sm:h-[170px] lg:h-[210px]"
         style={
           coverImageUrl
-            ? { backgroundImage: `url(${coverImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+            ? { backgroundImage: `url(${JSON.stringify(publicImageUrl(coverImageUrl, 1280))})`, backgroundSize: "cover", backgroundPosition: "center" }
             : { background: "linear-gradient(135deg, var(--color-brand-navy) 0%, var(--color-brand-ink-dark) 100%)" }
         }
       >
@@ -261,7 +262,7 @@ export function ProfileHeader({
           className="relative -mt-10 flex h-[82px] w-[82px] shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-brand-navy text-[30px] font-bold text-brand-gold-light sm:-mt-11"
           style={
             avatarUrl
-              ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+              ? { backgroundImage: `url(${JSON.stringify(publicImageUrl(avatarUrl, 96))})`, backgroundSize: "cover", backgroundPosition: "center" }
               : undefined
           }
         >

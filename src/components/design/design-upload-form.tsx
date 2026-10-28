@@ -13,6 +13,7 @@ import {
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
 import { ART_STYLES } from "@/lib/design/art-styles";
 import { compressImageFile } from "@/lib/media/compress-image";
+import { DisplayImage } from "@/components/ui/display-image";
 import { useOrigin } from "@/lib/use-origin";
 import { Field, Textarea, Select, Button, Alert, Checkbox } from "@/components/ui";
 import type { ArtStyle, DesignItemCategory } from "@/lib/supabase/types";
@@ -304,8 +305,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
         <div>
           {selected ? (
             <div className="overflow-hidden rounded-2xl border border-border-light bg-neutral-bg">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={selected.imageUrl ?? selected.previewUrl} alt="" className="h-auto w-full object-cover" />
+              <DisplayImage src={selected.imageUrl ?? selected.previewUrl} alt="" className="h-auto w-full object-cover" />
             </div>
           ) : (
             <button
@@ -480,8 +480,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
                     </Checkbox>
                   </span>
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-neutral-bg">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.imageUrl ?? item.previewUrl} alt="" className="h-full w-full object-cover" />
+                    <DisplayImage src={item.imageUrl ?? item.previewUrl} displayWidth={320} alt="" className="h-full w-full object-cover" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12.5px] font-semibold text-ink">{item.title}</div>

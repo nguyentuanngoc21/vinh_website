@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { genres as REAL_GENRES } from "@/lib/books";
 import { BookCover } from "@/components/covers/book-cover";
+import { publicImageUrl } from "@/lib/media/public-image";
 import { ExclusiveBadge } from "@/components/story/exclusive-badge";
 import { buildCoverSpec } from "@/lib/covers/build-cover-spec";
 import { DevelopmentOverlay } from "@/components/development-overlay";
@@ -253,7 +254,7 @@ export function RankingsBoard({ bookRankings }: { bookRankings: BookRankingsData
                           className="absolute inset-0 scale-[1.2] bg-cover bg-center opacity-65 blur-[28px]"
                           style={{
                             backgroundImage: b.coverUrl
-                              ? `url(${JSON.stringify(b.coverUrl)})`
+                              ? `url(${JSON.stringify(publicImageUrl(b.coverUrl, 320))})`
                               : `linear-gradient(135deg, ${palette?.from}, ${palette?.to})`,
                           }}
                         />

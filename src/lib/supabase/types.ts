@@ -1,3 +1,17 @@
+export type TreasurySnapshotRow = {
+  id: string; balance_vnd: number; fee_buffer_vnd: number; as_of: string;
+  note: string; created_by: string; created_at: string;
+};
+export type TreasuryBankEntryRow = {
+  id: string; source: string; external_id: string; direction: "in" | "out";
+  amount_vnd: number; fee_vnd: number; occurred_at: string;
+  reference_type: "deposit" | "withdrawal" | null; reference_id: string | null;
+  created_by: string; created_at: string;
+};
+export type TreasuryLinkRow = {
+  id: number; bank_entry_id: string; reference_type: "deposit" | "withdrawal" | null;
+  reference_id: string | null; note: string; created_by: string; created_at: string;
+};
 /**
  * Hand-written to match docs/supabase/schema.sql for now. Once the
  * Supabase project exists, replace this file with the generated version:
@@ -275,6 +289,21 @@ export type ContestReviewFlag = {
 export type Database = {
   public: {
     Tables: {
+      treasury_snapshots: {
+        Row: TreasurySnapshotRow;
+        Insert: Omit<TreasurySnapshotRow, "created_at">;
+        Update: never; Relationships: [];
+      };
+      treasury_bank_entries: {
+        Row: TreasuryBankEntryRow;
+        Insert: Omit<TreasuryBankEntryRow, "id" | "created_at">;
+        Update: never; Relationships: [];
+      };
+      treasury_reconciliation_links: {
+        Row: TreasuryLinkRow;
+        Insert: Omit<TreasuryLinkRow, "id" | "created_at">;
+        Update: never; Relationships: [];
+      };
       manuscript_import_jobs: {
         Row: ManuscriptImportJob;
         Insert: never;
@@ -2654,6 +2683,11 @@ export type Database = {
       };
     };
     Functions: {
+      admin_import_bank_entries: {
+        Args: { p_source: string; p_actor: string; p_entries: Omit<TreasuryBankEntryRow, "id" | "created_at" | "source" | "created_by">[] };
+        Returns: number;
+      };
+      admin_treasury_report: { Args: { p_page?: number }; Returns: unknown };
       admin_wallet_exposure: {
         Args: { p_search?: string; p_page?: number; p_page_size?: number };
         Returns: unknown;

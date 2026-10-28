@@ -12,6 +12,8 @@ import { TransactionsTable } from "@/components/admin/transactions-table";
 import { WalletExposurePanel } from "@/components/admin/wallet-exposure-panel";
 import { getWalletExposure } from "@/lib/admin/wallet-exposure";
 import { requireAdmin } from "@/lib/session";
+import { getTreasuryReport } from "@/lib/admin/treasury";
+import { TreasuryPanel } from "@/components/admin/treasury-panel";
 
 export const metadata: Metadata = {
   title: "Tổng quan · Vịnh Admin",
@@ -23,20 +25,23 @@ export const metadata: Metadata = {
 // /admin/tranh-chap) — admin cần thấy xuyên suốt mọi user, RLS thường sẽ
 // chặn hầu hết các bảng liên quan.
 export default async function AdminOverviewPage({ searchParams }: {
-  searchParams: Promise<{ walletSearch?: string; walletPage?: string }>;
+  searchParams: Promise<{ walletSearch?: string; walletPage?: string; treasuryPage?: string }>;
 }) {
   await requireAdmin();
   const params = await searchParams;
   const search = typeof params.walletSearch === "string" ? params.walletSearch.trim().slice(0, 100) : "";
   const rawPage = Number(params.walletPage);
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 1000000) : 1;
+  const rawTreasuryPage = Number(params.treasuryPage);
+  const treasuryPage = Number.isSafeInteger(rawTreasuryPage) && rawTreasuryPage > 0 ? Math.min(rawTreasuryPage, 1000000) : 1;
   const supabase = createServiceRoleClient();
-  const [overview, coverage, postsTrend, signupsTrend, exposure] = await Promise.all([
+  const [overview, coverage, postsTrend, signupsTrend, exposure, treasury] = await Promise.all([
     getOverviewStats(supabase),
     getCopyrightCoverage(supabase),
     getMonthlyPostsTrend(supabase),
     getWeeklySignupsTrend(supabase),
     getWalletExposure(supabase, search, page),
+    getTreasuryReport(supabase, treasuryPage),
   ]);
 
   return (
@@ -49,6 +54,7 @@ export default async function AdminOverviewPage({ searchParams }: {
       </div>
 
       <OverviewKpis stats={overview} />
+      <TreasuryPanel report={treasury} exposure={exposure} page={treasuryPage} />
       <WalletExposurePanel stats={exposure} search={search} page={page} />
 
       <div className="mb-[18px] grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-[18px]">

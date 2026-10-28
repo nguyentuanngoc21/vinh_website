@@ -145,34 +145,14 @@ export async function getDesignGallery(
     workCountByIllustrator.set(item.illustrator_id, (workCountByIllustrator.get(item.illustrator_id) ?? 0) + 1);
   }
 
-  // Signed URL hết hạn sau 10 phút — thay getPublicUrl() (public, không
-  // bao giờ hết hạn) để URL lấy được qua devtools không dùng lại được lâu
-  // dài (nhúng sang web khác, gửi cho người khác dùng về sau). KHÔNG chặn
-  // được việc tải ảnh ngay lúc đang xem — không có cơ chế frontend nào
-  // chặn được điều đó. Từng bị chặn bởi lỗi hạ tầng Storage của project
-  // Supabase (DatabaseInvalidObjectDefinition, xem git log file này) —
-  // đã được nâng cấp, bật lại. Vẫn GIỮ fallback getPublicUrl() cho từng
-  // ảnh lỡ ký lỗi (bất kỳ lý do gì) — không bao giờ để <img> vỡ vì thiếu
-  // src, đã có đúng bài học từ lần lỗi thật trên production trước đó.
-  const IMAGE_URL_EXPIRY_SECONDS = 600;
-  const imagePaths = [...new Set(items.map((i) => i.image_url))];
-  const { data: signedUrlRows, error: signError } = imagePaths.length
-    ? await supabase.storage.from("design-images").createSignedUrls(imagePaths, IMAGE_URL_EXPIRY_SECONDS)
-    : { data: [] as { path: string | null; signedUrl: string | null; error: string | null }[], error: null };
-  if (signError) console.error("[thiet-ke] createSignedUrls failed:", signError);
-  const signedUrlByPath = new Map<string, string>();
-  for (const row of signedUrlRows ?? []) {
-    if (row.path && row.signedUrl) signedUrlByPath.set(row.path, row.signedUrl);
-    else console.error("[thiet-ke] createSignedUrls: 1 ảnh lỗi ký URL:", row.path, row.error);
-  }
+  // This bucket is already public. Stable URLs let ProtectedImage reuse the
+  // cached display WebP instead of generating a new cache key every ten minutes.
 
   return items.map((item) => {
     const category = item.category as DesignItemCategory;
     const profile = profileById.get(item.illustrator_id);
     const album = item.album_id ? albumById.get(item.album_id) : null;
-    const imageUrl =
-      signedUrlByPath.get(item.image_url) ??
-      supabase.storage.from("design-images").getPublicUrl(item.image_url).data.publicUrl;
+    const imageUrl = supabase.storage.from("design-images").getPublicUrl(item.image_url).data.publicUrl;
     return {
       id: item.id,
       title: item.title,

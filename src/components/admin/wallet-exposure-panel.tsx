@@ -34,7 +34,7 @@ export function WalletExposurePanel({ stats, search, page }: { stats: WalletExpo
         khoản rút đang xử lý dùng số VND đã ghi nhận khi tạo yêu cầu.
         Đây là kịch bản toàn bộ số dư được quy đổi, chưa áp dụng xác minh, mức rút tối thiểu hay hạn mức từng người;
         không phải số được phép rút ngay. Chưa bao gồm phí thanh toán và tiền đang giữ trong đơn commission chưa ghi có vào ví.
-        Số dư ngân hàng chưa được kết nối nên chưa xác định mức thiếu hụt dự trữ.
+        Xem phần tiền thực phía trên để so sánh với số dư đã xác nhận thủ công.
       </p>
       <form action="/admin#token-balances" className="my-4 flex flex-wrap gap-2">
         <label htmlFor="wallet-search" className="sr-only">Tìm người sở hữu token</label>

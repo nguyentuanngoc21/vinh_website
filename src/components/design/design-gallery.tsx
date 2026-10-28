@@ -202,7 +202,7 @@ export function DesignGallery({
                   onClick={() => setOpenId(p.id)}
                   className="group relative mb-[18px] block cursor-pointer break-inside-avoid overflow-hidden rounded-2xl bg-neutral-bg"
                 >
-                  <ProtectedImage src={p.imageUrl} alt={p.title} className="block w-full" loading="lazy" />
+                  <ProtectedImage src={p.imageUrl} displayWidth={320} alt={p.title} className="block w-full" loading="lazy" />
 
                   {showRank && (
                     <div className="absolute left-3 top-3 rounded-full bg-brand-gold px-2.5 py-1 text-[11px] font-bold tracking-[.5px] text-brand-navy">
