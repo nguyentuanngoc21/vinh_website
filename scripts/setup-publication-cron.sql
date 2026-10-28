@@ -10,6 +10,9 @@ create or replace function public.invoke_publication_worker()
 returns bigint language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_url text; v_secret text; v_request bigint;
 begin
+  if to_regprocedure('public.sync_background_cron_activity(text)') is not null then
+    if not public.sync_background_cron_activity('publication') then return null; end if;
+  end if;
   select decrypted_secret into v_url from vault.decrypted_secrets where name = 'publication_site_url';
   select decrypted_secret into v_secret from vault.decrypted_secrets where name = 'publication_cron_secret';
   if v_url is null or v_url !~ '^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$' then
@@ -44,6 +47,11 @@ end $$;
 
 -- The stable job name makes rerunning setup update the existing job.
 select cron.schedule('vinh-publish-scheduled', '* * * * *', 'select public.invoke_publication_worker();');
+do $$ begin
+  if to_regprocedure('public.sync_background_cron_activity(text)') is not null then
+    perform public.sync_background_cron_activity('publication');
+  end if;
+end $$;
 commit;
 
 select jobid, jobname, schedule, active from cron.job where jobname='vinh-publish-scheduled';

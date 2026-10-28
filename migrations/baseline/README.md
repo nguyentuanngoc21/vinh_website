@@ -39,6 +39,7 @@ Chạy lần lượt theo tên file trong SQL editor (hoặc `psql -f`), từng 
 | `14_age_ratings.sql` | Nhãn độ tuổi + cảnh báo nội dung cấp truyện, khoá nhãn bởi admin + `book_age_rating_events`, xác thực tuổi qua CCCD (`is_age_verified_adult`), policy SELECT `chapters` chặn truyện 18+ |
 | `15_chapter_content_access.sql` | Thu hồi SELECT cột `chapters.content` khỏi anon/authenticated (cấp lại các cột khác) — nội dung chương chỉ đọc qua server |
 | `17_community_events.sql` | Sự kiện cộng đồng `community_events`, RLS công khai và bucket ảnh bìa `event-banners` |
+| `20_background_cron_activity.sql` | Tạm ngừng cron khi hết việc và bật lại bằng trigger khi có lịch xuất bản/bản thảo mới; phụ thuộc hàng đợi ở file 19, hỗ trợ lịch xuất bản nếu đã cài migration 20261001 |
 | `99_seed_data.sql` | Seed danh mục: `task_templates`, `achievement_templates`, `streak_milestones`, `service_tag_options` |
 
 Mỗi file bắt đầu bằng header liệt kê: phạm vi, bảng/view/hàm/enum/bucket tạo trong file, cột

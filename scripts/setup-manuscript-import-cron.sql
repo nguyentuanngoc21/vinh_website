@@ -8,6 +8,9 @@ create or replace function public.invoke_manuscript_import_worker()
 returns bigint language plpgsql security definer set search_path=public,pg_temp as $$
 declare site text; secret text;
 begin
+  if to_regprocedure('public.sync_background_cron_activity(text)') is not null then
+    if not public.sync_background_cron_activity('manuscript') then return null; end if;
+  end if;
   if not exists(select 1 from public.manuscript_import_jobs
     where status in ('uploading','queued','processing') or expires_at<=now()) then return null; end if;
   select decrypted_secret into site from vault.decrypted_secrets where name='publication_site_url';
@@ -28,6 +31,11 @@ begin
   end if;
 end $$;
 select cron.schedule('vinh-manuscript-imports','* * * * *','select public.invoke_manuscript_import_worker();');
+do $$ begin
+  if to_regprocedure('public.sync_background_cron_activity(text)') is not null then
+    perform public.sync_background_cron_activity('manuscript');
+  end if;
+end $$;
 commit;
 -- One HTTP worker invocation per minute only while jobs/cleanup need work.
 -- Cron success means HTTP queued; check net._http_response or Vercel logs for outcome.
