@@ -147,7 +147,7 @@ export default async function SearchPage({
               {activeTab === "thiet-ke" && (
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
                   {design.map((d) => (
-                    <Link key={d.id} href="/thiet-ke" className="no-underline">
+                    <Link key={d.id} href={`/thiet-ke/${d.id}`} className="no-underline">
                       <div className="aspect-square overflow-hidden rounded-[10px] bg-neutral-bg">
                         <ProtectedImage src={d.imageUrl} alt={d.title} wrapperClassName="h-full w-full" className="h-full w-full object-cover" />
                       </div>

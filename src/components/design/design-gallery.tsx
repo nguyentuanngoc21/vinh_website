@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { HeartIcon, ShareNetworkIcon, ImageSquareIcon, ChatCircleIcon } from "@phosphor-icons/react/dist/ssr";
-import { shareOrCopy } from "@/lib/share";
+import { DesignShareModal } from "@/components/design/design-share-modal";
 import { ContentCommentsPanel } from "@/components/comments/content-comments-panel";
 import {
   DESIGN_CATEGORIES,
@@ -41,14 +41,17 @@ type LikeState = { liked: boolean; count: number };
 export function DesignGallery({
   items,
   activeAlbum,
+  detailItem,
 }: {
   items: GalleryDesignItem[];
+  detailItem?: GalleryDesignItem;
   /** /thiet-ke?album=<id> đang lọc — tên để hiện banner, xem thiet-ke/page.tsx. */
   activeAlbum?: { id: string; name: string } | null;
 }) {
   const [cat, setCat] = useState<CategoryFilter>("Tất cả");
   const [sort, setSort] = useState<DesignSortKey>("likes");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [shareItem, setShareItem] = useState<{ item: GalleryDesignItem; url: string } | null>(null);
+  const shareRecorded = useRef(false);
   const [commentsOpenId, setCommentsOpenId] = useState<string | null>(null);
   const [likeState, setLikeState] = useState<Record<string, LikeState>>(() =>
     Object.fromEntries(items.map((p) => [p.id, { liked: p.likedByViewer, count: p.likeCount }]))
@@ -73,8 +76,7 @@ export function DesignGallery({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, cat, sort, likeState, shareCounts]);
 
-  const open = openId != null ? (items.find((p) => p.id === openId) ?? null) : null;
-  const openRank = open ? list.findIndex((p) => p.id === open.id) + 1 : 0;
+  const open = detailItem;
 
   const toggleLike = async (id: string) => {
     if (likePending[id]) return;
@@ -103,203 +105,213 @@ export function DesignGallery({
     }
   };
 
-  const handleShare = async (item: GalleryDesignItem) => {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/thiet-ke?item=${item.id}` : "";
-    const result = await shareOrCopy({ title: item.title, text: `${item.title} — ${item.illustratorName}`, url });
-    if (result === "failed") return;
-    const res = await fetch(`/api/design/${item.id}/share`, { method: "POST" });
-    const data = await res.json().catch(() => null);
-    if (res.ok && data) setShareCounts((prev) => ({ ...prev, [item.id]: data.shareCount ?? prev[item.id] }));
+  const handleShare = (item: GalleryDesignItem) => {
+    shareRecorded.current = false;
+    setShareItem({ item, url: `${window.location.origin}/thiet-ke/${item.id}` });
+  };
+
+  const recordShare = async (id: string) => {
+    if (shareRecorded.current) return;
+    shareRecorded.current = true;
+    try {
+      const res = await fetch(`/api/design/${id}/share`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) setShareCounts((prev) => ({ ...prev, [id]: data.shareCount ?? prev[id] }));
+    } catch {
+      // A tracking failure must not interrupt copying or downloading.
+    }
   };
 
   return (
     <>
-      <section className="flex flex-wrap items-end justify-between gap-6 px-11 pt-9">
-        <div>
-          <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">
-            THƯ VIỆN THIẾT KẾ
-          </div>
-          <h1 className="mt-2 max-w-[620px] font-[family-name:var(--font-lora)] text-[34px] font-bold leading-[1.2] text-brand-ink">
-            Ảnh bìa và minh họa được cộng đồng yêu thích nhất
-          </h1>
-          <p className="mt-2.5 max-w-[560px] text-[14.5px] leading-[1.6] text-stone-dark">
-            Xếp theo lượt thích và lượt chia sẻ thật từ cộng đồng. Mọi tác
-            phẩm đều gắn dấu chìm của họa sĩ.
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2 rounded-full bg-neutral-bg p-[5px]">
-          {DESIGN_SORTS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setSort(s.key)}
-              style={{
-                background: s.key === sort ? "var(--color-surface)" : "transparent",
-                color: s.key === sort ? "var(--color-brand-ink)" : "var(--color-stone)",
-                boxShadow: s.key === sort ? "0 1px 4px rgba(0,0,0,.12)" : "none",
-              }}
-              className="cursor-pointer whitespace-nowrap rounded-full px-[18px] py-2.5 text-[13.5px] font-semibold transition-all"
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {activeAlbum && (
-        <div className="mx-11 mt-5 flex items-center justify-between gap-3 rounded-xl bg-surface-gold px-4 py-2.5 text-[13px] text-brand-ink">
-          <span>
-            Đang xem album <strong>{activeAlbum.name}</strong>
-          </span>
-          <Link href="/thiet-ke" className="whitespace-nowrap font-semibold text-brand-gold-dark no-underline">
-            Xem tất cả
-          </Link>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2.5 px-11 pb-1 pt-6">
-        {CATEGORY_FILTERS.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            onClick={() => setCat(c.key)}
-            className={`cursor-pointer rounded-full px-[18px] py-2.5 text-sm font-medium transition-colors ${
-              c.key === cat ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2.5 px-11 pt-2 text-[13px] font-medium text-stone">
-        <ImageSquareIcon color="var(--color-brand-gold-dark)" />
-        {list.length === 0
-          ? "Chưa có tác phẩm nào trong mục này"
-          : `${list.length} tác phẩm · xếp theo ${DESIGN_SORT_DESCRIPTIONS[sort]}`}
-      </div>
-
-      {list.length === 0 ? (
-        <div className="mx-11 my-8 rounded-2xl border border-dashed border-line px-8 py-14 text-center">
-          <p className="text-sm text-stone-dark">
-            Chưa có ai đăng thiết kế ở mục này. Là người đầu tiên?
-          </p>
-          <Link
-            href="/thiet-ke/new"
-            className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-navy no-underline"
-          >
-            Đăng thiết kế
-          </Link>
-        </div>
-      ) : (
-        <div className="px-11 pb-2 pt-[18px]">
-          <div style={{ columnWidth: 270, columnGap: 18 }}>
-            {list.map((p, i) => {
-              const showRank = i < 3 && sort !== "new";
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setOpenId(p.id)}
-                  className="group relative mb-[18px] block cursor-pointer break-inside-avoid overflow-hidden rounded-2xl bg-neutral-bg"
+      {!detailItem && (
+        <>
+          <section className="flex flex-wrap items-end justify-between gap-6 px-11 pt-9">
+            <div>
+              <div className="text-xs font-semibold tracking-[1.4px] text-brand-gold-dark">
+                THƯ VIỆN THIẾT KẾ
+              </div>
+              <h1 className="mt-2 max-w-[620px] font-[family-name:var(--font-lora)] text-[34px] font-bold leading-[1.2] text-brand-ink">
+                Ảnh bìa và minh họa được cộng đồng yêu thích nhất
+              </h1>
+              <p className="mt-2.5 max-w-[560px] text-[14.5px] leading-[1.6] text-stone-dark">
+                Xếp theo lượt thích và lượt chia sẻ thật từ cộng đồng. Mọi tác
+                phẩm đều gắn dấu chìm của họa sĩ.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2 rounded-full bg-neutral-bg p-[5px]">
+              {DESIGN_SORTS.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => setSort(s.key)}
+                  style={{
+                    background: s.key === sort ? "var(--color-surface)" : "transparent",
+                    color: s.key === sort ? "var(--color-brand-ink)" : "var(--color-stone)",
+                    boxShadow: s.key === sort ? "0 1px 4px rgba(0,0,0,.12)" : "none",
+                  }}
+                  className="cursor-pointer whitespace-nowrap rounded-full px-[18px] py-2.5 text-[13.5px] font-semibold transition-all"
                 >
-                  <ProtectedImage src={p.imageUrl} displayWidth={320} alt={p.title} className="block w-full" loading="lazy" />
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </section>
 
-                  {showRank && (
-                    <div className="absolute left-3 top-3 rounded-full bg-brand-gold px-2.5 py-1 text-[11px] font-bold tracking-[.5px] text-brand-navy">
-                      TOP {i + 1}
-                    </div>
-                  )}
+          {activeAlbum && (
+            <div className="mx-11 mt-5 flex items-center justify-between gap-3 rounded-xl bg-surface-gold px-4 py-2.5 text-[13px] text-brand-ink">
+              <span>
+                Đang xem album <strong>{activeAlbum.name}</strong>
+              </span>
+              <Link href="/thiet-ke" className="whitespace-nowrap font-semibold text-brand-gold-dark no-underline">
+                Xem tất cả
+              </Link>
+            </div>
+          )}
 
-                  <div className="absolute right-3 top-3 flex -translate-y-1.5 gap-2 opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleLike(p.id);
-                      }}
-                      style={likedByViewerOf(p.id) ? { background: "var(--color-brand-gold)" } : undefined}
-                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-surface/94 text-brand-ink transition-colors hover:bg-brand-gold"
-                    >
-                      <HeartIcon weight={likedByViewerOf(p.id) ? "fill" : "regular"} size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShare(p);
-                      }}
-                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-surface/94 text-brand-ink transition-colors hover:bg-brand-gold"
-                    >
-                      <ShareNetworkIcon size={16} />
-                    </button>
-                  </div>
-
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-brand-ink-dark/0 from-[38%] to-brand-ink-dark/86 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-
-                  <div className="absolute inset-x-0 bottom-0 p-4 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                    <div className="truncate text-[15px] font-semibold leading-[1.35]">
-                      {p.title}
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-[12.5px] font-medium text-[#dbe4e8]">
-                      <span className="flex min-w-0 items-center gap-[7px]">
-                        <span
-                          style={{ background: avatarColor(p.illustratorName) }}
-                          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                        >
-                          {p.illustratorName[0]}
-                        </span>
-                        <span className="truncate">{p.illustratorName}</span>
-                      </span>
-                      {p.albumName && (
-                        <Link
-                          href={`/thiet-ke?album=${p.albumId}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="truncate rounded-full bg-white/18 px-2 py-0.5 text-[11px] font-semibold text-white no-underline"
-                        >
-                          {p.albumName}
-                        </Link>
-                      )}
-                      <span className="flex shrink-0 gap-3">
-                        <span className="flex items-center gap-1">
-                          <HeartIcon weight="fill" color="var(--color-brand-gold-light)" />
-                          {formatCount(likeCountOf(p.id))}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <ShareNetworkIcon />
-                          {formatCount(shareCountOf(p.id))}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex flex-wrap gap-2.5 px-11 pb-1 pt-6">
+            {CATEGORY_FILTERS.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setCat(c.key)}
+                className={`cursor-pointer rounded-full px-[18px] py-2.5 text-sm font-medium transition-colors ${
+                  c.key === cat ? "bg-brand-navy text-white" : "bg-neutral-bg text-ink-soft"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
           </div>
-        </div>
+
+          <div className="flex items-center gap-2.5 px-11 pt-2 text-[13px] font-medium text-stone">
+            <ImageSquareIcon color="var(--color-brand-gold-dark)" />
+            {list.length === 0
+              ? "Chưa có tác phẩm nào trong mục này"
+              : `${list.length} tác phẩm · xếp theo ${DESIGN_SORT_DESCRIPTIONS[sort]}`}
+          </div>
+
+          {list.length === 0 ? (
+            <div className="mx-11 my-8 rounded-2xl border border-dashed border-line px-8 py-14 text-center">
+              <p className="text-sm text-stone-dark">
+                Chưa có ai đăng thiết kế ở mục này. Là người đầu tiên?
+              </p>
+              <Link
+                href="/thiet-ke/new"
+                className="mt-4 inline-block rounded-full bg-brand-gold px-6 py-2.5 text-sm font-semibold text-brand-navy no-underline"
+              >
+                Đăng thiết kế
+              </Link>
+            </div>
+          ) : (
+            <div className="px-11 pb-2 pt-[18px]">
+              <div style={{ columnWidth: 270, columnGap: 18 }}>
+                {list.map((p, i) => {
+                  const showRank = i < 3 && sort !== "new";
+                  return (
+                    <div
+                      key={p.id}
+                      className="group relative mb-[18px] block cursor-pointer break-inside-avoid overflow-hidden rounded-2xl bg-neutral-bg"
+                    >
+                      <Link href={`/thiet-ke/${p.id}`} aria-label={`Xem ${p.title}`} className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-2 focus-visible:outline-brand-gold" />
+                      <ProtectedImage src={p.imageUrl} displayWidth={320} alt={p.title} className="block w-full" loading="lazy" />
+
+                      {showRank && (
+                        <div className="absolute left-3 top-3 rounded-full bg-brand-gold px-2.5 py-1 text-[11px] font-bold tracking-[.5px] text-brand-navy">
+                          TOP {i + 1}
+                        </div>
+                      )}
+
+                      <div className="absolute right-3 top-3 z-20 flex -translate-y-1.5 gap-2 opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLike(p.id);
+                          }}
+                          style={likedByViewerOf(p.id) ? { background: "var(--color-brand-gold)" } : undefined}
+                          className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-surface/94 text-brand-ink transition-colors hover:bg-brand-gold"
+                        >
+                          <HeartIcon weight={likedByViewerOf(p.id) ? "fill" : "regular"} size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShare(p);
+                          }}
+                          className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-surface/94 text-brand-ink transition-colors hover:bg-brand-gold"
+                        >
+                          <ShareNetworkIcon size={16} />
+                        </button>
+                      </div>
+
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-brand-ink-dark/0 from-[38%] to-brand-ink-dark/86 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+
+                      <div className="absolute inset-x-0 bottom-0 p-4 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                        <div className="truncate text-[15px] font-semibold leading-[1.35]">
+                          {p.title}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-[12.5px] font-medium text-[#dbe4e8]">
+                          <span className="flex min-w-0 items-center gap-[7px]">
+                            <span
+                              style={{ background: avatarColor(p.illustratorName) }}
+                              className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                            >
+                              {p.illustratorName[0]}
+                            </span>
+                            <span className="truncate">{p.illustratorName}</span>
+                          </span>
+                          {p.albumName && (
+                            <Link
+                              href={`/thiet-ke?album=${p.albumId}`}
+                                            className="relative z-20 truncate rounded-full bg-white/18 px-2 py-0.5 text-[11px] font-semibold text-white no-underline"
+                            >
+                              {p.albumName}
+                            </Link>
+                          )}
+                          <span className="flex shrink-0 gap-3">
+                            <span className="flex items-center gap-1">
+                              <HeartIcon weight="fill" color="var(--color-brand-gold-light)" />
+                              {formatCount(likeCountOf(p.id))}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <ShareNetworkIcon />
+                              {formatCount(shareCountOf(p.id))}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </>
       )}
 
       {open && (
         <div
-          onClick={() => setOpenId(null)}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-ink-dark/62 p-10"
+          className="mx-auto max-w-[1100px] px-4 py-8 sm:px-8"
         >
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="grid w-full max-w-[960px] max-h-[90vh] overflow-y-auto rounded-[22px] bg-surface shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:grid-cols-[1.15fr_minmax(0,1fr)]"
+            className="grid w-full overflow-hidden rounded-[22px] border border-line bg-surface sm:grid-cols-[1.15fr_minmax(0,1fr)]"
           >
             <ProtectedImage
               src={open.imageUrl}
               alt={open.title}
               wrapperClassName="min-h-[220px] w-full sm:min-h-[460px]"
-              className="h-full min-h-[220px] w-full object-cover sm:min-h-[460px]"
+              className="h-full min-h-[220px] w-full object-contain sm:min-h-[460px]"
             />
             <div className="flex flex-col p-[34px] pb-[30px]">
               <div className="text-[11.5px] font-semibold tracking-[1.2px] text-brand-gold-dark">
                 {open.categoryLabel.toUpperCase()}
               </div>
-              <div className="mt-2.5 font-[family-name:var(--font-lora)] text-[26px] font-bold leading-[1.3] text-brand-ink">
+              <h1 className="mt-2.5 font-[family-name:var(--font-lora)] text-[26px] font-bold leading-[1.3] text-brand-ink">
                 {open.title}
-              </div>
+              </h1>
               {open.albumName && (
                 <Link
                   href={`/thiet-ke?album=${open.albumId}`}
@@ -321,7 +333,7 @@ export function DesignGallery({
                     {open.illustratorName}
                   </div>
                   <div className="text-[12.5px] text-stone">
-                    Họa sĩ · {open.illustratorWorkCount} tác phẩm
+                    Họa sĩ
                   </div>
                 </div>
                 <Link
@@ -344,17 +356,11 @@ export function DesignGallery({
                   </div>
                   <div className="text-[12.5px] text-stone">Chia sẻ</div>
                 </div>
-                {openRank > 0 && (
-                  <div>
-                    <div className="text-[22px] font-extrabold text-brand-ink">#{openRank}</div>
-                    <div className="text-[12.5px] text-stone">Hạng hiện tại</div>
-                  </div>
-                )}
               </div>
               {open.description && (
                 <p className="mt-[18px] text-sm leading-[1.65] text-stone-dark">{open.description}</p>
               )}
-              <div className="mt-auto flex items-center gap-2.5 pt-6">
+              <div className="mt-auto flex flex-wrap items-center gap-2.5 pt-6">
                 <button
                   type="button"
                   onClick={() => toggleLike(open.id)}
@@ -383,17 +389,21 @@ export function DesignGallery({
                   <ChatCircleIcon />
                   Bình luận
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setOpenId(null)}
-                  className="ml-auto cursor-pointer rounded-full border border-line px-[18px] py-3 text-sm font-semibold text-stone"
-                >
-                  Đóng
-                </button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {shareItem && (
+        <DesignShareModal
+          key={shareItem.item.id}
+          id={shareItem.item.id}
+          title={shareItem.item.title}
+          url={shareItem.url}
+          onClose={() => setShareItem(null)}
+          onShared={() => { void recordShare(shareItem.item.id); }}
+        />
       )}
 
       {commentsOpenId && (

@@ -91,13 +91,15 @@ export async function getDesignGallery(
   viewerId: string | null,
   // Lọc theo 1 album cụ thể — /thiet-ke?album=<id> (xem
   // src/app/thiet-ke/page.tsx). undefined/null = mọi album + không-album.
-  albumId?: string | null
+  albumId?: string | null,
+  itemId?: string
 ): Promise<GalleryDesignItem[]> {
   let query = supabase
     .from("public_design_items")
     .select("id, illustrator_id, title, image_url, category, description, share_count, created_at, album_id")
     .not("category", "is", null)
     .order("created_at", { ascending: false });
+  if (itemId) query = query.eq("id", itemId);
   if (albumId) query = query.eq("album_id", albumId);
   const { data: rows, error } = await query;
   if (error) {
