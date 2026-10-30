@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Lora } from "next/font/google";
 import Link from "next/link";
@@ -28,9 +29,10 @@ export const metadata: Metadata = {
 export default async function DesignPage({
   searchParams,
 }: {
-  searchParams: Promise<{ album?: string }>;
+  searchParams: Promise<{ album?: string; item?: string }>;
 }) {
-  const { album } = await searchParams;
+  const { album, item } = await searchParams;
+  if (item) redirect(`/thiet-ke/${encodeURIComponent(item)}`);
   const supabase = await createClient();
   // Album đang lọc không phụ thuộc viewer — chạy song song với chuỗi
   // viewer → gallery (gallery cần viewerId cho cờ đã thích).
