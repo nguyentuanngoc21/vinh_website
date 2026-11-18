@@ -17,7 +17,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("design_albums")
-    .select("id, name, art_style")
+    .select("id, name, art_style, description")
     .eq("illustrator_id", user.id)
     .order("updated_at", { ascending: false });
   if (error) {

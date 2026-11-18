@@ -10,7 +10,7 @@ export type DesignSearchResult = {
 };
 
 const SEARCH_LIMIT = 24;
-const DESIGN_SEARCH_COLUMNS = "id, title, category, illustrator_id, image_url, share_count";
+const DESIGN_SEARCH_COLUMNS = "id, title, category, illustrator_id, image_url, share_count, album_id";
 
 type DesignSearchRow = {
   id: string;
@@ -19,6 +19,7 @@ type DesignSearchRow = {
   illustrator_id: string;
   image_url: string;
   share_count: number;
+  album_id?: string | null;
 };
 
 /** Tìm ảnh Thiết kế theo tên hoặc tên hoạ sĩ — cùng cách với
@@ -49,9 +50,18 @@ export async function searchDesign(supabase: SupabaseClient<Database>, query: st
         .limit(SEARCH_LIMIT)
     : { data: [] as DesignSearchRow[] };
 
-  const merged = new Map<string, DesignSearchRow>();
-  for (const row of [...(byTitle.data ?? []), ...(byIllustrator.data ?? [])]) merged.set(row.id, row);
-  const rows = [...merged.values()].slice(0, SEARCH_LIMIT);
+  const seenAlbumIds = new Set<string>();
+  const rows: DesignSearchRow[] = [];
+  for (const row of [...(byTitle.data ?? []), ...(byIllustrator.data ?? [])]) {
+    if (row.album_id) {
+      if (seenAlbumIds.has(row.album_id)) continue;
+      seenAlbumIds.add(row.album_id);
+    }
+    if (!rows.some((r) => r.id === row.id)) {
+      rows.push(row);
+      if (rows.length >= SEARCH_LIMIT) break;
+    }
+  }
   if (rows.length === 0) return [];
 
   const nicknameIds = [...new Set(rows.map((r) => r.illustrator_id))];

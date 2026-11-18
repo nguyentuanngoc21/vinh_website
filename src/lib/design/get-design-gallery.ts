@@ -83,6 +83,7 @@ export type GalleryDesignItem = {
   // album là thực thể lâu dài, hiện luôn ở đây (không chỉ ở form đăng).
   albumId: string | null;
   albumName: string | null;
+  albumDescription: string | null;
   artStyleLabel: string | null;
 };
 
@@ -121,7 +122,7 @@ export async function getDesignGallery(
     supabase.from("author_public_profiles").select("id, nickname, avatar_url").in("id", illustratorIds),
     supabase.from("design_item_like_counts").select("design_item_id, like_count").in("design_item_id", itemIds),
     albumIds.length > 0
-      ? supabase.from("design_albums").select("id, name, art_style").in("id", albumIds)
+      ? supabase.from("design_albums").select("id, name, art_style, description").in("id", albumIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (profilesError) console.error("[thiet-ke] author_public_profiles query failed:", profilesError);
@@ -172,6 +173,7 @@ export async function getDesignGallery(
       createdAt: item.created_at,
       albumId: album?.id ?? null,
       albumName: album?.name ?? null,
+      albumDescription: album?.description ?? null,
       artStyleLabel: album ? ART_STYLE_LABEL[album.art_style] ?? null : null,
     };
   });

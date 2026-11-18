@@ -9,12 +9,23 @@ import {
   LinkSimpleIcon,
   CheckIcon,
   CopyIcon,
+  PencilSimpleIcon,
+  StackIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Field, Textarea, Select, Button, Alert, Checkbox } from "@/components/ui";
+import { Modal } from "@/components/ui/modal";
 import { DESIGN_CATEGORIES } from "@/lib/design/get-design-gallery";
+import { ART_STYLES, ART_STYLE_LABEL } from "@/lib/design/art-styles";
 import { useOrigin } from "@/lib/use-origin";
 import { DisplayImage } from "@/components/ui/display-image";
-import type { DesignItemCategory } from "@/lib/supabase/types";
+import type { ArtStyle, DesignItemCategory } from "@/lib/supabase/types";
+
+type MyAlbum = {
+  id: string;
+  name: string;
+  art_style: ArtStyle;
+  description: string | null;
+};
 
 type MyDesignItem = {
   id: string;
@@ -51,12 +62,89 @@ export function DesignManageGallery() {
   const [copied, setCopied] = useState(false);
   const [shareTokenPending, setShareTokenPending] = useState(false);
 
+  const [albums, setAlbums] = useState<MyAlbum[]>([]);
+  const [editingAlbum, setEditingAlbum] = useState<MyAlbum | null>(null);
+  const [albumDraft, setAlbumDraft] = useState<{ name: string; artStyle: ArtStyle; description: string }>({
+    name: "",
+    artStyle: "anime_manga",
+    description: "",
+  });
+  const [albumSaving, setAlbumSaving] = useState(false);
+  const [albumError, setAlbumError] = useState<string | null>(null);
+
+  const loadAlbums = () => {
+    fetch("/api/design/albums")
+      .then((res) => res.json())
+      .then((data) => setAlbums(data?.albums ?? []))
+      .catch(() => { });
+  };
+
   useEffect(() => {
     fetch("/api/design/mine")
       .then((res) => res.json())
       .then((data) => setItems(data?.items ?? []))
       .catch(() => setLoadError("Không tải được danh sách ảnh."));
+    loadAlbums();
   }, []);
+
+  const openEditAlbum = (album: MyAlbum) => {
+    setEditingAlbum(album);
+    setAlbumDraft({
+      name: album.name,
+      artStyle: album.art_style,
+      description: album.description ?? "",
+    });
+    setAlbumError(null);
+  };
+
+  const saveAlbumChanges = async () => {
+    if (!editingAlbum) return;
+    if (!albumDraft.name.trim()) {
+      setAlbumError("Tên album không được để trống.");
+      return;
+    }
+    setAlbumSaving(true);
+    setAlbumError(null);
+    try {
+      const res = await fetch(`/api/design/albums/${editingAlbum.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: albumDraft.name.trim(),
+          artStyle: albumDraft.artStyle,
+          description: albumDraft.description.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setAlbumError(data?.error || "Lưu album thất bại.");
+        setAlbumSaving(false);
+        return;
+      }
+      setAlbums((prev) =>
+        prev.map((a) =>
+          a.id === editingAlbum.id
+            ? {
+              ...a,
+              name: albumDraft.name.trim(),
+              art_style: albumDraft.artStyle,
+              description: albumDraft.description.trim() || null,
+            }
+            : a
+        )
+      );
+      setItems((prev) =>
+        prev
+          ? prev.map((it) => (it.albumId === editingAlbum.id ? { ...it, albumName: albumDraft.name.trim() } : it))
+          : prev
+      );
+      setEditingAlbum(null);
+    } catch {
+      setAlbumError("Lỗi kết nối khi lưu album.");
+    } finally {
+      setAlbumSaving(false);
+    }
+  };
 
   const toggleChecked = (id: string) => {
     setCheckedIds((prev) => {
@@ -107,7 +195,7 @@ export function DesignManageGallery() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const regenerateShareToken = async () => {
@@ -161,6 +249,58 @@ export function DesignManageGallery() {
 
   return (
     <div>
+      {/* Danh sách Album của tôi */}
+      {albums.length > 0 && (
+        <div className="mb-8 rounded-2xl border border-border-light bg-neutral-bg/60 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <StackIcon size={18} className="text-brand-gold-dark" />
+              <h2 className="text-[15px] font-bold text-brand-ink">
+                Album của tôi ({albums.length})
+              </h2>
+            </div>
+            <span className="text-xs text-stone">
+              Bấm &quot;Sửa&quot; để đổi tên, phong cách hoặc mô tả
+            </span>
+          </div>
+          <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {albums.map((a) => {
+              const count = items?.filter((it) => it.albumId === a.id).length ?? 0;
+              return (
+                <div
+                  key={a.id}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-border-light bg-surface p-3.5 shadow-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13.5px] font-bold text-brand-ink">
+                      {a.name}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-stone">
+                      <span className="rounded-full bg-cream-gold px-2 py-0.5 font-medium text-brand-gold-dark">
+                        {ART_STYLE_LABEL[a.art_style] ?? a.art_style}
+                      </span>
+                      <span>· {count} ảnh</span>
+                    </div>
+                    {a.description && (
+                      <p className="mt-1.5 line-clamp-2 text-[12px] text-stone-dark">
+                        {a.description}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openEditAlbum(a)}
+                    className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border-light px-2.5 py-1.5 text-[12px] font-semibold text-brand-ink transition-colors hover:border-brand-gold hover:bg-surface-gold"
+                  >
+                    <PencilSimpleIcon size={13} /> Sửa
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {checkedIds.size > 0 && (
         <Button
           type="button"
@@ -201,9 +341,8 @@ export function DesignManageGallery() {
               </button>
               <div className="mt-1 flex items-center gap-1.5 text-[11px] text-stone">
                 <span
-                  className={`rounded-full px-2 py-0.5 font-semibold ${
-                    item.published ? "bg-success-form-bg text-success-form" : "bg-cream-gold text-brand-gold-dark"
-                  }`}
+                  className={`rounded-full px-2 py-0.5 font-semibold ${item.published ? "bg-success-form-bg text-success-form" : "bg-cream-gold text-brand-gold-dark"
+                    }`}
                 >
                   {item.published ? "Đã công khai" : "Chưa công khai"}
                 </span>
@@ -245,9 +384,8 @@ export function DesignManageGallery() {
             <div className="flex min-w-0 flex-col gap-4 p-6">
               <div className="flex items-center justify-between gap-3">
                 <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    editing.published ? "bg-success-form-bg text-success-form" : "bg-cream-gold text-brand-gold-dark"
-                  }`}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${editing.published ? "bg-success-form-bg text-success-form" : "bg-cream-gold text-brand-gold-dark"
+                    }`}
                 >
                   {editing.published ? "Đã công khai" : "Chưa công khai"}
                 </span>
@@ -332,6 +470,85 @@ export function DesignManageGallery() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Chỉnh sửa Album */}
+      {editingAlbum && (
+        <Modal
+          open={Boolean(editingAlbum)}
+          onClose={() => setEditingAlbum(null)}
+          panelClassName="max-w-md p-6"
+        >
+          <div className="flex items-center justify-between border-b border-border-light pb-3">
+            <h3 className="text-base font-bold text-brand-ink">
+              Chỉnh sửa album
+            </h3>
+            <button
+              type="button"
+              onClick={() => setEditingAlbum(null)}
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-stone hover:bg-neutral-bg"
+            >
+              <XIcon size={16} />
+            </button>
+          </div>
+
+          {albumError && <Alert tone="error" className="mt-3">{albumError}</Alert>}
+
+          <div className="mt-4 flex flex-col gap-3.5">
+            <Field
+              label="Tên album"
+              value={albumDraft.name}
+              onChange={(e) => setAlbumDraft((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="Nhập tên album…"
+            />
+
+            <Select
+              label="Phong cách nghệ thuật"
+              value={albumDraft.artStyle}
+              onChange={(e) => setAlbumDraft((prev) => ({ ...prev, artStyle: e.target.value as ArtStyle }))}
+            >
+              {ART_STYLES.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+
+            <Textarea
+              label="Mô tả album (tùy chọn)"
+              value={albumDraft.description}
+              onChange={(e) => setAlbumDraft((prev) => ({ ...prev, description: e.target.value }))}
+              rows={3}
+              placeholder="Mô tả chung cho bộ sưu tập này…"
+            />
+
+            <p className="text-[11.5px] leading-[1.5] text-stone">
+              Tên, phong cách và mô tả mới sẽ được cập nhật đồng bộ cho tất cả các ảnh thuộc album này.
+            </p>
+
+            <div className="mt-2 flex justify-end gap-2.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onClick={() => setEditingAlbum(null)}
+                disabled={albumSaving}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                fullWidth={false}
+                onClick={saveAlbumChanges}
+                disabled={albumSaving}
+              >
+                {albumSaving ? "Đang lưu…" : "Lưu thay đổi"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

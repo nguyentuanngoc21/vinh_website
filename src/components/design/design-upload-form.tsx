@@ -20,7 +20,7 @@ import type { ArtStyle, DesignItemCategory } from "@/lib/supabase/types";
 
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 
-type ExistingAlbum = { id: string; name: string; art_style: ArtStyle };
+type ExistingAlbum = { id: string; name: string; art_style: ArtStyle; description?: string | null };
 
 // null trong khi ảnh còn đang upload (chưa có id thật, chưa gọi được
 // PATCH/share-token cho nó) — mirror "Pin drafts" trong ảnh mẫu Pinterest:
@@ -39,13 +39,6 @@ type DraftItem = {
   shareToken: string | null;
   shareTokenPending: boolean;
 };
-
-// Album chốt cho CẢ lượt đăng này ngay từ ảnh đầu tiên — tránh việc đổi
-// album/phong cách giữa chừng vô tình làm lệch style của những ảnh đã
-// đăng trước đó trong cùng lượt (xem resolveOrCreateAlbum,
-// src/lib/design/design-items-service.ts, KHÔNG tự đổi style của album có
-// sẵn khi chỉ đính thêm ảnh).
-type LockedAlbum = { mode: "none" } | { mode: "existing"; albumId: string; artStyle: ArtStyle } | { mode: "new"; albumName: string; artStyle: ArtStyle };
 
 function titleFromFilename(name: string): string {
   const base = name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
@@ -66,35 +59,91 @@ export function DesignUploadForm({ className }: { className?: string }) {
   const [publishing, setPublishing] = useState(false);
 
   const [albumName, setAlbumName] = useState("");
+  const [albumDescription, setAlbumDescription] = useState("");
   const [artStyle, setArtStyle] = useState<ArtStyle | "">("");
   const [existingAlbums, setExistingAlbums] = useState<ExistingAlbum[]>([]);
-  const lockedAlbumRef = useRef<LockedAlbum | null>(null);
-  const [albumLocked, setAlbumLocked] = useState(false);
+  const activeAlbumIdRef = useRef<string | null>(null);
+  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
+  const [albumSaveStatus, setAlbumSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
     fetch("/api/design/albums")
       .then((res) => res.json())
       .then((data) => setExistingAlbums(data?.albums ?? []))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const matchedAlbum = existingAlbums.find((a) => a.name.trim().toLowerCase() === albumName.trim().toLowerCase());
+
+  const patchAlbum = async (patch: { name?: string; artStyle?: ArtStyle | ""; description?: string }) => {
+    const albumId = activeAlbumIdRef.current;
+    if (!albumId) return;
+    setAlbumSaveStatus("saving");
+    try {
+      const res = await fetch(`/api/design/albums/${albumId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: patch.name !== undefined ? patch.name.trim() || undefined : undefined,
+          artStyle: patch.artStyle ? patch.artStyle : undefined,
+          description: patch.description !== undefined ? patch.description.trim() || null : undefined,
+        }),
+      });
+      if (res.ok) {
+        setAlbumSaveStatus("saved");
+        setTimeout(() => setAlbumSaveStatus("idle"), 2500);
+      } else {
+        setAlbumSaveStatus("error");
+      }
+    } catch {
+      setAlbumSaveStatus("error");
+    }
+  };
+
+  const handleAlbumNameChange = (val: string) => {
+    setAlbumName(val);
+    const found = existingAlbums.find((a) => a.name.trim().toLowerCase() === val.trim().toLowerCase());
+    if (found) {
+      setArtStyle(found.art_style);
+      if (found.description) setAlbumDescription(found.description);
+      activeAlbumIdRef.current = found.id;
+      setActiveAlbumId(found.id);
+    } else if (activeAlbumIdRef.current) {
+      patchAlbum({ name: val });
+    }
+  };
+
+  const handleArtStyleChange = (val: ArtStyle) => {
+    setArtStyle(val);
+    if (activeAlbumIdRef.current) {
+      patchAlbum({ artStyle: val });
+    }
+  };
+
+  const handleAlbumDescriptionChange = (val: string) => {
+    setAlbumDescription(val);
+    if (activeAlbumIdRef.current) {
+      patchAlbum({ description: val });
+    }
+  };
 
   const updateItem = (key: string, patch: Partial<DraftItem>) => {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
   };
 
-  const uploadOne = async (draft: DraftItem, file: File, locked: LockedAlbum) => {
+  const uploadOne = async (draft: DraftItem, file: File) => {
     const body = new FormData();
     body.set("image", file);
     body.set("title", draft.title);
     body.set("category", draft.category);
     body.set("description", draft.description);
     body.set("altText", draft.altText);
-    if (locked.mode === "existing") body.set("albumId", locked.albumId);
-    if (locked.mode === "new") {
-      body.set("albumName", locked.albumName);
-      body.set("artStyle", locked.artStyle);
+    if (activeAlbumIdRef.current) {
+      body.set("albumId", activeAlbumIdRef.current);
+    } else if (albumName.trim()) {
+      body.set("albumName", albumName.trim());
+      if (artStyle) body.set("artStyle", artStyle);
+      if (albumDescription.trim()) body.set("albumDescription", albumDescription.trim());
     }
 
     const res = await fetch("/api/design", { method: "POST", body });
@@ -103,14 +152,13 @@ export function DesignUploadForm({ className }: { className?: string }) {
       updateItem(draft.key, { uploading: false, error: (data && data.error) || "Đăng ảnh thất bại." });
       return;
     }
+    if (data?.albumId) {
+      activeAlbumIdRef.current = data.albumId;
+      setActiveAlbumId(data.albumId);
+    }
     updateItem(draft.key, { uploading: false, id: data.id, imageUrl: data.imageUrl });
 
-    // Bù 1 PATCH ngay bằng state MỚI NHẤT — nếu người dùng đã sửa
-    // title/description/category/altText trong lúc ảnh còn đang lưu (POST
-    // ở trên đã mang giá trị CŨ chụp lúc bấm chọn file, patchSelected() tự
-    // bỏ qua PATCH khi chưa có id thật), sửa đó chỉ nằm ở local state, chưa
-    // từng lên server — không bù thì mất, không lỗi, không cách nào phát
-    // hiện cho tới khi sửa lại field đó 1 lần nữa.
+    // Bù 1 PATCH ngay bằng state MỚI NHẤT
     setItems((prev) => {
       const latest = prev.find((it) => it.key === draft.key);
       if (latest) {
@@ -123,7 +171,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
             category: latest.category,
             altText: latest.altText,
           }),
-        }).catch(() => {});
+        }).catch(() => { });
       }
       return prev;
     });
@@ -134,21 +182,10 @@ export function DesignUploadForm({ className }: { className?: string }) {
     e.target.value = "";
     if (files.length === 0) return;
 
-    if (!lockedAlbumRef.current) {
-      const trimmed = albumName.trim();
-      let locked: LockedAlbum;
-      if (!trimmed) {
-        locked = { mode: "none" };
-      } else if (matchedAlbum) {
-        locked = { mode: "existing", albumId: matchedAlbum.id, artStyle: matchedAlbum.art_style };
-      } else if (artStyle) {
-        locked = { mode: "new", albumName: trimmed, artStyle };
-      } else {
-        setFormError("Vui lòng chọn phong cách nghệ thuật cho album mới trước khi thêm ảnh.");
-        return;
-      }
-      lockedAlbumRef.current = locked;
-      setAlbumLocked(true);
+    const trimmed = albumName.trim();
+    if (trimmed && !matchedAlbum && !activeAlbumIdRef.current && !artStyle) {
+      setFormError("Vui lòng chọn phong cách nghệ thuật cho album mới trước khi thêm ảnh.");
+      return;
     }
     setFormError(null);
 
@@ -180,7 +217,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
       setItems((prev) => [...prev, draft]);
       setSelectedKey((cur) => cur ?? key);
 
-      compressImageFile(file).then((compressed) => uploadOne(draft, compressed, lockedAlbumRef.current!));
+      compressImageFile(file).then((compressed) => uploadOne(draft, compressed));
     }
   };
 
@@ -194,7 +231,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const toggleChecked = (key: string) => {
@@ -220,7 +257,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [item.id] }),
-      }).catch(() => {});
+      }).catch(() => { });
     }
   };
 
@@ -232,7 +269,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
-      }).catch(() => {});
+      }).catch(() => { });
     }
     setItems((prev) => prev.filter((it) => !checkedKeys.has(it.key)));
     setSelectedKey((cur) => (cur && checkedKeys.has(cur) ? null : cur));
@@ -405,8 +442,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
             label="Tên album"
             list="design-album-names"
             value={albumName}
-            onChange={(e) => setAlbumName(e.target.value)}
-            disabled={albumLocked}
+            onChange={(e) => handleAlbumNameChange(e.target.value)}
             placeholder="Đặt tên album…"
           />
           <datalist id="design-album-names">
@@ -419,10 +455,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
             label="Phong cách nghệ thuật"
             wrapperClassName="mt-3.5"
             value={matchedAlbum ? matchedAlbum.art_style : artStyle}
-            onChange={(e) => setArtStyle(e.target.value as ArtStyle)}
-            disabled={albumLocked || Boolean(matchedAlbum)}
-            // Giữ kiểu "khoá" cũ (nền xám, chữ nhạt) khi album đã chốt/đã có phong cách
-            className="disabled:bg-neutral-bg disabled:text-stone"
+            onChange={(e) => handleArtStyleChange(e.target.value as ArtStyle)}
           >
             <option value="">— Chọn phong cách —</option>
             {ART_STYLES.map((s) => (
@@ -431,10 +464,32 @@ export function DesignUploadForm({ className }: { className?: string }) {
               </option>
             ))}
           </Select>
-          {albumLocked && (
-            <p className="mt-1.5 text-[11px] leading-[1.5] text-stone">
-              Album đã chốt cho lượt đăng này — đổi tên/phong cách qua trang album sau khi đăng xong.
-            </p>
+
+          <Textarea
+            label="Mô tả album (tùy chọn)"
+            wrapperClassName="mt-3.5"
+            value={albumDescription}
+            onChange={(e) => handleAlbumDescriptionChange(e.target.value)}
+            rows={2}
+            placeholder="Mô tả chung cho bộ sưu tập/album này…"
+          />
+
+          {items.length > 0 && albumName.trim() && (
+            <div className="mt-2 text-[11.5px]">
+              {albumSaveStatus === "saving" ? (
+                <span className="flex items-center gap-1 font-medium text-brand-gold-dark">
+                  <ArrowClockwiseIcon size={12} className="animate-spin" /> Đang cập nhật album…
+                </span>
+              ) : albumSaveStatus === "saved" ? (
+                <span className="flex items-center gap-1 font-medium text-success-form">
+                  <CheckIcon size={12} /> Đã cập nhật cho album
+                </span>
+              ) : (
+                <span className="text-stone">
+                  Thay đổi tên, phong cách và mô tả sẽ áp dụng cho tất cả {items.length} ảnh trong album này.
+                </span>
+              )}
+            </div>
           )}
 
           <div className="mt-5 border-t border-border-light pt-4">
@@ -470,9 +525,8 @@ export function DesignUploadForm({ className }: { className?: string }) {
                 <div
                   key={item.key}
                   onClick={() => setSelectedKey(item.key)}
-                  className={`relative flex cursor-pointer items-center gap-2.5 rounded-xl border p-2 transition-colors ${
-                    item.key === selectedKey ? "border-brand-gold bg-cream-card" : "border-border-light"
-                  }`}
+                  className={`relative flex cursor-pointer items-center gap-2.5 rounded-xl border p-2 transition-colors ${item.key === selectedKey ? "border-brand-gold bg-cream-card" : "border-border-light"
+                    }`}
                 >
                   <span onClick={(e) => e.stopPropagation()} className="shrink-0">
                     <Checkbox checked={checkedKeys.has(item.key)} onChange={() => toggleChecked(item.key)}>

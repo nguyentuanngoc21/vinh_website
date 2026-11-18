@@ -40,6 +40,7 @@ export async function POST(request: Request) {
   const category = String(form.get("category") ?? "");
   const albumId = form.get("albumId") ? String(form.get("albumId")) : null;
   const albumName = form.get("albumName") ? String(form.get("albumName")).trim() : null;
+  const albumDescription = form.get("albumDescription") ? String(form.get("albumDescription")).trim() : null;
   const artStyle = form.get("artStyle") ? String(form.get("artStyle")) : null;
   const file = form.get("image");
 
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     albumId,
     albumName: albumId ? null : albumName,
     artStyle: artStyle as ArtStyle | null,
+    albumDescription,
   });
   if (!albumResult.ok) {
     return NextResponse.json({ error: albumResult.error }, { status: albumResult.status });
@@ -78,5 +80,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ ok: true, id: result.id, imageUrl: result.imageUrl });
+  return NextResponse.json({ ok: true, id: result.id, imageUrl: result.imageUrl, albumId: albumResult.albumId });
 }

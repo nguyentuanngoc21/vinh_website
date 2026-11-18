@@ -148,8 +148,9 @@ export async function resolveOrCreateAlbum(params: {
   albumId: string | null;
   albumName: string | null;
   artStyle: ArtStyle | null;
+  albumDescription?: string | null;
 }): Promise<ResolveAlbumResult> {
-  const { supabase, userId, albumId, albumName, artStyle } = params;
+  const { supabase, userId, albumId, albumName, artStyle, albumDescription } = params;
 
   if (albumId) {
     const { data: existing } = await supabase
@@ -183,7 +184,12 @@ export async function resolveOrCreateAlbum(params: {
   }
   const { data: created, error: createError } = await supabase
     .from("design_albums")
-    .insert({ illustrator_id: userId, name: albumName, art_style: artStyle })
+    .insert({
+      illustrator_id: userId,
+      name: albumName,
+      art_style: artStyle,
+      description: albumDescription || null,
+    })
     .select("id")
     .single();
   if (createError || !created) {

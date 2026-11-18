@@ -1920,6 +1920,7 @@ export type Database = {
           illustrator_id: string;
           name: string;
           art_style: ArtStyle;
+          description: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -1928,6 +1929,7 @@ export type Database = {
           illustrator_id: string;
           name: string;
           art_style: ArtStyle;
+          description?: string | null;
           created_at?: string;
           updated_at?: string;
         };

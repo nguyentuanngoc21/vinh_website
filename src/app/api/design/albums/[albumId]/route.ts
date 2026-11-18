@@ -20,7 +20,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ al
   const { user } = auth;
 
   const body = await request.json().catch(() => null);
-  const patch: { name?: string; art_style?: ArtStyle; updated_at: string } = {
+  const patch: { name?: string; art_style?: ArtStyle; description?: string | null; updated_at: string } = {
     updated_at: new Date().toISOString(),
   };
   if (typeof body?.name === "string") {
@@ -35,7 +35,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ al
     }
     patch.art_style = body.artStyle as ArtStyle;
   }
-  if (!patch.name && !patch.art_style) {
+  if (typeof body?.description === "string") {
+    patch.description = body.description.trim() || null;
+  }
+  if (!patch.name && !patch.art_style && !("description" in patch)) {
     return NextResponse.json({ error: "Không có gì để sửa." }, { status: 400 });
   }
 

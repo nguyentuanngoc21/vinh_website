@@ -14,15 +14,26 @@ const getItem = cache(async (id: string) => {
   const viewerId = await getAuthedUserId();
   const [item] = await getDesignGallery(supabase, viewerId, null, id);
   if (!item) notFound();
-  return item;
+
+  let albumItems = [item];
+  if (item.albumId) {
+    const siblings = await getDesignGallery(supabase, viewerId, item.albumId);
+    if (siblings.length > 0) {
+      albumItems = siblings;
+    }
+  }
+
+  return { item, albumItems };
 });
 
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const item = await getItem((await params).id);
-  const title = `${item.title} — ${item.illustratorName} — Vịnh`;
-  const description = item.description || `Thiết kế của ${item.illustratorName} trên Vịnh.`;
+  const { item } = await getItem((await params).id);
+  const title = item.albumName
+    ? `${item.title} — ${item.albumName} — ${item.illustratorName} — Vịnh`
+    : `${item.title} — ${item.illustratorName} — Vịnh`;
+  const description = item.description || item.albumDescription || `Thiết kế của ${item.illustratorName} trên Vịnh.`;
   return {
     title,
     description,
@@ -32,16 +43,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function DesignDetailPage({ params }: Props) {
-  const item = await getItem((await params).id);
+  const { item, albumItems } = await getItem((await params).id);
   return (
     <div className="flex-1 bg-surface-muted">
       <div className="mx-auto max-w-[1280px] bg-surface">
         <SiteHeader searchPlaceholder="Tìm ảnh bìa…" searchType="thiet-ke" />
         <main>
-          <Link href="/thiet-ke" className="mx-4 mt-6 inline-block text-sm font-semibold text-brand-gold-dark sm:mx-8">
-            ← Thư viện thiết kế
-          </Link>
-          <DesignGallery key={item.id} items={[item]} detailItem={item} />
+          <div className="mx-4 mt-6 sm:mx-8">
+            <Link
+              href="/thiet-ke"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-gold-dark hover:underline"
+            >
+              ← Thư viện thiết kế
+            </Link>
+          </div>
+          <DesignGallery key={item.id} items={albumItems} detailItem={item} />
         </main>
       </div>
     </div>

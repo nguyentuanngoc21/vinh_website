@@ -140,6 +140,7 @@ create table public.design_albums (
   id uuid primary key default gen_random_uuid(),
   illustrator_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
+  description text,
   -- 10 giá trị lấy từ cột "Phong cách nghệ thuật" của mega-menu
   -- (nav-strip-links.tsx) — xem src/lib/design/art-styles.ts.
   art_style text not null,
