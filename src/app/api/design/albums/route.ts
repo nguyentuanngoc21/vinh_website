@@ -27,3 +27,20 @@ export async function GET() {
 
   return NextResponse.json({ albums: data ?? [] });
 }
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const auth = await requireSupabaseUser(supabase);
+  if ("response" in auth) return auth.response;
+  const body = await request.json().catch(() => null);
+  const { resolveOrCreateAlbum } = await import("@/lib/design/design-items-service");
+  const { ART_STYLES } = await import("@/lib/design/art-styles");
+  if (typeof body?.name !== "string" || !body.name.trim() || !ART_STYLES.some((s) => s.key === body.artStyle)) {
+    return NextResponse.json({ error: "Vui lòng nhập tên và chọn phong cách album." }, { status: 400 });
+  }
+  const result = await resolveOrCreateAlbum({ supabase, userId: auth.user.id, albumId: null,
+    albumName: body.name.trim(), artStyle: body.artStyle,
+    albumDescription: typeof body.description === "string" ? body.description.trim() : null });
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json({ albumId: result.albumId });
+}

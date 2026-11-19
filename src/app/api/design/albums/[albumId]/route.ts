@@ -35,8 +35,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ al
     }
     patch.art_style = body.artStyle as ArtStyle;
   }
-  if (typeof body?.description === "string") {
-    patch.description = body.description.trim() || null;
+  if (body?.description === null || typeof body?.description === "string") {
+    patch.description = body.description?.trim() || null;
   }
   if (!patch.name && !patch.art_style && !("description" in patch)) {
     return NextResponse.json({ error: "Không có gì để sửa." }, { status: 400 });

@@ -59,6 +59,29 @@ export function DesignManageGallery() {
   const [bulkDeletePending, setBulkDeletePending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<MyDesignItem | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const openEdit = (item: MyDesignItem) => {
+    if (item.albumId) {
+      const album = albums.find((a) => a.id === item.albumId);
+      if (album) { openEditAlbum(album); return; }
+    }
+    let draft = item;
+    try {
+      const stored = sessionStorage.getItem(`design-edit:${item.id}`);
+      if (stored) draft = { ...item, ...JSON.parse(stored), id: item.id };
+    } catch { /* Storage is optional. */ }
+    setEditDraft(draft);
+    setSaveError(null);
+    setEditingId(item.id);
+  };
+  const cancelEdit = () => {
+    if (saving) return;
+    if (editingId) { try { sessionStorage.removeItem(`design-edit:${editingId}`); } catch {} }
+    setEditingId(null);
+    setEditDraft(null);
+  };
   const [copied, setCopied] = useState(false);
   const [shareTokenPending, setShareTokenPending] = useState(false);
 
@@ -89,12 +112,24 @@ export function DesignManageGallery() {
 
   const openEditAlbum = (album: MyAlbum) => {
     setEditingAlbum(album);
-    setAlbumDraft({
-      name: album.name,
-      artStyle: album.art_style,
-      description: album.description ?? "",
-    });
+    let draft = { name: album.name, artStyle: album.art_style, description: album.description ?? "" };
+    try {
+      const stored = sessionStorage.getItem(`design-album-edit:${album.id}`);
+      if (stored) draft = { ...draft, ...JSON.parse(stored) };
+    } catch {}
+    setAlbumDraft(draft);
     setAlbumError(null);
+  };
+
+  const patchAlbumDraft = (patch: Partial<typeof albumDraft>) => {
+    const next = { ...albumDraft, ...patch };
+    setAlbumDraft(next);
+    try { sessionStorage.setItem(`design-album-edit:${editingAlbum?.id}`, JSON.stringify(next)); } catch {}
+  };
+  const closeAlbum = () => {
+    if (albumSaving) return;
+    try { sessionStorage.removeItem(`design-album-edit:${editingAlbum?.id}`); } catch {}
+    setEditingAlbum(null);
   };
 
   const saveAlbumChanges = async () => {
@@ -138,6 +173,7 @@ export function DesignManageGallery() {
           ? prev.map((it) => (it.albumId === editingAlbum.id ? { ...it, albumName: albumDraft.name.trim() } : it))
           : prev
       );
+      try { sessionStorage.removeItem(`design-album-edit:${editingAlbum.id}`); } catch {}
       setEditingAlbum(null);
     } catch {
       setAlbumError("Lỗi kết nối khi lưu album.");
@@ -190,12 +226,30 @@ export function DesignManageGallery() {
 
   const patchEditing = (patch: Partial<Pick<MyDesignItem, "title" | "description" | "category" | "altText">>) => {
     if (!editingId) return;
-    setItems((prev) => (prev ? prev.map((it) => (it.id === editingId ? { ...it, ...patch } : it)) : prev));
-    fetch(`/api/design/${editingId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    }).catch(() => { });
+    if (!editDraft || saving) return;
+    const next = { ...editDraft, ...patch };
+    setEditDraft(next);
+    try { sessionStorage.setItem(`design-edit:${editingId}`, JSON.stringify(next)); } catch {}
+  };
+
+  const saveEditing = async () => {
+    if (!editDraft || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const response = await fetch(`/api/design/${editDraft.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editDraft.title, description: editDraft.description ?? "",
+          category: editDraft.category, altText: editDraft.altText ?? "" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setItems((prev) => prev?.map((item) => item.id === editDraft.id ? editDraft : item) ?? prev);
+      try { sessionStorage.removeItem(`design-edit:${editDraft.id}`); } catch {}
+      setEditingId(null);
+      setEditDraft(null);
+    } catch (error) { setSaveError(error instanceof Error ? error.message : "L\u1ed7i k\u1ebft n\u1ed1i. Vui l\u00f2ng th\u1eed l\u1ea1i."); }
+    finally { setSaving(false); }
   };
 
   const regenerateShareToken = async () => {
@@ -206,6 +260,7 @@ export function DesignManageGallery() {
     setShareTokenPending(false);
     if (res.ok && data?.shareToken) {
       setItems((prev) => (prev ? prev.map((it) => (it.id === editingId ? { ...it, shareToken: data.shareToken } : it)) : prev));
+      setEditDraft((prev) => prev ? { ...prev, shareToken: data.shareToken } : prev);
     }
   };
 
@@ -219,7 +274,7 @@ export function DesignManageGallery() {
     }
   };
 
-  const editing = items?.find((it) => it.id === editingId) ?? null;
+  const editing = editingId ? editDraft : null;
 
   if (loadError) {
     return <Alert tone="error">{loadError}</Alert>;
@@ -325,19 +380,19 @@ export function DesignManageGallery() {
             </span>
             <button
               type="button"
-              onClick={() => setEditingId(item.id)}
+              onClick={() => openEdit(item)}
               className="block w-full cursor-pointer text-left"
               title="Sửa thông tin / lấy link chia sẻ"
             >
-              <DisplayImage src={item.imageUrl} displayWidth={320} alt={item.title} className="block h-40 w-full object-cover" />
+              <DisplayImage src={item.imageUrl} displayWidth={320} alt={item.albumName || item.title} className="block h-40 w-full object-cover" />
             </button>
             <div className="p-2.5">
               <button
                 type="button"
-                onClick={() => setEditingId(item.id)}
+                onClick={() => openEdit(item)}
                 className="block w-full cursor-pointer truncate text-left text-[12.5px] font-semibold text-ink hover:text-brand-gold-dark"
               >
-                {item.title}
+                {item.albumName || item.title}
               </button>
               <div className="mt-1 flex items-center gap-1.5 text-[11px] text-stone">
                 <span
@@ -351,7 +406,7 @@ export function DesignManageGallery() {
               <div className="mt-2 flex gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setEditingId(item.id)}
+                  onClick={() => openEdit(item)}
                   className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border-light py-1.5 text-[12px] font-semibold text-stone-dark transition-colors hover:border-brand-gold hover:bg-cream-card"
                 >
                   Sửa
@@ -373,7 +428,7 @@ export function DesignManageGallery() {
 
       {editing && (
         <div
-          onClick={() => setEditingId(null)}
+          onClick={cancelEdit}
           className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-ink-dark/62 p-4 sm:p-10"
         >
           <div
@@ -391,15 +446,21 @@ export function DesignManageGallery() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setEditingId(null)}
+                  onClick={cancelEdit}
                   className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone hover:bg-neutral-bg"
                 >
                   <XIcon size={16} />
                 </button>
               </div>
 
+              {saveError && <Alert tone="error">{saveError}</Alert>}
+              <div className="flex gap-2">
+                <Button type="button" onClick={saveEditing} disabled={saving}>{saving ? "\u0110ang l\u01b0u..." : "L\u01b0u"}</Button>
+                <Button type="button" variant="ghost" onClick={cancelEdit} disabled={saving}>{"H\u1ee7y"}</Button>
+              </div>
               <Field
                 label="Tên tác phẩm"
+                disabled={saving}
                 value={editing.title}
                 onChange={(e) => patchEditing({ title: e.target.value })}
                 placeholder="Nhập tên tác phẩm…"
@@ -407,6 +468,7 @@ export function DesignManageGallery() {
 
               <Textarea
                 label="Mô tả"
+                disabled={saving}
                 value={editing.description ?? ""}
                 onChange={(e) => patchEditing({ description: e.target.value })}
                 rows={3}
@@ -415,6 +477,7 @@ export function DesignManageGallery() {
 
               <Select
                 label="Loại sản phẩm"
+                disabled={saving}
                 value={editing.category ?? ""}
                 onChange={(e) => patchEditing({ category: e.target.value as DesignItemCategory })}
               >
@@ -427,6 +490,7 @@ export function DesignManageGallery() {
 
               <Field
                 label="Alt text"
+                disabled={saving}
                 value={editing.altText ?? ""}
                 onChange={(e) => patchEditing({ altText: e.target.value })}
                 placeholder="Mô tả ngắn cho người dùng máy đọc màn hình"
@@ -476,7 +540,7 @@ export function DesignManageGallery() {
       {editingAlbum && (
         <Modal
           open={Boolean(editingAlbum)}
-          onClose={() => setEditingAlbum(null)}
+          onClose={closeAlbum}
           panelClassName="max-w-md p-6"
         >
           <div className="flex items-center justify-between border-b border-border-light pb-3">
@@ -485,7 +549,7 @@ export function DesignManageGallery() {
             </h3>
             <button
               type="button"
-              onClick={() => setEditingAlbum(null)}
+              onClick={closeAlbum}
               className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-stone hover:bg-neutral-bg"
             >
               <XIcon size={16} />
@@ -497,15 +561,17 @@ export function DesignManageGallery() {
           <div className="mt-4 flex flex-col gap-3.5">
             <Field
               label="Tên album"
+              disabled={albumSaving}
               value={albumDraft.name}
-              onChange={(e) => setAlbumDraft((prev) => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => patchAlbumDraft({ name: e.target.value })}
               placeholder="Nhập tên album…"
             />
 
             <Select
               label="Phong cách nghệ thuật"
+              disabled={albumSaving}
               value={albumDraft.artStyle}
-              onChange={(e) => setAlbumDraft((prev) => ({ ...prev, artStyle: e.target.value as ArtStyle }))}
+              onChange={(e) => patchAlbumDraft({ artStyle: e.target.value as ArtStyle })}
             >
               {ART_STYLES.map((s) => (
                 <option key={s.key} value={s.key}>
@@ -516,8 +582,9 @@ export function DesignManageGallery() {
 
             <Textarea
               label="Mô tả album (tùy chọn)"
+              disabled={albumSaving}
               value={albumDraft.description}
-              onChange={(e) => setAlbumDraft((prev) => ({ ...prev, description: e.target.value }))}
+              onChange={(e) => patchAlbumDraft({ description: e.target.value })}
               rows={3}
               placeholder="Mô tả chung cho bộ sưu tập này…"
             />
@@ -532,7 +599,7 @@ export function DesignManageGallery() {
                 variant="ghost"
                 size="sm"
                 fullWidth={false}
-                onClick={() => setEditingAlbum(null)}
+                onClick={closeAlbum}
                 disabled={albumSaving}
               >
                 Hủy

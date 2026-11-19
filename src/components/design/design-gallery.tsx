@@ -93,26 +93,9 @@ export function DesignGallery({
   );
   const [likePending, setLikePending] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    setLikeState((prev) => {
-      const next = { ...prev };
-      for (const p of items) {
-        if (!next[p.id]) next[p.id] = { liked: p.likedByViewer, count: p.likeCount };
-      }
-      return next;
-    });
-    setShareCounts((prev) => {
-      const next = { ...prev };
-      for (const p of items) {
-        if (next[p.id] === undefined) next[p.id] = p.shareCount;
-      }
-      return next;
-    });
-  }, [items]);
-
-  const likeCountOf = (id: string) => likeState[id]?.count ?? 0;
-  const likedByViewerOf = (id: string) => likeState[id]?.liked ?? false;
-  const shareCountOf = (id: string) => shareCounts[id] ?? 0;
+  const likeCountOf = (id: string) => likeState[id]?.count ?? items.find((item) => item.id === id)?.likeCount ?? 0;
+  const likedByViewerOf = (id: string) => likeState[id]?.liked ?? items.find((item) => item.id === id)?.likedByViewer ?? false;
+  const shareCountOf = (id: string) => shareCounts[id] ?? items.find((item) => item.id === id)?.shareCount ?? 0;
 
   // History API: popstate closes the modal or updates current item
   useEffect(() => {
@@ -322,6 +305,31 @@ export function DesignGallery({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openItem, activeIndex, activeAlbumItems]);
 
+  // Touch swipe navigation for mobile
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+
+    if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      if (deltaX < 0 && activeIndex < activeAlbumItems.length - 1) {
+        goToIndex(activeIndex + 1);
+      } else if (deltaX > 0 && activeIndex > 0) {
+        goToIndex(activeIndex - 1);
+      }
+    }
+  };
+
   const toggleLike = async (id: string) => {
     if (likePending[id]) return;
     setLikePending((prev) => ({ ...prev, [id]: true }));
@@ -373,7 +381,11 @@ export function DesignGallery({
     return (
       <div className="grid w-full overflow-hidden rounded-[22px] border border-line bg-surface sm:grid-cols-[1.15fr_minmax(0,1fr)]">
         {/* Cột trái: Ảnh + Carousel controls + Pagination Dots */}
-        <div className="relative flex min-h-[280px] w-full flex-col items-center justify-center bg-black/5 dark:bg-black/30 sm:min-h-[500px]">
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="relative flex min-h-[280px] w-full select-none flex-col items-center justify-center bg-black/5 dark:bg-black/30 sm:min-h-[500px]"
+        >
           <ProtectedImage
             src={item.imageUrl}
             alt={item.title}
@@ -513,7 +525,7 @@ export function DesignGallery({
 
           {(item.description || item.albumDescription) && (
             <p className="mt-[18px] text-sm leading-[1.65] text-stone-dark">
-              {item.description || item.albumDescription}
+              {item.albumId ? item.albumDescription : item.description}
             </p>
           )}
 

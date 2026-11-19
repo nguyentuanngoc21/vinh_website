@@ -34,13 +34,9 @@ export default async function DesignPage({
   const { album, item } = await searchParams;
   if (item) redirect(`/thiet-ke/${encodeURIComponent(item)}`);
   const supabase = await createClient();
-  // Album đang lọc không phụ thuộc viewer — chạy song song với chuỗi
-  // viewer → gallery (gallery cần viewerId cho cờ đã thích).
-  const [{ viewerId, items }, activeAlbum] = await Promise.all([
-    getAuthedUserId().then(async (viewerId) => ({
-      viewerId,
-      items: await getDesignGallery(supabase, viewerId, album ?? null),
-    })),
+  const viewerIdPromise = getAuthedUserId();
+  const [items, activeAlbum, viewerId] = await Promise.all([
+    getDesignGallery(supabase, viewerIdPromise, album ?? null),
     album
       ? supabase
           .from("design_albums")
@@ -49,6 +45,7 @@ export default async function DesignPage({
           .maybeSingle()
           .then(({ data }) => data ?? null)
       : Promise.resolve(null),
+    viewerIdPromise,
   ]);
 
   return (

@@ -89,12 +89,13 @@ export type GalleryDesignItem = {
 
 export async function getDesignGallery(
   supabase: SupabaseClient<Database>,
-  viewerId: string | null,
+  viewerIdOrPromise?: string | null | Promise<string | null>,
   // Lọc theo 1 album cụ thể — /thiet-ke?album=<id> (xem
   // src/app/thiet-ke/page.tsx). undefined/null = mọi album + không-album.
   albumId?: string | null,
   itemId?: string
 ): Promise<GalleryDesignItem[]> {
+  const viewerIdPromise = Promise.resolve(viewerIdOrPromise);
   let query = supabase
     .from("public_design_items")
     .select("id, illustrator_id, title, image_url, category, description, share_count, created_at, album_id")
@@ -102,7 +103,7 @@ export async function getDesignGallery(
     .order("created_at", { ascending: false });
   if (itemId) query = query.eq("id", itemId);
   if (albumId) query = query.eq("album_id", albumId);
-  const { data: rows, error } = await query;
+  const [{ data: rows, error }, viewerId] = await Promise.all([query, viewerIdPromise]);
   if (error) {
     console.error("[thiet-ke] public_design_items query failed:", error);
   }
@@ -158,8 +159,8 @@ export async function getDesignGallery(
     const imageUrl = supabase.storage.from("design-images").getPublicUrl(item.image_url).data.publicUrl;
     return {
       id: item.id,
-      title: item.title,
-      description: item.description,
+      title: album ? album.name : item.title,
+      description: album ? album.description : item.description,
       category,
       categoryLabel: CATEGORY_LABEL[category] ?? "Khác",
       imageUrl,

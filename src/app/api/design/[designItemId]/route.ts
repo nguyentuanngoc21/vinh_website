@@ -46,6 +46,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
     }
     patch.category = body.category;
   }
+  if (typeof body.albumId === "string") {
+    const { data: album } = await supabase.from("design_albums").select("id")
+      .eq("id", body.albumId).eq("illustrator_id", auth.user.id).maybeSingle();
+    if (!album) return NextResponse.json({ error: "Không tìm thấy album." }, { status: 404 });
+    patch.album_id = album.id;
+  }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Không có gì để sửa." }, { status: 400 });
   }
@@ -54,6 +60,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
     .from("design_items")
     .update(patch)
     .eq("id", designItemId)
+    .eq("illustrator_id", auth.user.id)
     .select("id")
     .maybeSingle();
   if (error) {

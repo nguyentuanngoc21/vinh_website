@@ -22,9 +22,7 @@ const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 
 type ExistingAlbum = { id: string; name: string; art_style: ArtStyle; description?: string | null };
 
-// null trong khi ảnh còn đang upload (chưa có id thật, chưa gọi được
-// PATCH/share-token cho nó) — mirror "Pin drafts" trong ảnh mẫu Pinterest:
-// mỗi ảnh tự lưu ngay khi chọn, không đợi 1 nút "Đăng" tổng.
+// Images upload privately first; metadata is committed before publication.
 type DraftItem = {
   key: string; // ổn định qua re-render dù id còn null (dùng cho React key + chọn ảnh)
   id: string | null;
@@ -64,7 +62,39 @@ export function DesignUploadForm({ className }: { className?: string }) {
   const [existingAlbums, setExistingAlbums] = useState<ExistingAlbum[]>([]);
   const activeAlbumIdRef = useRef<string | null>(null);
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
-  const [albumSaveStatus, setAlbumSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  // Only completed uploads can be restored: object URLs do not survive reloads.
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const saved = sessionStorage.getItem("design-upload-draft");
+        if (saved) {
+          const draft = JSON.parse(saved);
+          setItems(draft.items ?? []);
+          setSelectedKey(draft.items?.[0]?.key ?? null);
+          setAlbumName(draft.albumName ?? "");
+          setAlbumDescription(draft.albumDescription ?? "");
+          setArtStyle(draft.artStyle ?? "");
+          activeAlbumIdRef.current = draft.albumId ?? null;
+          setActiveAlbumId(draft.albumId ?? null);
+        }
+      } catch { /* Storage is optional. */ }
+      setDraftLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    if (!draftLoaded) return;
+    try {
+      sessionStorage.setItem("design-upload-draft", JSON.stringify({
+        items: items.filter((item) => item.id && item.imageUrl).map((item) => ({ ...item, previewUrl: item.imageUrl })),
+        albumName, albumDescription, artStyle, albumId: activeAlbumId,
+      }));
+    } catch { /* Keep the in-memory draft if storage is unavailable. */ }
+  }, [draftLoaded, items, albumName, albumDescription, artStyle, activeAlbumId]);
 
   useEffect(() => {
     fetch("/api/design/albums")
@@ -75,57 +105,19 @@ export function DesignUploadForm({ className }: { className?: string }) {
 
   const matchedAlbum = existingAlbums.find((a) => a.name.trim().toLowerCase() === albumName.trim().toLowerCase());
 
-  const patchAlbum = async (patch: { name?: string; artStyle?: ArtStyle | ""; description?: string }) => {
-    const albumId = activeAlbumIdRef.current;
-    if (!albumId) return;
-    setAlbumSaveStatus("saving");
-    try {
-      const res = await fetch(`/api/design/albums/${albumId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: patch.name !== undefined ? patch.name.trim() || undefined : undefined,
-          artStyle: patch.artStyle ? patch.artStyle : undefined,
-          description: patch.description !== undefined ? patch.description.trim() || null : undefined,
-        }),
-      });
-      if (res.ok) {
-        setAlbumSaveStatus("saved");
-        setTimeout(() => setAlbumSaveStatus("idle"), 2500);
-      } else {
-        setAlbumSaveStatus("error");
-      }
-    } catch {
-      setAlbumSaveStatus("error");
-    }
-  };
-
   const handleAlbumNameChange = (val: string) => {
     setAlbumName(val);
     const found = existingAlbums.find((a) => a.name.trim().toLowerCase() === val.trim().toLowerCase());
     if (found) {
       setArtStyle(found.art_style);
-      if (found.description) setAlbumDescription(found.description);
+      setAlbumDescription(found.description ?? "");
       activeAlbumIdRef.current = found.id;
       setActiveAlbumId(found.id);
-    } else if (activeAlbumIdRef.current) {
-      patchAlbum({ name: val });
     }
   };
-
-  const handleArtStyleChange = (val: ArtStyle) => {
-    setArtStyle(val);
-    if (activeAlbumIdRef.current) {
-      patchAlbum({ artStyle: val });
-    }
-  };
-
-  const handleAlbumDescriptionChange = (val: string) => {
-    setAlbumDescription(val);
-    if (activeAlbumIdRef.current) {
-      patchAlbum({ description: val });
-    }
-  };
+  const handleArtStyleChange = (val: ArtStyle) => setArtStyle(val);
+  const handleAlbumDescriptionChange = (val: string) => setAlbumDescription(val);
+  const uploadQueue = useRef<Promise<void>>(Promise.resolve());
 
   const updateItem = (key: string, patch: Partial<DraftItem>) => {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
@@ -138,13 +130,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
     body.set("category", draft.category);
     body.set("description", draft.description);
     body.set("altText", draft.altText);
-    if (activeAlbumIdRef.current) {
-      body.set("albumId", activeAlbumIdRef.current);
-    } else if (albumName.trim()) {
-      body.set("albumName", albumName.trim());
-      if (artStyle) body.set("artStyle", artStyle);
-      if (albumDescription.trim()) body.set("albumDescription", albumDescription.trim());
-    }
+
 
     const res = await fetch("/api/design", { method: "POST", body });
     const data = await res.json().catch(() => null);
@@ -158,23 +144,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
     }
     updateItem(draft.key, { uploading: false, id: data.id, imageUrl: data.imageUrl });
 
-    // Bù 1 PATCH ngay bằng state MỚI NHẤT
-    setItems((prev) => {
-      const latest = prev.find((it) => it.key === draft.key);
-      if (latest) {
-        fetch(`/api/design/${data.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: latest.title,
-            description: latest.description,
-            category: latest.category,
-            altText: latest.altText,
-          }),
-        }).catch(() => { });
-      }
-      return prev;
-    });
+
   };
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,7 +187,10 @@ export function DesignUploadForm({ className }: { className?: string }) {
       setItems((prev) => [...prev, draft]);
       setSelectedKey((cur) => cur ?? key);
 
-      compressImageFile(file).then((compressed) => uploadOne(draft, compressed));
+      uploadQueue.current = uploadQueue.current.then(async () => {
+        try { await uploadOne(draft, await compressImageFile(file)); }
+        catch { updateItem(key, { uploading: false, error: "Tải ảnh thất bại. Vui lòng thử lại." }); }
+      });
     }
   };
 
@@ -226,12 +199,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
   const patchSelected = (patch: Partial<Pick<DraftItem, "title" | "description" | "category" | "altText">>) => {
     if (!selected) return;
     updateItem(selected.key, patch);
-    if (!selected.id) return; // chưa có id thật, chưa PATCH được — sẽ lưu khi upload xong
-    fetch(`/api/design/${selected.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    }).catch(() => { });
+
   };
 
   const toggleChecked = (key: string) => {
@@ -309,30 +277,65 @@ export function DesignUploadForm({ className }: { className?: string }) {
   // không ảnh sẽ mãi ở trạng thái draft không ai thấy được (kể cả chính
   // họa sĩ, ngoài trang quản lý riêng).
   const handleComplete = async () => {
+    if (activeAlbumIdRef.current && !albumName.trim()) {
+      setFormError("Vui l\u00f2ng nh\u1eadp t\u00ean album.");
+      return;
+    }
     const ids = items.filter((it) => it.id).map((it) => it.id as string);
     if (ids.length === 0) {
       router.push("/thiet-ke");
       router.refresh();
       return;
     }
+    if (publishing || hasUploading || items.some((it) => it.error)) return;
     setPublishing(true);
-    const res = await fetch("/api/design/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
+    setFormError(null);
+    try {
+      let albumId = activeAlbumIdRef.current;
+      if (albumName.trim()) {
+        if (!albumId) {
+          const response = await fetch("/api/design/albums", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: albumName.trim(), artStyle, description: albumDescription }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+          albumId = data.albumId;
+          activeAlbumIdRef.current = albumId;
+          setActiveAlbumId(albumId);
+        }
+        const response = await fetch(`/api/design/albums/${albumId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: albumName.trim(), artStyle, description: albumDescription }),
+        });
+        if (!response.ok) throw new Error("Không lưu được thông tin album.");
+      }
+      for (const item of items) {
+        const response = await fetch(`/api/design/${item.id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: albumName.trim() || item.title, description: albumName.trim() ? albumDescription : item.description,
+            category: item.category, altText: item.altText, albumId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+      }
+      const response = await fetch("/api/design/publish", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+    } catch (error) {
       setPublishing(false);
-      setFormError((data && data.error) || "Đăng thiết kế thất bại.");
+      setFormError(error instanceof Error ? error.message : "Lỗi kết nối. Vui lòng thử lại.");
       return;
     }
+    try { sessionStorage.removeItem("design-upload-draft"); } catch {}
     router.push("/thiet-ke");
     router.refresh();
   };
 
   return (
-    <div className={className}>
+    <fieldset disabled={publishing} className={className}>
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="hidden" />
 
       {formError && <Alert tone="error" className="mb-4">{formError}</Alert>}
@@ -363,14 +366,16 @@ export function DesignUploadForm({ className }: { className?: string }) {
             <div className="flex flex-col gap-4">
               <Field
                 label="Tên tác phẩm"
-                value={selected.title}
+                disabled={!!albumName.trim()}
+                value={albumName.trim() ? albumName : selected.title}
                 onChange={(e) => patchSelected({ title: e.target.value })}
                 placeholder="Nhập tên tác phẩm…"
               />
 
               <Textarea
                 label="Mô tả"
-                value={selected.description}
+                disabled={!!albumName.trim()}
+                value={albumName.trim() ? albumDescription : selected.description}
                 onChange={(e) => patchSelected({ description: e.target.value })}
                 rows={3}
                 placeholder="Chất liệu, cảm hứng, hoặc bối cảnh sáng tác…"
@@ -454,7 +459,7 @@ export function DesignUploadForm({ className }: { className?: string }) {
           <Select
             label="Phong cách nghệ thuật"
             wrapperClassName="mt-3.5"
-            value={matchedAlbum ? matchedAlbum.art_style : artStyle}
+            value={artStyle}
             onChange={(e) => handleArtStyleChange(e.target.value as ArtStyle)}
           >
             <option value="">— Chọn phong cách —</option>
@@ -476,19 +481,9 @@ export function DesignUploadForm({ className }: { className?: string }) {
 
           {items.length > 0 && albumName.trim() && (
             <div className="mt-2 text-[11.5px]">
-              {albumSaveStatus === "saving" ? (
-                <span className="flex items-center gap-1 font-medium text-brand-gold-dark">
-                  <ArrowClockwiseIcon size={12} className="animate-spin" /> Đang cập nhật album…
-                </span>
-              ) : albumSaveStatus === "saved" ? (
-                <span className="flex items-center gap-1 font-medium text-success-form">
-                  <CheckIcon size={12} /> Đã cập nhật cho album
-                </span>
-              ) : (
-                <span className="text-stone">
-                  Thay đổi tên, phong cách và mô tả sẽ áp dụng cho tất cả {items.length} ảnh trong album này.
-                </span>
-              )}
+              <span className="text-stone">
+                {"T\u00ean v\u00e0 m\u00f4 t\u1ea3 album s\u1ebd \u00e1p d\u1ee5ng cho t\u1ea5t c\u1ea3 \u1ea3nh khi b\u1ea5m Ho\u00e0n t\u1ea5t."}
+              </span>
             </div>
           )}
 
@@ -575,6 +570,6 @@ export function DesignUploadForm({ className }: { className?: string }) {
           {publishing ? "Đang đăng…" : "Hoàn tất"}
         </Button>
       </div>
-    </div>
+    </fieldset>
   );
 }

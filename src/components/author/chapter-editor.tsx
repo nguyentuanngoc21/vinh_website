@@ -654,7 +654,7 @@ export function ChapterEditor({
       className={
         focusMode
           ? "fixed inset-0 z-[80] flex flex-col overflow-hidden bg-surface-warm"
-          : "flex flex-col bg-surface-warm lg:overflow-hidden"
+          : "flex min-h-0 min-w-0 flex-col bg-surface-warm lg:overflow-hidden"
       }
     >
       {/*
@@ -663,7 +663,7 @@ export function ChapterEditor({
         Tầng 1: breadcrumb + actions (focus mode, trang rộng, xem trước, xem truyện).
         Tầng 2: toolbar buttons + tool panels + QuickInsertBar.
       */}
-      <div className={`z-10 flex flex-col border-b border-cream-border bg-surface-warm/95 shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] backdrop-blur-sm ${focusMode ? "relative" : "sticky top-0"}`}>
+      <div className={`z-10 flex shrink-0 flex-col border-b border-cream-border bg-surface-warm/95 shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] backdrop-blur-sm ${focusMode ? "relative" : "sticky top-0"}`}>
         {/* Tầng 1 — header */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 lg:px-7">
           <div className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-stone-alt">
@@ -954,7 +954,7 @@ export function ChapterEditor({
       )}
       </div>
       {/* Thanh trạng thái chân trang: số chữ, thời gian đọc, trạng thái lưu — luôn ở đáy khung soạn. */}
-      <div className={`z-10 flex min-h-8 items-center justify-end gap-x-3 border-t border-cream-border bg-surface-warm/95 px-4 py-1 text-[12px] text-stone-alt backdrop-blur-sm lg:px-7 ${focusMode ? "" : "sticky bottom-0"}`}>
+      <div className={`z-10 flex min-h-8 shrink-0 flex-wrap items-center justify-end gap-x-3 border-t border-cream-border bg-surface-warm/95 px-4 py-1 text-[12px] text-stone-alt backdrop-blur-sm lg:px-7 ${focusMode ? "" : "sticky bottom-0"}`}>
         <span className="tabular-nums">{words.toLocaleString("vi-VN")} chữ</span>
         <span aria-hidden="true">·</span>
         <span>~{readMin} phút đọc</span>
