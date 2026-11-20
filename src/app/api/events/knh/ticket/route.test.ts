@@ -1,21 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
-const mocks = vi.hoisted(() => ({ user: vi.fn(), profile: vi.fn(), event: vi.fn(), limit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ user: vi.fn(), profile: vi.fn(), event: vi.fn(), limit: vi.fn(), cookie: vi.fn(), eq: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: mocks.cookie }) }));
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({ auth: { getUser: mocks.user } }),
-  createServiceRoleClient: () => ({ from: (table: string) => ({ select: () => ({ eq: () => ({ maybeSingle: table === 'profiles' ? mocks.profile : mocks.event }) }) }) }),
+  createServiceRoleClient: () => ({ from: (table: string) => ({ select: () => ({ eq: (field: string, value: string) => { mocks.eq(table, field, value); return { maybeSingle: table === 'profiles' ? mocks.profile : mocks.event }; } }) }) }),
 }));
 vi.mock('@/lib/rate-limit', () => ({ consumeRateLimits: mocks.limit }));
 import { POST } from './route';
+import { encodeSession } from '@/lib/session';
 const eventId = '71000000-0000-4000-8000-000000000001';
 const userId = '71000000-0000-4000-8000-000000000002';
 const nonce = '71000000-0000-4000-8000-000000000003';
 const call = (extra: Record<string, unknown> = {}, origin = 'https://vinh.example') => POST(new Request('https://vinh.example/api/events/knh/ticket', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId, nonce, ...extra }) }));
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.cookie.mockReturnValue(undefined);
+  vi.stubEnv('SESSION_SECRET', 'test-only-vinh-session-secret-not-a-production-secret');
   vi.stubEnv('KNH_GAME_URL', 'https://game.example/play/'); vi.stubEnv('KNH_WEB_ORIGIN', 'https://vinh.example'); vi.stubEnv('KNH_GAME_TICKET_SECRET', 'test-secret-with-at-least-thirty-two-bytes');
   mocks.user.mockResolvedValue({ data: { user: { id: userId } }, error: null });
-  mocks.profile.mockResolvedValue({ data: { nickname: 'Tên', username: 'test', role: 'user' }, error: null });
+  mocks.profile.mockResolvedValue({ data: { id: userId, nickname: 'Tên', username: 'test', role: 'user' }, error: null });
   mocks.event.mockResolvedValue({ data: { status: 'published', hidden: false, games: [{ id: 'ky-nhan-hoi' }] }, error: null });
   mocks.limit.mockReturnValue({ ok: true });
 });
@@ -54,7 +58,43 @@ describe('Knh ticket issuer', () => {
     expect(claims).toMatchObject({iss:'https://vinh.example',aud:'https://game.example',sub:userId,eventId,nonce,role:'user',canHost:false,guest:false,gameId:'ky-nhan-hoi'});
     expect(claims.exp-claims.iat).toBe(60); expect(res.headers.get('Cache-Control')).toBe('private, no-store'); expect(res.headers.get('Vary')).toBe('Cookie');
   });
-  it('permits both admin roles to host', async () => { for (const role of ['admin','super_admin']) { mocks.profile.mockResolvedValue({data:{role,nickname:'Admin'},error:null}); const data = await (await call()).json(); expect(JSON.parse(Buffer.from(data.ticket.split('.')[1],'base64url').toString()).canHost).toBe(true); } });
+  it('permits both admin roles to host', async () => { for (const role of ['admin','super_admin']) { mocks.profile.mockResolvedValue({data:{id:userId,role,nickname:'Admin'},error:null}); const data = await (await call()).json(); expect(JSON.parse(Buffer.from(data.ticket.split('.')[1],'base64url').toString()).canHost).toBe(true); } });
   it('rate limits ticket creation before database reads', async () => { mocks.limit.mockReturnValue({ok:false,retryAfterSec:12}); const res = await call(); expect(res.status).toBe(429); expect(res.headers.get('Retry-After')).toBe('12'); expect(mocks.profile).not.toHaveBeenCalled(); });
   it('does not expose internal errors', async () => { mocks.event.mockRejectedValue(new Error('secret DB error')); const res = await call(); expect(res.status).toBe(503); expect(await res.text()).not.toContain('secret'); });
+  it('recognizes a signed Vịnh admin session even without a Supabase SSR login', async () => {
+    const cookie = await encodeSession({ email: 'admin@example.test', name: 'Old name', handle: 'vinh-admin', role: 'user' }, 3600);
+    mocks.cookie.mockReturnValue({ value: cookie });
+    mocks.user.mockResolvedValue({ data: { user: null }, error: { name: 'AuthSessionMissingError' } });
+    mocks.profile.mockResolvedValue({ data: { id: userId, nickname: 'Admin hiện tại', username: 'vinh-admin', role: 'admin' }, error: null });
+    const response = await call({ guest: true, role: 'user' });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    const claims = JSON.parse(Buffer.from(data.ticket.split('.')[1], 'base64url').toString());
+    expect(claims).toMatchObject({ sub: userId, guest: false, role: 'admin', canHost: true, name: 'Admin hiện tại' });
+    expect(mocks.eq).toHaveBeenCalledWith('profiles', 'username', 'vinh-admin');
+    expect(mocks.user).not.toHaveBeenCalled();
+  });
+  it('keeps a signed ordinary Vịnh user authenticated so solo play remains available', async () => {
+    mocks.cookie.mockReturnValue({ value: await encodeSession({ email: 'user@example.test', name: 'User', handle: 'vinh-user', role: 'user' }, 3600) });
+    const data = await (await call()).json();
+    expect(JSON.parse(Buffer.from(data.ticket.split('.')[1], 'base64url').toString())).toMatchObject({ guest: false, canHost: false, role: 'user', sub: userId });
+    expect(mocks.user).not.toHaveBeenCalled();
+  });
+  it('reads current profile role rather than trusting an old admin role in the signed cookie', async () => {
+    mocks.cookie.mockReturnValue({ value: await encodeSession({ email: 'user@example.test', name: 'User', handle: 'demoted-admin', role: 'admin' }, 3600) });
+    const data = await (await call()).json();
+    expect(JSON.parse(Buffer.from(data.ticket.split('.')[1], 'base64url').toString())).toMatchObject({ guest: false, role: 'user', canHost: false });
+  });
+  it('does not silently convert an invalid or expired signed session to Guest', async () => {
+    mocks.user.mockResolvedValue({ data: { user: null }, error: { name: 'AuthSessionMissingError' } });
+    for (const value of ['tampered.cookie', await encodeSession({ email: 'x@example.test', name: 'Expired', handle: 'expired', role: 'admin' }, -1)]) {
+      mocks.cookie.mockReturnValue({ value }); expect((await call()).status).toBe(401);
+    }
+  });
+  it('does not convert signed users to Guest when a profile cannot be verified', async () => {
+    mocks.cookie.mockReturnValue({ value: await encodeSession({ email: 'x@example.test', name: 'User', handle: 'missing', role: 'user' }, 3600) });
+    mocks.profile.mockResolvedValue({ data: null, error: null }); expect((await call()).status).toBe(403);
+    mocks.profile.mockResolvedValue({ data: null, error: { message: 'database secret' } }); expect((await call()).status).toBe(503);
+  });
+
 });
