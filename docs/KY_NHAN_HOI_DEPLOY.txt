@@ -1,0 +1,67 @@
+KỲ NHÂN HỘI — GUEST VÀ TÀI KHOẢN VỊNH
+
+Gói này là ứng dụng Node.js + Unity WebGL, không phải ZIP tĩnh để giải nén vào public_html.
+Không chứa secret, tài khoản production, node_modules, SQLite hoặc cấu hình môi trường thật.
+
+1. TẠO ỨNG DỤNG CPANEL
+- Tạo game.vinhcauchuyen.vn với document root riêng, bật SSL hợp lệ.
+- Node.js version: 24.22.3 (hoặc Node 24+).
+- Application mode: Production.
+- Application root: apps/game-event (ngoài public_html).
+- Application URL: game.vinhcauchuyen.vn, đường dẫn /.
+- Application startup file: app.cjs.
+- Upload và giải nén nội dung ZIP vào Application root; app.cjs phải nằm ngay tại root.
+- Chọn Run NPM Install (npm ci nếu dùng Terminal).
+
+2. BIẾN MÔI TRƯỜNG CHO ỨNG DỤNG GAME
+NODE_ENV=production
+DVKN_HUB_ORIGIN=https://game.vinhcauchuyen.vn
+VINH_WEB_ORIGIN=https://www.vinhcauchuyen.vn
+VINH_GAME_TICKET_SECRET=<secret riêng ngẫu nhiên, ít nhất 32 byte>
+DVKN_HUB_DATABASE=/home/<cpanel-user>/apps/game-event/data/hub.sqlite
+Không dùng secret Supabase hoặc secret Dino cũ. Không đưa secret vào NEXT_PUBLIC hoặc URL.
+Giữ database trên ổ bền vững; sao lưu cả SQLite bằng công cụ backup SQLite phù hợp.
+Không ghi đè/xóa data khi cập nhật source. Không chạy nhiều replica game.
+Khởi động lại ứng dụng rồi kiểm tra /health và /api/event/config.
+
+3. WEBSITE VỊNH
+Code D:/Vinh_update đã bổ sung game ky-nhan-hoi, iframe và POST /api/events/knh/ticket.
+Cấu hình tại môi trường deploy website Vịnh, không phải trong frontend:
+KNH_WEB_ORIGIN=https://www.vinhcauchuyen.vn
+KNH_GAME_URL=https://game.vinhcauchuyen.vn/play/
+KNH_GAME_TICKET_SECRET=<cùng secret VINH_GAME_TICKET_SECRET của game>
+Deploy bản website có các thay đổi này. Mục Dino Run cũ giữ nguyên.
+Game dùng tài khoản Vịnh; không yêu cầu thêm đăng nhập Google.
+
+4. CHỌN GAME TRONG ADMIN
+Vào /admin/su-kien, chọn “Kỳ Nhân Hội — 5 trò chơi” và Lưu trò chơi cho:
+55e48662-abc5-4b9d-99c3-ce27ac718536
+627c9700-752c-4662-981f-cd3148b44890
+Chỉ sự kiện công khai, không bị ẩn, đã chọn game mới được cấp vé.
+
+5. HÀNH VI PHIÊN
+- Không đăng nhập Vịnh: tự vào Guest; điểm/thẻ chỉ tồn tại trong iframe đang mở.
+- Tải lại, đóng/mở lại game hoặc “Người chơi tiếp theo”: Guest bắt đầu mới.
+- Guest không đọc/ghi localStorage/sessionStorage, PlayerPrefs hoặc archive kết quả Unity.
+- Server chỉ lưu mã vé đã sử dụng tới khi hết hạn, không lưu kết quả hoặc hồ sơ Guest.
+- Tài khoản Vịnh: lưu kết quả/thẻ theo tài khoản, dùng chung qua hai sự kiện; lượt nhận được liên kết eventId.
+- Hàng chờ offline chỉ của tài khoản, tách theo tài khoản/sự kiện. Chỉ kết quả đã đồng bộ mới hiện trên thiết bị khác.
+- Tài khoản có phiên game 3 giờ. Hết hạn: đóng và mở lại game để lấy phiên mới; hàng chờ còn riêng tài khoản.
+- Cache mã/texture/âm thanh được giữ; không cần xóa cache tải game khi đổi Guest.
+- Trong mục Kỳ Nhân Hội mới, Dino chơi đơn được hỗ trợ. Dino theo phòng dùng mục Dino Run đã có và service riêng; chưa bật phòng trong luồng vé Kỳ Nhân Hội.
+
+6. NGHIỆM THU SAU DEPLOY
+- Dùng cửa sổ riêng tư chưa đăng nhập: chơi, nhận thẻ, reload -> 0 tiến độ.
+- Bấm Người chơi tiếp theo -> về menu trống; đóng/mở popup cũng phải trống.
+- Đăng nhập Vịnh, chơi rồi chờ hết thông báo đồng bộ, reload -> kết quả còn.
+- Đổi tài khoản/đăng xuất -> không được thấy dữ liệu tài khoản trước.
+- Thử cả hai sự kiện và điện thoại thật.
+- Nếu iframe bị chặn: bảo đảm proxy/hosting không gắn X-Frame-Options SAMEORIGIN/DENY vào trang game.
+  Trang /play/ đã gửi CSP frame-ancestors cho đúng VINH_WEB_ORIGIN; CSP frame-src của Vịnh nếu có cũng phải cho origin game.
+- File .wasm được Node phục vụ application/wasm. Build không nén tệp, texture ETC2.
+- Ngân hàng câu hỏi Cổ Loa hiện là Draft để chơi thử; chưa phải dữ liệu được duyệt phát hành.
+
+KIỂM THỬ CỤC BỘ
+Backend/bridge, API vé Vịnh và Unity memory isolation có tests riêng.
+Browser smoke dùng Unity giả lập để kiểm tra giao thức/phiên; không thay thế nghiệm thu gameplay thật.
+Chưa triển khai production hoặc thay đổi cấu hình hosting trong phiên làm việc này.
