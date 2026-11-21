@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { SiteHeader } from "@/components/site-header";
 import { ConnectDirectory } from "@/components/connect/connect-directory";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 import { loadConnectDirectory } from "@/lib/connect/directory";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export const metadata: Metadata = {
   title: "Kết nối — Vịnh",

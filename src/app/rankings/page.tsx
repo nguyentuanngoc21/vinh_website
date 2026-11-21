@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { RankingsBoard } from "@/components/rankings/rankings-board";
 import { getCachedBookRankings } from "@/lib/cache/public-data";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export const metadata: Metadata = {
   title: "Bảng xếp hạng — Vịnh",

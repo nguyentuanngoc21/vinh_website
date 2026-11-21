@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { bookReferenceColumn } from "@/lib/story/book-reference";
 import Link from "next/link";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { cache } from "react";
@@ -27,11 +27,6 @@ import { Age16Confirm, Age18Notice, AgeRatingBadge, ContentWarningList } from "@
 import { RewardEngine } from "@/lib/quests/reward-engine";
 import { loadPinnedChapterComments } from "@/lib/reading/pinned-comments";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 // Query sách dùng chung cho generateMetadata và page — cache() dedupe
 // trong cùng 1 request nên chỉ chạy 1 lần. Trả row thô (kể cả chưa

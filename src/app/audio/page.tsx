@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { PersonalListeningProgress } from "@/components/audio-hub/personal-listening-progress";
@@ -8,11 +8,6 @@ import { NarratorsRow } from "@/components/audio-hub/narrators-row";
 import { getNarratorStats } from "@/lib/audio/get-audio-catalog";
 import { getCachedAudioCatalog } from "@/lib/cache/public-data";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export const metadata: Metadata = {
   title: "Audio — Vịnh",

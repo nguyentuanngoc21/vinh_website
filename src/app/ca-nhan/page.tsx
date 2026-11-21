@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { SiteHeader } from "@/components/site-header";
 import { ProfilePage } from "@/components/profile/profile-page";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export const metadata: Metadata = {
   title: "Trang cá nhân — Vịnh",

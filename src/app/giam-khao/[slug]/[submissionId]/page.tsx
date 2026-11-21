@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeftIcon, CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react/dist/ssr";
 import { SiteHeader } from "@/components/site-header";
@@ -11,7 +11,6 @@ import { getAuthedUserId } from "@/lib/wallet/session";
 import { ContestError } from "@/lib/contests/errors";
 import { getJudgeEntry, type JudgeEntryView } from "@/lib/contests/judging-service";
 
-const lora = Lora({ variable: "--font-lora", subsets: ["latin", "vietnamese"], weight: ["600"] });
 
 export const metadata: Metadata = { title: "Chấm bài — Vịnh", robots: { index: false } };
 

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import Link from "next/link";
 import { ImageSquareIcon } from "@phosphor-icons/react/dist/ssr";
 import { SiteHeader } from "@/components/site-header";
@@ -9,11 +9,6 @@ import { getDesignGallery } from "@/lib/design/get-design-gallery";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedUserId } from "@/lib/wallet/session";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export const metadata: Metadata = {
   title: "Thiết kế — Vịnh",

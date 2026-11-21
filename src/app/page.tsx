@@ -1,4 +1,4 @@
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { SiteHeader } from "@/components/site-header";
 import { ProductTour } from "@/components/onboarding/product-tour";
 import { BookCoverflow } from "@/components/book-coverflow";
@@ -12,11 +12,6 @@ import { AuthorCta } from "@/components/author-cta";
 import { SiteFooter } from "@/components/site-footer";
 import { getCachedHomepageData, getCachedTopAudioTrack } from "@/lib/cache/public-data";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export default async function Home() {
   const [{ featured, trending, newest, weeklyRanking }, spotlightTrack] = await Promise.all([

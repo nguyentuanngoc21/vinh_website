@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import Link from "next/link";
 import { FingerprintIcon, HeadphonesIcon, ChartLineUpIcon } from "@phosphor-icons/react/dist/ssr";
 import { ResetPasswordForm } from "@/components/reset-password/reset-password-form";
 import { LegalLink } from "@/components/legal/legal-link";
 import { VinhMark } from "@/components/ui";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["600"],
-});
 
 export const metadata: Metadata = {
   title: "Đặt lại mật khẩu — Vịnh",

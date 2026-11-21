@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import Link from "next/link";
 import {
   IdentificationCardIcon,
@@ -11,11 +11,6 @@ import { RegisterForm } from "@/components/register/register-form";
 import { LegalLink } from "@/components/legal/legal-link";
 import { VinhMark } from "@/components/ui";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["600"],
-});
 
 export const metadata: Metadata = {
   title: "Đăng ký — Vịnh",

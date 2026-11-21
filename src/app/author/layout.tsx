@@ -1,15 +1,9 @@
-import { Lora } from "next/font/google";
+import { loraWithItalic as lora } from "@/lib/fonts";
 import { redirect } from "next/navigation";
 import { WorksSidebar, type SidebarBook } from "@/components/author/works-sidebar";
 import { createClient } from "@/lib/supabase/server";
 import { resolveBookCoverUrls } from "@/lib/covers/resolve-book-cover";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
-});
 
 /**
  * Trước đây layout này chỉ render <WorksSidebar/> tĩnh (1 mảng hằng số,

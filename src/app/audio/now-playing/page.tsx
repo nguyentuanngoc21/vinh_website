@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { NowPlaying } from "@/components/audio/now-playing";
 import { AudioQueue } from "@/components/audio/audio-queue";
 import { getCachedAudioCatalog } from "@/lib/cache/public-data";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export const metadata: Metadata = {
   title: "Đang phát — Vịnh Audio",

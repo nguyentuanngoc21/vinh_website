@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { WaitlistLanding } from "@/components/waitlist/waitlist-landing";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "Vịnh Câu Chuyện — Sắp ra mắt",

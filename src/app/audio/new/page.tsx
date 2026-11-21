@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Lora } from "next/font/google";
+import { lora } from "@/lib/fonts";
 import { SiteHeader } from "@/components/site-header";
 import { AudioUploadForm } from "@/components/audio-hub/audio-upload-form";
 import { MyNarrationsList } from "@/components/audio-hub/my-narrations-list";
 import { createClient } from "@/lib/supabase/server";
 
-const lora = Lora({
-  variable: "--font-lora",
-  subsets: ["latin", "vietnamese"],
-  weight: ["700"],
-});
 
 export const metadata: Metadata = {
   title: "Đăng tải Audio — Vịnh",
