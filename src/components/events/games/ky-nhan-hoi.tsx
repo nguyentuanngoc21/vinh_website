@@ -9,8 +9,11 @@ export default function KyNhanHoi(props: EventGameProps) {
   return <GameFrame key={`${props.eventId}:${attempt}`} {...props} onRetry={() => setAttempt(value => value + 1)} />;
 }
 
-function GameFrame({ eventId, onClose, onRetry }: EventGameProps & { onRetry: () => void }) {
+function GameFrame({ eventId, active = true, onClose, onRetry }: EventGameProps & { onRetry: () => void }) {
   const iframe = useRef<HTMLIFrameElement>(null);
+  const visibility = useRef(active);
+  const notifyVisibility = useRef<(() => void) | null>(null);
+  useEffect(() => { visibility.current = active; notifyVisibility.current?.(); }, [active]);
   const close = useRef(onClose);
   useEffect(() => { close.current = onClose; }, [onClose]);
   const [gameUrl, setGameUrl] = useState<string | null>(null);
@@ -43,16 +46,20 @@ function GameFrame({ eventId, onClose, onRetry }: EventGameProps & { onRetry: ()
         } catch (e) { fail(e instanceof Error ? e.message : 'Không cấp được vé chơi.'); }
         finally { sending = false; }
       } else if (sent && event.data.nonce === nonce) {
-        if (event.data.type === 'vinh:knh:authenticated') { authenticated = true; clearTimeout(timer); setStatus(''); }
+        if (event.data.type === 'vinh:knh:authenticated') { authenticated = true; notifyVisibility.current?.(); clearTimeout(timer); setStatus(''); }
         else if (event.data.type === 'vinh:knh:close' && authenticated) close.current();
         else if (event.data.type === 'vinh:knh:error') fail('Dịch vụ game chưa xác thực được phiên chơi. Vui lòng thử lại.');
       }
+    };
+    notifyVisibility.current = () => {
+      if (bootstrap && authenticated) gameWindow?.postMessage({ type: 'vinh:knh:visibility', protocol: 1, nonce, visible: visibility.current }, bootstrap.gameOrigin);
     };
     window.addEventListener('message', receive);
     const timer = setTimeout(() => fail('Dịch vụ game chưa phản hồi. Vui lòng thử lại.'), 45_000);
     requestTicket().then(data => { if (!abort.signal.aborted) { bootstrap = data; setGameUrl(data.gameUrl); setStatus('Đang tải Kỳ Nhân Hội…'); } }).catch(e => fail(e instanceof Error ? e.message : 'Không mở được Kỳ Nhân Hội.'));
     return () => {
       if (bootstrap && authenticated) gameWindow?.postMessage({ type: 'vinh:knh:dispose', protocol: 1, nonce }, bootstrap.gameOrigin);
+      notifyVisibility.current = null;
       abort.abort(); clearTimeout(timer); window.removeEventListener('message', receive);
     };
   }, [eventId]);
