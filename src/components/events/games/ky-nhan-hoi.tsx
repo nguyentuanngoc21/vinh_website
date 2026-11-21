@@ -23,6 +23,23 @@ function GameFrame({ eventId, active = true, onClose, onRetry }: EventGameProps 
     const abort = new AbortController();
     let bootstrap: Bootstrap | null = null, sent = false, sending = false, authenticated = false;
     let gameWindow: Window | null = null;
+    type Direction = 'landscape' | 'portrait' | 'any';
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (direction: Direction) => Promise<void> };
+    let direction: Direction = 'any', orientationPending = false;
+    const wantedDirection = (): Direction => visibility.current && !abort.signal.aborted && !document.hidden
+      && matchMedia('(pointer: coarse)').matches ? direction : 'any';
+    const updateOrientation = () => {
+      const wanted = wantedDirection();
+      if (wanted === 'any') { try { orientation?.unlock?.(); } catch {} return; }
+      if (orientationPending || !orientation?.lock) return;
+      orientationPending = true;
+      void orientation.lock(wanted).catch(() => {}).finally(() => {
+        orientationPending = false;
+        if (wantedDirection() !== wanted) updateOrientation();
+      });
+    };
+    document.addEventListener('fullscreenchange', updateOrientation);
+    document.addEventListener('visibilitychange', updateOrientation);
     let nonce = crypto.randomUUID();
     const fail = (message: string) => { if (!abort.signal.aborted) { clearTimeout(timer); setFailed(true); setStatus(message); } };
     const requestTicket = async () => {
@@ -47,11 +64,15 @@ function GameFrame({ eventId, active = true, onClose, onRetry }: EventGameProps 
         finally { sending = false; }
       } else if (sent && event.data.nonce === nonce) {
         if (event.data.type === 'vinh:knh:authenticated') { authenticated = true; notifyVisibility.current?.(); clearTimeout(timer); setStatus(''); }
+        else if (event.data.type === 'vinh:knh:orientation' && authenticated && ['landscape', 'portrait', 'any'].includes(event.data.orientation)) {
+          direction = event.data.orientation; updateOrientation();
+        }
         else if (event.data.type === 'vinh:knh:close' && authenticated) close.current();
         else if (event.data.type === 'vinh:knh:error') fail('Dịch vụ game chưa xác thực được phiên chơi. Vui lòng thử lại.');
       }
     };
     notifyVisibility.current = () => {
+      updateOrientation();
       if (bootstrap && authenticated) gameWindow?.postMessage({ type: 'vinh:knh:visibility', protocol: 1, nonce, visible: visibility.current }, bootstrap.gameOrigin);
     };
     window.addEventListener('message', receive);
@@ -61,10 +82,13 @@ function GameFrame({ eventId, active = true, onClose, onRetry }: EventGameProps 
       if (bootstrap && authenticated) gameWindow?.postMessage({ type: 'vinh:knh:dispose', protocol: 1, nonce }, bootstrap.gameOrigin);
       notifyVisibility.current = null;
       abort.abort(); clearTimeout(timer); window.removeEventListener('message', receive);
+      updateOrientation();
+      document.removeEventListener('fullscreenchange', updateOrientation);
+      document.removeEventListener('visibilitychange', updateOrientation);
     };
   }, [eventId]);
   return <div className="relative h-full min-h-[320px] bg-[#142d29]">
-    {gameUrl && !failed && <iframe key={eventId} ref={iframe} src={gameUrl} title="Kỳ Nhân Hội" className="h-full w-full border-0" sandbox="allow-scripts allow-same-origin" allow="autoplay; fullscreen" referrerPolicy="no-referrer" />}
+    {gameUrl && !failed && <iframe key={eventId} ref={iframe} src={gameUrl} title="Kỳ Nhân Hội" className="h-full w-full border-0" sandbox="allow-scripts allow-same-origin allow-orientation-lock" allow="autoplay; fullscreen" referrerPolicy="no-referrer" />}
     {status && <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#142d29] p-6 text-center text-white" role="status" aria-live="polite"><p>{status}</p>{failed && <button type="button" className="rounded-xl bg-amber-200 px-5 py-3 font-semibold text-stone-900" onClick={onRetry}>Thử lại</button>}</div>}
   </div>;
 }
