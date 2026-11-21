@@ -9,12 +9,14 @@ export default function KyNhanHoi(props: EventGameProps) {
   return <GameFrame key={`${props.eventId}:${attempt}`} {...props} onRetry={() => setAttempt(value => value + 1)} />;
 }
 
-function GameFrame({ eventId, active = true, onClose, onRetry }: EventGameProps & { onRetry: () => void }) {
+function GameFrame({ eventId, active = true, onClose, onRetry, onCatalogChange }: EventGameProps & { onRetry: () => void }) {
   const iframe = useRef<HTMLIFrameElement>(null);
   const visibility = useRef(active);
   const notifyVisibility = useRef<(() => void) | null>(null);
   useEffect(() => { visibility.current = active; notifyVisibility.current?.(); }, [active]);
   const close = useRef(onClose);
+  const catalog = useRef(onCatalogChange);
+  useEffect(() => { catalog.current = onCatalogChange; }, [onCatalogChange]);
   useEffect(() => { close.current = onClose; }, [onClose]);
   const [gameUrl, setGameUrl] = useState<string | null>(null);
   const [status, setStatus] = useState('Đang chuẩn bị Kỳ Nhân Hội…');
@@ -63,7 +65,10 @@ function GameFrame({ eventId, active = true, onClose, onRetry }: EventGameProps 
         } catch (e) { fail(e instanceof Error ? e.message : 'Không cấp được vé chơi.'); }
         finally { sending = false; }
       } else if (sent && event.data.nonce === nonce) {
-        if (event.data.type === 'vinh:knh:authenticated') { authenticated = true; notifyVisibility.current?.(); clearTimeout(timer); setStatus(''); }
+        if (event.data.type === 'vinh:knh:view' && authenticated && typeof event.data.catalog === 'boolean') {
+          catalog.current?.(event.data.catalog);
+        }
+        else if (event.data.type === 'vinh:knh:authenticated') { authenticated = true; notifyVisibility.current?.(); clearTimeout(timer); setStatus(''); }
         else if (event.data.type === 'vinh:knh:orientation' && authenticated && ['landscape', 'portrait', 'any'].includes(event.data.orientation)) {
           direction = event.data.orientation; updateOrientation();
         }

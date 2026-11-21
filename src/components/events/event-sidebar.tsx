@@ -11,6 +11,10 @@ export function EventSidebar({ event }: { event: VinhEvent }) {
 function EventSidebarContent({ event }: { event: VinhEvent }) {
   const [selected, setSelected] = useState<EventGame | null>(null);
   const [opened, setOpened] = useState<{ eventId: string; game: EventGame }[]>([]);
+  const [catalogScreens, setCatalogScreens] = useState<Record<string, boolean>>({});
+  function updateCatalog(gameId: string, visible: boolean) {
+    setCatalogScreens(current => current[gameId] === visible ? current : { ...current, [gameId]: visible });
+  }
   const dialog = useRef<HTMLDialogElement>(null);
   const fullscreenShell = useRef<HTMLDivElement>(null);
   const trigger = useRef<Element | null>(null);
@@ -69,8 +73,8 @@ function EventSidebarContent({ event }: { event: VinhEvent }) {
       <dialog ref={dialog} aria-labelledby="event-game-title" onCancel={(e) => { e.preventDefault(); setSelected(null); }} onClick={(e) => { if (e.target === e.currentTarget) { const box = e.currentTarget.getBoundingClientRect(); if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) setSelected(null); } }} style={{ width: "100vw", height: "100dvh", maxWidth: "none", maxHeight: "none", margin: 0, padding: 0, border: 0 }} className="fixed inset-0 overflow-hidden bg-[#142d29] text-ink backdrop:bg-black">
         <div ref={fullscreenShell} data-event-game-screen style={{ width: "100%", height: "100%", position: "relative" }} className="bg-[#142d29]">
         <h2 id="event-game-title" className="sr-only">{selected?.title ?? "Game"}</h2>
-        <button type="button" aria-label="Thu nhỏ trò chơi về trang sự kiện" title="Thu nhỏ / Quay lại sự kiện" onClick={() => setSelected(null)} className="absolute left-[max(8px,env(safe-area-inset-left))] top-[max(8px,env(safe-area-inset-top))] z-50 flex min-h-11 items-center gap-2 rounded-lg border border-brand-gold bg-brand-navy px-3 py-2 text-sm font-bold text-white shadow-lg"><ArrowsInIcon size={20} /><span>Thu nhỏ</span></button>
-        <div className="h-full overflow-hidden">{opened.filter(item => item.eventId === event.slug).map(({ game }) => { const CachedGame = EVENT_GAME_COMPONENTS[game.id]; return CachedGame ? <div key={`${event.slug}:${game.id}`} hidden={selected?.id !== game.id} className="h-full"><CachedGame eventId={event.slug} active={selected?.id === game.id} onClose={() => setSelected(null)} /></div> : null; })}{selected && !Game ? <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center"><GameControllerIcon size={40} className="text-brand-gold-dark" /><h3 className="text-xl font-bold">Trò chơi chưa mở</h3><p className="max-w-md text-sm text-stone">Vịnh sẽ cập nhật trò chơi tại đây khi sẵn sàng.</p></div> : null}</div>
+        {selected && catalogScreens[selected.id] && <button type="button" aria-label="Thu nhỏ trò chơi về trang sự kiện" title="Thu nhỏ / Quay lại sự kiện" onClick={() => setSelected(null)} className="absolute left-[max(8px,env(safe-area-inset-left))] top-[max(8px,env(safe-area-inset-top))] z-50 flex min-h-11 items-center gap-2 rounded-lg border border-brand-gold bg-brand-navy px-3 py-2 text-sm font-bold text-white shadow-lg"><ArrowsInIcon size={20} /><span>Thu nhỏ</span></button>}
+        <div className="h-full overflow-hidden">{opened.filter(item => item.eventId === event.slug).map(({ game }) => { const CachedGame = EVENT_GAME_COMPONENTS[game.id]; return CachedGame ? <div key={`${event.slug}:${game.id}`} hidden={selected?.id !== game.id} className="h-full"><CachedGame eventId={event.slug} active={selected?.id === game.id} onCatalogChange={visible => updateCatalog(game.id, visible)} onClose={() => setSelected(null)} /></div> : null; })}{selected && !Game ? <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center"><GameControllerIcon size={40} className="text-brand-gold-dark" /><h3 className="text-xl font-bold">Trò chơi chưa mở</h3><p className="max-w-md text-sm text-stone">Vịnh sẽ cập nhật trò chơi tại đây khi sẵn sàng.</p></div> : null}</div>
         </div>
       </dialog>
     </>
